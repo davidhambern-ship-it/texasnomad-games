@@ -5,8 +5,20 @@ const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925
 
 export default function BFFGame() {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [htmlContent, setHtmlContent] = useState('');
+  const [loading, setLoading] = useState(true);
   const iframeRef = useRef(null);
   const containerRef = useRef(null);
+
+  useEffect(() => {
+    fetch(BFF_HTML_URL)
+      .then(r => r.text())
+      .then(html => {
+        setHtmlContent(html);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const handleFullscreen = () => {
     const el = containerRef.current;
@@ -29,7 +41,7 @@ export default function BFFGame() {
 
   const handleRestart = () => {
     if (iframeRef.current) {
-      iframeRef.current.src = BFF_HTML_URL;
+      iframeRef.current.srcdoc = htmlContent;
     }
   };
 
@@ -152,19 +164,28 @@ export default function BFFGame() {
         />
 
         {/* The iframe — fills all remaining space */}
-        <iframe
-          ref={iframeRef}
-          src={BFF_HTML_URL}
-          title="BFF — BIGO Family Feud Game Board"
-          className="flex-1 w-full border-0"
-          style={{
-            minHeight: 'calc(100vh - 3.5rem - 3px)',
-            background: '#080516',
-          }}
-          allow="microphone"
-          allowFullScreen
-          sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
-        />
+        {loading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="flex flex-col items-center gap-4">
+              <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
+              <span className="text-[#FFD700] font-bold tracking-widest text-sm uppercase">Loading Game Board…</span>
+            </div>
+          </div>
+        ) : (
+          <iframe
+            ref={iframeRef}
+            srcdoc={htmlContent}
+            title="BFF — BIGO Family Feud Game Board"
+            className="flex-1 w-full border-0"
+            style={{
+              minHeight: 'calc(100vh - 3.5rem - 3px)',
+              background: '#080516',
+            }}
+            allow="microphone"
+            allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
+          />
+        )}
       </div>
     </div>
   );
