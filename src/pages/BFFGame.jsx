@@ -149,6 +149,28 @@ function BFFViewer({ roomCode }) {
   // Sync game state into iframe whenever it changes
   useEffect(() => {
     if (!iframeReady || !gs) return;
+    
+    // First time: wait for board to fully init before sending anything
+    if (!prevGsRef.current || Object.keys(prevGsRef.current).length === 0) {
+      const timer = setTimeout(() => {
+        sendToBoard({ type: 'SET_FAMILIES', family1: gs.family1, family2: gs.family2 });
+        sendToBoard({ type: 'SET_SCORES', score1: gs.score1 || 0, score2: gs.score2 || 0 });
+        sendToBoard({ type: 'SET_ACTIVE_TURN', turn: gs.active_turn });
+        sendToBoard({ type: 'SET_BANK', value: gs.round_bank || 0 });
+        if (gs.current_question && gs.answers?.length > 0) {
+          sendToBoard({ type: 'LOAD_SURVEY', question: gs.current_question, answers: gs.answers });
+          // Re-reveal any already-revealed answers
+          setTimeout(() => {
+            gs.answers?.forEach((ans, i) => {
+              if (ans.revealed) sendToBoard({ type: 'REVEAL_ANSWER', index: i });
+            });
+          }, 600);
+        }
+        prevGsRef.current = JSON.parse(JSON.stringify(gs));
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+
     const prev = prevGsRef.current;
 
     // Family names
@@ -202,29 +224,6 @@ function BFFViewer({ roomCode }) {
 
     prevGsRef.current = JSON.parse(JSON.stringify(gs));
   }, [gs, iframeReady, sendToBoard]);
-
-  // On first ready, do a full sync
-  useEffect(() => {
-    if (!iframeReady || !gs?.current_question) return;
-    // Wait for board JS to finish initializing, then sync everything
-    const timer = setTimeout(() => {
-      sendToBoard({ type: 'SET_FAMILIES', family1: gs.family1, family2: gs.family2 });
-      sendToBoard({ type: 'SET_SCORES', score1: gs.score1 || 0, score2: gs.score2 || 0 });
-      sendToBoard({ type: 'SET_ACTIVE_TURN', turn: gs.active_turn });
-      sendToBoard({ type: 'SET_BANK', value: gs.round_bank || 0 });
-      if (gs.current_question && gs.answers?.length > 0) {
-        sendToBoard({ type: 'LOAD_SURVEY', question: gs.current_question, answers: gs.answers });
-        // After survey loads, re-reveal any already-revealed answers
-        setTimeout(() => {
-          gs.answers?.forEach((ans, i) => {
-            if (ans.revealed) sendToBoard({ type: 'REVEAL_ANSWER', index: i });
-          });
-        }, 800);
-      }
-      prevGsRef.current = JSON.parse(JSON.stringify(gs));
-    }, 1500); // longer delay: board JS needs to fully init before we push state
-    return () => clearTimeout(timer);
-  }, [iframeReady]); // eslint-disable-line
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
