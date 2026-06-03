@@ -38,13 +38,13 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             last_command: null,
           });
         } else {
-          throw new Error('Room ' + roomCode.toUpperCase() + ' not found. Ask the host for the correct code.');
+          // Viewer: room doesn't exist yet — show waiting state, poll will pick it up
+          setLoading(false);
+          return;
         }
 
-        // If host role, check if another host is already connected
-        if (role === 'host' && r.host_connected) {
-          throw new Error('Room ' + roomCode.toUpperCase() + ' already has a host connected.');
-        }
+        // If host role, check if another host is already connected (but allow reconnect)
+        // Removed hard block — just let host reconnect if needed
 
         // Mark connection
         const patch = role === 'host' ? { host_connected: true } : { screen_connected: true };
@@ -70,6 +70,13 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             const fresh = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
             if (fresh.length > 0) {
               const fr = fresh[0];
+              // If viewer just found the room for the first time, connect
+              if (!roomRef.current) {
+                const patched = await base44.entities.GameRoom.update(fr.id, { screen_connected: true });
+                roomRef.current = patched;
+                setRoom({ ...patched });
+                return;
+              }
               if (JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
                   fr.host_connected !== roomRef.current?.host_connected ||
                   fr.status !== roomRef.current?.status) {
