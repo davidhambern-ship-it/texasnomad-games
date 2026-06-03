@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
-const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/f87b881b3_BFF-GameBoard-v69-collapsible-control-panel.html';
+const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/c10ab0da8_BFF-GameBoard-v73-fuzzy-synonym-scan.html';
 
 export default function BFFGame() {
   const [isFullscreen, setIsFullscreen] = useState(false);
