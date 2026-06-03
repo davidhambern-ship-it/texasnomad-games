@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import HostPasswordGate from '@/components/host/HostPasswordGate';
 import HostGameSelect from '@/components/host/HostGameSelect';
-import HostRoomConnect from '@/components/host/HostRoomConnect';
 import HostConsole from '@/components/host/HostConsole';
 
 const HOST_PASSWORD = 'BERNA88@tx';
@@ -20,13 +19,16 @@ export default function HostPanel() {
     }
   };
 
-  const handleGameSelect = (game) => {
-    setSelectedGame(game);
-    setActiveRoom(null);
+  const generateRoomCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let code = 'TN';
+    for (let i = 0; i < 3; i++) code += chars[Math.floor(Math.random() * chars.length)];
+    return code;
   };
 
-  const handleRoomConnect = (roomCode) => {
-    setActiveRoom(roomCode);
+  const handleGameSelect = (game) => {
+    setSelectedGame(game);
+    setActiveRoom(generateRoomCode());
   };
 
   const handleDisconnect = () => {
@@ -76,9 +78,6 @@ export default function HostPanel() {
         )}
         {authenticated && !selectedGame && (
           <HostGameSelect onSelect={handleGameSelect} />
-        )}
-        {authenticated && selectedGame && !activeRoom && (
-          <HostRoomConnect game={selectedGame} onConnect={handleRoomConnect} onBack={() => setSelectedGame(null)} />
         )}
         {authenticated && selectedGame && activeRoom && (
           <HostConsole game={selectedGame} roomCode={activeRoom} onDisconnect={handleDisconnect} />
