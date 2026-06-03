@@ -53,11 +53,14 @@ function SquareBizViewer({ roomCode }) {
               </span>
             )}
           </div>
-          <button
-            onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
-            className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
-            {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
-          </button>
+          <div className="flex items-center gap-2">
+            <Link to="/" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <button
+              onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
+              className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
+              {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
+            </button>
+          </div>
         </div>
       </header>
 
