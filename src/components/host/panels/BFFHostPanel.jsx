@@ -52,7 +52,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       round: 1,
       current_survey_idx: 0,
       current_question: firstSurvey?.question || '',
-      answers: firstSurvey ? firstSurvey.answers.map(a => ({ ...a, revealed: false })) : [],
+      answers: firstSurvey ? firstSurvey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })) : [],
     });
   };
 
@@ -62,7 +62,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     await updateState({
       current_survey_idx: idx,
       current_question: survey.question,
-      answers: survey.answers.map(a => ({ ...a, revealed: false })),
+      answers: survey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })),
       round_bank: 0,
     });
   };
