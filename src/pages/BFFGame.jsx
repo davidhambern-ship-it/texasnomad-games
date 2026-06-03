@@ -153,7 +153,7 @@ function BFFViewer({ roomCode }) {
 }
 
 /* ── LEGACY IFRAME MODE (no room code) ── */
-const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/c10ab0da8_BFF-GameBoard-v73-fuzzy-synonym-scan.html';
+const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/768ce4a2e_BFF-GameBoard-v73-fuzzy-synonym-scan.html';
 
 function BFFIframe() {
   const [isFullscreen, setIsFullscreen] = useState(false);
