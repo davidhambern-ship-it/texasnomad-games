@@ -15,8 +15,9 @@ export default function HostPanel() {
   const handlePassword = (pw) => {
     if (pw === HOST_PASSWORD) {
       setAuthenticated(true);
+    } else {
+      return false;
     }
-    // If wrong, HostPasswordGate shows error automatically
   };
 
   const handleGameSelect = (game) => {

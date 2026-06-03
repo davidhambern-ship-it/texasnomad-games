@@ -7,10 +7,12 @@ export default function HostPasswordGate({ onSuccess }) {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSuccess(pw); // parent handles success/failure; we show error on wrong pw
-    setError(true);
-    setShake(true);
-    setTimeout(() => { setShake(false); setPw(''); }, 500);
+    const result = onSuccess(pw);
+    if (result === false) {
+      setError(true);
+      setShake(true);
+      setTimeout(() => { setShake(false); setPw(''); }, 500);
+    }
   };
 
   return (
