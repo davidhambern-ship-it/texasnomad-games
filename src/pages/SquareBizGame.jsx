@@ -44,6 +44,11 @@ function SquareBizViewer({ roomCode }) {
               <div className="w-2 h-2 rounded-full bg-[#ff2bd6] animate-pulse" />
               <span className="font-heading text-[10px] tracking-widest text-[#ff2bd6] uppercase">ROOM {roomCode}</span>
             </div>
+            {room?.host_connected && (
+              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 font-heading text-[9px] tracking-widest uppercase">
+                🔴 HOST LIVE
+              </span>
+            )}
           </div>
           <button
             onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}

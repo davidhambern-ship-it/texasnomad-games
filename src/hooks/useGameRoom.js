@@ -38,6 +38,11 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
           });
         }
 
+        // If host role, check if another host is already connected
+        if (role === 'host' && rooms.length > 0 && r.host_connected) {
+          throw new Error('Room ' + roomCode.toUpperCase() + ' already has a host connected. Disconnect the other host first.');
+        }
+
         // Mark connection
         const patch = role === 'host' ? { host_connected: true } : { screen_connected: true };
         r = await base44.entities.GameRoom.update(r.id, patch);
