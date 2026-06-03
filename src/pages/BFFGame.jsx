@@ -30,12 +30,12 @@ const BRIDGE_SCRIPT = `
       if (!cmd || !cmd.type) return;
 
       if (cmd.type === 'LOAD_SURVEY') {
-        // Override the current question with data from the host
-        if (cmd.question && cmd.answers) {
-          questions[currentQuestion] = {
-            question: cmd.question,
-            answers: cmd.answers.map(function(a) { return { answer: a.text, points: a.points }; })
-          };
+      // Override the current question with data from the host
+      if (cmd.question && cmd.answers) {
+        questions[currentQuestion] = {
+          question: cmd.question,
+          answers: cmd.answers.map(function(a) { return { answer: a.answer || a.text, points: a.points }; })
+        };
           setupRevealArray();
           byeStep = 0;
           deadRevealMode = false;

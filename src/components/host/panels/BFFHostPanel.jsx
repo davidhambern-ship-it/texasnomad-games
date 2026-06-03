@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
@@ -22,6 +22,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const [loadingSurveys, setLoadingSurveys] = useState(false);
   const [family1Input, setFamily1Input] = useState(gs.family1 || '');
   const [family2Input, setFamily2Input] = useState(gs.family2 || '');
+  const [answerInput, setAnswerInput] = useState('');
+  const [checkResult, setCheckResult] = useState(null); // { type: 'hit'|'miss'|'warn', message: string }
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
 
   const isSetup = gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
@@ -35,6 +39,51 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       .then(setSurveys)
       .finally(() => setLoadingSurveys(false));
   }, []);
+
+  // Normalize answer text for fuzzy matching
+  const normalize = (text) => String(text || '').toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  const checkAnswer = async (guess) => {
+    if (!guess.trim() || answers.length === 0) return;
+    const cleanGuess = normalize(guess);
+    const matchIdx = answers.findIndex((a) => {
+      const cleanAns = normalize(a.answer || a.text);
+      return cleanAns === cleanGuess ||
+        (cleanAns.length >= 4 && cleanGuess.includes(cleanAns)) ||
+        (cleanGuess.length >= 4 && cleanAns.includes(cleanGuess));
+    });
+
+    if (matchIdx === -1) {
+      setCheckResult({ type: 'miss', message: `"${guess}" — NOT on the board` });
+    } else if (answers[matchIdx].revealed) {
+      setCheckResult({ type: 'warn', message: `"${answers[matchIdx].answer || answers[matchIdx].text}" — already revealed` });
+    } else {
+      const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+      await updateState({ answers: newAnswers });
+      setCheckResult({ type: 'hit', message: `✓ "${answers[matchIdx].answer || answers[matchIdx].text}" — ${answers[matchIdx].points} pts!` });
+    }
+    setAnswerInput('');
+    setTimeout(() => setCheckResult(null), 3000);
+  };
+
+  const toggleVoice = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { setCheckResult({ type: 'warn', message: 'Voice needs Chrome/Edge' }); return; }
+    if (isListening) { recognitionRef.current?.stop(); return; }
+    const r = new SR();
+    r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 3;
+    r.onstart = () => setIsListening(true);
+    r.onend = () => setIsListening(false);
+    r.onerror = () => { setIsListening(false); setCheckResult({ type: 'warn', message: 'Voice error — try again' }); };
+    r.onresult = (e) => {
+      const transcript = e.results[0][0].transcript.trim();
+      setAnswerInput(transcript);
+      checkAnswer(transcript);
+    };
+    recognitionRef.current = r;
+    r.start();
+  };
 
   const startGame = async () => {
     if (!family1Input.trim() || !family2Input.trim()) return;
@@ -228,6 +277,43 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                   {i + 1}. {s.question}
                 </button>
               ))}
+            </div>
+          )}
+        </div>
+
+        {/* Answer Checker */}
+        <div className="p-4 border border-[#22d3ee]/30 rounded-xl bg-black/60 space-y-3">
+          <h3 className="font-heading text-xs tracking-[0.2em] text-[#22d3ee]/70 uppercase">Check Player Answer</h3>
+          <div className="flex gap-2">
+            <input
+              className="flex-1 px-4 py-3 rounded-lg bg-black/80 border-2 border-[#22d3ee]/30 text-white font-body text-base focus:border-[#22d3ee] focus:outline-none transition-colors"
+              value={answerInput}
+              onChange={(e) => setAnswerInput(e.target.value)}
+              placeholder="Type player's answer..."
+              onKeyDown={(e) => e.key === 'Enter' && checkAnswer(answerInput)}
+              autoComplete="off"
+            />
+            <button
+              onClick={toggleVoice}
+              className={`px-4 py-3 rounded-lg border-2 font-heading text-lg transition-all ${isListening ? 'border-red-500 text-red-400 bg-red-500/20' : 'border-[#22d3ee]/40 text-[#22d3ee]/70 hover:bg-[#22d3ee]/10'}`}
+              title={isListening ? 'Stop listening' : 'Speak answer'}
+            >
+              {isListening ? '🔴' : '🎙'}
+            </button>
+            <button
+              onClick={() => checkAnswer(answerInput)}
+              className="px-4 py-3 rounded-lg border-2 border-[#22d3ee] text-[#22d3ee] font-heading text-sm tracking-widest uppercase hover:bg-[#22d3ee]/20 transition-all"
+            >
+              CHECK
+            </button>
+          </div>
+          {checkResult && (
+            <div className={`px-4 py-2 rounded-lg font-heading text-sm tracking-wide ${
+              checkResult.type === 'hit' ? 'bg-green-500/20 text-green-400 border border-green-500/40' :
+              checkResult.type === 'miss' ? 'bg-red-500/20 text-red-400 border border-red-500/40' :
+              'bg-yellow-500/20 text-yellow-400 border border-yellow-500/40'
+            }`}>
+              {checkResult.message}
             </div>
           )}
         </div>
