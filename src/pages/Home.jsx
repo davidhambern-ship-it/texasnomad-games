@@ -57,9 +57,9 @@ function FeaturedGamesInline({ gameImages }) {
       </h3>
       <div className="grid grid-cols-3 gap-2">
         {[
-          { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD', path: '/games/bff' },
+            { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD', path: '/games/bff' },
           { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS', path: '/games/square-biz' },
-          { id: 'spades', title: 'SPADES', subtitle: 'TEXASNOMAD DECK', path: '/games/spades' },
+          { id: 'hangman', title: 'HANGMAN', subtitle: 'GUESS THE WORD', path: '/games/hangman' },
         ].map((game, i) => (
           <a
             key={game.id}

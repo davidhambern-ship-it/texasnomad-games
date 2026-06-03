@@ -9,6 +9,7 @@ import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import BFFGame from '@/pages/BFFGame';
 import SquareBizGame from '@/pages/SquareBizGame';
+import HangmanGame from '@/pages/HangmanGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -43,7 +44,7 @@ const AuthenticatedApp = () => {
       <Route path="/games" element={<PlaceholderPage />} />
       <Route path="/games/bff" element={<BFFGame />} />
       <Route path="/games/square-biz" element={<SquareBizGame />} />
-      <Route path="/games/spades" element={<GamePlaceholder />} />
+      <Route path="/games/hangman" element={<HangmanGame />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
       <Route path="/live-status" element={<PlaceholderPage />} />
       <Route path="/about" element={<PlaceholderPage />} />
