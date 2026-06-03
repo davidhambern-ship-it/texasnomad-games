@@ -67,24 +67,24 @@ function BFFViewer({ roomCode }) {
           <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+        <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4 w-full max-w-5xl mx-auto">
           {/* Scores */}
-          <div className="grid grid-cols-2 gap-8 w-full max-w-3xl">
+          <div className="grid grid-cols-2 gap-6 w-full">
             {[
               { name: gs.family1 || 'Family 1', score: gs.score1 || 0, turn: 1 },
               { name: gs.family2 || 'Family 2', score: gs.score2 || 0, turn: 2 },
             ].map((f) => (
-              <div key={f.turn} className="text-center p-6 border-2 rounded-2xl transition-all"
+              <div key={f.turn} className="text-center p-4 border-2 rounded-2xl transition-all"
                 style={{
                   borderColor: gs.active_turn === f.turn ? '#FFD700' : '#BC13FE30',
                   background: gs.active_turn === f.turn ? '#FFD70010' : '#00000060',
                   boxShadow: gs.active_turn === f.turn ? '0 0 40px rgba(255,215,0,0.2)' : 'none',
                 }}>
-                <div className="font-heading text-2xl md:text-4xl tracking-widest text-white uppercase">{f.name}</div>
-                <div className="font-heading text-6xl md:text-8xl text-[#FFD700] mt-2"
+                <div className="font-heading text-2xl md:text-3xl tracking-widest text-white uppercase truncate">{f.name}</div>
+                <div className="font-heading text-5xl md:text-7xl text-[#FFD700] mt-1"
                   style={{ textShadow: '0 0 30px rgba(255,215,0,0.5)' }}>{f.score}</div>
                 {gs.active_turn === f.turn && (
-                  <div className="mt-2 text-xs tracking-widest text-[#FFD700] font-heading uppercase">▶ ACTIVE TURN</div>
+                  <div className="mt-1 text-xs tracking-widest text-[#FFD700] font-heading uppercase">▶ ACTIVE TURN</div>
                 )}
               </div>
             ))}
@@ -92,24 +92,53 @@ function BFFViewer({ roomCode }) {
 
           {/* Round Bank */}
           {(gs.round_bank || 0) > 0 && (
-            <div className="px-8 py-3 border-2 border-[#FF5F1F] rounded-xl text-center"
+            <div className="px-8 py-2 border-2 border-[#FF5F1F] rounded-xl text-center"
               style={{ boxShadow: '0 0 20px rgba(255,95,31,0.3)' }}>
               <div className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/70 uppercase">Round Bank</div>
-              <div className="font-heading text-4xl text-[#FF5F1F]">{gs.round_bank}</div>
+              <div className="font-heading text-3xl text-[#FF5F1F]">{gs.round_bank}</div>
             </div>
           )}
 
           {/* Current Question */}
           {gs.current_question && (
-            <div className="w-full max-w-3xl p-6 border border-[#BC13FE]/40 rounded-2xl bg-black/60 text-center"
+            <div className="w-full p-4 border border-[#BC13FE]/40 rounded-2xl bg-black/60 text-center"
               style={{ boxShadow: '0 0 30px rgba(188,19,254,0.15)' }}>
-              <div className="font-heading text-xs tracking-[0.2em] text-[#BC13FE]/70 uppercase mb-2">Question</div>
-              <div className="font-heading text-2xl md:text-3xl text-white tracking-wide">{gs.current_question}</div>
+              <div className="font-heading text-xs tracking-[0.2em] text-[#BC13FE]/70 uppercase mb-1">Question</div>
+              <div className="font-heading text-2xl md:text-4xl text-white tracking-wide">{gs.current_question}</div>
             </div>
           )}
 
-          {/* Status when waiting */}
-          {gs.phase === 'setup' && !gs.current_question && (
+          {/* Answer Board */}
+          {gs.answers && gs.answers.length > 0 && (
+            <div className="w-full grid grid-cols-2 gap-3">
+              {gs.answers.map((ans, i) => (
+                <div key={i}
+                  className="flex items-center gap-3 px-5 py-3 border-2 rounded-xl transition-all"
+                  style={{
+                    borderColor: ans.revealed ? '#FFD700' : '#ffffff15',
+                    background: ans.revealed ? '#FFD70015' : '#00000080',
+                    boxShadow: ans.revealed ? '0 0 20px rgba(255,215,0,0.2)' : 'none',
+                  }}>
+                  <span className="font-heading text-2xl text-[#FFD700] w-8 text-center shrink-0">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    {ans.revealed ? (
+                      <>
+                        <div className="font-heading text-lg md:text-2xl text-white tracking-wide truncate">{ans.text}</div>
+                        {ans.points !== undefined && (
+                          <div className="font-heading text-sm text-[#FF5F1F]">{ans.points} pts</div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="font-heading text-2xl text-white/20 tracking-[0.4em]">▓▓▓▓▓▓▓</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Waiting state */}
+          {gs.phase === 'setup' && (
             <div className="text-center mt-2">
               <div className="font-heading text-lg tracking-widest text-white/30 uppercase">Host is setting up the game…</div>
             </div>

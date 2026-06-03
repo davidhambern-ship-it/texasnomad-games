@@ -41,30 +41,48 @@ const Toggle = ({ label, value, onChange }) => (
 
 export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const [answerInput, setAnswerInput] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pointsInput, setPointsInput] = useState('');
+  const [questionInput, setQuestionInput] = useState('');
 
   const isSetup = gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
+  const answers = gs.answers || [];
 
   const startGame = async () => {
     await updateState({ phase: 'playing', status: 'active' });
   };
 
-  const submitAnswer = async () => {
-    if (!answerInput.trim()) return;
-    setIsSubmitting(true);
-    await sendCommand({ type: 'SUBMIT_ANSWER', answer: answerInput.trim() });
-    setAnswerInput('');
-    setIsSubmitting(false);
+  const setQuestion = async () => {
+    if (!questionInput.trim()) return;
+    await updateState({ current_question: questionInput.trim(), answers: [] });
+    setQuestionInput('');
   };
 
-  const revealAnswer = async () => {
-    await sendCommand({ type: 'SPEAK_ANSWER' });
+  const addAnswer = async () => {
+    if (!answerInput.trim()) return;
+    const pts = parseInt(pointsInput) || 0;
+    const newAnswers = [...answers, { text: answerInput.trim(), points: pts, revealed: false }];
+    await updateState({ answers: newAnswers });
+    setAnswerInput('');
+    setPointsInput('');
+  };
+
+  const toggleReveal = async (idx) => {
+    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: !a.revealed } : a);
+    await updateState({ answers: newAnswers });
+  };
+
+  const removeAnswer = async (idx) => {
+    const newAnswers = answers.filter((_, i) => i !== idx);
+    await updateState({ answers: newAnswers });
+  };
+
+  const revealAll = async () => {
+    await updateState({ answers: answers.map(a => ({ ...a, revealed: true })) });
   };
 
   const clearNext = async () => {
-    await sendCommand({ type: 'CLEAR_NEXT' });
-    await updateState({ round_bank: 0 });
+    await updateState({ current_question: '', answers: [], round_bank: 0 });
   };
 
   const newGame = async () => {
@@ -175,22 +193,68 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
             <Toggle label="Dead Reveal" value={!!gs.dead_reveal} onChange={(v) => updateState({ dead_reveal: v })} />
           </div>
 
-          {/* Answer Controls */}
-          <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Answer Input</h3>
+          {/* Question Input */}
+          <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-3">
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Set Question</h3>
             <div className="flex gap-3">
               <input
-                className="flex-1 px-4 py-3 rounded-lg bg-black/80 border-2 border-[#BC13FE]/40 text-white font-body text-lg focus:border-[#BC13FE] focus:outline-none transition-colors"
+                className="flex-1 px-4 py-3 rounded-lg bg-black/80 border-2 border-[#FFD700]/40 text-white font-body text-base focus:border-[#FFD700] focus:outline-none transition-colors"
+                value={questionInput}
+                onChange={(e) => setQuestionInput(e.target.value)}
+                placeholder="Type question…"
+                onKeyDown={(e) => e.key === 'Enter' && setQuestion()}
+              />
+              <Btn onClick={setQuestion} color="#FFD700" size="md" disabled={!questionInput.trim()}>SET</Btn>
+            </div>
+            {gs.current_question && (
+              <div className="px-3 py-2 rounded bg-[#FFD700]/10 border border-[#FFD700]/30 font-heading text-sm text-[#FFD700] tracking-wide">
+                ★ {gs.current_question}
+              </div>
+            )}
+          </div>
+
+          {/* Answer Controls */}
+          <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Answers ({answers.length})</h3>
+              {answers.length > 0 && <Btn onClick={revealAll} color="#4ade80" size="sm">Reveal All</Btn>}
+            </div>
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-3 py-2 rounded-lg bg-black/80 border-2 border-[#BC13FE]/40 text-white font-body text-base focus:border-[#BC13FE] focus:outline-none transition-colors"
                 value={answerInput}
                 onChange={(e) => setAnswerInput(e.target.value)}
-                placeholder="Type answer…"
-                onKeyDown={(e) => e.key === 'Enter' && submitAnswer()}
+                placeholder="Answer text…"
+                onKeyDown={(e) => e.key === 'Enter' && addAnswer()}
               />
-              <Btn onClick={revealAnswer} color="#BC13FE" size="md">Speak</Btn>
+              <input
+                className="w-20 px-3 py-2 rounded-lg bg-black/80 border-2 border-[#FF5F1F]/40 text-white font-body text-base focus:border-[#FF5F1F] focus:outline-none transition-colors text-center"
+                value={pointsInput}
+                onChange={(e) => setPointsInput(e.target.value)}
+                placeholder="Pts"
+                type="number"
+              />
+              <Btn onClick={addAnswer} color="#4ade80" size="sm" disabled={!answerInput.trim()}>ADD</Btn>
             </div>
-            <Btn onClick={submitAnswer} color="#4ade80" size="md" className="w-full" disabled={isSubmitting || !answerInput.trim()}>
-              SUBMIT ANSWER
-            </Btn>
+            {/* Answer list */}
+            {answers.length > 0 && (
+              <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                {answers.map((ans, i) => (
+                  <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all"
+                    style={{ borderColor: ans.revealed ? '#FFD700' : '#ffffff15', background: ans.revealed ? '#FFD70010' : '#00000060' }}>
+                    <span className="font-heading text-sm text-[#FFD700] w-5 shrink-0">{i + 1}</span>
+                    <span className="font-heading text-sm text-white flex-1 truncate">{ans.text}</span>
+                    {ans.points > 0 && <span className="font-heading text-xs text-[#FF5F1F]">{ans.points}pts</span>}
+                    <button onClick={() => toggleReveal(i)}
+                      className="px-2 py-1 rounded border font-heading text-[10px] tracking-widest uppercase transition-all"
+                      style={{ borderColor: ans.revealed ? '#FFD700' : '#ffffff30', color: ans.revealed ? '#FFD700' : '#ffffff60' }}>
+                      {ans.revealed ? 'HIDE' : 'SHOW'}
+                    </button>
+                    <button onClick={() => removeAnswer(i)} className="text-red-400/60 hover:text-red-400 transition-colors font-heading text-xs">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Score Adjustments */}
