@@ -1,0 +1,38 @@
+{
+  "name": "BFFSurvey",
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string",
+      "description": "The survey question shown on the board"
+    },
+    "answers": {
+      "type": "array",
+      "description": "Array of answer objects with text and points",
+      "items": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "points": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "category": {
+      "type": "string",
+      "description": "Optional category label"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this survey is available for use"
+    }
+  },
+  "required": [
+    "question",
+    "answers"
+  ]
+}
