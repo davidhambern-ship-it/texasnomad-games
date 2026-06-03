@@ -5,7 +5,10 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 export default function HangmanGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
-  if (!roomCode) return <HangmanIframe />;
+  if (!roomCode) {
+    window.location.href = '/';
+    return null;
+  }
   return <HangmanViewer roomCode={roomCode} />;
 }
 

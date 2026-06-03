@@ -5,7 +5,10 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 export default function SquareBizGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
-  if (!roomCode) return <SquareBizIframe />;
+  if (!roomCode) {
+    window.location.href = '/';
+    return null;
+  }
   return <SquareBizViewer roomCode={roomCode} />;
 }
 

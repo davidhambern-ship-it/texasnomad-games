@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createRoomAndJoin } from '@/lib/roomUtils';
 import Header from '../components/home/Header';
 import Hero from '../components/home/Hero';
 import FeaturedGames from '../components/home/FeaturedGames';
@@ -57,13 +58,13 @@ function FeaturedGamesInline({ gameImages }) {
       </h3>
       <div className="grid grid-cols-3 gap-2">
         {[
-            { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD', path: '/games/bff' },
-          { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS', path: '/games/square-biz' },
-          { id: 'hangman', title: 'HANGMAN', subtitle: 'GUESS THE WORD', path: '/games/hangman' },
+          { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD' },
+          { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS' },
+          { id: 'hangman', title: 'HANGMAN', subtitle: 'GUESS THE WORD' },
         ].map((game, i) => (
-          <a
+          <button
             key={game.id}
-            href={game.path}
+            onClick={() => createRoomAndJoin(game.id)}
             className="group flex flex-col items-center p-2 border border-cyber-purple/20 rounded bg-black/60 hover:border-outlaw-gold hover:box-glow-gold transition-all duration-300"
           >
             <div className="w-16 h-16 md:w-20 md:h-20 mb-2 rounded overflow-hidden">
@@ -71,10 +72,10 @@ function FeaturedGamesInline({ gameImages }) {
             </div>
             <span className="font-heading text-sm md:text-base tracking-wider text-white uppercase text-center leading-tight">{game.title}</span>
             <span className="text-[9px] tracking-widest text-outlaw-gold/70 uppercase text-center">{game.subtitle}</span>
-            <span className="mt-2 px-3 py-1 border border-outlaw-gold text-outlaw-gold font-heading text-[10px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all">
-              Play Now
+            <span className="mt-2 px-3 py-1 border border-outlaw-gold text-outlaw-gold font-heading text-[10px] tracking-widest uppercase rounded group-hover:bg-outlaw-gold group-hover:text-black transition-all">
+              Create Room
             </span>
-          </a>
+          </button>
         ))}
       </div>
     </div>

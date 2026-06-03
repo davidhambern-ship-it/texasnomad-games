@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
+import { getDefaultGameState } from '@/lib/roomUtils';
 
 /**
  * Shared hook for both Host Panel and Public Game Screen.
@@ -20,12 +21,13 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
       setLoading(true);
       setError(null);
       try {
-        // Find existing room or create new one
+        // Find existing room
         const rooms = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
         let r;
         if (rooms.length > 0) {
           r = rooms[0];
-        } else {
+        } else if (role === 'host') {
+          // Host may create a room if it doesn't exist yet
           r = await base44.entities.GameRoom.create({
             room_code: roomCode.toUpperCase(),
             game_id: gameId,
@@ -36,11 +38,13 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             game_state: getDefaultGameState(gameId),
             last_command: null,
           });
+        } else {
+          throw new Error('Room ' + roomCode.toUpperCase() + ' not found. Ask the host for the correct code.');
         }
 
         // If host role, check if another host is already connected
-        if (role === 'host' && rooms.length > 0 && r.host_connected) {
-          throw new Error('Room ' + roomCode.toUpperCase() + ' already has a host connected. Disconnect the other host first.');
+        if (role === 'host' && r.host_connected) {
+          throw new Error('Room ' + roomCode.toUpperCase() + ' already has a host connected.');
         }
 
         // Mark connection
@@ -103,51 +107,4 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
   };
 
   return { room, loading, error, updateState, sendCommand, updateRoomStatus };
-}
-
-function getDefaultGameState(gameId) {
-  switch (gameId) {
-    case 'bff':
-      return {
-        phase: 'setup', // setup | playing | finished
-        family1: 'Family 1',
-        family2: 'Family 2',
-        score1: 0,
-        score2: 0,
-        active_turn: 1, // 1 or 2
-        round_bank: 0,
-        current_question: '',
-        answers: [],
-        sound_on: true,
-        dead_reveal: false,
-        round: 1,
-      };
-    case 'square-biz':
-      return {
-        phase: 'playing',
-        board: Array(9).fill(''), // '' | 'X' | 'O'
-        current_turn: 'X',
-        current_question: '',
-        show_question: false,
-        music_on: true,
-        music_volume: 70,
-        sfx_on: true,
-        sfx_volume: 80,
-        winner: null,
-      };
-    case 'hangman':
-      return {
-        phase: 'setup', // setup | playing | finished
-        secret_word: '',
-        category: '',
-        hint: '',
-        hint_revealed: false,
-        word_revealed: false,
-        guessed_letters: [],
-        wrong_letters: [],
-        max_wrong: 6,
-      };
-    default:
-      return {};
-  }
 }

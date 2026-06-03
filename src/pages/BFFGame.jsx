@@ -2,13 +2,14 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 
-// The viewer page reads room state in real-time; host controls are in /host
 export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
 
-  // If no room code, show the full iframe (legacy / standalone mode)
-  if (!roomCode) return <BFFIframe />;
+  if (!roomCode) {
+    window.location.href = '/';
+    return null;
+  }
 
   return <BFFViewer roomCode={roomCode} />;
 }

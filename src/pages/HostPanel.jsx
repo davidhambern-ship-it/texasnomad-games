@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import HostPasswordGate from '@/components/host/HostPasswordGate';
 import HostGameSelect from '@/components/host/HostGameSelect';
 import HostConsole from '@/components/host/HostConsole';
+import { generateRoomCode } from '@/lib/roomUtils';
 
 const HOST_PASSWORD = 'BERNA88@tx';
 
@@ -17,13 +18,6 @@ export default function HostPanel() {
     } else {
       return false;
     }
-  };
-
-  const generateRoomCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    let code = 'TN';
-    for (let i = 0; i < 3; i++) code += chars[Math.floor(Math.random() * chars.length)];
-    return code;
   };
 
   const handleGameSelect = (game) => {
