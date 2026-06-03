@@ -6,7 +6,10 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-// Add page imports here
+import Home from '@/pages/Home';
+import GamePlaceholder from '@/pages/GamePlaceholder';
+import JoinRoom from '@/pages/JoinRoom';
+import PlaceholderPage from '@/pages/PlaceholderPage';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -34,7 +37,15 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      {/* Add your page Route elements here */}
+      <Route path="/" element={<Home />} />
+      <Route path="/games" element={<PlaceholderPage />} />
+      <Route path="/games/bff" element={<GamePlaceholder />} />
+      <Route path="/games/square-biz" element={<GamePlaceholder />} />
+      <Route path="/games/spades" element={<GamePlaceholder />} />
+      <Route path="/join/:roomCode" element={<JoinRoom />} />
+      <Route path="/live-status" element={<PlaceholderPage />} />
+      <Route path="/about" element={<PlaceholderPage />} />
+      <Route path="/contact" element={<PlaceholderPage />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

@@ -1,0 +1,168 @@
+import React, { useState } from 'react';
+import Header from '../components/home/Header';
+import Hero from '../components/home/Hero';
+import FeaturedGames from '../components/home/FeaturedGames';
+import JoinGame from '../components/home/JoinGame';
+import LiveStatus from '../components/home/LiveStatus';
+import AboutSection from '../components/home/AboutSection';
+import Footer from '../components/home/Footer';
+
+const HERO_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b3513c9bc_generated_6e198e91.png';
+const CROWN_LOGO = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/53a7a7364_generated_1d547579.png';
+const ABOUT_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/301dda749_generated_b80b5902.png';
+
+const GAME_IMAGES = [
+  'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c270ce064_generated_c7b46bf7.png',
+  'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/f6b3e81c0_generated_32748b6c.png',
+  'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/e175f361e_generated_0ed19397.png',
+];
+
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-midnight-void text-white">
+      <Header />
+      <Hero heroBg={HERO_BG} crownLogo={CROWN_LOGO} />
+
+      {/* Three-column panel: Featured | Join | Live Status */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Featured Games - takes full width on mobile, 1 col on desktop */}
+          <div className="lg:col-span-1">
+            <FeaturedGamesInline gameImages={GAME_IMAGES} />
+          </div>
+          <div className="lg:col-span-1">
+            <JoinGameInline />
+          </div>
+          <div className="lg:col-span-1">
+            <LiveStatusInline />
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8">
+        <AboutSection aboutBg={ABOUT_BG} />
+      </div>
+
+      <Footer />
+    </div>
+  );
+}
+
+/* Inline versions without the max-w wrapper for grid layout */
+function FeaturedGamesInline({ gameImages }) {
+  return (
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
+      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-4 uppercase">
+        ★ FEATURED GAMES ★
+      </h3>
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD', path: '/games/bff' },
+          { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS', path: '/games/square-biz' },
+          { id: 'spades', title: 'SPADES', subtitle: 'TEXASNOMAD DECK', path: '/games/spades' },
+        ].map((game, i) => (
+          <a
+            key={game.id}
+            href={game.path}
+            className="group flex flex-col items-center p-2 border border-cyber-purple/20 rounded bg-black/60 hover:border-outlaw-gold hover:box-glow-gold transition-all duration-300"
+          >
+            <div className="w-16 h-16 md:w-20 md:h-20 mb-2 rounded overflow-hidden">
+              <img src={gameImages[i]} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+            </div>
+            <span className="font-heading text-sm md:text-base tracking-wider text-white uppercase text-center leading-tight">{game.title}</span>
+            <span className="text-[9px] tracking-widest text-outlaw-gold/70 uppercase text-center">{game.subtitle}</span>
+            <span className="mt-2 px-3 py-1 border border-outlaw-gold text-outlaw-gold font-heading text-[10px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all">
+              Play Now
+            </span>
+          </a>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function JoinGameInline() {
+  const [roomCode, setRoomCode] = React.useState('');
+  const [error, setError] = React.useState(false);
+  const [shaking, setShaking] = React.useState(false);
+
+  const handleJoin = () => {
+    if (!roomCode.trim()) {
+      setError(true);
+      setShaking(true);
+      setTimeout(() => setShaking(false), 400);
+      return;
+    }
+    setError(false);
+    window.location.href = `/join/${roomCode.trim().toUpperCase()}`;
+  };
+
+  return (
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col items-center justify-center">
+      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-3 uppercase">
+        ★ JOIN A LIVE GAME ★
+      </h3>
+      <p className="font-heading text-xs tracking-widest text-white/60 uppercase mb-3">ENTER ROOM CODE</p>
+      <input
+        type="text"
+        value={roomCode}
+        onChange={(e) => { setRoomCode(e.target.value.toUpperCase()); if (error) setError(false); }}
+        placeholder="EX: TN817"
+        className={`w-full max-w-[200px] px-3 py-2.5 rounded bg-black/80 border-2 text-center font-mono text-base tracking-widest text-white placeholder:text-white/30 focus:outline-none focus:border-outlaw-gold transition-colors ${
+          error ? 'border-kinetic-orange' : 'border-cyber-purple/50'
+        } ${shaking ? 'animate-shake' : ''}`}
+      />
+      {error && <p className="text-kinetic-orange text-xs mt-1.5">Enter a room code to join!</p>}
+      <button
+        onClick={handleJoin}
+        className="mt-4 px-6 py-2.5 border-2 border-kinetic-orange text-kinetic-orange font-heading text-lg tracking-widest uppercase rounded hover:bg-kinetic-orange hover:text-black hover:shadow-[0_0_20px_rgba(255,95,31,0.5)] transition-all duration-300"
+      >
+        JOIN GAME
+      </button>
+      <p className="mt-3 font-display text-xs text-outlaw-gold/50 italic">★ BE PART OF THE ACTION ★</p>
+    </div>
+  );
+}
+
+function LiveStatusInline() {
+  const games = [
+    { name: 'BFF', subtitle: 'BIGO FAMILY FEUD', players: 12 },
+    { name: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS', players: 8 },
+    { name: 'SPADES', subtitle: 'TEXASNOMAD DECK', players: 16 },
+  ];
+
+  return (
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
+      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-4 uppercase">
+        ★ LIVE STATUS ★
+      </h3>
+      <div className="space-y-2">
+        {games.map((game) => (
+          <div key={game.name} className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-kinetic-orange animate-pulse-glow shrink-0" />
+              <div>
+                <span className="font-heading text-sm tracking-wider text-white uppercase">{game.name}</span>
+                <span className="block text-[8px] tracking-widest text-white/40 uppercase">{game.subtitle}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <span className="font-heading text-xl text-outlaw-gold">{game.players}</span>
+                <span className="block text-[8px] tracking-widest text-white/40 uppercase">PLAYERS</span>
+              </div>
+              <span className="px-1.5 py-0.5 bg-cyber-purple/20 border border-cyber-purple/50 rounded text-cyber-purple font-heading text-[10px] tracking-wider animate-pulse-glow">
+                LIVE
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 text-center">
+        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold font-heading text-xs tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all">
+          VIEW ALL LIVE GAMES
+        </a>
+      </div>
+    </div>
+  );
+}
