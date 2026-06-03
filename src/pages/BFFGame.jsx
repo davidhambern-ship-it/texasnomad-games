@@ -109,9 +109,9 @@ function BFFViewer({ roomCode }) {
           )}
 
           {/* Status when waiting */}
-          {gs.phase === 'setup' && (
-            <div className="text-center">
-              <div className="font-heading text-lg tracking-widest text-white/30 uppercase">Waiting for Host…</div>
+          {gs.phase === 'setup' && !gs.current_question && (
+            <div className="text-center mt-2">
+              <div className="font-heading text-lg tracking-widest text-white/30 uppercase">Host is setting up the game…</div>
             </div>
           )}
         </div>

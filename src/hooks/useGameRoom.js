@@ -11,11 +11,11 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const roomRef = useRef(null);
+  const unsubscribeRef = useRef(null);
+  const pollRef = useRef(null);
 
   useEffect(() => {
     if (!roomCode || !gameId) return;
-
-    let unsubscribe = null;
 
     async function init() {
       setLoading(true);
@@ -27,7 +27,6 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
         if (rooms.length > 0) {
           r = rooms[0];
         } else if (role === 'host') {
-          // Host may create a room if it doesn't exist yet
           r = await base44.entities.GameRoom.create({
             room_code: roomCode.toUpperCase(),
             game_id: gameId,
@@ -54,14 +53,33 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
         setRoom(r);
 
         // Subscribe to real-time changes
-        unsubscribe = base44.entities.GameRoom.subscribe((event) => {
-          const eventId = event.data?.id || event.id;
-          if (eventId === r.id && event.type === 'update') {
-            const updated = event.data || event;
-            roomRef.current = updated;
-            setRoom({ ...updated });
+        unsubscribeRef.current = base44.entities.GameRoom.subscribe((event) => {
+          if (event.type === 'update' && event.data) {
+            const updated = event.data;
+            const updatedId = updated.id || event.id;
+            if (updatedId === roomRef.current?.id) {
+              roomRef.current = updated;
+              setRoom({ ...updated });
+            }
           }
         });
+
+        // Poll every 3s as a reliable fallback
+        pollRef.current = setInterval(async () => {
+          try {
+            const fresh = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
+            if (fresh.length > 0) {
+              const fr = fresh[0];
+              if (JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
+                  fr.host_connected !== roomRef.current?.host_connected ||
+                  fr.status !== roomRef.current?.status) {
+                roomRef.current = fr;
+                setRoom({ ...fr });
+              }
+            }
+          } catch (_) {}
+        }, 3000);
+
       } catch (e) {
         setError(e.message);
       } finally {
@@ -72,7 +90,8 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     init();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeRef.current) unsubscribeRef.current();
+      if (pollRef.current) clearInterval(pollRef.current);
       // Disconnect on unmount
       if (roomRef.current) {
         const patch = role === 'host' ? { host_connected: false } : { screen_connected: false };
