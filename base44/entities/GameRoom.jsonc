@@ -1,0 +1,52 @@
+{
+  "name": "GameRoom",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. TN817)"
+    },
+    "game_id": {
+      "type": "string",
+      "enum": [
+        "bff",
+        "square-biz",
+        "hangman"
+      ],
+      "description": "Which game this room is for"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "screen_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "players_connected": {
+      "type": "number",
+      "default": 0
+    },
+    "game_state": {
+      "type": "object",
+      "description": "Full game state JSON (game-specific)"
+    },
+    "last_command": {
+      "type": "object",
+      "description": "Last command issued by host"
+    }
+  },
+  "required": [
+    "room_code",
+    "game_id"
+  ]
+}

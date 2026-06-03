@@ -13,6 +13,7 @@ import HangmanGame from '@/pages/HangmanGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
+import HostPanel from '@/pages/HostPanel';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -49,6 +50,7 @@ const AuthenticatedApp = () => {
       <Route path="/live-status" element={<PlaceholderPage />} />
       <Route path="/about" element={<PlaceholderPage />} />
       <Route path="/contact" element={<PlaceholderPage />} />
+      <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
   );

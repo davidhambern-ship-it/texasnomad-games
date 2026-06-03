@@ -1,9 +1,123 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useGameRoom } from '@/hooks/useGameRoom';
 
+// The viewer page reads room state in real-time; host controls are in /host
+export default function BFFGame() {
+  const params = new URLSearchParams(window.location.search);
+  const roomCode = params.get('room');
+
+  // If no room code, show the full iframe (legacy / standalone mode)
+  if (!roomCode) return <BFFIframe />;
+
+  return <BFFViewer roomCode={roomCode} />;
+}
+
+/* ── VIEWER: connected to a room ── */
+function BFFViewer({ roomCode }) {
+  const { room, loading } = useGameRoom(roomCode, 'bff', 'viewer');
+  const gs = room?.game_state || {};
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  const handleFullscreen = () => {
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.();
+    else document.exitFullscreen?.();
+  };
+
+  return (
+    <div ref={containerRef} className="min-h-screen bg-[#050515] text-white flex flex-col"
+      style={{ fontFamily: "'Teko', sans-serif" }}>
+      {/* Header */}
+      <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#050515]/90 backdrop-blur-xl">
+        <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors">
+              <div className="w-7 h-7 rounded-full bg-[#BC13FE]/20 border border-[#FFD700] flex items-center justify-center">
+                <span className="font-bold text-[10px]">TN</span>
+              </div>
+            </Link>
+            <span className="text-[#FFD700] font-heading text-lg tracking-widest uppercase">BFF — BIGO FAMILY FEUD</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
+              <span className="font-heading text-[10px] tracking-widest text-[#BC13FE] uppercase">ROOM {roomCode}</span>
+            </div>
+          </div>
+          <button onClick={handleFullscreen}
+            className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
+            {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
+          </button>
+        </div>
+      </header>
+
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+          {/* Scores */}
+          <div className="grid grid-cols-2 gap-8 w-full max-w-3xl">
+            {[
+              { name: gs.family1 || 'Family 1', score: gs.score1 || 0, turn: 1 },
+              { name: gs.family2 || 'Family 2', score: gs.score2 || 0, turn: 2 },
+            ].map((f) => (
+              <div key={f.turn} className="text-center p-6 border-2 rounded-2xl transition-all"
+                style={{
+                  borderColor: gs.active_turn === f.turn ? '#FFD700' : '#BC13FE30',
+                  background: gs.active_turn === f.turn ? '#FFD70010' : '#00000060',
+                  boxShadow: gs.active_turn === f.turn ? '0 0 40px rgba(255,215,0,0.2)' : 'none',
+                }}>
+                <div className="font-heading text-2xl md:text-4xl tracking-widest text-white uppercase">{f.name}</div>
+                <div className="font-heading text-6xl md:text-8xl text-[#FFD700] mt-2"
+                  style={{ textShadow: '0 0 30px rgba(255,215,0,0.5)' }}>{f.score}</div>
+                {gs.active_turn === f.turn && (
+                  <div className="mt-2 text-xs tracking-widest text-[#FFD700] font-heading uppercase">▶ ACTIVE TURN</div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Round Bank */}
+          {(gs.round_bank || 0) > 0 && (
+            <div className="px-8 py-3 border-2 border-[#FF5F1F] rounded-xl text-center"
+              style={{ boxShadow: '0 0 20px rgba(255,95,31,0.3)' }}>
+              <div className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/70 uppercase">Round Bank</div>
+              <div className="font-heading text-4xl text-[#FF5F1F]">{gs.round_bank}</div>
+            </div>
+          )}
+
+          {/* Current Question */}
+          {gs.current_question && (
+            <div className="w-full max-w-3xl p-6 border border-[#BC13FE]/40 rounded-2xl bg-black/60 text-center"
+              style={{ boxShadow: '0 0 30px rgba(188,19,254,0.15)' }}>
+              <div className="font-heading text-xs tracking-[0.2em] text-[#BC13FE]/70 uppercase mb-2">Question</div>
+              <div className="font-heading text-2xl md:text-3xl text-white tracking-wide">{gs.current_question}</div>
+            </div>
+          )}
+
+          {/* Status when waiting */}
+          {gs.phase === 'setup' && (
+            <div className="text-center">
+              <div className="font-heading text-lg tracking-widest text-white/30 uppercase">Waiting for Host…</div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── LEGACY IFRAME MODE (no room code) ── */
 const BFF_HTML_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/c10ab0da8_BFF-GameBoard-v73-fuzzy-synonym-scan.html';
 
-export default function BFFGame() {
+function BFFIframe() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [htmlContent, setHtmlContent] = useState('');
   const [loading, setLoading] = useState(true);
@@ -11,180 +125,56 @@ export default function BFFGame() {
   const containerRef = useRef(null);
 
   useEffect(() => {
-    fetch(BFF_HTML_URL)
-      .then(r => r.text())
-      .then(html => {
-        setHtmlContent(html);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    fetch(BFF_HTML_URL).then(r => r.text()).then(html => { setHtmlContent(html); setLoading(false); }).catch(() => setLoading(false));
   }, []);
 
-  const handleFullscreen = () => {
-    const el = containerRef.current;
-    if (!document.fullscreenElement) {
-      el?.requestFullscreen?.();
-      setIsFullscreen(true);
-    } else {
-      document.exitFullscreen?.();
-      setIsFullscreen(false);
-    }
-  };
-
   useEffect(() => {
-    const handler = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+    const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  const handleRestart = () => {
-    if (iframeRef.current) {
-      iframeRef.current.srcdoc = htmlContent;
-    }
-  };
-
-  const handleHostControls = () => {
-    if (iframeRef.current) {
-      try {
-        const iDoc = iframeRef.current.contentDocument || iframeRef.current.contentWindow?.document;
-        if (iDoc) {
-          const btn = iDoc.getElementById('hostPanelToggleBtn');
-          if (btn) btn.click();
-        }
-      } catch (e) {
-        // cross-origin fallback — silently ignore
-      }
-    }
+  const handleFullscreen = () => {
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.();
+    else document.exitFullscreen?.();
   };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
-      {/* ── PAGE HEADER ── */}
       <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#050505]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          {/* Left: logo + title */}
           <div className="flex items-center gap-3 shrink-0">
-            <Link
-              to="/"
-              className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors"
-            >
+            <Link to="/" className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors">
               <div className="w-8 h-8 rounded-full bg-[#BC13FE]/20 border border-[#FFD700] flex items-center justify-center">
                 <span className="font-bold text-xs">TN</span>
               </div>
-              <span className="hidden sm:block font-bold tracking-widest text-xs uppercase">TexasNomad</span>
             </Link>
-
-            <span className="text-[#BC13FE]/50 hidden sm:block">|</span>
-
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
-              <span
-                className="font-extrabold tracking-wider uppercase text-sm sm:text-base"
-                style={{
-                  fontFamily: "'Teko', sans-serif",
-                  letterSpacing: '0.12em',
-                  color: '#FFD700',
-                  textShadow: '0 0 10px rgba(255,215,0,0.5)',
-                }}
-              >
-                BFF — BIGO Family Feud
-              </span>
-            </div>
+            <span className="font-heading text-base tracking-widest text-[#FFD700] uppercase">BFF — BIGO FAMILY FEUD</span>
           </div>
-
-          {/* Right: action buttons */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Link
-              to="/"
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FFD700]/10 hover:border-[#FFD700] transition-all"
-            >
-              ← LOBBY
-            </Link>
-            <button
-              onClick={handleHostControls}
-              className="px-3 py-1.5 border border-[#22d3ee]/40 text-[#22d3ee]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#22d3ee]/10 hover:border-[#22d3ee] transition-all"
-            >
-              HOST
-            </button>
-            <button
-              onClick={handleRestart}
-              className="px-3 py-1.5 border border-[#BC13FE]/40 text-[#BC13FE]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#BC13FE]/10 hover:border-[#BC13FE] transition-all"
-            >
-              RESTART
-            </button>
-            <button
-              onClick={handleFullscreen}
-              className="px-3 py-1.5 bg-[#FF5F1F] border border-[#FF5F1F] text-white rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FF5F1F]/80 transition-all"
-            >
+          <div className="flex items-center gap-2">
+            <Link to="/" className="hidden sm:flex px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <button onClick={handleFullscreen} className="px-3 py-1.5 bg-[#FF5F1F] text-white rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FF5F1F]/80 transition-all">
               {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
             </button>
           </div>
         </div>
       </header>
-
-      {/* ── MOBILE WARNING ── */}
       <div className="sm:hidden flex flex-col items-center justify-center flex-1 px-6 py-16 text-center gap-4">
         <div className="text-5xl">🎮</div>
-        <h2
-          className="text-3xl uppercase font-extrabold"
-          style={{
-            fontFamily: "'Teko', sans-serif",
-            color: '#FFD700',
-            textShadow: '0 0 16px rgba(255,215,0,0.4)',
-          }}
-        >
-          Game On — Bigger Screen!
-        </h2>
-        <p className="text-white/70 text-sm leading-relaxed max-w-xs">
-          For the best BFF experience, play on a tablet, laptop, or desktop. The game board is designed for a larger screen.
-        </p>
-        <Link
-          to="/"
-          className="mt-4 px-6 py-2.5 border-2 border-[#FFD700] text-[#FFD700] font-bold tracking-widest uppercase text-sm rounded hover:bg-[#FFD700] hover:text-black transition-all"
-        >
-          ← Back to Lobby
-        </Link>
+        <h2 className="text-3xl uppercase font-extrabold" style={{ fontFamily: "'Teko', sans-serif", color: '#FFD700' }}>Game On — Bigger Screen!</h2>
+        <Link to="/" className="mt-4 px-6 py-2.5 border-2 border-[#FFD700] text-[#FFD700] font-bold tracking-widest uppercase text-sm rounded hover:bg-[#FFD700] hover:text-black transition-all">← Back to Lobby</Link>
       </div>
-
-      {/* ── GAME FRAME (desktop / tablet) ── */}
-      <div
-        ref={containerRef}
-        className="hidden sm:flex flex-col flex-1 min-h-0"
-        style={{ background: '#050505' }}
-      >
-        {/* Neon border accent strip */}
-        <div
-          style={{
-            height: '3px',
-            background: 'linear-gradient(90deg, #BC13FE, #FF5F1F, #FFD700, #BC13FE)',
-            backgroundSize: '200% 100%',
-          }}
-        />
-
-        {/* The iframe — fills all remaining space */}
+      <div ref={containerRef} className="hidden sm:flex flex-col flex-1 min-h-0" style={{ background: '#050505' }}>
+        <div style={{ height: '3px', background: 'linear-gradient(90deg, #BC13FE, #FF5F1F, #FFD700, #BC13FE)' }} />
         {loading ? (
           <div className="flex-1 flex items-center justify-center">
-            <div className="flex flex-col items-center gap-4">
-              <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
-              <span className="text-[#FFD700] font-bold tracking-widest text-sm uppercase">Loading Game Board…</span>
-            </div>
+            <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
           </div>
         ) : (
-          <iframe
-            ref={iframeRef}
-            srcdoc={htmlContent}
-            title="BFF — BIGO Family Feud Game Board"
-            className="flex-1 w-full border-0"
-            style={{
-              minHeight: 'calc(100vh - 3.5rem - 3px)',
-              background: '#080516',
-            }}
-            allow="microphone"
-            allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads"
-          />
+          <iframe ref={iframeRef} srcdoc={htmlContent} title="BFF" className="flex-1 w-full border-0"
+            style={{ minHeight: 'calc(100vh - 3.5rem - 3px)' }}
+            allow="microphone" allowFullScreen
+            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads" />
         )}
       </div>
     </div>

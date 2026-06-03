@@ -37,6 +37,14 @@ export default function Header() {
           ))}
         </nav>
 
+        {/* Host Link */}
+        <Link
+          to="/host"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#BC13FE]/40 text-[#BC13FE]/70 rounded text-[10px] font-heading tracking-widest uppercase hover:bg-[#BC13FE]/10 hover:border-[#BC13FE] transition-all mr-2"
+        >
+          🎛 HOST
+        </Link>
+
         {/* Social Icons */}
         <div className="flex items-center gap-2">
           <a href="https://youtube.com/@bernatune?si=meQWazY1fXAjPeF0" target="_blank" rel="noopener noreferrer"
