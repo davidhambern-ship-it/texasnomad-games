@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import HostPasswordGate from '@/components/host/HostPasswordGate';
 import HostGameSelect from '@/components/host/HostGameSelect';
 import HostConsole from '@/components/host/HostConsole';
-import { generateRoomCode } from '@/lib/roomUtils';
 
 const HOST_PASSWORD = 'BERNA88@tx';
 
@@ -11,6 +10,7 @@ export default function HostPanel() {
   const [authenticated, setAuthenticated] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
+  const [changingRoom, setChangingRoom] = useState(false);
 
   const handlePassword = (pw) => {
     if (pw === HOST_PASSWORD) {
@@ -20,14 +20,20 @@ export default function HostPanel() {
     }
   };
 
-  const handleGameSelect = (game) => {
+  const handleGameSelect = (game, roomCode) => {
     setSelectedGame(game);
-    setActiveRoom(generateRoomCode());
+    setActiveRoom(roomCode);
+    setChangingRoom(false);
   };
 
   const handleDisconnect = () => {
     setActiveRoom(null);
     setSelectedGame(null);
+    setChangingRoom(false);
+  };
+
+  const handleChangeRoom = () => {
+    setChangingRoom(true);
   };
 
   return (
@@ -55,12 +61,22 @@ export default function HostPanel() {
             )}
           </div>
           {authenticated && (
-            <button
-              onClick={handleDisconnect}
-              className="px-3 py-1 border border-red-500/50 text-red-400 text-xs font-bold tracking-widest uppercase rounded hover:bg-red-500/20 transition-all"
-            >
-              DISCONNECT
-            </button>
+            <div className="flex items-center gap-2">
+              {activeRoom && !changingRoom && (
+                <button
+                  onClick={handleChangeRoom}
+                  className="px-3 py-1 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all"
+                >
+                  ⇄ CHANGE ROOM
+                </button>
+              )}
+              <button
+                onClick={handleDisconnect}
+                className="px-3 py-1 border border-red-500/50 text-red-400 text-xs font-bold tracking-widest uppercase rounded hover:bg-red-500/20 transition-all"
+              >
+                DISCONNECT
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -70,10 +86,10 @@ export default function HostPanel() {
         {!authenticated && (
           <HostPasswordGate onSuccess={handlePassword} />
         )}
-        {authenticated && !selectedGame && (
-          <HostGameSelect onSelect={handleGameSelect} />
+        {authenticated && (!selectedGame || changingRoom) && (
+          <HostGameSelect onSelect={handleGameSelect} currentGame={selectedGame} />
         )}
-        {authenticated && selectedGame && activeRoom && (
+        {authenticated && selectedGame && activeRoom && !changingRoom && (
           <HostConsole game={selectedGame} roomCode={activeRoom} onDisconnect={handleDisconnect} />
         )}
       </main>
