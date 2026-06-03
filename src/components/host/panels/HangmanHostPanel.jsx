@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const Btn = ({ children, onClick, color = '#FFD700', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -16,11 +16,34 @@ const Btn = ({ children, onClick, color = '#FFD700', size = 'md', className = ''
   );
 };
 
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
 export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const isSetup = !gs.phase || gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
   const wrongCount = (gs.wrong_letters || []).length;
   const maxWrong = gs.max_wrong || 6;
+  const guessed = gs.guessed_letters || [];
+  const wrong = gs.wrong_letters || [];
+  const secretWord = (gs.secret_word || '').toUpperCase();
+
+  const guessLetter = async (letter) => {
+    if (guessed.includes(letter) || wrong.includes(letter)) return;
+    const isCorrect = secretWord.includes(letter);
+    const newGuessed = isCorrect ? [...guessed, letter] : guessed;
+    const newWrong = !isCorrect ? [...wrong, letter] : wrong;
+
+    // Check win condition
+    const allRevealed = secretWord.split('').every(ch => ch === ' ' || newGuessed.includes(ch));
+    const newPhase = allRevealed ? 'finished' : (newWrong.length >= maxWrong ? 'finished' : 'playing');
+
+    await updateState({
+      guessed_letters: newGuessed,
+      wrong_letters: newWrong,
+      phase: newPhase,
+      word_revealed: newPhase === 'finished',
+    });
+  };
 
   const startGame = async () => {
     if (!gs.secret_word?.trim()) return;
@@ -126,6 +149,37 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
             <div className={`font-heading text-2xl ${gs.hint_revealed ? 'text-green-400' : 'text-white/30'}`}>
               {gs.hint_revealed ? 'SHOWN' : 'HIDDEN'}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── ALPHABET KEYBOARD ── */}
+      {isPlaying && (
+        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60">
+          <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase mb-3">Guess a Letter</h3>
+          <div className="flex flex-wrap gap-2 justify-center">
+            {ALPHABET.map((letter) => {
+              const isWrong = wrong.includes(letter);
+              const isCorrect = guessed.includes(letter);
+              const used = isWrong || isCorrect;
+              return (
+                <button
+                  key={letter}
+                  onClick={() => guessLetter(letter)}
+                  disabled={used}
+                  className="w-10 h-10 rounded-lg border-2 font-heading text-base tracking-widest transition-all active:scale-90 disabled:cursor-not-allowed"
+                  style={{
+                    borderColor: isWrong ? '#ef4444' : isCorrect ? '#4ade80' : '#FFD700',
+                    color: isWrong ? '#ef4444' : isCorrect ? '#4ade80' : '#FFD700',
+                    background: isWrong ? '#ef444415' : isCorrect ? '#4ade8015' : 'transparent',
+                    opacity: used ? 0.5 : 1,
+                    textDecoration: isWrong ? 'line-through' : 'none',
+                  }}
+                >
+                  {letter}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}
