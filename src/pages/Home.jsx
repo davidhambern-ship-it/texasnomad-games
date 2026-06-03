@@ -14,7 +14,7 @@ const ABOUT_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead
 const GAME_IMAGES = [
   'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c270ce064_generated_c7b46bf7.png',
   'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/f6b3e81c0_generated_32748b6c.png',
-  'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/e175f361e_generated_0ed19397.png',
+  'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b32b97429_generated_image.png',
 ];
 
 export default function Home() {
