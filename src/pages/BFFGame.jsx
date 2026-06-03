@@ -171,21 +171,28 @@ function BFFViewer({ roomCode }) {
       sendToBoard({ type: 'SET_BANK', value: gs.round_bank || 0 });
     }
 
-    // Survey/question changed
+    // Survey/question changed — only reload if question text or answer list changed (not just reveals)
     const questionChanged = gs.current_question !== prev.current_question;
-    const answersChanged = JSON.stringify(gs.answers) !== JSON.stringify(prev.answers);
+    const answerListChanged = gs.answers?.length !== prev.answers?.length ||
+      gs.answers?.some((a, i) => (a.text || a.answer) !== ((prev.answers?.[i]?.text) || (prev.answers?.[i]?.answer)));
 
-    if (questionChanged || answersChanged) {
+    if (questionChanged || answerListChanged) {
       if (gs.current_question && gs.answers?.length > 0) {
         sendToBoard({
           type: 'LOAD_SURVEY',
           question: gs.current_question,
           answers: gs.answers,
         });
+        // Re-reveal any already-revealed answers after the board reloads
+        setTimeout(() => {
+          gs.answers?.forEach((ans, i) => {
+            if (ans.revealed) sendToBoard({ type: 'REVEAL_ANSWER', index: i });
+          });
+        }, 600);
       }
-    } else if (iframeReady && gs.answers?.length > 0) {
-      // Sync individual reveals
-      gs.answers.forEach((ans, i) => {
+    } else {
+      // Only answer reveals changed — just send individual reveals
+      gs.answers?.forEach((ans, i) => {
         const wasRevealed = prev.answers?.[i]?.revealed;
         if (ans.revealed && !wasRevealed) {
           sendToBoard({ type: 'REVEAL_ANSWER', index: i });
@@ -199,6 +206,7 @@ function BFFViewer({ roomCode }) {
   // On first ready, do a full sync
   useEffect(() => {
     if (!iframeReady || !gs?.current_question) return;
+    // Wait for board JS to finish initializing, then sync everything
     const timer = setTimeout(() => {
       sendToBoard({ type: 'SET_FAMILIES', family1: gs.family1, family2: gs.family2 });
       sendToBoard({ type: 'SET_SCORES', score1: gs.score1 || 0, score2: gs.score2 || 0 });
@@ -206,15 +214,15 @@ function BFFViewer({ roomCode }) {
       sendToBoard({ type: 'SET_BANK', value: gs.round_bank || 0 });
       if (gs.current_question && gs.answers?.length > 0) {
         sendToBoard({ type: 'LOAD_SURVEY', question: gs.current_question, answers: gs.answers });
-        // After a brief delay, reveal any already-revealed answers
+        // After survey loads, re-reveal any already-revealed answers
         setTimeout(() => {
           gs.answers?.forEach((ans, i) => {
             if (ans.revealed) sendToBoard({ type: 'REVEAL_ANSWER', index: i });
           });
-        }, 600);
+        }, 800);
       }
       prevGsRef.current = JSON.parse(JSON.stringify(gs));
-    }, 800); // small delay to let board JS finish init
+    }, 1500); // longer delay: board JS needs to fully init before we push state
     return () => clearTimeout(timer);
   }, [iframeReady]); // eslint-disable-line
 
