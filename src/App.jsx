@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
+import BFFGame from '@/pages/BFFGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -39,7 +40,7 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/" element={<Home />} />
       <Route path="/games" element={<PlaceholderPage />} />
-      <Route path="/games/bff" element={<GamePlaceholder />} />
+      <Route path="/games/bff" element={<BFFGame />} />
       <Route path="/games/square-biz" element={<GamePlaceholder />} />
       <Route path="/games/spades" element={<GamePlaceholder />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
