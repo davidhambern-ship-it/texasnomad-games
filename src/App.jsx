@@ -8,6 +8,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import BFFGame from '@/pages/BFFGame';
+import SquareBizGame from '@/pages/SquareBizGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -41,7 +42,7 @@ const AuthenticatedApp = () => {
       <Route path="/" element={<Home />} />
       <Route path="/games" element={<PlaceholderPage />} />
       <Route path="/games/bff" element={<BFFGame />} />
-      <Route path="/games/square-biz" element={<GamePlaceholder />} />
+      <Route path="/games/square-biz" element={<SquareBizGame />} />
       <Route path="/games/spades" element={<GamePlaceholder />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
       <Route path="/live-status" element={<PlaceholderPage />} />
