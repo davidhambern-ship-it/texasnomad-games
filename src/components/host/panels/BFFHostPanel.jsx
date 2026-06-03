@@ -31,7 +31,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   // Load surveys once
   useEffect(() => {
     setLoadingSurveys(true);
-    base44.entities.BFFSurvey.filter({ active: true })
+    base44.entities.BFFSurvey.list()
       .then(setSurveys)
       .finally(() => setLoadingSurveys(false));
   }, []);
