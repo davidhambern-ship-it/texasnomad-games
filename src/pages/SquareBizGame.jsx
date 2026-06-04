@@ -101,7 +101,7 @@ function SquareBizViewer({ roomCode }) {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col relative">
       {/* Role Selection Modal */}
-      {!chosenRole && isSeated && displayMode === 'board' && (
+      {!chosenRole && isSeated && displayMode === 'board' && !loading && (
         <RoleSelector
           seatNumber={seatNumber}
           isSeated={isSeated}

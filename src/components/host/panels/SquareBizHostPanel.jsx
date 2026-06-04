@@ -349,7 +349,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!currentTrivia || loadingTrivia}>Show Question</Btn>
           <Btn onClick={() => fetchOTDBQuestion()} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Fetch Question'}</Btn>
         </div>
-        <Btn onClick={() => updateState({ show_choices: true })} color="#8a22ff" disabled={!gs.show_question || !currentTrivia} className="w-full">Show Choices</Btn>
+        <Btn onClick={() => updateState({ show_question: true, show_choices: true })} color="#8a22ff" disabled={!currentTrivia || loadingTrivia} className="w-full">Show Choices</Btn>
       </div>
 
       {/* Music */}

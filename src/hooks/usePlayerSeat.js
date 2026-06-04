@@ -32,7 +32,6 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
 
   useEffect(() => {
     if (isHost || !room || !updateState) return;
-    if (!chosenRole) return; // Wait for role selection
 
     const gs = room.game_state || {};
     const players = gs.players || [];
@@ -64,7 +63,7 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
     const newPlayer = {
       playerId,
       seatNumber: nextSeat,
-      role: chosenRole,
+      role: chosenRole || 'pending',
       connected: true,
       joinedAt: Date.now(),
       lastActionAt: null,
