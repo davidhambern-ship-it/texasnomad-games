@@ -23,8 +23,9 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const [family1Input, setFamily1Input] = useState(gs.family1 || '');
   const [family2Input, setFamily2Input] = useState(gs.family2 || '');
   const [answerInput, setAnswerInput] = useState('');
-  const [checkResult, setCheckResult] = useState(null); // { type: 'hit'|'miss'|'warn', message: string }
+  const [checkResult, setCheckResult] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [lastSubmission, setLastSubmission] = useState(null); // { seatNumber, familyTeam, submittedAnswer }
   const recognitionRef = useRef(null);
 
   const isSetup = gs.phase === 'setup';
@@ -40,10 +41,22 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       .finally(() => setLoadingSurveys(false));
   }, []);
 
-  // Normalize answer text for fuzzy matching
+  // Watch for new player submissions in game_state
+  const lastSubRef = useRef(null);
+  useEffect(() => {
+    const sub = gs.last_submission;
+    if (!sub) return;
+    if (JSON.stringify(sub) === JSON.stringify(lastSubRef.current)) return;
+    lastSubRef.current = sub;
+    setLastSubmission(sub);
+    // Auto-clear after 12s so it doesn't get stale
+    setTimeout(() => setLastSubmission(null), 12000);
+  }, [gs.last_submission]);
+
   const normalize = (text) => String(text || '').toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
+  // Check answer input but do NOT reveal — host must click the answer slot to reveal
   const checkAnswer = async (guess) => {
     if (!guess.trim() || answers.length === 0) return;
     const cleanGuess = normalize(guess);
@@ -57,14 +70,31 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     if (matchIdx === -1) {
       setCheckResult({ type: 'miss', message: `"${guess}" — NOT on the board` });
     } else if (answers[matchIdx].revealed) {
-      setCheckResult({ type: 'warn', message: `"${answers[matchIdx].answer || answers[matchIdx].text}" — already revealed` });
+      setCheckResult({ type: 'warn', message: `Already revealed: "${answers[matchIdx].answer || answers[matchIdx].text}"` });
     } else {
-      const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
-      await updateState({ answers: newAnswers });
-      setCheckResult({ type: 'hit', message: `✓ "${answers[matchIdx].answer || answers[matchIdx].text}" — ${answers[matchIdx].points} pts!` });
+      setCheckResult({ type: 'hit', message: `✓ Match found: "${answers[matchIdx].text || answers[matchIdx].answer}" — ${answers[matchIdx].points} pts. Click it on the board to reveal.` });
     }
     setAnswerInput('');
-    setTimeout(() => setCheckResult(null), 3000);
+    setTimeout(() => setCheckResult(null), 5000);
+  };
+
+  // Reveal an answer slot — also adds points to round bank
+  const revealAnswer = async (idx) => {
+    if (answers[idx].revealed) return;
+    const ans = answers[idx];
+    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: true } : a);
+    const newBank = (gs.round_bank || 0) + (ans.points || 0);
+    await updateState({ answers: newAnswers, round_bank: newBank });
+  };
+
+  // Un-reveal (toggle off)
+  const hideAnswer = async (idx) => {
+    const ans = answers[idx];
+    if (!ans.revealed) return;
+    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: false } : a);
+    // Subtract points from bank when hiding
+    const newBank = Math.max(0, (gs.round_bank || 0) - (ans.points || 0));
+    await updateState({ answers: newAnswers, round_bank: newBank });
   };
 
   const toggleVoice = () => {
@@ -87,7 +117,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
 
   const startGame = async () => {
     if (!family1Input.trim() || !family2Input.trim()) return;
-    // Pick first survey
     const firstSurvey = surveys[0];
     await updateState({
       phase: 'playing',
@@ -102,6 +131,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       current_survey_idx: 0,
       current_question: firstSurvey?.question || '',
       answers: firstSurvey ? firstSurvey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })) : [],
+      last_submission: null,
     });
   };
 
@@ -116,13 +146,12 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     });
   };
 
-  const toggleReveal = async (idx) => {
-    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: !a.revealed } : a);
-    await updateState({ answers: newAnswers });
-  };
-
   const revealAll = async () => {
-    await updateState({ answers: answers.map(a => ({ ...a, revealed: true })) });
+    const totalPoints = answers.reduce((sum, a) => sum + (a.revealed ? 0 : (a.points || 0)), 0);
+    await updateState({
+      answers: answers.map(a => ({ ...a, revealed: true })),
+      round_bank: (gs.round_bank || 0) + totalPoints,
+    });
   };
 
   const nextSurvey = async () => {
@@ -135,12 +164,21 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     await loadSurvey(prevIdx);
   };
 
+  // Award round bank to a family
+  const awardBank = async (family) => {
+    const bank = gs.round_bank || 0;
+    if (bank === 0) return;
+    const key = family === 1 ? 'score1' : 'score2';
+    await updateState({ [key]: (gs[key] || 0) + bank, round_bank: 0 });
+  };
+
   const newGame = async () => {
     await updateState({
       phase: 'setup',
       score1: 0, score2: 0,
       active_turn: 1, round_bank: 0,
       current_question: '', answers: [], round: 1, current_survey_idx: 0,
+      last_submission: null,
     });
   };
 
@@ -180,13 +218,8 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
               {surveys.length} surveys ready
             </div>
           )}
-          <Btn
-            onClick={startGame}
-            color="#4ade80"
-            size="lg"
-            className="w-full"
-            disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0}
-          >
+          <Btn onClick={startGame} color="#4ade80" size="lg" className="w-full"
+            disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0}>
             ▶ START GAME
           </Btn>
         </div>
@@ -198,6 +231,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   if (isPlaying) {
     return (
       <div className="max-w-4xl mx-auto space-y-5">
+
         {/* Scores */}
         <div className="grid grid-cols-2 gap-4">
           {[
@@ -232,54 +266,52 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
           </div>
         </div>
 
-        {/* Round Bank */}
-        <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 flex items-center justify-between">
-          <span className="font-heading text-sm tracking-widest text-white/60 uppercase">Round Bank</span>
-          <div className="flex items-center gap-3">
-            <button onClick={() => updateState({ round_bank: Math.max(0, (gs.round_bank || 0) - 50) })}
-              className="w-8 h-8 rounded border border-white/20 text-white/60 hover:border-white/50 hover:text-white transition-all font-heading text-lg">-</button>
-            <span className="font-heading text-2xl text-[#FF5F1F] w-16 text-center">{gs.round_bank || 0}</span>
-            <button onClick={() => updateState({ round_bank: (gs.round_bank || 0) + 50 })}
-              className="w-8 h-8 rounded border border-white/20 text-white/60 hover:border-white/50 hover:text-white transition-all font-heading text-lg">+</button>
+        {/* Round Bank + Award */}
+        <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="font-heading text-sm tracking-widest text-white/60 uppercase">Round Bank</span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => updateState({ round_bank: Math.max(0, (gs.round_bank || 0) - 50) })}
+                className="w-8 h-8 rounded border border-white/20 text-white/60 hover:border-white/50 hover:text-white transition-all font-heading text-lg">-</button>
+              <span className="font-heading text-2xl text-[#FF5F1F] w-16 text-center">{gs.round_bank || 0}</span>
+              <button onClick={() => updateState({ round_bank: (gs.round_bank || 0) + 50 })}
+                className="w-8 h-8 rounded border border-white/20 text-white/60 hover:border-white/50 hover:text-white transition-all font-heading text-lg">+</button>
+            </div>
           </div>
+          {(gs.round_bank || 0) > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => awardBank(1)}
+                className="py-2 rounded-lg border-2 border-[#BC13FE] text-[#BC13FE] font-heading text-xs tracking-widest uppercase hover:bg-[#BC13FE]/20 transition-all">
+                Award → {gs.family1 || 'Family 1'}
+              </button>
+              <button onClick={() => awardBank(2)}
+                className="py-2 rounded-lg border-2 border-[#FF5F1F] text-[#FF5F1F] font-heading text-xs tracking-widest uppercase hover:bg-[#FF5F1F]/20 transition-all">
+                Award → {gs.family2 || 'Family 2'}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Current Survey */}
-        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">
-              Survey {currentSurveyIdx + 1} / {surveys.length}
-            </h3>
-            <div className="flex gap-2">
-              <Btn onClick={prevSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>◀ Prev</Btn>
-              <Btn onClick={nextSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>Next ▶</Btn>
+        {/* Player Submission Feed */}
+        {lastSubmission && (
+          <div className="p-4 border-2 border-[#22d3ee] rounded-xl bg-[#22d3ee]/10 flex items-center gap-3"
+            style={{ boxShadow: '0 0 20px rgba(34,211,238,0.2)' }}>
+            <div className="text-2xl">💬</div>
+            <div>
+              <div className="font-heading text-xs tracking-[0.2em] text-[#22d3ee]/70 uppercase mb-0.5">
+                Seat {lastSubmission.seatNumber} answered:
+              </div>
+              <div className="font-heading text-xl text-white tracking-widest uppercase">
+                "{lastSubmission.submittedAnswer}"
+              </div>
+              {lastSubmission.familyTeam && (
+                <div className="font-heading text-xs text-[#22d3ee]/60 uppercase mt-0.5">
+                  Team: {lastSubmission.familyTeam}
+                </div>
+              )}
             </div>
           </div>
-          {gs.current_question && (
-            <div className="px-4 py-3 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 font-heading text-base text-[#FFD700] tracking-wide">
-              ★ {gs.current_question}
-            </div>
-          )}
-          {/* Survey picker */}
-          {surveys.length > 0 && (
-            <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-              {surveys.map((s, i) => (
-                <button
-                  key={s.id}
-                  onClick={() => loadSurvey(i)}
-                  className="w-full text-left px-3 py-2 rounded-lg font-heading text-xs tracking-wide transition-all border"
-                  style={{
-                    borderColor: i === currentSurveyIdx ? '#FFD700' : '#ffffff15',
-                    background: i === currentSurveyIdx ? '#FFD70015' : 'transparent',
-                    color: i === currentSurveyIdx ? '#FFD700' : '#ffffff60',
-                  }}
-                >
-                  {i + 1}. {s.question}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Answer Checker */}
         <div className="p-4 border border-[#22d3ee]/30 rounded-xl bg-black/60 space-y-3">
@@ -302,8 +334,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
             </button>
             <button
               onClick={() => checkAnswer(answerInput)}
-              className="px-4 py-3 rounded-lg border-2 border-[#22d3ee] text-[#22d3ee] font-heading text-sm tracking-widest uppercase hover:bg-[#22d3ee]/20 transition-all"
-            >
+              className="px-4 py-3 rounded-lg border-2 border-[#22d3ee] text-[#22d3ee] font-heading text-sm tracking-widest uppercase hover:bg-[#22d3ee]/20 transition-all">
               CHECK
             </button>
           </div>
@@ -318,27 +349,64 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
           )}
         </div>
 
-        {/* Answers */}
+        {/* Current Survey */}
+        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">
+              Survey {currentSurveyIdx + 1} / {surveys.length}
+            </h3>
+            <div className="flex gap-2">
+              <Btn onClick={prevSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>◀ Prev</Btn>
+              <Btn onClick={nextSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>Next ▶</Btn>
+            </div>
+          </div>
+          {gs.current_question && (
+            <div className="px-4 py-3 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 font-heading text-base text-[#FFD700] tracking-wide">
+              ★ {gs.current_question}
+            </div>
+          )}
+          {surveys.length > 0 && (
+            <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+              {surveys.map((s, i) => (
+                <button key={s.id} onClick={() => loadSurvey(i)}
+                  className="w-full text-left px-3 py-2 rounded-lg font-heading text-xs tracking-wide transition-all border"
+                  style={{
+                    borderColor: i === currentSurveyIdx ? '#FFD700' : '#ffffff15',
+                    background: i === currentSurveyIdx ? '#FFD70015' : 'transparent',
+                    color: i === currentSurveyIdx ? '#FFD700' : '#ffffff60',
+                  }}>
+                  {i + 1}. {s.question}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Host Answer Board — click to reveal */}
         <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Answers ({answers.length})</h3>
-            {answers.length > 0 && <Btn onClick={revealAll} color="#4ade80" size="sm">Reveal All</Btn>}
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">
+              Answer Board — click to reveal
+            </h3>
+            {answers.some(a => !a.revealed) && (
+              <Btn onClick={revealAll} color="#4ade80" size="sm">Reveal All</Btn>
+            )}
           </div>
-          {answers.length > 0 && (
+          {answers.length > 0 ? (
             <div className="space-y-2">
               {answers.map((ans, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-2 rounded-lg border transition-all"
-                  style={{ borderColor: ans.revealed ? '#FFD700' : '#ffffff15', background: ans.revealed ? '#FFD70010' : '#00000060' }}>
-                  <span className="font-heading text-sm text-[#FFD700] w-5 shrink-0">{i + 1}</span>
-                  <span className="font-heading text-sm text-white flex-1 truncate">{ans.text}</span>
-                  {ans.points > 0 && <span className="font-heading text-xs text-[#FF5F1F]">{ans.points}pts</span>}
-                  <button onClick={() => toggleReveal(i)}
-                    className="px-2 py-1 rounded border font-heading text-[10px] tracking-widest uppercase transition-all"
-                    style={{ borderColor: ans.revealed ? '#FFD700' : '#ffffff30', color: ans.revealed ? '#FFD700' : '#ffffff60' }}>
-                    {ans.revealed ? 'HIDE' : 'SHOW'}
-                  </button>
-                </div>
+                <HostAnswerRow
+                  key={i}
+                  rank={i + 1}
+                  answer={ans}
+                  onReveal={() => revealAnswer(i)}
+                  onHide={() => hideAnswer(i)}
+                />
               ))}
+            </div>
+          ) : (
+            <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase py-4">
+              Load a survey to see answers
             </div>
           )}
         </div>
@@ -380,4 +448,48 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   }
 
   return null;
+}
+
+function HostAnswerRow({ rank, answer, onReveal, onHide }) {
+  const revealed = answer.revealed;
+  return (
+    <div
+      className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-300 cursor-pointer group"
+      style={{
+        borderColor: revealed ? '#FFD700' : '#BC13FE40',
+        background: revealed ? 'rgba(255,215,0,0.1)' : 'rgba(188,19,254,0.05)',
+        boxShadow: revealed ? '0 0 15px rgba(255,215,0,0.2)' : 'none',
+      }}
+      onClick={revealed ? onHide : onReveal}
+      title={revealed ? 'Click to hide' : 'Click to reveal on main board'}
+    >
+      {/* Rank */}
+      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-heading text-sm"
+        style={{ background: revealed ? '#FFD700' : '#BC13FE30', color: revealed ? '#000' : '#BC13FE' }}>
+        {rank}
+      </div>
+
+      {/* Answer text — always visible to host */}
+      <div className="flex-1 font-heading text-base tracking-wide uppercase"
+        style={{ color: revealed ? '#FFD700' : '#ffffffcc' }}>
+        {answer.text || answer.answer}
+      </div>
+
+      {/* Points */}
+      <div className="font-heading text-sm shrink-0"
+        style={{ color: revealed ? '#FF5F1F' : '#FF5F1F80' }}>
+        {answer.points} pts
+      </div>
+
+      {/* Status pill */}
+      <div className="px-2 py-1 rounded border font-heading text-[9px] tracking-widest uppercase shrink-0 transition-all"
+        style={{
+          borderColor: revealed ? '#FFD700' : '#BC13FE50',
+          color: revealed ? '#FFD700' : '#BC13FE80',
+          background: revealed ? '#FFD70015' : 'transparent',
+        }}>
+        {revealed ? '✓ REVEALED' : 'CLICK TO REVEAL'}
+      </div>
+    </div>
+  );
 }
