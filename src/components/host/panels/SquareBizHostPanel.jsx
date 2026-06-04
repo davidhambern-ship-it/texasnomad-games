@@ -62,7 +62,25 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
     const next = [...board];
     next[idx] = next[idx] === mark ? '' : mark;
     const winner = checkWinner(next);
-    updateState({ board: next, winner: winner || null });
+    // If placing (not erasing) on an unlocked board, lock it and switch turn to O
+    const placing = !!mark && !board[idx];
+    const wasUnlocked = !boardLocked;
+    updateState({
+      board: next,
+      winner: winner || null,
+      ...(placing && wasUnlocked && !winner ? {
+        board_locked: true,
+        current_turn: 'O',
+        show_question: false,
+        show_choices: false,
+        answer_result: null,
+        selected_answer: null,
+        current_question: null,
+        current_choices: null,
+        correct_answer: null,
+        current_category: null,
+      } : {}),
+    });
   };
 
   const resetBoard = () => {
