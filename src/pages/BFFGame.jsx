@@ -77,11 +77,15 @@ function BFFViewer({ roomCode }) {
               <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
               <span className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>ROOM {roomCode}</span>
             </div>
-            {room?.host_connected && (
+            {room?.host_connected ? (
               <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 🔴 HOST LIVE
               </span>
-            )}
+            ) : selectedFamily ? (
+              <span className="px-2 py-0.5 bg-yellow-500/20 border border-yellow-500/40 rounded text-yellow-400 text-[8px] tracking-widest uppercase animate-pulse" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                ⏳ WAITING FOR HOST
+              </span>
+            ) : null}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Seat badge */}
@@ -115,16 +119,15 @@ function BFFViewer({ roomCode }) {
           seatNumber={seatNumber}
           onChoose={handleChooseFamily}
         />
-      ) : !phase || phase === 'setup' ? (
-        <WaitingScreen
-          family1={gs.family1}
-          family2={gs.family2}
+      ) : (
+        <GameBoard
+          gs={gs}
+          answers={answers}
           selectedFamily={selectedFamily}
           seatNumber={seatNumber}
+          locked={!phase || phase === 'setup'}
           onChangeFamily={() => { localStorage.removeItem(`tn_bff_family_${roomCode}_${playerId}`); setSelectedFamily(null); }}
         />
-      ) : (
-        <GameBoard gs={gs} answers={answers} selectedFamily={selectedFamily} seatNumber={seatNumber} />
       )}
     </div>
   );
@@ -189,50 +192,8 @@ function FamilySelect({ family1, family2, seatNumber, onChoose }) {
   );
 }
 
-/* ── WAITING SCREEN ── */
-function WaitingScreen({ family1, family2, selectedFamily, seatNumber, onChangeFamily }) {
-  const myName = selectedFamily === 1 ? (family1 || 'Family 1') : (family2 || 'Family 2');
-  const myColor = selectedFamily === 1 ? '#BC13FE' : '#FF5F1F';
-
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
-      <div className="w-16 h-16 border-4 border-[#BC13FE]/40 border-t-[#BC13FE] rounded-full animate-spin" />
-      <div className="font-heading text-2xl tracking-widest text-white/40 uppercase">Waiting for Host…</div>
-
-      <div className="px-8 py-5 rounded-2xl border-2 text-center space-y-2"
-        style={{ borderColor: myColor, background: `${myColor}10`, boxShadow: `0 0 20px ${myColor}30` }}>
-        {seatNumber && (
-          <div className="text-[9px] tracking-[0.25em] text-white/50 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-            Seat {seatNumber}
-          </div>
-        )}
-        <div className="font-heading text-2xl tracking-widest uppercase" style={{ color: myColor }}>
-          {myName}
-        </div>
-        <div className="text-[8px] tracking-[0.2em] text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          You're in!
-        </div>
-      </div>
-
-      {(family1 || family2) && (
-        <div className="flex gap-4">
-          {family1 && <div className="px-4 py-2 border rounded-lg font-heading text-sm tracking-widest uppercase"
-            style={{ borderColor: '#BC13FE40', color: '#BC13FE80' }}>{family1}</div>}
-          {family2 && <div className="px-4 py-2 border rounded-lg font-heading text-sm tracking-widest uppercase"
-            style={{ borderColor: '#FF5F1F40', color: '#FF5F1F80' }}>{family2}</div>}
-        </div>
-      )}
-
-      <button onClick={onChangeFamily}
-        className="text-[8px] tracking-widest text-white/20 uppercase hover:text-white/50 transition-colors" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-        ← Change Family
-      </button>
-    </div>
-  );
-}
-
 /* ── GAME BOARD ── */
-function GameBoard({ gs, answers, selectedFamily, seatNumber }) {
+function GameBoard({ gs, answers, selectedFamily, seatNumber, locked, onChangeFamily }) {
   const [revealAnim, setRevealAnim] = useState({});
   const prevAnswersRef = useRef([]);
 
@@ -251,7 +212,24 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber }) {
   const myName = selectedFamily === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
 
   return (
-    <div className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-4xl mx-auto w-full">
+    <div className="flex-1 flex flex-col p-4 md:p-8 gap-6 max-w-4xl mx-auto w-full relative">
+
+      {/* Locked overlay — shown while waiting for host */}
+      {locked && (
+        <div className="absolute inset-0 z-20 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center gap-4 rounded-xl pointer-events-none">
+          <div className="w-12 h-12 border-4 border-[#FFD700]/40 border-t-[#FFD700] rounded-full animate-spin" />
+          <div className="text-[#FFD700] text-[10px] tracking-[0.3em] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            Waiting for Host…
+          </div>
+          <button
+            className="text-[7px] tracking-widest text-white/20 uppercase hover:text-white/50 transition-colors pointer-events-auto mt-2"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+            onClick={onChangeFamily}
+          >
+            ← Change Family
+          </button>
+        </div>
+      )}
 
       {/* Scoreboard */}
       <div className="grid grid-cols-3 gap-4 items-center">
