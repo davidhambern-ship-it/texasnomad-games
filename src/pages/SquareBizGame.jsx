@@ -333,25 +333,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     await updateState({ auto_next_question: Date.now(), show_question: false, answer_result: null });
   };
 
-  const handleShowChoices = async () => {
-    if (myRole !== currentTurn) return;
-    await updateState({ show_choices: true });
-  };
-
-  const handleSelectAnswer = async (letter) => {
-    if (myRole !== currentTurn) return;
-    const isCorrect = letter === gs.correct_answer;
-    if (isCorrect) {
-      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true });
-      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
-    } else {
-      const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: nextTurn, board_locked: true });
-      setTimeout(() => updateState({ popup: null }), 2000);
-      setTimeout(() => updateState({ auto_next_question: Date.now() }), 2200);
-    }
-  };
-
   const cellDisplay = (v) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
     if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 24px rgba(255,95,31,0.7)' };
@@ -434,30 +415,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
-            {gs.show_choices && gs.current_choices ? (
-              <div className="space-y-2 mt-2">
-                {['A','B','C','D'].map((letter) => {
-                  const text = gs.current_choices?.[letter];
-                  if (!text) return null;
-                  const isCorrect = letter === gs.correct_answer;
-                  return (
-                    <button
-                      key={letter}
-                      onClick={() => handleSelectAnswer(letter)}
-                      disabled={!isMyTurn || !canControl}
-                      className="w-full text-left px-4 py-3 rounded-lg border-2 font-heading text-base transition-all active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:scale-102"
-                      style={{ borderColor: isCorrect ? '#4ade80' : '#8a22ff60', background: isCorrect ? '#4ade8015' : '#8a22ff10', color: isCorrect ? '#4ade80' : '#ffffffcc' }}>
-                      <span className="font-bold">{letter}.</span>{' '}{text}
-                    </button>
-                  );
-                })}
-              </div>
-            ) : isMyTurn && canControl && gs.current_choices ? (
-              <button onClick={handleShowChoices}
-                className="px-4 py-3 rounded-lg border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95">
-                Show Choices
-              </button>
-            ) : null}
           </>
         ) : null}
 
