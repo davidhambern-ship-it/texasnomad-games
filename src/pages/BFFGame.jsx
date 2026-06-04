@@ -211,7 +211,11 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
   const faceoffMode = gs.faceoff_mode || false;
   const buzzWinner = gs.buzz_winner || null;
   const myFaceoffId = selectedFamily === 1 ? gs.faceoff_player1_id : gs.faceoff_player2_id;
-  const iAmFaceoffPlayer = isSeated && playerId && myFaceoffId === playerId;
+  // If host assigned specific faceoff players, only those can buzz. Otherwise any seated player can.
+  const faceoffPlayersAssigned = !!(gs.faceoff_player1_id || gs.faceoff_player2_id);
+  const iAmFaceoffPlayer = isSeated && playerId && (
+    !faceoffPlayersAssigned || myFaceoffId === playerId
+  );
   const buzzAlreadyWon = !!buzzWinner;
   const iAmBuzzWinner = buzzWinner?.playerId === playerId;
 
@@ -283,7 +287,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     buzzerDisabled = true;
   } else if (faceoffMode && iAmFaceoffPlayer && !buzzAlreadyWon) {
     buzzerDisabled = false;
-    buzzerSubtext = 'You are in the faceoff!';
+    buzzerSubtext = faceoffPlayersAssigned ? 'You are in the faceoff!' : 'First to buzz wins!';
   } else if (faceoffMode && !iAmFaceoffPlayer) {
     buzzerSubtext = "Waiting for your team's faceoff player.";
   }
