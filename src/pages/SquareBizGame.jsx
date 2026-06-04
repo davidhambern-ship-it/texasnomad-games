@@ -272,32 +272,31 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     if (gs.display_mode !== 'board') return;
     if (chosenRole !== 'participant') return;
 
-    const xTaken = !!sbPlayers.find(p => p.role === 'X');
-    const oTaken = !!sbPlayers.find(p => p.role === 'O');
-    const activeCount = sbPlayers.filter(p => p.role === 'X' || p.role === 'O').length;
+    const xTaken = !!xPlayer;
+    const oTaken = !!oPlayer;
 
     // First participant gets X, second gets O
     if (!xTaken) {
-      const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
+      const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
     } else if (!oTaken) {
-      const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'O', joinedAt: Date.now(), lastActionAt: Date.now() }];
+      const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'O', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
     }
     // else: both taken — show the prompt (myRole stays null)
-  }, [isSeated, playerId, gs.display_mode, gs.sb_players, chosenRole]);
+  }, [isSeated, playerId, gs.display_mode, sbPlayers, chosenRole, xPlayer, oPlayer]);
 
   const handleJoinQueue = async () => {
     const nextPos = sbQueue.length + 1;
     const newQueue = [...sbQueue, { playerId, seatNumber, joinedQueueAt: Date.now(), queuePosition: nextPos }];
-    const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'queued', joinedAt: Date.now(), lastActionAt: Date.now() }];
+    const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'queued', joinedAt: Date.now(), lastActionAt: Date.now() }];
     await updateState({ sb_queue: newQueue, sb_players: newPlayers });
     setRoleChoice('queue');
     setJoinedQueue(true);
   };
 
   const handleWatchOnly = async () => {
-    const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'viewer', joinedAt: Date.now(), lastActionAt: Date.now() }];
+    const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'viewer', joinedAt: Date.now(), lastActionAt: Date.now() }];
     await updateState({ sb_players: newPlayers });
     setRoleChoice('viewer');
   };

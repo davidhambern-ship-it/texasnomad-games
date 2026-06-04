@@ -49,6 +49,8 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
   const currentTurn = gs.current_turn || 'X';
   const boardLocked = gs.board_locked !== false;
   const displayMode = gs.display_mode || null;
+  const xPlayer = sbPlayers.find(p => p.role === 'X');
+  const oPlayer = sbPlayers.find(p => p.role === 'O');
 
   const cellDisplay = (v) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE' };
@@ -211,7 +213,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
       )}
 
       {/* Live Status */}
-      <div className="grid grid-cols-3 gap-3 px-1">
+      <div className="grid grid-cols-4 gap-3 px-1">
         <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
           <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Current Turn</div>
           <div className="font-heading text-2xl font-bold"
@@ -229,6 +231,21 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           <div className="font-heading text-sm tracking-widest"
             style={{ color: gs.answer_result === true ? '#4ade80' : gs.answer_result === false ? '#ef4444' : '#ffffff30' }}>
             {gs.answer_result === true ? '✓ CORRECT' : gs.answer_result === false ? '✗ WRONG' : '—'}
+          </div>
+        </div>
+        <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+          <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Players</div>
+          <div className="flex flex-col gap-1 mt-1">
+            {xPlayer ? (
+              <div className="text-[7px] tracking-widest" style={{ color: '#BC13FE' }}>X: Seat {xPlayer.seatNumber}</div>
+            ) : (
+              <div className="text-[7px] tracking-widest text-white/20">X: Open</div>
+            )}
+            {oPlayer ? (
+              <div className="text-[7px] tracking-widest" style={{ color: '#FF5F1F' }}>O: Seat {oPlayer.seatNumber}</div>
+            ) : (
+              <div className="text-[7px] tracking-widest text-white/20">O: Open</div>
+            )}
           </div>
         </div>
       </div>
@@ -294,29 +311,31 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
               <div className="font-heading text-[10px] tracking-widest text-white/30 uppercase">{currentTrivia.category}</div>
             )}
             <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {currentTrivia.question}</div>
-            <div className="grid grid-cols-2 gap-2">
-              {['A','B','C','D'].map((letter) => {
-                const answerText = currentTrivia.choices?.[letter];
-                if (!answerText) return null;
-                const isSelected = gs.selected_answer === letter;
-                const isCorrect = letter === currentTrivia.correctLetter;
-                return (
-                  <button key={letter}
-                    onClick={() => handleAnswerSelect(letter)}
-                    disabled={!gs.show_choices || isSelected}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:cursor-default ${
-                      isSelected
-                        ? isCorrect
-                          ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'
-                          : 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
-                        : 'border-[#ffffff15] bg-transparent text-[#ffffff80] hover:enabled:scale-105'
-                    }`}>
-                    <span className="font-bold">{letter}.</span>
-                    <span className="truncate">{answerText}</span>
-                  </button>
-                );
-              })}
-            </div>
+            {gs.show_choices && (
+              <div className="grid grid-cols-2 gap-2">
+                {['A','B','C','D'].map((letter) => {
+                  const answerText = currentTrivia.choices?.[letter];
+                  if (!answerText) return null;
+                  const isSelected = gs.selected_answer === letter;
+                  const isCorrect = letter === currentTrivia.correctLetter;
+                  return (
+                    <button key={letter}
+                      onClick={() => handleAnswerSelect(letter)}
+                      disabled={isSelected}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:cursor-default ${
+                        isSelected
+                          ? isCorrect
+                            ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'
+                            : 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
+                          : 'border-[#ffffff15] bg-transparent text-[#ffffff80] hover:enabled:scale-105'
+                      }`}>
+                      <span className="font-bold">{letter}.</span>
+                      <span className="truncate">{answerText}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
 
@@ -330,7 +349,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!currentTrivia || loadingTrivia}>Show Question</Btn>
           <Btn onClick={() => fetchOTDBQuestion()} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Fetch Question'}</Btn>
         </div>
-        <Btn onClick={() => updateState({ show_choices: true })} color="#8a22ff" disabled={!gs.show_question} className="w-full">Show Choices</Btn>
+        <Btn onClick={() => updateState({ show_choices: true })} color="#8a22ff" disabled={!gs.show_question || !currentTrivia} className="w-full">Show Choices</Btn>
       </div>
 
       {/* Music */}
