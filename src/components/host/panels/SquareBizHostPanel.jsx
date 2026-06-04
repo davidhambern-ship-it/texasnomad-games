@@ -301,11 +301,166 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
         </div>
       </div>
 
+      {/* Board Mode: Player Roster */}
+      {displayMode === 'board' && <BoardModeRoster gs={gs} updateState={updateState} />}
+
       {/* Game Controls */}
       <div className="grid grid-cols-2 gap-3">
         <Btn onClick={resetBoard} color="#FF5F1F" size="lg">↺ Reset Board</Btn>
-        <Btn onClick={() => { resetBoard(); updateState({ display_mode: null }); }} color="#ffffff" size="lg">New Game</Btn>
+        <Btn onClick={() => { resetBoard(); updateState({ display_mode: null, sb_players: [], sb_queue: [] }); }} color="#ffffff" size="lg">New Game</Btn>
       </div>
+    </div>
+  );
+}
+
+function BoardModeRoster({ gs, updateState }) {
+  const sbPlayers = gs.sb_players || [];
+  const sbQueue = gs.sb_queue || [];
+  const sty = { fontFamily: "'Press Start 2P', monospace" };
+
+  const xPlayer = sbPlayers.find(p => p.role === 'X');
+  const oPlayer = sbPlayers.find(p => p.role === 'O');
+  const viewers = sbPlayers.filter(p => p.role === 'viewer');
+  const queued = [...sbQueue].sort((a, b) => a.queuePosition - b.queuePosition);
+
+  const setRole = async (playerId, newRole) => {
+    // Remove from queue if promoting
+    let newQueue = sbQueue;
+    if (newRole === 'X' || newRole === 'O') {
+      // Clear the slot they're taking
+      const displaced = sbPlayers.find(p => p.role === newRole);
+      newQueue = sbQueue.filter(p => p.playerId !== playerId);
+      let newPlayers = sbPlayers.map(p => {
+        if (p.playerId === playerId) return { ...p, role: newRole };
+        if (displaced && p.playerId === displaced.playerId) return { ...p, role: 'viewer' };
+        return p;
+      });
+      // Reindex queue
+      newQueue = newQueue.map((q, i) => ({ ...q, queuePosition: i + 1 }));
+      await updateState({ sb_players: newPlayers, sb_queue: newQueue });
+    } else {
+      const newPlayers = sbPlayers.map(p => p.playerId === playerId ? { ...p, role: newRole } : p);
+      if (newRole !== 'queued') {
+        newQueue = sbQueue.filter(q => q.playerId !== playerId).map((q, i) => ({ ...q, queuePosition: i + 1 }));
+      }
+      await updateState({ sb_players: newPlayers, sb_queue: newQueue });
+    }
+  };
+
+  const promoteFromQueue = async () => {
+    if (queued.length === 0) return;
+    const next = queued[0];
+    // Find open slot
+    const xFree = !xPlayer;
+    const oFree = !oPlayer;
+    if (!xFree && !oFree) return; // no slots
+    const slotRole = xFree ? 'X' : 'O';
+    const newQueue = sbQueue.filter(q => q.playerId !== next.playerId).map((q, i) => ({ ...q, queuePosition: i + 1 }));
+    const newPlayers = sbPlayers.map(p => p.playerId === next.playerId ? { ...p, role: slotRole } : p);
+    await updateState({ sb_players: newPlayers, sb_queue: newQueue });
+  };
+
+  const removeFromQueue = async (playerId) => {
+    const newQueue = sbQueue.filter(q => q.playerId !== playerId).map((q, i) => ({ ...q, queuePosition: i + 1 }));
+    const newPlayers = sbPlayers.map(p => p.playerId === playerId ? { ...p, role: 'viewer' } : p);
+    await updateState({ sb_players: newPlayers, sb_queue: newQueue });
+  };
+
+  return (
+    <div className="p-5 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-heading text-xl tracking-[0.15em] text-[#BC13FE] uppercase">Board Mode Players</h2>
+        {queued.length > 0 && (
+          <button onClick={promoteFromQueue}
+            className="px-3 py-2 rounded-lg border-2 border-[#FFD700] text-[#FFD700] font-heading text-xs tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95">
+            ↑ Promote Next
+          </button>
+        )}
+      </div>
+
+      {/* Active X / O */}
+      <div className="grid grid-cols-2 gap-3">
+        {[{ role: 'X', label: 'X Player', color: '#BC13FE', player: xPlayer }, { role: 'O', label: 'O Player', color: '#FF5F1F', player: oPlayer }].map(({ role, label, color, player }) => (
+          <div key={role} className="p-4 rounded-xl border-2 text-center"
+            style={{ borderColor: `${color}40`, background: `${color}08` }}>
+            <div className="font-heading text-2xl mb-1" style={{ color }}>{role}</div>
+            {player ? (
+              <>
+                <div className="text-[8px] text-white/70 mb-2" style={sty}>Seat {player.seatNumber}</div>
+                <div className="flex gap-1 justify-center flex-wrap">
+                  <button onClick={() => setRole(player.playerId, 'viewer')}
+                    className="px-2 py-1 rounded border border-white/20 text-white/40 font-heading text-[8px] uppercase hover:border-white/40 transition-all" style={sty}>
+                    → Viewer
+                  </button>
+                  {role === 'X' && oPlayer?.playerId !== player.playerId && (
+                    <button onClick={() => setRole(player.playerId, 'O')}
+                      className="px-2 py-1 rounded border border-[#FF5F1F]/40 text-[#FF5F1F]/70 font-heading text-[8px] uppercase hover:border-[#FF5F1F] transition-all" style={sty}>
+                      → O
+                    </button>
+                  )}
+                  {role === 'O' && xPlayer?.playerId !== player.playerId && (
+                    <button onClick={() => setRole(player.playerId, 'X')}
+                      className="px-2 py-1 rounded border border-[#BC13FE]/40 text-[#BC13FE]/70 font-heading text-[8px] uppercase hover:border-[#BC13FE] transition-all" style={sty}>
+                      → X
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="text-[8px] text-white/20 uppercase" style={sty}>Open Slot</div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Queue */}
+      {queued.length > 0 && (
+        <div>
+          <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase mb-2" style={sty}>Queue ({queued.length})</div>
+          <div className="space-y-2">
+            {queued.map((q) => {
+              const p = sbPlayers.find(pl => pl.playerId === q.playerId);
+              return (
+                <div key={q.playerId} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/5">
+                  <div className="w-6 h-6 rounded flex items-center justify-center font-heading text-sm text-[#FFD700]"
+                    style={{ background: '#FFD70020', ...sty, fontSize: '9px' }}>
+                    {q.queuePosition}
+                  </div>
+                  <div className="flex-1 text-[8px] text-white/70 uppercase" style={sty}>Seat {q.seatNumber}</div>
+                  <div className="flex gap-1">
+                    <button onClick={() => setRole(q.playerId, 'X')}
+                      className="px-2 py-1 rounded border border-[#BC13FE]/40 text-[#BC13FE]/70 font-heading text-[8px] uppercase hover:border-[#BC13FE] transition-all" style={sty}>X</button>
+                    <button onClick={() => setRole(q.playerId, 'O')}
+                      className="px-2 py-1 rounded border border-[#FF5F1F]/40 text-[#FF5F1F]/70 font-heading text-[8px] uppercase hover:border-[#FF5F1F] transition-all" style={sty}>O</button>
+                    <button onClick={() => removeFromQueue(q.playerId)}
+                      className="px-2 py-1 rounded border border-white/10 text-white/30 font-heading text-[8px] uppercase hover:border-red-500/50 hover:text-red-400 transition-all" style={sty}>✕</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Viewers */}
+      {viewers.length > 0 && (
+        <div>
+          <div className="text-[8px] tracking-widest text-white/30 uppercase mb-2" style={sty}>Viewers ({viewers.length})</div>
+          <div className="flex flex-wrap gap-2">
+            {viewers.map(p => (
+              <div key={p.playerId} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-white/10 bg-white/5">
+                <span className="text-[8px] text-white/50 uppercase" style={sty}>Seat {p.seatNumber}</span>
+                <button onClick={() => setRole(p.playerId, 'X')} className="text-[7px] text-[#BC13FE]/60 hover:text-[#BC13FE] transition-colors" style={sty}>→X</button>
+                <button onClick={() => setRole(p.playerId, 'O')} className="text-[7px] text-[#FF5F1F]/60 hover:text-[#FF5F1F] transition-colors" style={sty}>→O</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sbPlayers.length === 0 && sbQueue.length === 0 && (
+        <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase py-4">No players yet</div>
+      )}
     </div>
   );
 }
