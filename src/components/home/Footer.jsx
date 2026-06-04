@@ -6,9 +6,7 @@ export default function Footer() {
       <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
         {/* Branding */}
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-cyber-purple/20 border border-outlaw-gold flex items-center justify-center">
-            <span className="font-display text-outlaw-gold text-xs">TN</span>
-          </div>
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-8 h-8 object-contain" />
           <div>
             <span className="text-sm tracking-widest text-white uppercase" style={{ fontFamily: "'Rye', serif" }}>TEXASNOMAD</span>
             <span className="block text-[7px] tracking-[0.2em] text-kinetic-orange uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PRODUCTIONS</span>
@@ -40,7 +38,7 @@ export default function Footer() {
 
         {/* Copyright */}
         <p className="text-[7px] tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          © 2026 TEXASNOMAD GAMES
+          © 2026 TEXASNOMAD PRODUCTIONS
         </p>
       </div>
     </footer>
