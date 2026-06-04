@@ -53,9 +53,9 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
   const viewerPlayers = sbPlayers.filter(p => p.role === 'viewer').length;
 
   const cellDisplay = (v) => {
-    if (v === 'X') return { char: 'X', color: '#BC13FE' };
-    if (v === 'O') return { char: 'O', color: '#FF5F1F' };
-    return { char: '·', color: '#ffffff20' };
+    if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', bg: '#BC13FE18', glow: '0 0 12px rgba(188,19,254,0.7), inset 0 0 8px rgba(188,19,254,0.2)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', bg: '#FF5F1F18', glow: '0 0 12px rgba(255,95,31,0.7), inset 0 0 8px rgba(255,95,31,0.2)' };
+    return { char: '', color: '#ffffff60', border: '#FF5F1F', bg: '#1a0a2e', glow: '0 0 8px rgba(188,19,254,0.4), inset 0 0 6px rgba(255,95,31,0.15)' };
   };
 
   const forceCell = (idx, mark) => {
@@ -264,11 +264,11 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         </div>
         <div className="grid grid-cols-3 gap-2 max-w-xs mx-auto mb-4">
           {board.map((cell, idx) => {
-            const { char, color } = cellDisplay(cell);
+            const { char, color, border, bg, glow } = cellDisplay(cell);
             return (
               <div key={idx} className="relative group">
                 <div className="aspect-square flex items-center justify-center rounded-lg border-2 text-3xl font-heading transition-all"
-                  style={{ borderColor: cell ? color : '#ffffff15', color, background: cell ? `${color}15` : 'black' }}>
+                  style={{ borderColor: border, color, background: bg, boxShadow: glow }}>
                   {char}
                 </div>
                 {!cell && (
@@ -311,36 +311,50 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
             )}
             <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {gs.current_question}</div>
 
-            {/* Choices preview — always shown on host panel once loaded */}
+            {/* Choices — clickable by host to set selected_answer, no correct highlight until after resolution */}
             {gs.current_choices && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {['A','B','C','D'].map((letter) => {
                   const answerText = gs.current_choices[letter];
                   if (!answerText) return null;
-                  const isCorrect = letter === gs.correct_answer;
                   const isSelected = gs.selected_answer === letter;
+                  const hostJudged = gs.answer_result === true || gs.answer_result === false;
+                  const isCorrect = letter === gs.correct_answer;
+
+                  // Only show result highlights AFTER host has judged
+                  let cls = 'border-[#ffffff20] bg-[#ffffff08] text-[#ffffffcc] hover:border-[#FF5F1F] hover:bg-[#FF5F1F]/10 cursor-pointer';
+                  if (isSelected && !hostJudged) cls = 'border-[#FFD700]/70 bg-[#FFD700]/15 text-[#FFD700] cursor-pointer';
+                  if (hostJudged && isSelected && gs.answer_result) cls = 'border-[#4ade80]/70 bg-[#4ade80]/15 text-[#4ade80] cursor-default';
+                  if (hostJudged && isSelected && !gs.answer_result) cls = 'border-[#ef4444]/70 bg-[#ef4444]/10 text-[#ef4444] cursor-default';
+                  if (hostJudged && isCorrect && gs.answer_result) cls = 'border-[#4ade80]/70 bg-[#4ade80]/15 text-[#4ade80] cursor-default';
+
                   return (
-                    <div key={letter}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left ${
-                        isCorrect ? 'border-[#4ade80]/50 bg-[#4ade80]/10 text-[#4ade80]' :
-                        isSelected ? 'border-[#ef4444]/50 bg-[#ef4444]/10 text-[#ef4444]' :
-                        'border-[#ffffff15] text-[#ffffff60]'
-                      }`}>
+                    <button key={letter}
+                      onClick={() => !hostJudged && updateState({ selected_answer: letter })}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 ${cls}`}>
                       <span className="font-bold">{letter}.</span>
                       <span className="truncate">{answerText}</span>
-                      {isCorrect && <span className="ml-auto text-[#4ade80]">✓</span>}
-                      {isSelected && !isCorrect && <span className="ml-auto text-[#ef4444]">✗</span>}
-                    </div>
+                      {isSelected && !hostJudged && <span className="ml-auto text-[#FFD700]">●</span>}
+                      {hostJudged && isSelected && gs.answer_result && <span className="ml-auto text-[#4ade80]">✓</span>}
+                      {hostJudged && isSelected && !gs.answer_result && <span className="ml-auto text-[#ef4444]">✗</span>}
+                    </button>
                   );
                 })}
               </div>
             )}
 
-            {/* Player's selected answer indicator */}
+            {/* Status indicator */}
             {gs.selected_answer && gs.answer_result === null && (
               <div className="px-3 py-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 text-center">
                 <div className="font-heading text-xs tracking-widest text-[#FFD700] uppercase">
-                  Player selected: {gs.selected_answer} — Judge below
+                  Selected: {gs.selected_answer} — Click CORRECT or WRONG
+                </div>
+              </div>
+            )}
+            {!gs.selected_answer && gs.show_choices && (
+              <div className="px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-center">
+                <div className="font-heading text-[9px] tracking-widest text-white/40 uppercase">
+                  Click a choice above to select player's answer
                 </div>
               </div>
             )}
@@ -364,12 +378,12 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           </Btn>
         </div>
 
-        {/* CORRECT / WRONG — shown once a player has answered or host wants to judge */}
+        {/* CORRECT / WRONG — always clickable when choices are showing */}
         {gs.show_choices && (
           <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
             <button
               onClick={handleCorrect}
-              disabled={!!gs.answer_result || gs.answer_result === true}
+              disabled={gs.answer_result === true}
               className="py-5 rounded-xl border-2 border-[#4ade80] font-heading text-xl tracking-widest text-[#4ade80] uppercase hover:bg-[#4ade80]/20 transition-all active:scale-95 disabled:opacity-40"
               style={{ boxShadow: '0 0 20px rgba(74,222,128,0.3)' }}>
               ✓ CORRECT

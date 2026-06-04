@@ -435,10 +435,10 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
 
               let style = 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] opacity-50'; // default: dimmed
               if (canClick) style = 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] hover:scale-[1.02] hover:border-[#8a22ff]';
-              if (isSelected && !hostJudged) style = 'border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]'; // pending
-              if (hostJudged && isSelected && gs.answer_result) style = 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'; // correct
-              if (hostJudged && isSelected && !gs.answer_result) style = 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'; // wrong
-              if (hostJudged && isCorrect && gs.answer_result) style = 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'; // correct reveal
+              if (isSelected && !hostJudged) style = 'border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]'; // pending — player selected, waiting for host
+              if (hostJudged && isSelected && gs.answer_result) style = 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'; // host marked correct
+              if (hostJudged && isSelected && !gs.answer_result) style = 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'; // host marked wrong
+              // NOTE: do NOT highlight correct answer for wrong selections — don't reveal it
 
               return (
                 <button key={letter}
