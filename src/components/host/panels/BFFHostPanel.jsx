@@ -291,32 +291,60 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
               {/* Family 1 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-2" style={sty}>{gs.family1 || 'Family 1'}</div>
-                <select
-                  className="w-full px-3 py-2 rounded-lg bg-black/80 border-2 border-[#BC13FE]/40 text-white font-body text-sm focus:border-[#BC13FE] focus:outline-none"
-                  value={gs.faceoff_player1_id || ''}
-                  onChange={(e) => setFaceoffPlayer(1, e.target.value)}>
-                  <option value="">-- Select Player --</option>
-                  {family1Players.map(p => <option key={p.playerId} value={p.playerId}>Seat {p.seatNumber}</option>)}
-                </select>
+                {family1Players.length === 0
+                  ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
+                  : <div className="flex flex-wrap gap-2">
+                      {family1Players.map(p => {
+                        const selected = gs.faceoff_player1_id === p.playerId;
+                        return (
+                          <button key={p.playerId} onClick={() => setFaceoffPlayer(1, selected ? '' : p.playerId)}
+                            className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
+                            style={{
+                              borderColor: selected ? '#BC13FE' : '#BC13FE30',
+                              color: selected ? '#BC13FE' : '#ffffff50',
+                              background: selected ? '#BC13FE20' : 'transparent',
+                              boxShadow: selected ? '0 0 10px rgba(188,19,254,0.3)' : 'none',
+                            }}>
+                            SEAT {p.seatNumber}
+                            <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                }
                 {fo1 && (
-                  <div className="mt-1 px-2 py-1 rounded border border-[#BC13FE]/30 bg-[#BC13FE]/10 text-[8px] text-[#BC13FE] text-center" style={sty}>
-                    SEAT {fo1.seatNumber} — {fo1.connected !== false ? '🟢 connected' : '🔴 offline'}
+                  <div className="mt-2 px-2 py-1 rounded border border-[#BC13FE]/30 bg-[#BC13FE]/10 text-[8px] text-[#BC13FE] text-center" style={sty}>
+                    ⚡ SEAT {fo1.seatNumber} in faceoff
                   </div>
                 )}
               </div>
               {/* Family 2 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#FF5F1F]/70 uppercase mb-2" style={sty}>{gs.family2 || 'Family 2'}</div>
-                <select
-                  className="w-full px-3 py-2 rounded-lg bg-black/80 border-2 border-[#FF5F1F]/40 text-white font-body text-sm focus:border-[#FF5F1F] focus:outline-none"
-                  value={gs.faceoff_player2_id || ''}
-                  onChange={(e) => setFaceoffPlayer(2, e.target.value)}>
-                  <option value="">-- Select Player --</option>
-                  {family2Players.map(p => <option key={p.playerId} value={p.playerId}>Seat {p.seatNumber}</option>)}
-                </select>
+                {family2Players.length === 0
+                  ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
+                  : <div className="flex flex-wrap gap-2">
+                      {family2Players.map(p => {
+                        const selected = gs.faceoff_player2_id === p.playerId;
+                        return (
+                          <button key={p.playerId} onClick={() => setFaceoffPlayer(2, selected ? '' : p.playerId)}
+                            className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
+                            style={{
+                              borderColor: selected ? '#FF5F1F' : '#FF5F1F30',
+                              color: selected ? '#FF5F1F' : '#ffffff50',
+                              background: selected ? '#FF5F1F20' : 'transparent',
+                              boxShadow: selected ? '0 0 10px rgba(255,95,31,0.3)' : 'none',
+                            }}>
+                            SEAT {p.seatNumber}
+                            <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                }
                 {fo2 && (
-                  <div className="mt-1 px-2 py-1 rounded border border-[#FF5F1F]/30 bg-[#FF5F1F]/10 text-[8px] text-[#FF5F1F] text-center" style={sty}>
-                    SEAT {fo2.seatNumber} — {fo2.connected !== false ? '🟢 connected' : '🔴 offline'}
+                  <div className="mt-2 px-2 py-1 rounded border border-[#FF5F1F]/30 bg-[#FF5F1F]/10 text-[8px] text-[#FF5F1F] text-center" style={sty}>
+                    ⚡ SEAT {fo2.seatNumber} in faceoff
                   </div>
                 )}
               </div>
