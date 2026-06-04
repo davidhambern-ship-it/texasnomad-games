@@ -22,21 +22,21 @@ export default function AboutSection({ aboutBg }) {
 
           {/* Text */}
           <div className="text-center md:text-left">
-            <h3 className="font-heading text-2xl md:text-3xl tracking-[0.15em] text-outlaw-gold mb-4 uppercase">
-              ★ ABOUT TEXASNOMAD GAMES ★
+            <h3 className="text-base md:text-lg tracking-[0.1em] text-outlaw-gold mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+              ABOUT TEXASNOMAD
             </h3>
-            <p className="font-body text-sm md:text-base leading-relaxed text-white/80 max-w-xl">
+            <p className="text-xs md:text-sm leading-relaxed text-white/80 max-w-xl font-body">
               TexasNomad Games is a livestream gaming network built for interactive competition,
               community engagement, and live entertainment.
             </p>
-            <p className="font-body text-sm md:text-base leading-relaxed text-white/80 max-w-xl mt-2">
+            <p className="text-xs md:text-sm leading-relaxed text-white/80 max-w-xl mt-2 font-body">
               Join the action, compete in real-time, and become part of the network.
             </p>
           </div>
 
           {/* Fort Worth text */}
           <div className="hidden md:block text-right">
-            <p className="font-display text-xl text-kinetic-orange leading-tight text-glow-orange">
+            <p className="text-sm text-kinetic-orange leading-loose text-glow-orange" style={{ fontFamily: "'Rye', serif" }}>
               FORT WORTH<br/>MADE.<br/>NATIONWIDE<br/>PLAYED.
             </p>
           </div>

@@ -53,8 +53,8 @@ export default function Home() {
 function FeaturedGamesInline({ gameImages }) {
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
-      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-4 uppercase">
-        ★ FEATURED GAMES ★
+      <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+        FEATURED GAMES
       </h3>
       <div className="grid grid-cols-3 gap-2">
         {[
@@ -70,9 +70,9 @@ function FeaturedGamesInline({ gameImages }) {
             <div className="w-16 h-16 md:w-20 md:h-20 mb-2 rounded overflow-hidden">
               <img src={gameImages[i]} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
             </div>
-            <span className="font-heading text-sm md:text-base tracking-wider text-white uppercase text-center leading-tight">{game.title}</span>
-            <span className="text-[9px] tracking-widest text-outlaw-gold/70 uppercase text-center">{game.subtitle}</span>
-            <span className="mt-2 px-3 py-1 border border-outlaw-gold text-outlaw-gold font-heading text-[10px] tracking-widest uppercase rounded group-hover:bg-outlaw-gold group-hover:text-black transition-all">
+            <span className="text-[8px] md:text-[9px] tracking-wider text-white uppercase text-center leading-tight" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.title}</span>
+            <span className="text-[6px] tracking-widest text-outlaw-gold/70 uppercase text-center mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
+            <span className="mt-2 px-2 py-1 border border-outlaw-gold text-outlaw-gold text-[6px] tracking-widest uppercase rounded group-hover:bg-outlaw-gold group-hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               Create Room
             </span>
           </button>
@@ -100,10 +100,10 @@ function JoinGameInline() {
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col items-center justify-center">
-      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-3 uppercase">
-        ★ JOIN A LIVE GAME ★
+      <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-3 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+        JOIN LIVE
       </h3>
-      <p className="font-heading text-xs tracking-widest text-white/60 uppercase mb-3">ENTER ROOM CODE</p>
+      <p className="text-[8px] tracking-widest text-white/60 uppercase mb-3" style={{ fontFamily: "'Press Start 2P', monospace" }}>ENTER ROOM CODE</p>
       <input
         type="text"
         value={roomCode}
@@ -116,11 +116,12 @@ function JoinGameInline() {
       {error && <p className="text-kinetic-orange text-xs mt-1.5">Enter a room code to join!</p>}
       <button
         onClick={handleJoin}
-        className="mt-4 px-6 py-2.5 border-2 border-kinetic-orange text-kinetic-orange font-heading text-lg tracking-widest uppercase rounded hover:bg-kinetic-orange hover:text-black hover:shadow-[0_0_20px_rgba(255,95,31,0.5)] transition-all duration-300"
+        className="mt-4 px-6 py-2.5 border-2 border-kinetic-orange text-kinetic-orange text-xs tracking-widest uppercase rounded hover:bg-kinetic-orange hover:text-black hover:shadow-[0_0_20px_rgba(255,95,31,0.5)] transition-all duration-300"
+        style={{ fontFamily: "'Press Start 2P', monospace" }}
       >
         JOIN GAME
       </button>
-      <p className="mt-3 font-display text-xs text-outlaw-gold/50 italic">★ BE PART OF THE ACTION ★</p>
+      <p className="mt-3 text-[7px] text-outlaw-gold/50 tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>★ BE PART OF THE ACTION ★</p>
     </div>
   );
 }
@@ -134,8 +135,8 @@ function LiveStatusInline() {
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
-      <h3 className="font-heading text-xl md:text-2xl tracking-[0.12em] text-outlaw-gold text-center mb-4 uppercase">
-        ★ LIVE STATUS ★
+      <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+        LIVE STATUS
       </h3>
       <div className="space-y-2">
         {games.map((game) => (
@@ -143,16 +144,16 @@ function LiveStatusInline() {
             <div className="flex items-center gap-2">
               <div className="w-2.5 h-2.5 rounded-full bg-kinetic-orange animate-pulse-glow shrink-0" />
               <div>
-                <span className="font-heading text-sm tracking-wider text-white uppercase">{game.name}</span>
-                <span className="block text-[8px] tracking-widest text-white/40 uppercase">{game.subtitle}</span>
+                <span className="text-[9px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.name}</span>
+                <span className="block text-[7px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
               </div>
             </div>
             <div className="flex items-center gap-2">
               <div className="text-right">
-                <span className="font-heading text-xl text-outlaw-gold">{game.players}</span>
-                <span className="block text-[8px] tracking-widest text-white/40 uppercase">PLAYERS</span>
+                <span className="text-lg text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{game.players}</span>
+                <span className="block text-[6px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLAYERS</span>
               </div>
-              <span className="px-1.5 py-0.5 bg-cyber-purple/20 border border-cyber-purple/50 rounded text-cyber-purple font-heading text-[10px] tracking-wider animate-pulse-glow">
+              <span className="px-1.5 py-0.5 bg-cyber-purple/20 border border-cyber-purple/50 rounded text-cyber-purple text-[7px] tracking-wider animate-pulse-glow" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 LIVE
               </span>
             </div>
@@ -160,7 +161,7 @@ function LiveStatusInline() {
         ))}
       </div>
       <div className="mt-4 text-center">
-        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold font-heading text-xs tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all">
+        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[7px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
           VIEW ALL LIVE GAMES
         </a>
       </div>

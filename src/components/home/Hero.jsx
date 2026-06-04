@@ -35,10 +35,10 @@ export default function Hero({ heroBg, crownLogo }) {
         <div className="mt-6 w-full max-w-lg overflow-hidden">
           <div className="relative py-3 px-2 border-y-2 border-outlaw-gold/60">
             <div className="flex whitespace-nowrap animate-marquee">
-              <span className="font-heading text-2xl md:text-3xl tracking-[0.2em] text-kinetic-orange text-glow-orange mx-8">
+              <span className="text-sm md:text-base tracking-[0.2em] text-kinetic-orange text-glow-orange mx-8" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 ★ PLAY • COMPETE • CONNECT ★
               </span>
-              <span className="font-heading text-2xl md:text-3xl tracking-[0.2em] text-kinetic-orange text-glow-orange mx-8">
+              <span className="text-sm md:text-base tracking-[0.2em] text-kinetic-orange text-glow-orange mx-8" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 ★ PLAY • COMPETE • CONNECT ★
               </span>
             </div>

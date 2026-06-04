@@ -19,8 +19,8 @@ export default function Header() {
             <span className="font-display text-outlaw-gold text-sm">TN</span>
           </div>
           <div className="hidden sm:block">
-            <span className="font-heading text-xl tracking-widest text-white uppercase leading-none">TEXASNOMAD</span>
-            <span className="block font-heading text-[10px] tracking-[0.3em] text-kinetic-orange uppercase leading-none">PRODUCTIONS</span>
+            <span className="tracking-widest text-white uppercase leading-none text-base" style={{ fontFamily: "'Rye', serif" }}>TEXASNOMAD</span>
+            <span className="block text-[8px] tracking-[0.2em] text-kinetic-orange uppercase leading-none mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PRODUCTIONS</span>
           </div>
         </Link>
 
@@ -30,7 +30,8 @@ export default function Header() {
             <Link
               key={item.label}
               to={item.path}
-              className="px-3 py-1.5 font-heading text-sm tracking-widest text-white/80 hover:text-outlaw-gold transition-colors uppercase"
+              className="px-3 py-1.5 text-[10px] tracking-widest text-white/80 hover:text-outlaw-gold transition-colors uppercase"
+              style={{ fontFamily: "'Press Start 2P', monospace" }}
             >
               {item.label}
             </Link>
@@ -40,7 +41,8 @@ export default function Header() {
         {/* Host Link */}
         <Link
           to="/host"
-          className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#BC13FE]/40 text-[#BC13FE]/70 rounded text-[10px] font-heading tracking-widest uppercase hover:bg-[#BC13FE]/10 hover:border-[#BC13FE] transition-all mr-2"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#BC13FE]/40 text-[#BC13FE]/70 rounded text-[9px] tracking-widest uppercase hover:bg-[#BC13FE]/10 hover:border-[#BC13FE] transition-all mr-2"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
         >
           🎛 HOST
         </Link>
