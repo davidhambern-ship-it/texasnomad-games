@@ -79,6 +79,7 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
               }
               if (JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
                   fr.host_connected !== roomRef.current?.host_connected ||
+                  fr.players_connected !== roomRef.current?.players_connected ||
                   fr.status !== roomRef.current?.status) {
                 roomRef.current = fr;
                 setRoom({ ...fr });

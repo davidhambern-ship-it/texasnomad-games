@@ -58,6 +58,11 @@ export function getDefaultGameState(gameId) {
         guessed_letters: [],
         wrong_letters: [],
         max_wrong: 6,
+        // Universal seat system fields
+        players: [],
+        current_go_round: 1,
+        seats_that_chose: [],
+        last_action: null,
       };
     default:
       return {};
