@@ -17,29 +17,29 @@ const Btn = ({ children, onClick, color = '#FF5F1F', size = 'md', className = ''
   );
 };
 
+// Decode HTML entities from Open Trivia DB responses
+function decodeHTML(str) {
+  const txt = document.createElement('textarea');
+  txt.innerHTML = str;
+  return txt.value;
+}
+
+// Shuffle an array in place (Fisher-Yates)
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
-  const [trivia, setTrivia] = useState([]);
+  const [currentTrivia, setCurrentTrivia] = useState(null);
   const [loadingTrivia, setLoadingTrivia] = useState(false);
-  const [currentTriviaIdx, setCurrentTriviaIdx] = useState(0);
 
   const board = gs.board || Array(9).fill('');
   const currentTurn = gs.current_turn || 'X';
-  const displayMode = gs.display_mode || null; // null = mode select screen
-
-  // Load trivia bank from SquareBizTrivia entity
-  useEffect(() => {
-    setLoadingTrivia(true);
-    base44.entities.SquareBizTrivia.list()
-      .then(setTrivia)
-      .finally(() => setLoadingTrivia(false));
-  }, []);
-
-  // Sync currentTriviaIdx when gs.trivia_idx changes
-  useEffect(() => {
-    if (gs.trivia_idx != null) setCurrentTriviaIdx(gs.trivia_idx);
-  }, [gs.trivia_idx]);
-
-  const currentTrivia = trivia[currentTriviaIdx] || null;
+  const displayMode = gs.display_mode || null;
 
   const cellDisplay = (v) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE' };
@@ -61,21 +61,48 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     updateState({ display_mode: mode, board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false, popup: null });
   };
 
+  const fetchOTDBQuestion = async () => {
+    setLoadingTrivia(true);
+    try {
+      const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
+      const data = await res.json();
+      const q = data.results[0];
+
+      const correct = decodeHTML(q.correct_answer);
+      const allAnswers = shuffleArray([
+        correct,
+        ...q.incorrect_answers.map(decodeHTML),
+      ]);
+      const letters = ['A', 'B', 'C', 'D'];
+      const choices = {};
+      allAnswers.forEach((ans, i) => { choices[letters[i]] = ans; });
+      const correctLetter = letters[allAnswers.indexOf(correct)];
+
+      const trivia = {
+        question: decodeHTML(q.question),
+        choices,
+        correctLetter,
+        category: decodeHTML(q.category),
+      };
+      setCurrentTrivia(trivia);
+      // Stage the question in game state (hide correct answer from players)
+      updateState({
+        show_question: false,
+        show_choices: false,
+        current_question: trivia.question,
+        current_choices: trivia.choices,
+        correct_answer: trivia.correctLetter,
+      });
+    } catch {
+      // silently fail — host can retry
+    } finally {
+      setLoadingTrivia(false);
+    }
+  };
+
   const showQuestion = () => {
     if (!currentTrivia) return;
-    updateState({
-      show_question: true,
-      show_choices: false,
-      current_question: currentTrivia.question,
-      current_choices: {
-        A: currentTrivia.answer_a,
-        B: currentTrivia.answer_b,
-        C: currentTrivia.answer_c,
-        D: currentTrivia.answer_d,
-      },
-      correct_answer: currentTrivia.correct_answer,
-      trivia_idx: currentTriviaIdx,
-    });
+    updateState({ show_question: true, show_choices: false });
   };
 
   const showChoices = () => {
@@ -83,23 +110,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
   };
 
   const shuffleQuestion = () => {
-    if (trivia.length === 0) return;
-    const newIdx = Math.floor(Math.random() * trivia.length);
-    setCurrentTriviaIdx(newIdx);
-    const t = trivia[newIdx];
-    updateState({
-      show_question: false,
-      show_choices: false,
-      current_question: t.question,
-      current_choices: {
-        A: t.answer_a,
-        B: t.answer_b,
-        C: t.answer_c,
-        D: t.answer_d,
-      },
-      correct_answer: t.correct_answer,
-      trivia_idx: newIdx,
-    });
+    fetchOTDBQuestion();
   };
 
   const handleCorrect = () => {
@@ -243,20 +254,20 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
         <div className="flex items-center justify-between">
           <h2 className="font-heading text-xl tracking-[0.15em] text-[#FFD700] uppercase">Question</h2>
           {loadingTrivia && <span className="font-heading text-xs text-white/30 uppercase tracking-widest">Loading…</span>}
-          {!loadingTrivia && trivia.length > 0 && (
-            <span className="font-heading text-xs text-white/30 uppercase tracking-widest">{trivia.length} questions</span>
-          )}
         </div>
 
         {/* Current question display */}
         {currentTrivia && (
           <div className="p-4 rounded-lg bg-[#FFD700]/5 border border-[#FFD700]/20 space-y-3">
-            <div className="font-heading text-sm tracking-wide text-[#FFD700]">★ {currentTrivia.question}</div>
+            {currentTrivia.category && (
+              <div className="font-heading text-[10px] tracking-widest text-white/30 uppercase">{currentTrivia.category}</div>
+            )}
+            <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {currentTrivia.question}</div>
             <div className="grid grid-cols-2 gap-2">
               {['A', 'B', 'C', 'D'].map((letter) => {
-                const answerText = currentTrivia[`answer_${letter.toLowerCase()}`];
+                const answerText = currentTrivia.choices?.[letter];
                 if (!answerText) return null;
-                const isCorrect = currentTrivia.correct_answer === letter;
+                const isCorrect = currentTrivia.correctLetter === letter;
                 return (
                   <div key={letter}
                     className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading"
@@ -277,13 +288,13 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
 
         {!currentTrivia && !loadingTrivia && (
           <div className="px-4 py-6 rounded-lg border border-white/10 text-center font-body text-white/30 text-sm">
-            No trivia loaded yet. Add questions to the SquareBizTrivia entity.
+            Press <span className="text-[#BC13FE]">Shuffle Question</span> to fetch a question from Open Trivia DB.
           </div>
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Btn onClick={showQuestion} color="#4ade80" disabled={!currentTrivia}>Show Question</Btn>
-          <Btn onClick={shuffleQuestion} color="#BC13FE" disabled={trivia.length === 0}>Shuffle Question</Btn>
+          <Btn onClick={showQuestion} color="#4ade80" disabled={!currentTrivia || loadingTrivia}>Show Question</Btn>
+          <Btn onClick={shuffleQuestion} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Shuffle Question'}</Btn>
         </div>
         <Btn onClick={showChoices} color="#8a22ff" disabled={!gs.show_question} className="w-full">Show Choices</Btn>
       </div>
