@@ -307,12 +307,20 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     });
   };
 
-  // Player answers — only the active player (whose turn it is) may answer
+  // Player answers — auto-resolves correct/wrong immediately
   const handleAnswerSelect = async (letter) => {
-    if (myRole !== currentTurn) return; // only the active player can answer
-    if (gs.selected_answer) return; // already answered
-    // Signal to host panel — host decides CORRECT/WRONG
-    await updateState({ selected_answer: letter });
+    if (myRole !== currentTurn) return;
+    if (gs.selected_answer) return;
+    const isCorrect = letter === gs.correct_answer;
+    await updateState({ selected_answer: letter, answer_result: isCorrect });
+    if (isCorrect) {
+      await updateState({ popup: 'correct' });
+      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
+    } else {
+      const nextTurn = currentTurn === 'X' ? 'O' : 'X';
+      await updateState({ popup: 'wrong', current_turn: nextTurn, board_locked: true });
+      setTimeout(() => updateState({ popup: null }), 2000);
+    }
   };
 
   // O taps board to reveal question (when it's O's turn and board is locked, no question yet)
@@ -450,14 +458,7 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
                 </button>
               );
             })}
-            {/* Waiting for host to judge */}
-            {gs.selected_answer && gs.answer_result === null && !popup && (
-              <div className="px-4 py-3 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
-                <div className="text-[8px] tracking-widest text-[#FFD700] uppercase animate-pulse" style={sty}>
-                  Waiting for host…
-                </div>
-              </div>
-            )}
+
           </>
         )}
 
