@@ -12,15 +12,15 @@ export default function Hero({ heroBg, crownLogo }) {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center text-center px-4 py-12">
         {/* Crown B Logo */}
-        <img src={crownLogo} alt="Crown B Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-2 drop-shadow-[0_0_30px_rgba(188,19,254,0.6)]" />
+        <img src={crownLogo} alt="Crown B Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-2 drop-shadow-[0_0_30px_rgba(188,19,254,0.6)] rounded-2xl" />
 
         {/* Title */}
         <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl uppercase leading-none"
-          style={{ fontFamily: "'Alfa Slab One', serif", color: '#E55A00', textShadow: '0 0 10px rgba(229,90,0,0.7), 0 0 20px rgba(229,90,0,0.4), 0 0 40px rgba(229,90,0,0.25)', letterSpacing: '0.05em' }}>
+        style={{ fontFamily: "'Alfa Slab One', serif", color: '#E55A00', textShadow: '0 0 10px rgba(229,90,0,0.7), 0 0 20px rgba(229,90,0,0.4), 0 0 40px rgba(229,90,0,0.25)', letterSpacing: '0.05em' }}>
           TEXASNOMAD
         </h1>
         <h2 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl uppercase leading-none mt-[-0.05em]"
-          style={{ fontFamily: "'Righteous', sans-serif", color: 'white', textShadow: '0 0 10px #BC13FE, 0 0 20px #BC13FE, 0 0 40px #BC13FE', letterSpacing: '0.25em' }}>
+        style={{ fontFamily: "'Righteous', sans-serif", color: 'white', textShadow: '0 0 10px #BC13FE, 0 0 20px #BC13FE, 0 0 40px #BC13FE', letterSpacing: '0.25em' }}>
           GAMES
         </h2>
 
@@ -45,6 +45,6 @@ export default function Hero({ heroBg, crownLogo }) {
           </div>
         </div>
       </div>
-    </section>
-  );
+    </section>);
+
 }
