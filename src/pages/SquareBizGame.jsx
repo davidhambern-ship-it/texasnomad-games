@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 
@@ -12,11 +12,9 @@ export default function SquareBizGame() {
   return <SquareBizViewer roomCode={roomCode} />;
 }
 
-/* ── VIEWER: connected to a room ── */
 function SquareBizViewer({ roomCode }) {
-  const { room, loading } = useGameRoom(roomCode, 'square-biz', 'viewer');
+  const { room, loading, updateState } = useGameRoom(roomCode, 'square-biz', 'viewer');
   const gs = room?.game_state || {};
-  const board = gs.board || Array(9).fill('');
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
 
@@ -26,11 +24,7 @@ function SquareBizViewer({ roomCode }) {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
-  const cellDisplay = (v) => {
-    if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.6)' };
-    if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.6)' };
-    return { char: '', color: '#ffffff15', glow: 'none' };
-  };
+  const displayMode = gs.display_mode;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col">
@@ -68,28 +62,251 @@ function SquareBizViewer({ roomCode }) {
         <div className="flex-1 flex items-center justify-center">
           <div className="w-10 h-10 border-4 border-[#8a22ff] border-t-transparent rounded-full animate-spin" />
         </div>
+      ) : !displayMode ? (
+        <WaitingForHost />
+      ) : displayMode === 'panel' ? (
+        <PanelModeBoard gs={gs} />
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
-          {/* Turn Indicator */}
-          <div className="text-center">
-            <div className="font-heading text-xs tracking-[0.25em] text-white/40 uppercase mb-1">Current Turn</div>
-            <div className="font-heading text-5xl font-bold"
-              style={{
-                color: gs.current_turn === 'X' ? '#BC13FE' : '#FF5F1F',
-                textShadow: `0 0 30px ${gs.current_turn === 'X' ? '#BC13FE' : '#FF5F1F'}`,
-              }}>
-              {gs.current_turn || 'X'}
-            </div>
-          </div>
+        <BoardModeBoard gs={gs} updateState={updateState} />
+      )}
+    </div>
+  );
+}
 
-          {/* Board */}
-          <div className="grid grid-cols-3 gap-3 w-full max-w-sm">
+/* ── WAITING ── */
+function WaitingForHost() {
+  return (
+    <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
+      <div className="w-16 h-16 border-4 border-[#8a22ff]/40 border-t-[#8a22ff] rounded-full animate-spin" />
+      <div className="font-heading text-2xl tracking-widest text-white/40 uppercase">Waiting for Host…</div>
+    </div>
+  );
+}
+
+/* ── PANEL MODE ── */
+function PanelModeBoard({ gs }) {
+  const board = gs.board || Array(9).fill('');
+  const popup = gs.popup;
+
+  const cellDisplay = (v, idx) => {
+    const isSelected = gs.selected_square === idx;
+    if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 24px rgba(255,95,31,0.7)' };
+    if (isSelected) return { char: '', color: '#FFD700', glow: '0 0 16px rgba(255,215,0,0.5)' };
+    return { char: '', color: '#ffffff10', glow: 'none' };
+  };
+
+  return (
+    <div className="flex-1 flex items-stretch p-4 gap-4 relative">
+      {/* Popup overlay */}
+      {popup && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <div
+            className="font-heading text-8xl md:text-9xl tracking-widest uppercase animate-pulse"
+            style={{
+              color: popup === 'correct' ? '#4ade80' : '#ef4444',
+              textShadow: `0 0 40px ${popup === 'correct' ? '#4ade80' : '#ef4444'}, 0 0 80px ${popup === 'correct' ? '#4ade8060' : '#ef444460'}`,
+            }}
+          >
+            {popup === 'correct' ? 'CORRECT!' : 'WRONG!'}
+          </div>
+        </div>
+      )}
+
+      {/* LEFT — Choices */}
+      <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
+        {gs.show_question && gs.current_choices ? (
+          <>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#8a22ff]/70 uppercase mb-1">Choices</div>
+            {['A', 'B', 'C', 'D'].map((letter) => {
+              const text = gs.current_choices?.[letter];
+              if (!text) return null;
+              return (
+                <div key={letter}
+                  className="px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide"
+                  style={{ borderColor: '#8a22ff40', background: '#8a22ff10', color: '#ffffffcc' }}>
+                  <span className="text-[#8a22ff] mr-3">{letter}.</span>{text}
+                </div>
+              );
+            })}
+          </>
+        ) : (
+          <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase">
+            Choices will appear here
+          </div>
+        )}
+      </div>
+
+      {/* CENTER — Board */}
+      <div className="flex flex-col items-center justify-center gap-4 shrink-0">
+        {/* Turn indicator */}
+        <div className="text-center">
+          <div className="font-heading text-xs tracking-[0.25em] text-white/40 uppercase mb-1">Turn</div>
+          <div className="font-heading text-4xl font-bold"
+            style={{ color: gs.current_turn === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 24px ${gs.current_turn === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
+            {gs.current_turn || 'X'}
+          </div>
+        </div>
+
+        {/* 3x3 */}
+        <div className="grid grid-cols-3 gap-3" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
+          {board.map((cell, idx) => {
+            const { char, color, glow } = cellDisplay(cell, idx);
+            return (
+              <div key={idx}
+                className="aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all"
+                style={{
+                  fontSize: 'clamp(2rem, 5vw, 5rem)',
+                  borderColor: cell ? color : gs.selected_square === idx ? '#FFD700' : '#ffffff10',
+                  color,
+                  background: cell ? `${color}15` : gs.selected_square === idx ? '#FFD70015' : '#00000060',
+                  boxShadow: glow,
+                }}>
+                {char}
+              </div>
+            );
+          })}
+        </div>
+
+        {gs.winner && (
+          <div className="font-heading text-3xl tracking-widest uppercase"
+            style={{ color: gs.winner === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 30px ${gs.winner === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
+            🏆 {gs.winner} WINS!
+          </div>
+        )}
+      </div>
+
+      {/* RIGHT — Question */}
+      <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
+        {gs.show_question && gs.current_question ? (
+          <>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#FFD700]/70 uppercase mb-1">Question</div>
+            <div className="px-5 py-5 rounded-xl border-2 border-[#FFD700]/30 bg-[#FFD700]/5 font-heading text-xl tracking-wide text-white leading-snug"
+              style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
+              {gs.current_question}
+            </div>
+          </>
+        ) : (
+          <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase">
+            Question will appear here
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── BOARD MODE ── */
+function BoardModeBoard({ gs, updateState }) {
+  const board = gs.board || Array(9).fill('');
+  const [showControlPanel, setShowControlPanel] = useState(false);
+  const [roundPhase, setRoundPhase] = useState('idle'); // idle | question | choices
+  const [questionTimer, setQuestionTimer] = useState(null);
+  const timerRef = useRef(null);
+
+  const currentTurn = gs.current_turn || 'X';
+  const popup = gs.popup;
+
+  const handlePlay = () => {
+    if (!gs.current_question) return;
+    setRoundPhase('question');
+    updateState({ show_question: true, show_choices: false });
+    timerRef.current = setTimeout(() => {
+      setRoundPhase('choices');
+    }, 5000);
+  };
+
+  const handleShowChoices = () => {
+    setRoundPhase('choices');
+    updateState({ show_choices: true });
+  };
+
+  const handleCellClick = (idx) => {
+    if (board[idx] || gs.winner) return;
+    // In board mode, clicking a cell places the current turn marker
+    const newBoard = [...board];
+    newBoard[idx] = currentTurn;
+    const nextTurn = currentTurn === 'X' ? 'O' : 'X';
+    updateState({ board: newBoard, current_turn: nextTurn, show_question: false, show_choices: false });
+    setRoundPhase('idle');
+  };
+
+  useEffect(() => {
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, []);
+
+  const cellDisplay = (v) => {
+    if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 24px rgba(255,95,31,0.7)' };
+    return { char: '', color: '#ffffff10', glow: 'none' };
+  };
+
+  return (
+    <div className="flex-1 flex items-stretch p-4 gap-4 relative">
+      {/* Popup overlay */}
+      {popup && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
+          <div
+            className="font-heading text-8xl md:text-9xl tracking-widest uppercase animate-pulse"
+            style={{
+              color: popup === 'correct' ? '#4ade80' : '#ef4444',
+              textShadow: `0 0 40px ${popup === 'correct' ? '#4ade80' : '#ef4444'}`,
+            }}
+          >
+            {popup === 'correct' ? 'CORRECT!' : 'WRONG!'}
+          </div>
+        </div>
+      )}
+
+      {/* LEFT — Question card */}
+      <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
+        {roundPhase !== 'idle' && gs.current_question ? (
+          <>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#FFD700]/70 uppercase mb-1">Question</div>
+            <div className="px-5 py-5 rounded-xl border-2 border-[#FFD700]/30 bg-[#FFD700]/5 font-heading text-xl tracking-wide text-white leading-snug"
+              style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
+              {gs.current_question}
+            </div>
+            {roundPhase === 'choices' && gs.current_choices && (
+              <div className="space-y-2 mt-2">
+                {['A', 'B', 'C', 'D'].map((letter) => {
+                  const text = gs.current_choices?.[letter];
+                  if (!text) return null;
+                  return (
+                    <div key={letter}
+                      className="px-4 py-3 rounded-lg border font-heading text-base"
+                      style={{ borderColor: '#8a22ff40', background: '#8a22ff10', color: '#ffffffcc' }}>
+                      <span className="text-[#8a22ff] mr-2">{letter}.</span>{text}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        ) : null}
+      </div>
+
+      {/* CENTER — Board */}
+      <div className="flex flex-col items-center justify-center gap-4 shrink-0">
+        <div className="text-center">
+          <div className="font-heading text-xs tracking-[0.25em] text-white/40 uppercase mb-1">Turn</div>
+          <div className="font-heading text-4xl font-bold"
+            style={{ color: currentTurn === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 24px ${currentTurn === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
+            {currentTurn}
+          </div>
+        </div>
+
+        {/* Board with PLAY overlay */}
+        <div className="relative" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
+          <div className="grid grid-cols-3 gap-3">
             {board.map((cell, idx) => {
               const { char, color, glow } = cellDisplay(cell);
               return (
                 <div key={idx}
-                  className="aspect-square flex items-center justify-center rounded-xl border-2 text-5xl md:text-7xl font-heading transition-all"
+                  onClick={() => roundPhase === 'idle' && handleCellClick(idx)}
+                  className="aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all cursor-pointer hover:scale-105"
                   style={{
+                    fontSize: 'clamp(2rem, 5vw, 5rem)',
                     borderColor: cell ? color : '#ffffff10',
                     color,
                     background: cell ? `${color}15` : '#00000060',
@@ -101,89 +318,81 @@ function SquareBizViewer({ roomCode }) {
             })}
           </div>
 
-          {/* Question */}
-          {gs.show_question && gs.current_question && (
-            <div className="w-full max-w-2xl p-6 border border-[#8a22ff]/40 rounded-2xl bg-black/60 text-center"
-              style={{ boxShadow: '0 0 30px rgba(138,34,255,0.15)' }}>
-              <div className="font-heading text-xs tracking-[0.2em] text-[#8a22ff]/70 uppercase mb-2">Question</div>
-              <div className="font-heading text-2xl md:text-3xl text-white tracking-wide">{gs.current_question}</div>
-            </div>
-          )}
-
-          {gs.winner && (
-            <div className="text-center">
-              <div className="font-heading text-3xl tracking-widest uppercase"
-                style={{ color: gs.winner === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 30px ${gs.winner === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
-                🏆 {gs.winner} WINS!
-              </div>
+          {/* PLAY button overlay */}
+          {roundPhase === 'idle' && !gs.winner && gs.current_question && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
+              <button
+                onClick={handlePlay}
+                className="px-8 py-4 rounded-xl border-2 border-[#FFD700] text-[#FFD700] font-heading text-2xl tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95"
+                style={{ boxShadow: '0 0 20px rgba(255,215,0,0.3)' }}
+              >
+                ▶ PLAY
+              </button>
             </div>
           )}
         </div>
-      )}
-    </div>
-  );
-}
 
-/* ── LEGACY IFRAME MODE ── */
-const SQUARE_BIZ_URL = 'https://media.base44.com/files/public/6a1faf9539e2c1e12925ead8/78526944c_Square-Biz-Game-App-v5-PDF-Trivia-Bank.html';
+        {/* CHOICES button */}
+        {roundPhase === 'question' && (
+          <button
+            onClick={handleShowChoices}
+            className="px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-lg tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
+          >
+            Choices →
+          </button>
+        )}
 
-function SquareBizIframe() {
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [htmlContent, setHtmlContent] = useState('');
-  const [loading, setLoading] = useState(true);
-  const iframeRef = useRef(null);
-  const containerRef = useRef(null);
-
-  useEffect(() => {
-    fetch(SQUARE_BIZ_URL).then(r => r.text()).then(html => { setHtmlContent(html); setLoading(false); }).catch(() => setLoading(false));
-  }, []);
-
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener('fullscreenchange', handler);
-    return () => document.removeEventListener('fullscreenchange', handler);
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-[#05030b] text-white flex flex-col">
-      <header className="sticky top-0 z-50 border-b border-[#8a22ff]/30 bg-[#05030b]/90 backdrop-blur-xl">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3 shrink-0">
-            <Link to="/" className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors">
-              <div className="w-8 h-8 rounded-full bg-[#8a22ff]/20 border border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-xs">TN</span>
-              </div>
-            </Link>
-            <span className="font-heading text-base tracking-widest text-[#ff8a00] uppercase">Square Biz! — Trivia + Tactics</span>
+        {gs.winner && (
+          <div className="font-heading text-3xl tracking-widest uppercase"
+            style={{ color: gs.winner === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 30px ${gs.winner === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
+            🏆 {gs.winner} WINS!
           </div>
-          <div className="flex items-center gap-2">
-            <Link to="/" className="hidden sm:flex px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+        )}
+
+        {/* Control Panel button */}
+        <button
+          onClick={() => setShowControlPanel(!showControlPanel)}
+          className="mt-2 px-4 py-2 rounded-lg border border-white/20 text-white/40 font-heading text-xs tracking-widest uppercase hover:text-white/70 hover:border-white/40 transition-all"
+        >
+          ⚙ Control Panel
+        </button>
+      </div>
+
+      {/* RIGHT — empty or placeholder */}
+      <div className="flex-1" />
+
+      {/* Control Panel drawer */}
+      {showControlPanel && (
+        <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-20 w-80 p-5 rounded-2xl border border-white/20 bg-[#05030b]/95 backdrop-blur-xl space-y-3"
+          style={{ boxShadow: '0 0 30px rgba(0,0,0,0.8)' }}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-heading text-sm tracking-widest text-white/60 uppercase">Control Panel</span>
+            <button onClick={() => setShowControlPanel(false)} className="text-white/30 hover:text-white/60 text-lg">✕</button>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-heading text-xs tracking-widest text-white/50 uppercase">Music</span>
             <button
-              onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
-              className="px-3 py-1.5 bg-[#FF5F1F] text-white rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FF5F1F]/80 transition-all">
-              {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
+              onClick={() => updateState({ music_on: !(gs.music_on !== false) })}
+              className={`px-3 py-1.5 rounded border-2 font-heading text-xs tracking-widest uppercase transition-all ${gs.music_on !== false ? 'border-green-400 text-green-400 bg-green-400/10' : 'border-white/20 text-white/30'}`}>
+              {gs.music_on !== false ? 'ON' : 'OFF'}
+            </button>
+          </div>
+          <button onClick={() => { updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null }); setRoundPhase('idle'); }}
+            className="w-full py-2 rounded-lg border border-[#FF5F1F]/40 text-[#FF5F1F] font-heading text-xs tracking-widest uppercase hover:bg-[#FF5F1F]/10 transition-all">
+            ↺ Clear Board
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button onClick={() => updateState({ current_turn: 'X' })}
+              className="py-2 rounded-lg border border-[#BC13FE]/40 text-[#BC13FE] font-heading text-xs tracking-widest uppercase hover:bg-[#BC13FE]/10 transition-all">
+              X Turn
+            </button>
+            <button onClick={() => updateState({ current_turn: 'O' })}
+              className="py-2 rounded-lg border border-[#FF5F1F]/40 text-[#FF5F1F] font-heading text-xs tracking-widest uppercase hover:bg-[#FF5F1F]/10 transition-all">
+              O Turn
             </button>
           </div>
         </div>
-      </header>
-      <div className="sm:hidden flex flex-col items-center justify-center flex-1 px-6 py-16 text-center gap-4">
-        <div className="text-5xl">🎯</div>
-        <h2 className="text-3xl uppercase font-extrabold" style={{ fontFamily: "'Teko', sans-serif", color: '#ff8a00' }}>Bigger Screen Required!</h2>
-        <Link to="/" className="mt-4 px-6 py-2.5 border-2 border-[#FFD700] text-[#FFD700] font-bold tracking-widest uppercase text-sm rounded hover:bg-[#FFD700] hover:text-black transition-all">← Back to Lobby</Link>
-      </div>
-      <div ref={containerRef} className="hidden sm:flex flex-col flex-1 min-h-0" style={{ background: '#05030b' }}>
-        <div style={{ height: '3px', background: 'linear-gradient(90deg, #8a22ff, #ff2bd6, #ff8a00, #00b8ff, #8a22ff)' }} />
-        {loading ? (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="w-10 h-10 border-4 border-[#8a22ff] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <iframe ref={iframeRef} srcdoc={htmlContent} title="Square Biz!" className="flex-1 w-full border-0"
-            style={{ minHeight: 'calc(100vh - 3.5rem - 3px)' }}
-            allow="microphone" allowFullScreen
-            sandbox="allow-scripts allow-same-origin allow-forms allow-modals allow-popups allow-downloads" />
-        )}
-      </div>
+      )}
     </div>
   );
 }

@@ -1,0 +1,49 @@
+{
+  "name": "SquareBizTrivia",
+  "type": "object",
+  "properties": {
+    "question": {
+      "type": "string",
+      "description": "The trivia question"
+    },
+    "answer_a": {
+      "type": "string",
+      "description": "Choice A"
+    },
+    "answer_b": {
+      "type": "string",
+      "description": "Choice B"
+    },
+    "answer_c": {
+      "type": "string",
+      "description": "Choice C"
+    },
+    "answer_d": {
+      "type": "string",
+      "description": "Choice D"
+    },
+    "correct_answer": {
+      "type": "string",
+      "enum": [
+        "A",
+        "B",
+        "C",
+        "D"
+      ],
+      "description": "Which answer is correct"
+    },
+    "category": {
+      "type": "string",
+      "description": "Optional category"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "required": [
+    "question",
+    "answer_a",
+    "correct_answer"
+  ]
+}

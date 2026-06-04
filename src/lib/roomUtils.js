@@ -33,14 +33,18 @@ export function getDefaultGameState(gameId) {
     case 'square-biz':
       return {
         phase: 'playing',
+        display_mode: null,
         board: Array(9).fill(''),
         current_turn: 'X',
         current_question: '',
+        current_choices: null,
+        correct_answer: null,
         show_question: false,
+        show_choices: false,
+        selected_square: null,
+        trivia_idx: 0,
+        popup: null,
         music_on: true,
-        music_volume: 70,
-        sfx_on: true,
-        sfx_volume: 80,
         winner: null,
       };
     case 'hangman':
