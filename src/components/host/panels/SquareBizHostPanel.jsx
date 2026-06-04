@@ -378,23 +378,15 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           </Btn>
         </div>
 
-        {/* CORRECT / WRONG — always clickable when choices are showing */}
-        {gs.show_choices && (
-          <div className="grid grid-cols-2 gap-4 pt-2 border-t border-white/10">
-            <button
-              onClick={handleCorrect}
-              disabled={gs.answer_result === true}
-              className="py-5 rounded-xl border-2 border-[#4ade80] font-heading text-xl tracking-widest text-[#4ade80] uppercase hover:bg-[#4ade80]/20 transition-all active:scale-95 disabled:opacity-40"
-              style={{ boxShadow: '0 0 20px rgba(74,222,128,0.3)' }}>
-              ✓ CORRECT
-            </button>
-            <button
-              onClick={handleWrong}
-              disabled={gs.answer_result === false}
-              className="py-5 rounded-xl border-2 border-[#ef4444] font-heading text-xl tracking-widest text-[#ef4444] uppercase hover:bg-[#ef4444]/20 transition-all active:scale-95 disabled:opacity-40"
-              style={{ boxShadow: '0 0 20px rgba(239,68,68,0.3)' }}>
-              ✗ WRONG
-            </button>
+        {/* Correct Answer display — only shown when choices are loaded */}
+        {gs.current_choices && gs.correct_answer && (
+          <div className="pt-2 border-t border-white/10">
+            <div className="font-heading text-[9px] tracking-widest text-[#4ade80]/70 uppercase mb-2" style={{ fontFamily: "'Press Start 2P', monospace" }}>Correct Answer</div>
+            <div className="px-4 py-3 rounded-xl border-2 border-[#4ade80]/60 bg-[#4ade80]/10 font-heading text-lg tracking-wide text-[#4ade80]"
+              style={{ boxShadow: '0 0 15px rgba(74,222,128,0.2)' }}>
+              <span className="opacity-60 mr-2">{gs.correct_answer}.</span>
+              {gs.current_choices[gs.correct_answer]}
+            </div>
           </div>
         )}
       </div>
