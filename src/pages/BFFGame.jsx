@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
+import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 
 export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
@@ -10,8 +11,12 @@ export default function BFFGame() {
 }
 
 function BFFViewer({ roomCode }) {
-  const { room, loading } = useGameRoom(roomCode, 'bff', 'viewer');
+  const { room, loading, updateState } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
+
+  // Universal seat assignment
+  usePlayerSeat(room, roomCode, 'bff', updateState);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
 
