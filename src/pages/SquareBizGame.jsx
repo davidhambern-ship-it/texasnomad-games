@@ -308,6 +308,23 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     });
   };
 
+  const handleAnswerSelect = async (letter) => {
+    // Only Player O can select answers, and only on their turn
+    if (myRole !== 'O' || !isMyTurn) return;
+    
+    const isCorrect = letter === gs.correct_answer;
+    if (isCorrect) {
+      // Correct: show popup, then unlock board for marker placement
+      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
+      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
+    } else {
+      // Wrong: show popup, switch turn, stay locked, auto-fetch next question
+      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: 'X', board_locked: true, selected_answer: letter });
+      setTimeout(() => updateState({ popup: null }), 2000);
+      setTimeout(() => updateState({ auto_next_question: Date.now() }), 2200);
+    }
+  };
+
   const cellDisplay = (v, idx) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
     if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
@@ -418,11 +435,26 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
             {['A','B','C','D'].map((letter) => {
               const text = gs.current_choices[letter];
               if (!text) return null;
+              const isSelected = gs.selected_answer === letter;
+              const isCorrect = letter === gs.correct_answer;
+              const canClick = myRole === 'O' && isMyTurn && !gs.selected_answer;
               return (
-                <div key={letter} className="px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide"
-                  style={{ borderColor: '#8a22ff40', background: '#8a22ff10', color: '#ffffffcc' }}>
-                  <span className="text-[#8a22ff] mr-3">{letter}.</span>{text}
-                </div>
+                <button
+                  key={letter}
+                  onClick={() => canClick && handleAnswerSelect(letter)}
+                  disabled={!canClick || isSelected}
+                  className={`w-full px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide text-left transition-all active:scale-95 disabled:cursor-default ${
+                    isSelected
+                      ? isCorrect
+                        ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'
+                        : 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
+                      : canClick
+                        ? 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] hover:scale-105 hover:border-[#8a22ff]'
+                        : 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] opacity-50'
+                  }`}
+                  style={!isSelected ? { boxShadow: canClick ? '0 0 15px rgba(138,34,255,0.3)' : 'none' } : {}}>
+                  <span className={isCorrect && isSelected ? 'text-[#4ade80]' : 'text-[#8a22ff]'}>{letter}.</span>{text}
+                </button>
               );
             })}
           </>

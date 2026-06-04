@@ -127,9 +127,8 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
       await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
       setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
     } else {
-      // Wrong: show popup, switch turn, stay locked, auto-fetch next question
-      const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: nextTurn, board_locked: true, selected_answer: letter });
+      // Wrong: show popup, switch turn to X, stay locked, auto-fetch next question
+      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: 'X', board_locked: true, selected_answer: letter });
       setTimeout(() => updateState({ popup: null }), 2000);
       setTimeout(() => fetchOTDBQuestion(true), 2200);
     }
