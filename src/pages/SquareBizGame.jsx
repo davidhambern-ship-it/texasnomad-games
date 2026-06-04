@@ -237,11 +237,11 @@ function BoardModeBoard({ gs, updateState }) {
   };
 
   const handleCellClick = (idx) => {
-    if (board[idx] || gs.winner || roundPhase !== 'idle') return;
+    if (board[idx] || gs.winner || !gs.board_enabled) return;
     const newBoard = [...board];
     newBoard[idx] = currentTurn;
     const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-    updateState({ board: newBoard, current_turn: nextTurn, show_question: false, show_choices: false });
+    updateState({ board: newBoard, current_turn: nextTurn, board_enabled: false, show_question: false, show_choices: false });
   };
 
   const cellDisplay = (v) => {
@@ -312,8 +312,8 @@ function BoardModeBoard({ gs, updateState }) {
               const { char, color, glow } = cellDisplay(cell);
               return (
                 <div key={idx}
-                  onClick={() => roundPhase === 'idle' && handleCellClick(idx)}
-                  className="aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all cursor-pointer hover:scale-105"
+                  onClick={() => handleCellClick(idx)}
+                  className={`aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all ${!cell && gs.board_enabled ? 'cursor-pointer hover:scale-105 hover:border-white/40' : 'cursor-default'}`}
                   style={{
                     fontSize: 'clamp(2rem, 5vw, 5rem)',
                     borderColor: cell ? color : '#ffffff10',
@@ -327,8 +327,8 @@ function BoardModeBoard({ gs, updateState }) {
             })}
           </div>
 
-          {/* PLAY button overlay — always visible in idle phase */}
-          {roundPhase === 'idle' && !gs.winner && (
+          {/* PLAY button overlay — shown when board is not enabled and no active question */}
+          {!gs.board_enabled && roundPhase === 'idle' && !gs.winner && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
               <button
                 onClick={handlePlay}
@@ -339,6 +339,11 @@ function BoardModeBoard({ gs, updateState }) {
                 ▶ PLAY
               </button>
             </div>
+          )}
+          {/* Board enabled indicator */}
+          {gs.board_enabled && (
+            <div className="absolute inset-0 rounded-xl pointer-events-none"
+              style={{ boxShadow: '0 0 0 3px #4ade80, 0 0 20px rgba(74,222,128,0.3)' }} />
           )}
         </div>
 
@@ -387,7 +392,15 @@ function BoardModeBoard({ gs, updateState }) {
               {gs.music_on !== false ? 'ON' : 'OFF'}
             </button>
           </div>
-          <button onClick={() => { updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false }); }}
+          <div className="flex items-center justify-between">
+            <span className="font-heading text-xs tracking-widest text-white/50 uppercase">Board</span>
+            <button
+              onClick={() => updateState({ board_enabled: !gs.board_enabled })}
+              className={`px-3 py-1.5 rounded border-2 font-heading text-xs tracking-widest uppercase transition-all ${gs.board_enabled ? 'border-green-400 text-green-400 bg-green-400/10' : 'border-white/20 text-white/30'}`}>
+              {gs.board_enabled ? 'ENABLED' : 'DISABLED'}
+            </button>
+          </div>
+          <button onClick={() => { updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null, board_enabled: false, show_question: false, show_choices: false }); }}
             className="w-full py-2 rounded-lg border border-[#FF5F1F]/40 text-[#FF5F1F] font-heading text-xs tracking-widest uppercase hover:bg-[#FF5F1F]/10 transition-all">
             ↺ Clear Board
           </button>

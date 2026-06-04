@@ -127,31 +127,23 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
   };
 
   const handleCorrect = () => {
-    const selected = gs.selected_square;
-    const newBoard = [...board];
-    if (selected != null && !newBoard[selected]) {
-      newBoard[selected] = currentTurn;
-    }
-    const nextTurn = currentTurn === 'X' ? 'O' : 'X';
     updateState({
       popup: 'correct',
-      board: newBoard,
-      current_turn: nextTurn,
       show_question: false,
       show_choices: false,
       selected_square: null,
     });
-    setTimeout(() => updateState({ popup: null }), 2500);
+    // After popup clears, enable the board for the player to place their mark
+    setTimeout(() => updateState({ popup: null, board_enabled: true }), 2500);
   };
 
   const handleWrong = () => {
-    const nextTurn = currentTurn === 'X' ? 'O' : 'X';
     updateState({
       popup: 'wrong',
-      current_turn: nextTurn,
       show_question: false,
       show_choices: false,
       selected_square: null,
+      board_enabled: false,
     });
     setTimeout(() => updateState({ popup: null }), 2500);
   };
