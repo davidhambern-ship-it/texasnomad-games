@@ -2,29 +2,33 @@ import { useState, useEffect, useRef } from 'react';
 
 /**
  * Universal Player Seat Hook
- * - Persists playerId per room in localStorage
- * - Assigns and restores seat number from game_state.players
- * - Only runs for non-host viewers; pass isHost=true to skip seating
+ * - Persists a unique playerId per room in localStorage
+ * - Assigns seat from game_state.players on first visit, restores on refresh
+ * - Works across ALL games (bff, hangman, square-biz, etc.)
+ * - Pass isHost=true to skip seating (host is never assigned a seat)
  */
 export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = false) {
-  // Stable playerId per room — persisted in localStorage
+  // One stable playerId per room, persisted in localStorage
   const [playerId] = useState(() => {
     const key = `tn_pid_${roomCode}`;
     let id = localStorage.getItem(key);
     if (!id) {
-      id = 'p_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+      id = 'p_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
       localStorage.setItem(key, id);
     }
     return id;
   });
 
+  // Restore seat number instantly from localStorage to avoid flash
   const [seatNumber, setSeatNumber] = useState(() => {
-    // Try to restore seat from localStorage immediately (avoids flash)
     const cached = localStorage.getItem(`tn_seat_${roomCode}_${playerId}`);
     return cached ? Number(cached) : null;
   });
-  const [isSeated, setIsSeated] = useState(false);
-  const registrationAttemptedRef = useRef(false);
+  const [isSeated, setIsSeated] = useState(() => {
+    return !!localStorage.getItem(`tn_seat_${roomCode}_${playerId}`);
+  });
+
+  const registeredRef = useRef(false);
 
   useEffect(() => {
     if (isHost || !room || !updateState) return;
@@ -32,25 +36,29 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
     const gs = room.game_state || {};
     const players = gs.players || [];
 
-    // Check if already registered in current room state
+    // Already registered in server state — sync locally and stop
     const existing = players.find(p => p.playerId === playerId);
     if (existing) {
-      const seat = existing.seatNumber;
-      setSeatNumber(seat);
+      setSeatNumber(existing.seatNumber);
       setIsSeated(true);
-      localStorage.setItem(`tn_seat_${roomCode}_${playerId}`, String(seat));
-      registrationAttemptedRef.current = true;
+      localStorage.setItem(`tn_seat_${roomCode}_${playerId}`, String(existing.seatNumber));
+      registeredRef.current = true;
       return;
     }
 
-    // Don't double-register
-    if (registrationAttemptedRef.current) return;
-    registrationAttemptedRef.current = true;
+    // Already registered locally, waiting for server echo (optimistic)
+    if (registeredRef.current) return;
+    registeredRef.current = true;
 
-    // Assign next available seat
+    // Assign next available seat number
     const usedSeats = new Set(players.map(p => p.seatNumber));
     let nextSeat = 1;
     while (usedSeats.has(nextSeat)) nextSeat++;
+
+    // Optimistically update local state immediately
+    setSeatNumber(nextSeat);
+    setIsSeated(true);
+    localStorage.setItem(`tn_seat_${roomCode}_${playerId}`, String(nextSeat));
 
     const newPlayer = {
       playerId,
@@ -61,14 +69,9 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
       lastActionAt: null,
     };
 
-    // Optimistically set seat locally
-    setSeatNumber(nextSeat);
-    setIsSeated(true);
-    localStorage.setItem(`tn_seat_${roomCode}_${playerId}`, String(nextSeat));
-
     updateState({ players: [...players, newPlayer] }).catch(() => {
-      // If it fails, reset so next room poll can retry
-      registrationAttemptedRef.current = false;
+      // Allow retry on next room update
+      registeredRef.current = false;
     });
   }, [room, playerId, updateState, isHost, roomCode]);
 
