@@ -333,6 +333,8 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   // PLAY button: Only show when it's O's turn, board is locked, question is showing, no popup, no winner
   const showPlayButton = myRole === 'O' && boardLocked && gs.show_question && !gs.show_choices && !gs.winner && !popup && isMyTurn;
   const canControl = myRole === 'X' || myRole === 'O';
+  const xTaken = !!xPlayer;
+  const oTaken = !!oPlayer;
   const showPrompt = isSeated && !myRole && !myQueueRecord && xTaken && oTaken && roleChoice === null;
 
   const roleColor = myRole === 'X' ? '#BC13FE' : myRole === 'O' ? '#FF5F1F' : myRole === 'queued' ? '#FFD700' : '#ffffff40';
