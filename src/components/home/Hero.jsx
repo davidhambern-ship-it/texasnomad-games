@@ -12,7 +12,7 @@ export default function Hero({ heroBg, crownLogo }) {
       {/* Content */}
       <div className="relative z-10 flex flex-col items-center text-center px-4 py-12">
         {/* Crown B Logo */}
-        <img src={crownLogo} alt="Crown B Logo" className="w-24 h-24 md:w-32 md:h-32 object-contain mb-2 drop-shadow-[0_0_30px_rgba(188,19,254,0.6)]" />
+        <img src={crownLogo} alt="Crown B Logo" className="w-32 h-32 md:w-44 md:h-44 object-contain mb-2 drop-shadow-[0_0_30px_rgba(188,19,254,0.6)]" />
 
         {/* Title */}
         <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl tracking-wider uppercase leading-none"
