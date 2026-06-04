@@ -36,7 +36,12 @@ function checkWinner(b) {
   return null;
 }
 
-export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
+export default function SquareBizHostPanel({ gs, updateState, sendCommand, room }) {
+  const roomPlayers = room?.game_state?.players || [];
+  const sbPlayers = gs.sb_players || [];
+  const activePlayers = sbPlayers.filter(p => p.role === 'X' || p.role === 'O').length;
+  const queuedPlayers = (gs.sb_queue || []).length;
+  const viewerPlayers = sbPlayers.filter(p => p.role === 'viewer').length;
   const [currentTrivia, setCurrentTrivia] = useState(null);
   const [loadingTrivia, setLoadingTrivia] = useState(false);
 
@@ -118,7 +123,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     }
   };
 
-  // ── MODE SELECT ──
+  {/* ── MODE SELECT ── */}
   if (!displayMode) {
     return (
       <div className="max-w-md mx-auto space-y-6 py-4">
@@ -171,6 +176,37 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
           </button>
         </div>
       </div>
+
+      {/* Live Player Status — Board Mode only */}
+      {displayMode === 'board' && (
+        <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-heading text-lg tracking-[0.15em] text-[#BC13FE] uppercase">Live Players</h2>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse" />
+              <span className="font-heading text-[9px] tracking-widest text-[#4ade80]/70 uppercase">Live</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-3">
+            <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+              <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Total</div>
+              <div className="font-heading text-2xl text-white">{roomPlayers.length}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/5 text-center">
+              <div className="font-heading text-[8px] tracking-widest text-[#4ade80]/60 uppercase mb-1">Active</div>
+              <div className="font-heading text-2xl text-[#4ade80]">{activePlayers}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
+              <div className="font-heading text-[8px] tracking-widest text-[#FFD700]/60 uppercase mb-1">Queue</div>
+              <div className="font-heading text-2xl text-[#FFD700]">{queuedPlayers}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+              <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Viewers</div>
+              <div className="font-heading text-2xl text-white/50">{viewerPlayers}</div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Live Status */}
       <div className="grid grid-cols-3 gap-3 px-1">

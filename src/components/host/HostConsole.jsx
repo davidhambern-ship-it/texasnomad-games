@@ -51,7 +51,7 @@ export default function HostConsole({ game, roomCode, onDisconnect }) {
           <BFFHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} roomCode={roomCode} />
         )}
         {game.id === 'square-biz' && (
-          <SquareBizHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} />
+          <SquareBizHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} room={room} />
         )}
         {game.id === 'hangman' && (
           <HangmanHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} />
