@@ -26,35 +26,11 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
   const currentTurn = gs.current_turn || 'X';
   const displayMode = gs.display_mode || null; // null = mode select screen
 
-  // Load trivia bank — uses BFFSurvey as the question source
+  // Load trivia bank from SquareBizTrivia entity
   useEffect(() => {
     setLoadingTrivia(true);
-    base44.entities.BFFSurvey.list()
-      .then(data => {
-        // Convert BFFSurvey format to trivia format with A/B/C/D choices
-        const converted = data.map((s) => {
-          const answers = s.answers || [];
-          const choices = {};
-          const letters = ['A', 'B', 'C', 'D'];
-          // Pick up to 4 answers, shuffle which one is correct
-          const shuffled = [...answers].sort(() => Math.random() - 0.5).slice(0, 4);
-          const correctIdx = Math.floor(Math.random() * Math.min(shuffled.length, 4));
-          shuffled.forEach((a, i) => {
-            if (i < 4) choices[letters[i]] = a.answer || a.text || '';
-          });
-          return {
-            id: s.id,
-            question: s.question,
-            answer_a: choices['A'] || '',
-            answer_b: choices['B'] || '',
-            answer_c: choices['C'] || '',
-            answer_d: choices['D'] || '',
-            correct_answer: letters[correctIdx],
-            _raw: s,
-          };
-        });
-        setTrivia(converted);
-      })
+    base44.entities.SquareBizTrivia.list()
+      .then(setTrivia)
       .finally(() => setLoadingTrivia(false));
   }, []);
 
