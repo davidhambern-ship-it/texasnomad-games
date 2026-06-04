@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
+import RoleSelection from '@/components/game/RoleSelection.jsx';
 
 export default function SquareBizGame() {
   const params = new URLSearchParams(window.location.search);
@@ -22,9 +23,16 @@ function checkWinner(b) {
 function SquareBizViewer({ roomCode }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'square-biz', 'viewer');
   const gs = room?.game_state || {};
+  const roomPlayers = gs.players || [];
+  const sbPlayers = gs.sb_players || [];
+  const sbQueue = gs.sb_queue || [];
 
-  // Universal seat assignment
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'square-biz', updateState);
+  // Role selection state
+  const [chosenRole, setChosenRole] = useState(null); // 'participant' | 'watcher' | null
+  const [roleLoading, setRoleLoading] = useState(false);
+
+  // Universal seat assignment — now requires chosenRole
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'square-biz', updateState, false, chosenRole);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
@@ -36,6 +44,61 @@ function SquareBizViewer({ roomCode }) {
   }, []);
 
   const displayMode = gs.display_mode;
+  const createdFromHostPanel = room?.created_from_host_panel || false;
+
+  // Auto-assign X/O based on room creation type and player choice
+  useEffect(() => {
+    if (!isSeated || !playerId || chosenRole !== 'participant') return;
+    if (displayMode !== 'board') return;
+
+    const xPlayer = sbPlayers.find(p => p.role === 'X');
+    const oPlayer = sbPlayers.find(p => p.role === 'O');
+    const myRecord = sbPlayers.find(p => p.playerId === playerId);
+    
+    // Already assigned a marker
+    if (myRecord && (myRecord.role === 'X' || myRecord.role === 'O')) return;
+
+    const xTaken = !!xPlayer;
+    const oTaken = !!oPlayer;
+
+    // Auto-assign logic based on room creation type
+    if (createdFromHostPanel) {
+      // Host-created room: Host is X, first participant is O
+      const hostPlayer = roomPlayers.find(p => p.role === 'hostPlayer');
+      const hostHasX = hostPlayer && hostPlayer.playerId === xPlayer?.playerId;
+      
+      if (!xTaken && !hostHasX) {
+        // No X yet — assign X to this player (host will take it, or this player if host not connected)
+        assignMarker('X');
+      } else if (!oTaken) {
+        // X is taken (by host), assign O to this player
+        assignMarker('O');
+      }
+      // Both taken — stay as participant but no marker (will be queued)
+    } else {
+      // Player-created room: first participant is X, second is O
+      if (!xTaken) {
+        assignMarker('X');
+      } else if (!oTaken) {
+        assignMarker('O');
+      }
+      // Both taken — stay as participant but no marker (will be queued)
+    }
+  }, [isSeated, playerId, chosenRole, displayMode, createdFromHostPanel, sbPlayers, roomPlayers]);
+
+  const assignMarker = async (marker) => {
+    const newPlayers = sbPlayers.map(p => 
+      p.playerId === playerId ? { ...p, role: marker, marker, lastActionAt: Date.now() } : p
+    );
+    await updateState({ sb_players: newPlayers });
+  };
+
+  const handleChooseRole = async (role) => {
+    setRoleLoading(true);
+    setChosenRole(role);
+    // Role assignment happens in usePlayerSeat
+    setTimeout(() => setRoleLoading(false), 1000);
+  };
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col">

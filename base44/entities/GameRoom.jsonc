@@ -36,6 +36,15 @@
       "type": "number",
       "default": 0
     },
+    "created_from_host_panel": {
+      "type": "boolean",
+      "default": false,
+      "description": "True if room was created from Host Panel, false if from public homepage"
+    },
+    "created_by_user_id": {
+      "type": "string",
+      "description": "User ID who created the room"
+    },
     "game_state": {
       "type": "object",
       "description": "Full game state JSON (game-specific)"

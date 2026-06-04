@@ -27,6 +27,7 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
         if (rooms.length > 0) {
           r = rooms[0];
         } else if (role === 'host') {
+          const user = await base44.auth.me();
           r = await base44.entities.GameRoom.create({
             room_code: roomCode.toUpperCase(),
             game_id: gameId,
@@ -34,6 +35,8 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             host_connected: false,
             screen_connected: false,
             players_connected: 0,
+            created_from_host_panel: true,
+            created_by_user_id: user?.id || null,
             game_state: getDefaultGameState(gameId),
             last_command: null,
           });

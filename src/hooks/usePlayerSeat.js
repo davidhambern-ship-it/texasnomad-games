@@ -7,7 +7,7 @@ import { useState, useEffect, useRef } from 'react';
  * - Works across ALL games (bff, hangman, square-biz, etc.)
  * - Pass isHost=true to skip seating (host is never assigned a seat)
  */
-export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = false) {
+export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = false, chosenRole = null) {
   // One stable playerId per room, persisted in localStorage
   const [playerId] = useState(() => {
     const key = `tn_pid_${roomCode}`;
@@ -32,6 +32,7 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
 
   useEffect(() => {
     if (isHost || !room || !updateState) return;
+    if (!chosenRole) return; // Wait for role selection
 
     const gs = room.game_state || {};
     const players = gs.players || [];
@@ -63,7 +64,7 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
     const newPlayer = {
       playerId,
       seatNumber: nextSeat,
-      role: 'player',
+      role: chosenRole,
       connected: true,
       joinedAt: Date.now(),
       lastActionAt: null,
@@ -73,7 +74,7 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
       // Allow retry on next room update
       registeredRef.current = false;
     });
-  }, [room, playerId, updateState, isHost, roomCode]);
+  }, [room, playerId, updateState, isHost, roomCode, chosenRole]);
 
   return { playerId, seatNumber, isSeated };
 }
