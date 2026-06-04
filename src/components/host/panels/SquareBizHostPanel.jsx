@@ -93,6 +93,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         correct_answer: trivia.correctLetter,
         answer_result: null,
         selected_answer: null,
+        popup: null,
       });
     } catch {
       // silently fail

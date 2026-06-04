@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
-import RoleSelection from '@/components/game/RoleSelection.jsx';
+import RoleSelector from '@/components/game/RoleSelector.jsx';
 
 export default function SquareBizGame() {
   const params = new URLSearchParams(window.location.search);
@@ -46,6 +46,13 @@ function SquareBizViewer({ roomCode }) {
   const displayMode = gs.display_mode;
   const createdFromHostPanel = room?.created_from_host_panel || false;
 
+  const assignMarker = async (marker) => {
+    const newPlayers = sbPlayers.map(p => 
+      p.playerId === playerId ? { ...p, role: marker, marker, lastActionAt: Date.now() } : p
+    );
+    await updateState({ sb_players: newPlayers });
+  };
+
   // Auto-assign X/O based on room creation type and player choice
   useEffect(() => {
     if (!isSeated || !playerId || chosenRole !== 'participant') return;
@@ -68,13 +75,12 @@ function SquareBizViewer({ roomCode }) {
       const hostHasX = hostPlayer && hostPlayer.playerId === xPlayer?.playerId;
       
       if (!xTaken && !hostHasX) {
-        // No X yet — assign X to this player (host will take it, or this player if host not connected)
+        // No X yet — assign X to this player
         assignMarker('X');
       } else if (!oTaken) {
         // X is taken (by host), assign O to this player
         assignMarker('O');
       }
-      // Both taken — stay as participant but no marker (will be queued)
     } else {
       // Player-created room: first participant is X, second is O
       if (!xTaken) {
@@ -82,16 +88,8 @@ function SquareBizViewer({ roomCode }) {
       } else if (!oTaken) {
         assignMarker('O');
       }
-      // Both taken — stay as participant but no marker (will be queued)
     }
-  }, [isSeated, playerId, chosenRole, displayMode, createdFromHostPanel, sbPlayers, roomPlayers]);
-
-  const assignMarker = async (marker) => {
-    const newPlayers = sbPlayers.map(p => 
-      p.playerId === playerId ? { ...p, role: marker, marker, lastActionAt: Date.now() } : p
-    );
-    await updateState({ sb_players: newPlayers });
-  };
+  }, [isSeated, playerId, chosenRole, displayMode, createdFromHostPanel, sbPlayers, roomPlayers, assignMarker]);
 
   const handleChooseRole = async (role) => {
     setRoleLoading(true);
@@ -101,8 +99,18 @@ function SquareBizViewer({ roomCode }) {
   };
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col">
-      <header className="sticky top-0 z-50 border-b border-[#8a22ff]/30 bg-[#05030b]/90 backdrop-blur-xl">
+    <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col relative">
+      {/* Role Selection Modal */}
+      {!chosenRole && isSeated && displayMode === 'board' && (
+        <RoleSelector
+          seatNumber={seatNumber}
+          isSeated={isSeated}
+          onChooseRole={handleChooseRole}
+          loading={roleLoading}
+        />
+      )}
+
+      <header className="sticky top-0 z-40 border-b border-[#8a22ff]/30 bg-[#05030b]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2">
@@ -140,7 +148,7 @@ function SquareBizViewer({ roomCode }) {
       ) : displayMode === 'panel' ? (
         <PanelModeBoard gs={gs} />
       ) : (
-        <BoardModeBoard gs={gs} updateState={updateState} playerId={playerId} seatNumber={seatNumber} isSeated={isSeated} />
+        <BoardModeBoard gs={gs} updateState={updateState} playerId={playerId} seatNumber={seatNumber} isSeated={isSeated} chosenRole={chosenRole} />
       )}
     </div>
   );
@@ -237,7 +245,7 @@ function PanelModeBoard({ gs }) {
 }
 
 /* ── BOARD MODE ── */
-function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated }) {
+function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chosenRole }) {
   const board = gs.board || Array(9).fill('');
   const currentTurn = gs.current_turn || 'X';
   const boardLocked = gs.board_locked !== false;
@@ -258,40 +266,26 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated }) {
   const xPlayer = sbPlayers.find(p => p.role === 'X');
   const oPlayer = sbPlayers.find(p => p.role === 'O');
 
-  // Auto-assign role when joining board mode
+  // Auto-assign role when joining board mode (only if chosenRole is 'participant')
   useEffect(() => {
     if (!isSeated || !playerId || myRole) return;
     if (gs.display_mode !== 'board') return;
+    if (chosenRole !== 'participant') return;
 
     const xTaken = !!sbPlayers.find(p => p.role === 'X');
     const oTaken = !!sbPlayers.find(p => p.role === 'O');
     const activeCount = sbPlayers.filter(p => p.role === 'X' || p.role === 'O').length;
 
-    // If only 1 active player and host is connected, auto-assign host as the other player
-    const roomPlayers = gs.players || [];
-    const hostPlayer = roomPlayers.find(p => p.role === 'hostPlayer');
-    const hostPid = hostPlayer?.playerId;
-
-    if (activeCount === 1 && !xTaken) {
-      // Assign X to this player
+    // First participant gets X, second gets O
+    if (!xTaken) {
       const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
-    } else if (activeCount === 1 && !oTaken) {
-      // Assign O to this player
+    } else if (!oTaken) {
       const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'O', joinedAt: Date.now(), lastActionAt: Date.now() }];
-      updateState({ sb_players: newPlayers });
-    } else if (activeCount === 1 && hostPid && !sbPlayers.find(p => p.playerId === hostPid)) {
-      // Auto-assign host as the second player (opposite role)
-      const myAssignedRole = xTaken ? 'O' : 'X';
-      const newPlayers = [
-        ...sbPlayers.filter(p => p.playerId !== playerId),
-        { playerId, seatNumber, role: myAssignedRole, joinedAt: Date.now(), lastActionAt: Date.now() },
-        { playerId: hostPid, seatNumber: 99, role: myAssignedRole === 'X' ? 'O' : 'X', joinedAt: Date.now(), lastActionAt: Date.now() }
-      ];
       updateState({ sb_players: newPlayers });
     }
     // else: both taken — show the prompt (myRole stays null)
-  }, [isSeated, playerId, gs.display_mode, gs.sb_players, gs.players]);
+  }, [isSeated, playerId, gs.display_mode, gs.sb_players, chosenRole]);
 
   const handleJoinQueue = async () => {
     const nextPos = sbQueue.length + 1;
