@@ -113,6 +113,13 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
     }
   }, [gs.auto_next_question]);
 
+  // Watch for Player O revealing question (show_question becomes true without a question loaded)
+  useEffect(() => {
+    if (gs.show_question && !gs.current_question && !loadingTrivia) {
+      fetchOTDBQuestion(true);
+    }
+  }, [gs.show_question]);
+
   const handleAnswerSelect = async (letter) => {
     const isCorrect = letter === gs.correct_answer;
     if (isCorrect) {

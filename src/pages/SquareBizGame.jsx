@@ -308,12 +308,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     });
   };
 
-  const handlePlayClick = async () => {
-    if (myRole !== 'O') return; // Only O player can click PLAY
-    // Trigger auto-fetch and show question
-    await updateState({ auto_next_question: Date.now(), show_question: false, show_choices: false, answer_result: null });
-  };
-
   const cellDisplay = (v, idx) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
     if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
@@ -330,12 +324,12 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   };
 
   const isMyTurn = myRole === currentTurn;
-  // PLAY button: Only show when it's O's turn, board is locked, question is showing, no popup, no winner
-  const showPlayButton = myRole === 'O' && boardLocked && gs.show_question && !gs.show_choices && !gs.winner && !popup && isMyTurn;
   const canControl = myRole === 'X' || myRole === 'O';
   const xTaken = !!xPlayer;
   const oTaken = !!oPlayer;
   const showPrompt = isSeated && !myRole && !myQueueRecord && xTaken && oTaken && roleChoice === null;
+  // Player O can tap to reveal question when board is locked and no question showing
+  const canRevealQuestion = myRole === 'O' && boardLocked && !gs.show_question && !gs.winner && !popup && isMyTurn;
 
   const roleColor = myRole === 'X' ? '#BC13FE' : myRole === 'O' ? '#FF5F1F' : myRole === 'queued' ? '#FFD700' : '#ffffff40';
   const roleLabel = myRole === 'X' ? 'You are X' : myRole === 'O' ? 'You are O' : myRole === 'queued' ? `Queued — Position ${myQueuePos}` : myRole === 'viewer' ? 'You are Viewer' : null;
@@ -406,8 +400,8 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
-            {/* Show Choices button - only for O player, when choices not yet shown */}
-            {isMyTurn && !gs.show_choices && !popup && (
+            {/* Show Choices button - appears when question is revealed and choices not yet shown */}
+            {!gs.show_choices && !popup && (
               <button
                 onClick={() => updateState({ show_choices: true })}
                 className="mt-2 px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
@@ -468,13 +462,19 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
         </div>
 
         <div className="relative" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
-          <div className="grid grid-cols-3 gap-3">
+          <div
+            onClick={() => canRevealQuestion && updateState({ show_question: true })}
+            className={`grid grid-cols-3 gap-3 ${canRevealQuestion ? 'cursor-pointer' : ''}`}
+          >
             {board.map((cell, idx) => {
               const { char, color, border, glow } = cellDisplay(cell, idx);
               const canClick = !boardLocked && !cell && !gs.winner && isMyTurn && canControl;
               return (
                 <div key={idx}
-                  onClick={() => canClick && handleCellClick(idx)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (canClick) handleCellClick(idx);
+                  }}
                   className={`aspect-square flex items-center justify-center rounded-xl border-4 font-heading transition-all ${canClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
                   style={{ 
                     fontSize: 'clamp(2rem, 5vw, 5rem)', 
@@ -490,22 +490,20 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
             })}
           </div>
 
-          {/* PLAY button */}
-          {showPlayButton && canControl && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl">
-              <button
-                onClick={handlePlayClick}
-                className="px-8 py-4 rounded-xl border-2 border-[#FFD700] text-[#FFD700] font-heading text-2xl tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95"
-                style={{ boxShadow: '0 0 20px rgba(255,215,0,0.3)' }}>
-                ▶ PLAY
-              </button>
-            </div>
-          )}
-
           {/* Board open indicator */}
           {!boardLocked && !gs.winner && isMyTurn && canControl && (
             <div className="absolute inset-0 rounded-xl pointer-events-none"
               style={{ boxShadow: '0 0 0 3px #4ade80, 0 0 20px rgba(74,222,128,0.3)' }} />
+          )}
+
+          {/* Tap hint for Player O */}
+          {canRevealQuestion && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl pointer-events-none">
+              <div className="font-heading text-lg tracking-widest text-[#FFD700] uppercase animate-pulse"
+                style={{ textShadow: '0 0 20px rgba(255,215,0,0.5)' }}>
+                TAP TO REVEAL
+              </div>
+            </div>
           )}
         </div>
 
