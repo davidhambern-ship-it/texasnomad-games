@@ -93,6 +93,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         current_question: trivia.question,
         current_choices: trivia.choices,
         correct_answer: trivia.correctLetter,
+        current_category: trivia.category,
         answer_result: null,
         selected_answer: null,
         popup: null,
@@ -113,7 +114,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
   }, [gs.auto_next_question]);
 
   const handleAnswerSelect = async (letter) => {
-    const isCorrect = letter === currentTrivia?.correctLetter;
+    const isCorrect = letter === gs.correct_answer;
     if (isCorrect) {
       // Correct: show popup, then unlock board for marker placement
       await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
@@ -305,19 +306,19 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           {loadingTrivia && <span className="font-heading text-xs text-white/30 uppercase tracking-widest">Loading…</span>}
         </div>
 
-        {currentTrivia && (
+        {gs.current_question && (
           <div className="p-4 rounded-lg bg-[#FFD700]/5 border border-[#FFD700]/20 space-y-3">
-            {currentTrivia.category && (
-              <div className="font-heading text-[10px] tracking-widest text-white/30 uppercase">{currentTrivia.category}</div>
+            {gs.current_category && (
+              <div className="font-heading text-[10px] tracking-widest text-white/30 uppercase">{gs.current_category}</div>
             )}
-            <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {currentTrivia.question}</div>
-            {gs.show_choices && (
+            <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {gs.current_question}</div>
+            {gs.show_choices && gs.current_choices && (
               <div className="grid grid-cols-2 gap-2">
                 {['A','B','C','D'].map((letter) => {
-                  const answerText = currentTrivia.choices?.[letter];
+                  const answerText = gs.current_choices[letter];
                   if (!answerText) return null;
                   const isSelected = gs.selected_answer === letter;
-                  const isCorrect = letter === currentTrivia.correctLetter;
+                  const isCorrect = letter === gs.correct_answer;
                   return (
                     <button key={letter}
                       onClick={() => handleAnswerSelect(letter)}
@@ -346,10 +347,10 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         )}
 
         <div className="grid grid-cols-2 gap-3">
-          <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!currentTrivia || loadingTrivia}>Show Question</Btn>
+          <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!gs.current_question || loadingTrivia}>Show Question</Btn>
           <Btn onClick={() => fetchOTDBQuestion()} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Fetch Question'}</Btn>
         </div>
-        <Btn onClick={() => updateState({ show_question: true, show_choices: true })} color="#8a22ff" disabled={!currentTrivia || loadingTrivia} className="w-full">Show Choices</Btn>
+        <Btn onClick={() => updateState({ show_question: true, show_choices: true })} color="#8a22ff" disabled={!gs.current_question || loadingTrivia} className="w-full">Show Choices</Btn>
       </div>
 
       {/* Music */}
