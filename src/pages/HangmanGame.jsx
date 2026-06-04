@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
-import { usePlayerSeat } from '@/hooks/usePlayerSeat';
+import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 
