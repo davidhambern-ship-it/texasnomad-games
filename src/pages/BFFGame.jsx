@@ -230,26 +230,24 @@ function BFFViewer({ roomCode }) {
       <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#050505]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <Link to="/" className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors">
-              <div className="w-7 h-7 rounded-full bg-[#BC13FE]/20 border border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-[10px]">TN</span>
-              </div>
+            <Link to="/" className="flex items-center gap-2">
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" className="w-7 h-7 object-contain" />
             </Link>
-            <span className="font-heading text-base tracking-widest text-[#FFD700] uppercase">BFF — BIGO FAMILY FEUD</span>
+            <span className="text-[#FFD700] uppercase text-[10px] tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>BFF — BIGO FAMILY FEUD</span>
             <div className="flex items-center gap-1.5">
               <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
-              <span className="font-heading text-[10px] tracking-widest text-[#BC13FE] uppercase">ROOM {roomCode}</span>
+              <span className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>ROOM {roomCode}</span>
             </div>
             {room?.host_connected && (
-              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 font-heading text-[9px] tracking-widest uppercase">
+              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 🔴 HOST LIVE
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="hidden sm:flex px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <Link to="/" className="hidden sm:flex px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>← LOBBY</Link>
             <button onClick={handleFullscreen}
-              className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
+              className="px-3 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
             </button>
           </div>

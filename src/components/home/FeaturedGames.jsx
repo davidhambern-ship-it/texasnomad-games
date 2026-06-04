@@ -28,7 +28,7 @@ export default function FeaturedGames({ gameImages }) {
       <div className="max-w-7xl mx-auto">
         <div className="border border-cyber-purple/40 rounded-lg p-6 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden">
           {/* Section Title */}
-          <h3 className="font-heading text-2xl md:text-3xl tracking-[0.15em] text-outlaw-gold text-center mb-6 uppercase">
+          <h3 className="text-lg md:text-xl tracking-[0.15em] text-outlaw-gold text-center mb-6 uppercase" style={{ fontFamily: "'Monoton', cursive", textShadow: '0 0 15px #FFD700' }}>
             ★ FEATURED GAMES ★
           </h3>
 
@@ -49,17 +49,17 @@ export default function FeaturedGames({ gameImages }) {
                 </div>
 
                 {/* Title & Subtitle */}
-                <h4 className="font-heading text-xl md:text-2xl tracking-wider text-white uppercase">
+                <h4 className="text-base md:text-lg tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                   {game.title}
                 </h4>
-                <p className="font-body text-xs tracking-widest text-outlaw-gold/80 uppercase mb-3">
+                <p className="text-[8px] tracking-widest text-outlaw-gold/80 uppercase mb-3 mt-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                   {game.subtitle}
                 </p>
 
                 {/* Play Button */}
                 <Link
                   to={game.path}
-                  className="px-5 py-1.5 border-2 border-outlaw-gold text-outlaw-gold font-heading text-sm tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black hover:shadow-[0_0_20px_rgba(255,215,0,0.5)] transition-all duration-300 focus-visible:outline-2 focus-visible:outline-kinetic-orange"
+                  className="px-5 py-1.5 border-2 border-outlaw-gold text-outlaw-gold tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black hover:shadow-[0_0_20px_rgba(255,215,0,0.5)] transition-all duration-300 text-[8px]" style={{ fontFamily: "'Press Start 2P', monospace" }}
                 >
                   Play Now
                 </Link>

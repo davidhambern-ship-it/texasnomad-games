@@ -31,27 +31,25 @@ function SquareBizViewer({ roomCode }) {
       <header className="sticky top-0 z-50 border-b border-[#8a22ff]/30 bg-[#05030b]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 text-[#FFD700]">
-              <div className="w-7 h-7 rounded-full bg-[#8a22ff]/20 border border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-[10px]">TN</span>
-              </div>
+            <Link to="/" className="flex items-center gap-2">
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" className="w-7 h-7 object-contain" />
             </Link>
-            <span className="font-heading text-lg tracking-widest text-[#ff8a00] uppercase">Square Biz!</span>
+            <span className="text-[#FF5F1F] uppercase text-[10px] tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>Square Biz!</span>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#ff2bd6] animate-pulse" />
-              <span className="font-heading text-[10px] tracking-widest text-[#ff2bd6] uppercase">ROOM {roomCode}</span>
+              <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
+              <span className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>ROOM {roomCode}</span>
             </div>
             {room?.host_connected && (
-              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 font-heading text-[9px] tracking-widest uppercase">
+              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 🔴 HOST LIVE
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <Link to="/" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>← LOBBY</Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
-              className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
+              className="px-3 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
             </button>
           </div>

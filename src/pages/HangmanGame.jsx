@@ -52,27 +52,25 @@ function HangmanViewer({ roomCode }) {
       <header className="sticky top-0 z-50 border-b border-[#8f37ff]/30 bg-[#070311]/90 backdrop-blur-xl">
         <div className="px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 text-[#FFD700]">
-              <div className="w-7 h-7 rounded-full bg-[#8f37ff]/20 border border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-[10px]">TN</span>
-              </div>
+            <Link to="/" className="flex items-center gap-2">
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" className="w-7 h-7 object-contain" />
             </Link>
-            <span className="font-heading text-lg tracking-widest text-[#FFD700] uppercase">TexasNomad Hangman</span>
+            <span className="text-[#FFD700] uppercase text-[10px] tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>TexasNomad Hangman</span>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-[#19d7ff] animate-pulse" />
-              <span className="font-heading text-[10px] tracking-widest text-[#19d7ff] uppercase">ROOM {roomCode}</span>
+              <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
+              <span className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>ROOM {roomCode}</span>
             </div>
             {room?.host_connected && (
-              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 font-heading text-[9px] tracking-widest uppercase">
+              <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 🔴 HOST LIVE
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <Link to="/" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>← LOBBY</Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
-              className="px-3 py-1 bg-[#FF5F1F] text-white font-heading text-xs tracking-widest uppercase rounded hover:bg-[#FF5F1F]/80 transition-all">
+              className="px-3 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
             </button>
           </div>
@@ -87,8 +85,8 @@ function HangmanViewer({ roomCode }) {
         <div className="flex-1 flex items-center justify-center text-center px-4">
           <div>
             <div className="text-6xl mb-4">🔤</div>
-            <div className="font-heading text-2xl tracking-widest text-white/40 uppercase">Waiting for Host…</div>
-            <div className="font-heading text-xs tracking-widest text-white/20 uppercase mt-2">Host is setting up the game</div>
+            <div className="text-lg tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>Waiting for Host…</div>
+            <div className="text-[8px] tracking-widest text-white/20 uppercase mt-2" style={{ fontFamily: "'Press Start 2P', monospace" }}>Host is setting up the game</div>
           </div>
         </div>
       ) : (
@@ -217,18 +215,16 @@ function HangmanIframe() {
       <header className="sticky top-0 z-50 border-b border-[#8f37ff]/30 bg-[#070311]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
-            <Link to="/" className="flex items-center gap-2 text-[#FFD700] hover:text-[#FF5F1F] transition-colors">
-              <div className="w-8 h-8 rounded-full bg-[#8f37ff]/20 border border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-xs">TN</span>
-              </div>
+            <Link to="/" className="flex items-center gap-2">
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" className="w-8 h-8 object-contain" />
             </Link>
-            <span className="font-heading text-base tracking-widest text-[#FFD700] uppercase">TexasNomad Hangman</span>
+            <span className="text-[#FFD700] uppercase text-[10px] tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>TexasNomad Hangman</span>
           </div>
           <div className="flex items-center gap-2">
-            <Link to="/" className="hidden sm:flex px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FFD700]/10 transition-all">← LOBBY</Link>
+            <Link to="/" className="hidden sm:flex px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>← LOBBY</Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
-              className="px-3 py-1.5 bg-[#FF5F1F] text-white rounded text-xs font-bold tracking-widest uppercase hover:bg-[#FF5F1F]/80 transition-all">
+              className="px-3 py-1.5 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               {isFullscreen ? '✕ EXIT' : '⛶ FULL'}
             </button>
           </div>
@@ -236,8 +232,8 @@ function HangmanIframe() {
       </header>
       <div className="sm:hidden flex flex-col items-center justify-center flex-1 px-6 py-16 text-center gap-4">
         <div className="text-5xl">🔤</div>
-        <h2 className="text-3xl uppercase font-extrabold" style={{ fontFamily: "'Teko', sans-serif", color: '#FFD700' }}>Bigger Screen Required!</h2>
-        <Link to="/" className="mt-4 px-6 py-2.5 border-2 border-[#FFD700] text-[#FFD700] font-bold tracking-widest uppercase text-sm rounded hover:bg-[#FFD700] hover:text-black transition-all">← Back to Lobby</Link>
+        <h2 className="text-xl uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: '#FFD700' }}>Bigger Screen Required!</h2>
+        <Link to="/" className="mt-4 px-6 py-2.5 border-2 border-[#FFD700] text-[#FFD700] tracking-widest uppercase text-[8px] rounded hover:bg-[#FFD700] hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>← Back to Lobby</Link>
       </div>
       <div ref={containerRef} className="hidden sm:flex flex-col flex-1 min-h-0" style={{ background: '#070311' }}>
         <div style={{ height: '3px', background: 'linear-gradient(90deg, #8f37ff, #19d7ff, #FFD700, #FF5F1F, #8f37ff)' }} />
