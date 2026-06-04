@@ -51,7 +51,13 @@ export default function HostGameSelect({ onSelect, currentGame }) {
     
     // Create room in database
     try {
-      const user = await base44.auth.me();
+      let user = null;
+      try {
+        user = await base44.auth.me();
+      } catch (_) {
+        // User not authenticated - that's ok for host panel
+      }
+      
       const gameMode = pendingGame.id === 'square-biz' ? 'board' : null;
       const initialGameState = getDefaultGameState(pendingGame.id);
       
