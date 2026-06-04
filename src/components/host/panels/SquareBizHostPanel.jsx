@@ -78,17 +78,18 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
   };
 
   const resetBoard = () => {
-    updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, popup: null });
+    updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false, popup: null });
   };
 
   const selectMode = (mode) => {
-    updateState({ display_mode: mode, board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, popup: null });
+    updateState({ display_mode: mode, board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false, popup: null });
   };
 
   const showQuestion = () => {
     if (!currentTrivia) return;
     updateState({
       show_question: true,
+      show_choices: false,
       current_question: currentTrivia.question,
       current_choices: {
         A: currentTrivia.answer_a,
@@ -101,6 +102,10 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     });
   };
 
+  const showChoices = () => {
+    updateState({ show_choices: true });
+  };
+
   const shuffleQuestion = () => {
     if (trivia.length === 0) return;
     const newIdx = Math.floor(Math.random() * trivia.length);
@@ -108,6 +113,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     const t = trivia[newIdx];
     updateState({
       show_question: false,
+      show_choices: false,
       current_question: t.question,
       current_choices: {
         A: t.answer_a,
@@ -121,7 +127,6 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
   };
 
   const handleCorrect = () => {
-    // Show CORRECT! popup, then place X/O on selected square
     const selected = gs.selected_square;
     const newBoard = [...board];
     if (selected != null && !newBoard[selected]) {
@@ -133,6 +138,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
       board: newBoard,
       current_turn: nextTurn,
       show_question: false,
+      show_choices: false,
       selected_square: null,
     });
     setTimeout(() => updateState({ popup: null }), 2500);
@@ -144,6 +150,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
       popup: 'wrong',
       current_turn: nextTurn,
       show_question: false,
+      show_choices: false,
       selected_square: null,
     });
     setTimeout(() => updateState({ popup: null }), 2500);
@@ -310,6 +317,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
           <Btn onClick={showQuestion} color="#4ade80" disabled={!currentTrivia}>Show Question</Btn>
           <Btn onClick={shuffleQuestion} color="#BC13FE" disabled={trivia.length === 0}>Shuffle Question</Btn>
         </div>
+        <Btn onClick={showChoices} color="#8a22ff" disabled={!gs.show_question} className="w-full">Show Choices</Btn>
       </div>
 
       {/* ── CORRECT / WRONG ── */}

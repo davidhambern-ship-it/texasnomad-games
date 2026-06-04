@@ -113,9 +113,9 @@ function PanelModeBoard({ gs }) {
         </div>
       )}
 
-      {/* LEFT — Choices */}
+      {/* LEFT — Choices (only shown when host sends show_choices) */}
       <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
-        {gs.show_question && gs.current_choices ? (
+        {gs.show_choices && gs.current_choices ? (
           <>
             <div className="font-heading text-xs tracking-[0.25em] text-[#8a22ff]/70 uppercase mb-1">Choices</div>
             {['A', 'B', 'C', 'D'].map((letter) => {
@@ -200,40 +200,30 @@ function PanelModeBoard({ gs }) {
 function BoardModeBoard({ gs, updateState }) {
   const board = gs.board || Array(9).fill('');
   const [showControlPanel, setShowControlPanel] = useState(false);
-  const [roundPhase, setRoundPhase] = useState('idle'); // idle | question | choices
-  const [questionTimer, setQuestionTimer] = useState(null);
-  const timerRef = useRef(null);
 
   const currentTurn = gs.current_turn || 'X';
   const popup = gs.popup;
 
+  // Phase derived from game state — no timers
+  // idle: show_question=false  |  question: show_question=true, show_choices=false  |  choices: show_choices=true
+  const roundPhase = !gs.show_question ? 'idle' : !gs.show_choices ? 'question' : 'choices';
+
   const handlePlay = () => {
     if (!gs.current_question) return;
-    setRoundPhase('question');
     updateState({ show_question: true, show_choices: false });
-    timerRef.current = setTimeout(() => {
-      setRoundPhase('choices');
-    }, 5000);
   };
 
   const handleShowChoices = () => {
-    setRoundPhase('choices');
     updateState({ show_choices: true });
   };
 
   const handleCellClick = (idx) => {
-    if (board[idx] || gs.winner) return;
-    // In board mode, clicking a cell places the current turn marker
+    if (board[idx] || gs.winner || roundPhase !== 'idle') return;
     const newBoard = [...board];
     newBoard[idx] = currentTurn;
     const nextTurn = currentTurn === 'X' ? 'O' : 'X';
     updateState({ board: newBoard, current_turn: nextTurn, show_question: false, show_choices: false });
-    setRoundPhase('idle');
   };
-
-  useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []);
 
   const cellDisplay = (v) => {
     if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
@@ -258,16 +248,16 @@ function BoardModeBoard({ gs, updateState }) {
         </div>
       )}
 
-      {/* LEFT — Question card */}
+      {/* LEFT — Question card: shown when show_question=true, choices when show_choices=true */}
       <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
-        {roundPhase !== 'idle' && gs.current_question ? (
+        {gs.show_question && gs.current_question ? (
           <>
             <div className="font-heading text-xs tracking-[0.25em] text-[#FFD700]/70 uppercase mb-1">Question</div>
             <div className="px-5 py-5 rounded-xl border-2 border-[#FFD700]/30 bg-[#FFD700]/5 font-heading text-xl tracking-wide text-white leading-snug"
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
-            {roundPhase === 'choices' && gs.current_choices && (
+            {gs.show_choices && gs.current_choices && (
               <div className="space-y-2 mt-2">
                 {['A', 'B', 'C', 'D'].map((letter) => {
                   const text = gs.current_choices?.[letter];
@@ -318,12 +308,13 @@ function BoardModeBoard({ gs, updateState }) {
             })}
           </div>
 
-          {/* PLAY button overlay */}
-          {roundPhase === 'idle' && !gs.winner && gs.current_question && (
+          {/* PLAY button overlay — always visible in idle phase */}
+          {roundPhase === 'idle' && !gs.winner && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
               <button
                 onClick={handlePlay}
-                className="px-8 py-4 rounded-xl border-2 border-[#FFD700] text-[#FFD700] font-heading text-2xl tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95"
+                disabled={!gs.current_question}
+                className="px-8 py-4 rounded-xl border-2 border-[#FFD700] text-[#FFD700] font-heading text-2xl tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95 disabled:opacity-40"
                 style={{ boxShadow: '0 0 20px rgba(255,215,0,0.3)' }}
               >
                 ▶ PLAY
@@ -332,7 +323,7 @@ function BoardModeBoard({ gs, updateState }) {
           )}
         </div>
 
-        {/* CHOICES button */}
+        {/* CHOICES button — visible during question phase, disappears once choices are shown */}
         {roundPhase === 'question' && (
           <button
             onClick={handleShowChoices}
@@ -377,7 +368,7 @@ function BoardModeBoard({ gs, updateState }) {
               {gs.music_on !== false ? 'ON' : 'OFF'}
             </button>
           </div>
-          <button onClick={() => { updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null }); setRoundPhase('idle'); }}
+          <button onClick={() => { updateState({ board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false }); }}
             className="w-full py-2 rounded-lg border border-[#FF5F1F]/40 text-[#FF5F1F] font-heading text-xs tracking-widest uppercase hover:bg-[#FF5F1F]/10 transition-all">
             ↺ Clear Board
           </button>
