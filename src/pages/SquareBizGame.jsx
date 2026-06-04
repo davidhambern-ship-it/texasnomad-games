@@ -207,8 +207,16 @@ function BoardModeBoard({ gs, updateState }) {
   // Phase derived from game state
   const roundPhase = !gs.show_question ? 'idle' : !gs.show_choices ? 'question' : 'choices';
 
+  // Check for tic-tac-toe winner
+  const checkWinner = (b) => {
+    const lines = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+    for (const [a, c, d] of lines) {
+      if (b[a] && b[a] === b[c] && b[a] === b[d]) return b[a];
+    }
+    return null;
+  };
+
   const handlePlay = () => {
-    if (!gs.current_question) return;
     updateState({ show_question: true, show_choices: false });
   };
 
@@ -220,8 +228,30 @@ function BoardModeBoard({ gs, updateState }) {
     if (board[idx] || gs.winner || !gs.board_enabled) return;
     const newBoard = [...board];
     newBoard[idx] = currentTurn;
+    const winner = checkWinner(newBoard);
     const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-    updateState({ board: newBoard, current_turn: nextTurn, board_enabled: false, show_question: false, show_choices: false });
+    updateState({
+      board: newBoard,
+      current_turn: nextTurn,
+      winner: winner || null,
+      board_enabled: false,
+      show_question: false,
+      show_choices: false,
+      // Auto-advance: fetch next question unless game is won
+      ...(winner ? {} : { auto_next_question: Date.now() }),
+    });
+  };
+
+  const handleAnswerSelect = (letter) => {
+    const isCorrect = letter === gs.correct_answer;
+    if (isCorrect) {
+      updateState({ popup: 'correct', show_question: false, show_choices: false, board_enabled: false });
+      setTimeout(() => updateState({ popup: null, board_enabled: true }), 2500);
+    } else {
+      updateState({ popup: 'wrong', show_question: false, show_choices: false, board_enabled: false });
+      // Auto-advance to next question on wrong answer
+      setTimeout(() => updateState({ popup: null, auto_next_question: Date.now() }), 2500);
+    }
   };
 
   const cellDisplay = (v) => {
@@ -262,11 +292,12 @@ function BoardModeBoard({ gs, updateState }) {
                   const text = gs.current_choices?.[letter];
                   if (!text) return null;
                   return (
-                    <div key={letter}
-                      className="px-4 py-3 rounded-lg border font-heading text-base"
-                      style={{ borderColor: '#8a22ff40', background: '#8a22ff10', color: '#ffffffcc' }}>
+                    <button key={letter}
+                      onClick={() => handleAnswerSelect(letter)}
+                      className="w-full px-4 py-3 rounded-lg border font-heading text-base text-left transition-all hover:scale-[1.02] active:scale-95"
+                      style={{ borderColor: '#8a22ff60', background: '#8a22ff10', color: '#ffffffcc' }}>
                       <span className="text-[#8a22ff] mr-2">{letter}.</span>{text}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -307,8 +338,8 @@ function BoardModeBoard({ gs, updateState }) {
             })}
           </div>
 
-          {/* PLAY button overlay — shown when board is not enabled and no active question */}
-          {!gs.board_enabled && roundPhase === 'idle' && !gs.winner && (
+          {/* PLAY button — only shown when game is won (start new) OR no question loaded yet */}
+          {roundPhase === 'idle' && !gs.board_enabled && (gs.winner || !gs.current_question) && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-xl">
               <button
                 onClick={handlePlay}
@@ -327,15 +358,7 @@ function BoardModeBoard({ gs, updateState }) {
           )}
         </div>
 
-        {/* CHOICES button — shown whenever question is active but choices not yet revealed */}
-        {roundPhase === 'question' && (
-          <button
-            onClick={handleShowChoices}
-            className="px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-lg tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
-          >
-            Choices →
-          </button>
-        )}
+
 
         {gs.winner && (
           <div className="font-heading text-3xl tracking-widest uppercase"

@@ -61,7 +61,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     updateState({ display_mode: mode, board: Array(9).fill(''), current_turn: 'X', winner: null, show_question: false, show_choices: false, popup: null });
   };
 
-  const fetchOTDBQuestion = async () => {
+  const fetchOTDBQuestion = async (autoShow = false) => {
     setLoadingTrivia(true);
     try {
       const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
@@ -85,9 +85,8 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
         category: decodeHTML(q.category),
       };
       setCurrentTrivia(trivia);
-      // Stage the question in game state (hide correct answer from players)
       updateState({
-        show_question: false,
+        show_question: autoShow,
         show_choices: false,
         current_question: trivia.question,
         current_choices: trivia.choices,
@@ -113,26 +112,25 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
     fetchOTDBQuestion();
   };
 
-  const handleCorrect = () => {
-    updateState({
-      popup: 'correct',
-      show_question: false,
-      show_choices: false,
-      selected_square: null,
-    });
-    // After popup clears, enable the board for the player to place their mark
-    setTimeout(() => updateState({ popup: null, board_enabled: true }), 2500);
-  };
+  // Watch for auto-next-question signal (set by board mode after cell placement or wrong answer)
+  useEffect(() => {
+    if (gs.auto_next_question) {
+      updateState({ auto_next_question: null });
+      fetchOTDBQuestion(true); // autoShow=true so question appears immediately
+    }
+  }, [gs.auto_next_question]);
 
-  const handleWrong = () => {
-    updateState({
-      popup: 'wrong',
-      show_question: false,
-      show_choices: false,
-      selected_square: null,
-      board_enabled: false,
-    });
-    setTimeout(() => updateState({ popup: null }), 2500);
+  const handleAnswerSelect = async (letter) => {
+    const isCorrect = letter === currentTrivia?.correctLetter;
+    if (isCorrect) {
+      updateState({ popup: 'correct', show_question: false, show_choices: false, selected_square: null });
+      setTimeout(() => updateState({ popup: null, board_enabled: true }), 2500);
+    } else {
+      updateState({ popup: 'wrong', show_question: false, show_choices: false, selected_square: null, board_enabled: false });
+      // Auto-advance to next question after wrong answer
+      setTimeout(() => updateState({ popup: null }), 2500);
+      setTimeout(() => fetchOTDBQuestion(), 2600);
+    }
   };
 
   // ── MODE SELECT SCREEN ──
@@ -269,8 +267,10 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
                 if (!answerText) return null;
                 const isCorrect = currentTrivia.correctLetter === letter;
                 return (
-                  <div key={letter}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading"
+                  <button key={letter}
+                    onClick={() => handleAnswerSelect(letter)}
+                    disabled={!gs.show_choices}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:opacity-40 disabled:cursor-default hover:enabled:scale-105"
                     style={{
                       borderColor: isCorrect ? '#4ade80' : '#ffffff15',
                       background: isCorrect ? '#4ade8015' : 'transparent',
@@ -279,7 +279,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
                     <span className="font-bold">{letter}.</span>
                     <span className="truncate">{answerText}</span>
                     {isCorrect && <span className="ml-auto">✓</span>}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -297,22 +297,6 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand }) {
           <Btn onClick={shuffleQuestion} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Shuffle Question'}</Btn>
         </div>
         <Btn onClick={showChoices} color="#8a22ff" disabled={!gs.show_question} className="w-full">Show Choices</Btn>
-      </div>
-
-      {/* ── CORRECT / WRONG ── */}
-      <div className="grid grid-cols-2 gap-4">
-        <button
-          onClick={handleCorrect}
-          className="py-5 rounded-xl border-2 border-green-500 font-heading text-2xl tracking-widest uppercase text-green-400 hover:bg-green-500/20 transition-all active:scale-95"
-        >
-          ✓ Correct
-        </button>
-        <button
-          onClick={handleWrong}
-          className="py-5 rounded-xl border-2 border-red-500 font-heading text-2xl tracking-widest uppercase text-red-400 hover:bg-red-500/20 transition-all active:scale-95"
-        >
-          ✗ Wrong
-        </button>
       </div>
 
       {/* ── AUDIO ── */}
