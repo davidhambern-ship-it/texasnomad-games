@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
+import Welcome from '@/pages/Welcome';
 import BFFGame from '@/pages/BFFGame';
 import SquareBizGame from '@/pages/SquareBizGame';
 import HangmanGame from '@/pages/HangmanGame';
@@ -14,6 +15,12 @@ import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import HostPanel from '@/pages/HostPanel';
+
+function HomeGate() {
+  const seen = localStorage.getItem('tn_welcome_seen');
+  if (!seen) { window.location.replace('/welcome'); return null; }
+  return <Home />;
+}
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -41,7 +48,8 @@ const AuthenticatedApp = () => {
   // Render the main app
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      <Route path="/welcome" element={<Welcome />} />
+      <Route path="/" element={<HomeGate />} />
       <Route path="/games" element={<PlaceholderPage />} />
       <Route path="/games/bff" element={<BFFGame />} />
       <Route path="/games/square-biz" element={<SquareBizGame />} />
