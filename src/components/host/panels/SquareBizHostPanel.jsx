@@ -92,6 +92,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         current_choices: trivia.choices,
         correct_answer: trivia.correctLetter,
         answer_result: null,
+        selected_answer: null,
       });
     } catch {
       // silently fail
@@ -112,12 +113,12 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
     const isCorrect = letter === currentTrivia?.correctLetter;
     if (isCorrect) {
       // Correct: show popup, then unlock board for marker placement
-      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true });
+      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
       setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
     } else {
       // Wrong: show popup, switch turn, stay locked, auto-fetch next question
       const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: nextTurn, board_locked: true });
+      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: nextTurn, board_locked: true, selected_answer: letter });
       setTimeout(() => updateState({ popup: null }), 2000);
       setTimeout(() => fetchOTDBQuestion(true), 2200);
     }
@@ -296,11 +297,19 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
               {['A','B','C','D'].map((letter) => {
                 const answerText = currentTrivia.choices?.[letter];
                 if (!answerText) return null;
+                const isSelected = gs.selected_answer === letter;
+                const isCorrect = letter === currentTrivia.correctLetter;
                 return (
                   <button key={letter}
                     onClick={() => handleAnswerSelect(letter)}
-                    disabled={!gs.show_choices}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#ffffff15] bg-transparent text-xs font-heading text-left text-[#ffffff80] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-default hover:enabled:scale-105">
+                    disabled={!gs.show_choices || isSelected}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:cursor-default ${
+                      isSelected
+                        ? isCorrect
+                          ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'
+                          : 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
+                        : 'border-[#ffffff15] bg-transparent text-[#ffffff80] hover:enabled:scale-105'
+                    }`}>
                     <span className="font-bold">{letter}.</span>
                     <span className="truncate">{answerText}</span>
                   </button>
