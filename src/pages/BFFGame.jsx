@@ -6,6 +6,18 @@ import SeatBadge from '@/components/game/SeatBadge.jsx';
 
 const sty = { fontFamily: "'Press Start 2P', monospace" };
 
+// ── Fuzzy answer matcher ──
+function normalize(text) {
+  return String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+function matchAnswer(guess, answers) {
+  const g = normalize(guess);
+  return answers.findIndex((a) => {
+    const t = normalize(a.text || a.answer || '');
+    return t === g || (t.length >= 4 && g.includes(t)) || (g.length >= 4 && t.includes(g));
+  });
+}
+
 export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
@@ -19,7 +31,6 @@ function BFFViewer({ roomCode }) {
 
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'bff', updateState);
 
-  // Family selection — persisted per room/player
   const familyKey = `tn_bff_family_${roomCode}_${playerId || 'anon'}`;
   const [selectedFamily, setSelectedFamily] = useState(() => {
     const v = localStorage.getItem(familyKey);
@@ -29,21 +40,17 @@ function BFFViewer({ roomCode }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
 
-  // Auto-assign to family with fewer players on mid-game join
+  // Auto-assign family on mid-game join
   useEffect(() => {
     if (!isSeated || selectedFamily || !gs.phase || gs.phase === 'setup') return;
     const players = gs.players || [];
     const f1 = players.filter(p => p.familyTeam === 1 || p.familyTeam === '1').length;
     const f2 = players.filter(p => p.familyTeam === 2 || p.familyTeam === '2').length;
-    if (f1 < f2) {
-      handleChooseFamily(1, true);
-    } else if (f2 < f1) {
-      handleChooseFamily(2, true);
-    }
-    // If equal — let player choose (don't auto-assign)
+    if (f1 < f2) handleChooseFamily(1, true);
+    else if (f2 < f1) handleChooseFamily(2, true);
   }, [isSeated, selectedFamily, gs.phase, gs.players]);
 
-  // Sync family choice into player record
+  // Sync family into player record
   const familySyncedRef = useRef(false);
   useEffect(() => {
     if (!isSeated || !selectedFamily || !playerId || familySyncedRef.current) return;
@@ -51,8 +58,7 @@ function BFFViewer({ roomCode }) {
     const existing = players.find(p => p.playerId === playerId);
     if (!existing || existing.familyTeam === selectedFamily) { familySyncedRef.current = true; return; }
     familySyncedRef.current = true;
-    const updated = players.map(p => p.playerId === playerId ? { ...p, familyTeam: selectedFamily } : p);
-    updateState({ players: updated });
+    updateState({ players: players.map(p => p.playerId === playerId ? { ...p, familyTeam: selectedFamily } : p) });
   }, [isSeated, selectedFamily, playerId, gs.players, updateState]);
 
   useEffect(() => {
@@ -62,14 +68,12 @@ function BFFViewer({ roomCode }) {
   }, []);
 
   const [autoAssignedMsg, setAutoAssignedMsg] = useState('');
-
   const handleChooseFamily = (familyNum, isAuto = false) => {
     localStorage.setItem(familyKey, String(familyNum));
     setSelectedFamily(familyNum);
     familySyncedRef.current = false;
     if (isAuto) {
-      const fname = familyNum === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
-      setAutoAssignedMsg(`You have been assigned to ${fname} to balance teams.`);
+      setAutoAssignedMsg(`Assigned to ${familyNum === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}`);
       setTimeout(() => setAutoAssignedMsg(''), 5000);
     }
   };
@@ -82,7 +86,6 @@ function BFFViewer({ roomCode }) {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#050505] text-white flex flex-col">
-      {/* Header */}
       <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#050505]/95 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 shrink-0">
@@ -113,7 +116,6 @@ function BFFViewer({ roomCode }) {
         </div>
       </header>
 
-      {/* Auto-assign toast */}
       {autoAssignedMsg && (
         <div className="fixed top-14 left-1/2 z-50 -translate-x-1/2 px-6 py-3 rounded-xl border border-[#FFD700]/50 bg-[#FFD700]/10 text-[#FFD700] text-[9px] tracking-widest uppercase text-center" style={sty}>
           {autoAssignedMsg}
@@ -125,13 +127,7 @@ function BFFViewer({ roomCode }) {
           <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !selectedFamily ? (
-        <FamilySelect
-          family1={gs.family1}
-          family2={gs.family2}
-          seatNumber={seatNumber}
-          isSeated={isSeated}
-          onChoose={handleChooseFamily}
-        />
+        <FamilySelect family1={gs.family1} family2={gs.family2} seatNumber={seatNumber} isSeated={isSeated} onChoose={handleChooseFamily} />
       ) : (
         <GameBoard
           gs={gs}
@@ -160,9 +156,7 @@ function FamilySelect({ family1, family2, seatNumber, isSeated, onChoose }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-8 p-6 text-center">
       <div>
-        <div className="font-heading text-3xl tracking-widest text-[#FFD700] uppercase mb-2" style={{ textShadow: '0 0 20px rgba(255,215,0,0.4)' }}>
-          Choose Your Family
-        </div>
+        <div className="font-heading text-3xl tracking-widest text-[#FFD700] uppercase mb-2" style={{ textShadow: '0 0 20px rgba(255,215,0,0.4)' }}>Choose Your Family</div>
         {seatNumber && <div className="text-[9px] tracking-[0.25em] text-white/40 uppercase mt-1" style={sty}>You are Seat {seatNumber}</div>}
         {!isSeated && <div className="text-[8px] tracking-widest text-white/20 uppercase mt-1" style={sty}>Assigning seat…</div>}
       </div>
@@ -170,13 +164,13 @@ function FamilySelect({ family1, family2, seatNumber, isSeated, onChoose }) {
         <button onClick={() => onChoose(1)}
           className="p-8 rounded-2xl border-2 border-[#BC13FE]/50 bg-[#BC13FE]/5 hover:bg-[#BC13FE]/15 hover:border-[#BC13FE] hover:scale-105 transition-all duration-200 active:scale-95">
           <div className="text-5xl mb-3">🟣</div>
-          <div className="font-heading text-2xl tracking-widest uppercase text-[#BC13FE] mb-1" style={{ textShadow: '0 0 15px rgba(188,19,254,0.6)' }}>{name1}</div>
+          <div className="font-heading text-2xl tracking-widest uppercase text-[#BC13FE] mb-1">{name1}</div>
           <div className="text-[8px] tracking-[0.2em] text-white/40 uppercase mt-1" style={sty}>Tap to join</div>
         </button>
         <button onClick={() => onChoose(2)}
           className="p-8 rounded-2xl border-2 border-[#FF5F1F]/50 bg-[#FF5F1F]/5 hover:bg-[#FF5F1F]/15 hover:border-[#FF5F1F] hover:scale-105 transition-all duration-200 active:scale-95">
           <div className="text-5xl mb-3">🟠</div>
-          <div className="font-heading text-2xl tracking-widest uppercase text-[#FF5F1F] mb-1" style={{ textShadow: '0 0 15px rgba(255,95,31,0.6)' }}>{name2}</div>
+          <div className="font-heading text-2xl tracking-widest uppercase text-[#FF5F1F] mb-1">{name2}</div>
           <div className="text-[8px] tracking-[0.2em] text-white/40 uppercase mt-1" style={sty}>Tap to join</div>
         </button>
       </div>
@@ -194,6 +188,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
   const [buzzAnim, setBuzzAnim] = useState(false);
   const recognitionRef = useRef(null);
 
+  // Reveal animation
   useEffect(() => {
     const prev = prevAnswersRef.current;
     answers.forEach((ans, i) => {
@@ -205,105 +200,155 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     prevAnswersRef.current = answers;
   }, [answers]);
 
-  const myFamilyColor = selectedFamily === 1 ? '#BC13FE' : '#FF5F1F';
-  const myFamilyName = selectedFamily === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
-
+  const players = gs.players || [];
   const faceoffMode = gs.faceoff_mode || false;
   const buzzWinner = gs.buzz_winner || null;
   const myFaceoffId = selectedFamily === 1 ? gs.faceoff_player1_id : gs.faceoff_player2_id;
-  // If host assigned specific faceoff players, only those can buzz. Otherwise any seated player can.
   const faceoffPlayersAssigned = !!(gs.faceoff_player1_id || gs.faceoff_player2_id);
-  const iAmFaceoffPlayer = isSeated && playerId && (
-    !faceoffPlayersAssigned || myFaceoffId === playerId
-  );
+  const iAmFaceoffPlayer = isSeated && playerId && (!faceoffPlayersAssigned || myFaceoffId === playerId);
   const buzzAlreadyWon = !!buzzWinner;
   const iAmBuzzWinner = buzzWinner?.playerId === playerId;
   const iAmAnsweringPlayer = isSeated && playerId && gs.answering_player_id === playerId;
+  const canAnswer = iAmAnsweringPlayer || iAmBuzzWinner;
 
-  // Buzzer handler
+  const pendingDecision = gs.pending_decision || null;
+  const iAmDecisionPlayer = pendingDecision && pendingDecision.playerId === playerId;
+
+  // ── Buzzer ──
   const handleBuzz = async () => {
     if (!isSeated || !playerId || !faceoffMode || buzzAlreadyWon || !iAmFaceoffPlayer) return;
     setBuzzAnim(true);
     setTimeout(() => setBuzzAnim(false), 600);
     await updateState({
-      buzz_winner: {
-        playerId,
-        seatNumber,
-        familyTeam: selectedFamily,
-        timestamp: Date.now(),
-      },
+      buzz_winner: { playerId, seatNumber, familyTeam: selectedFamily, timestamp: Date.now() },
       faceoff_mode: false,
     });
   };
 
-  // Stream typing live
+  // ── Live typing stream ──
   const handleTyping = async (value) => {
     setAnswerInput(value);
     await updateState({ current_typing: value });
   };
 
-  // Answer submit
+  // ── Answer submit: auto-check against board ──
   const handleSubmitAnswer = async (method = 'typed') => {
     const answer = answerInput.trim();
-    if (!answer) return;
-    if (!canAnswer) { setSubmitMsg('Wait — host will assign your turn.'); setTimeout(() => setSubmitMsg(''), 3000); return; }
+    if (!answer || !canAnswer) return;
+
+    const matchIdx = matchAnswer(answer, answers);
+    const alreadyRevealed = matchIdx !== -1 && answers[matchIdx].revealed;
+
+    if (matchIdx !== -1 && !alreadyRevealed) {
+      // ✅ CORRECT — reveal it and set pending decision
+      const ans = answers[matchIdx];
+      const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+      const newBank = (gs.round_bank || 0) + (ans.points || 0);
+
+      const myFamilyPlayers = players.filter(p => Number(p.familyTeam) === Number(selectedFamily));
+      const myIdx = myFamilyPlayers.findIndex(p => p.playerId === playerId);
+      const nextInFamily = myFamilyPlayers[(myIdx + 1) % myFamilyPlayers.length] || null;
+
+      await updateState({
+        answers: newAnswers,
+        round_bank: newBank,
+        current_typing: '',
+        last_submission: {
+          playerId, seatNumber, familyTeam: selectedFamily,
+          submittedAnswer: answer, inputMethod: method, timestamp: Date.now(),
+          result: 'correct',
+        },
+        pending_decision: {
+          playerId,
+          seatNumber,
+          familyTeam: selectedFamily,
+          answeredText: ans.text || ans.answer,
+          points: ans.points || 0,
+          nextInFamilyId: nextInFamily?.playerId || null,
+          nextInFamilySeat: nextInFamily?.seatNumber || null,
+          oppositeFamilyTeam: selectedFamily === 1 ? 2 : 1,
+        },
+        answering_player_id: null,
+      });
+      setAnswerInput('');
+    } else if (alreadyRevealed) {
+      setSubmitMsg('Already on the board!');
+      setTimeout(() => setSubmitMsg(''), 2500);
+    } else {
+      // ❌ WRONG
+      await updateState({
+        last_submission: {
+          playerId, seatNumber, familyTeam: selectedFamily,
+          submittedAnswer: answer, inputMethod: method, timestamp: Date.now(),
+          result: 'wrong',
+        },
+        current_typing: '',
+        answering_player_id: null,
+      });
+      setAnswerInput('');
+      setSubmitMsg('Not on the board!');
+      setTimeout(() => setSubmitMsg(''), 3000);
+    }
+  };
+
+  // ── Accept: play the board — next player in same family ──
+  const handleAccept = async () => {
+    if (!pendingDecision) return;
+    const { nextInFamilyId, familyTeam } = pendingDecision;
     await updateState({
-      last_submission: {
-        playerId,
-        seatNumber,
-        familyTeam: selectedFamily,
-        submittedAnswer: answer,
-        inputMethod: method,
-        timestamp: Date.now(),
-      },
-      current_typing: '',
+      pending_decision: null,
+      active_turn: Number(familyTeam),
+      answering_player_id: nextInFamilyId || null,
+      buzz_winner: null,
+      faceoff_mode: false,
     });
-    setAnswerInput('');
-    setSubmitMsg('Answer submitted!');
-    setTimeout(() => setSubmitMsg(''), 3000);
+  };
+
+  // ── Decline: opposing team plays, no choice ──
+  const handleDecline = async () => {
+    if (!pendingDecision) return;
+    const { oppositeFamilyTeam } = pendingDecision;
+    const oppPlayers = players.filter(p => Number(p.familyTeam) === Number(oppositeFamilyTeam));
+    const nextOpp = oppPlayers[0] || null;
+    await updateState({
+      pending_decision: null,
+      active_turn: Number(oppositeFamilyTeam),
+      answering_player_id: nextOpp?.playerId || null,
+      buzz_winner: null,
+      faceoff_mode: false,
+    });
   };
 
   const toggleVoice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setSubmitMsg('Voice not supported in this browser.'); setTimeout(() => setSubmitMsg(''), 3000); return; }
+    if (!SR) { setSubmitMsg('Voice not supported.'); setTimeout(() => setSubmitMsg(''), 3000); return; }
     if (isListening) { recognitionRef.current?.stop(); return; }
     const r = new SR();
     r.lang = 'en-US'; r.interimResults = false;
     r.onstart = () => setIsListening(true);
     r.onend = () => setIsListening(false);
-    r.onerror = () => { setIsListening(false); };
-    r.onresult = (e) => {
-      const t = e.results[0][0].transcript.trim();
-      setAnswerInput(t);
-      handleSubmitAnswer('spoken');
-    };
+    r.onerror = () => setIsListening(false);
+    r.onresult = (e) => { const t = e.results[0][0].transcript.trim(); setAnswerInput(t); };
     recognitionRef.current = r; r.start();
   };
 
-  // Determine buzzer state
-  let buzzerLabel = 'BUZZ IN';
-  let buzzerColor = '#FF5F1F';
-  let buzzerDisabled = true;
-  let buzzerSubtext = '';
-
+  // Buzzer display state
+  let buzzerLabel = 'BUZZ IN', buzzerColor = '#FF5F1F', buzzerDisabled = true, buzzerSubtext = '';
   if (!faceoffMode && !buzzWinner) {
     buzzerSubtext = 'Stand by…';
   } else if (buzzAlreadyWon) {
     buzzerColor = '#BC13FE';
-    buzzerLabel = buzzWinner.seatNumber === seatNumber ? 'YOU BUZZED!' : `SEAT ${buzzWinner.seatNumber} BUZZED`;
-    buzzerSubtext = `${buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}`;
-    buzzerDisabled = true;
-  } else if (faceoffMode && iAmFaceoffPlayer && !buzzAlreadyWon) {
+    buzzerLabel = iAmBuzzWinner ? 'YOU BUZZED!' : `SEAT ${buzzWinner.seatNumber} BUZZED`;
+    buzzerSubtext = buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
+  } else if (faceoffMode && iAmFaceoffPlayer) {
     buzzerDisabled = false;
     buzzerSubtext = faceoffPlayersAssigned ? 'You are in the faceoff!' : 'First to buzz wins!';
   } else if (faceoffMode && !iAmFaceoffPlayer) {
-    buzzerSubtext = "Waiting for your team's faceoff player.";
+    buzzerSubtext = "Waiting for faceoff player…";
   }
 
-  // Answer input: show for the buzz winner immediately, OR when host explicitly assigns an answering player
-  const showAnswerInput = gs.phase === 'playing' && (iAmBuzzWinner || iAmAnsweringPlayer || !!gs.answering_player_id);
-  // Can actually type/submit if host assigned this player OR if they buzzed in (before host assigns)
-  const canAnswer = iAmAnsweringPlayer || iAmBuzzWinner;
+  const showAnswerInput = gs.phase === 'playing' && !pendingDecision && (iAmBuzzWinner || iAmAnsweringPlayer || !!gs.answering_player_id);
+  const myFamilyColor = selectedFamily === 1 ? '#BC13FE' : '#FF5F1F';
 
   return (
     <div className="flex-1 flex flex-col p-4 md:p-6 gap-5 max-w-5xl mx-auto w-full relative">
@@ -327,9 +372,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         <div className="text-center">
           <div className="font-heading text-xs tracking-[0.25em] text-white/30 uppercase mb-1" style={sty}>Bank</div>
           <div className="font-heading text-3xl text-[#FF5F1F]" style={{ textShadow: '0 0 15px rgba(255,95,31,0.5)' }}>{gs.round_bank || 0}</div>
-          {gs.byes > 0 && (
-            <div className="mt-1 text-[9px] text-red-400 tracking-widest uppercase" style={sty}>BYE x{gs.byes}</div>
-          )}
+          {gs.byes > 0 && <div className="mt-1 text-[9px] text-red-400 tracking-widest uppercase" style={sty}>BYE x{gs.byes}</div>}
         </div>
         <FamilyScore name={gs.family2 || 'Family 2'} score={gs.score2 || 0} isActive={gs.active_turn === 2} color="#FF5F1F" isMyTeam={selectedFamily === 2} />
       </div>
@@ -342,21 +385,29 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         </div>
       )}
 
-      {/* Live typing display — visible to everyone */}
-      {gs.answering_player_id && gs.phase === 'playing' && (
+      {/* ── PENDING DECISION BANNER ── */}
+      {pendingDecision && (
+        <DecisionBanner
+          pendingDecision={pendingDecision}
+          iAmDecisionPlayer={iAmDecisionPlayer}
+          gs={gs}
+          onAccept={handleAccept}
+          onDecline={handleDecline}
+        />
+      )}
+
+      {/* Live typing */}
+      {!pendingDecision && gs.answering_player_id && gs.phase === 'playing' && (
         <div className="px-5 py-3 rounded-xl border border-[#22d3ee]/30 bg-[#22d3ee]/5 flex items-center gap-3 min-h-[3rem]">
           <span className="text-[7px] tracking-widest text-[#22d3ee]/50 uppercase shrink-0" style={sty}>Typing:</span>
           <span className="font-heading text-xl tracking-widest text-white flex-1">
-            {gs.current_typing
-              ? gs.current_typing
-              : <span className="text-white/15">…</span>
-            }
+            {gs.current_typing || <span className="text-white/15">…</span>}
           </span>
           <span className="w-2 h-5 bg-[#22d3ee]/60 animate-pulse rounded-sm shrink-0" />
         </div>
       )}
 
-      {/* Main layout: answers LEFT + buzzer/actions RIGHT */}
+      {/* Main layout */}
       <div className="flex gap-5 items-start">
 
         {/* LEFT: Answer Board */}
@@ -392,8 +443,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
                     : 'radial-gradient(circle, #FF5F1F25, #FF5F1F08)',
                 boxShadow: buzzAlreadyWon
                   ? '0 0 30px rgba(188,19,254,0.6), 0 0 60px rgba(188,19,254,0.3), inset 0 0 20px rgba(188,19,254,0.1)'
-                  : buzzerDisabled
-                    ? 'none'
+                  : buzzerDisabled ? 'none'
                     : `0 0 ${buzzAnim ? '50px' : '20px'} rgba(255,95,31,0.5), 0 0 ${buzzAnim ? '80px' : '40px'} rgba(255,95,31,0.2)`,
                 transform: buzzAnim ? 'scale(0.93)' : 'scale(1)',
                 cursor: buzzerDisabled || locked ? 'not-allowed' : 'pointer',
@@ -409,7 +459,6 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
                 }}>
                 {buzzerLabel}
               </div>
-              {/* Ring pulse when active */}
               {!buzzerDisabled && !buzzAlreadyWon && (
                 <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: '#FF5F1F', animationDuration: '1.5s' }} />
               )}
@@ -419,8 +468,8 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
             </div>
           </div>
 
-          {/* Buzz winner banner */}
-          {buzzWinner && (
+          {/* Buzz winner badge */}
+          {buzzWinner && !pendingDecision && (
             <div className="w-full px-3 py-3 rounded-xl border-2 text-center"
               style={{ borderColor: '#BC13FE', background: '#BC13FE10', boxShadow: '0 0 15px rgba(188,19,254,0.3)' }}>
               <div className="text-[7px] tracking-widest text-[#BC13FE]/70 uppercase mb-1" style={sty}>Buzzed In</div>
@@ -431,7 +480,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
             </div>
           )}
 
-          {/* Answer input — for buzz winner or host-assigned player */}
+          {/* Answer input */}
           {showAnswerInput && (
             <div className="w-full space-y-2">
               <div className="text-[7px] tracking-widest text-center uppercase mb-1"
@@ -439,24 +488,22 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
                 {canAnswer ? '✓ Your turn to answer' : 'Stand by…'}
               </div>
               <input
+                autoFocus={canAnswer}
                 className="w-full px-3 py-2 rounded-lg bg-black/80 border-2 text-white font-body text-sm focus:outline-none transition-colors"
-                style={{ borderColor: canAnswer ? '#4ade80' : '#ffffff15', color: canAnswer ? 'white' : '#ffffff30' }}
+                style={{ borderColor: canAnswer ? '#4ade80' : '#ffffff15' }}
                 value={answerInput}
                 onChange={(e) => handleTyping(e.target.value)}
-                placeholder={canAnswer ? 'Your answer…' : '—'}
+                placeholder={canAnswer ? 'Type answer…' : '—'}
                 disabled={!canAnswer || locked}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer('typed')}
               />
               <div className="flex gap-2">
-                <button
-                  onClick={toggleVoice}
-                  disabled={!canAnswer || locked}
+                <button onClick={toggleVoice} disabled={!canAnswer || locked}
                   className="flex-1 py-2 rounded-lg border-2 font-heading text-xs transition-all disabled:opacity-30"
                   style={{ borderColor: isListening ? '#ef4444' : '#22d3ee40', color: isListening ? '#ef4444' : '#22d3ee70' }}>
                   {isListening ? '🔴' : '🎙'}
                 </button>
-                <button
-                  onClick={() => handleSubmitAnswer('typed')}
+                <button onClick={() => handleSubmitAnswer('typed')}
                   disabled={!canAnswer || !answerInput.trim() || locked}
                   className="flex-1 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all disabled:opacity-30"
                   style={{ borderColor: '#4ade80', color: '#4ade80' }}>
@@ -465,13 +512,75 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
               </div>
               {submitMsg && (
                 <div className="text-[8px] text-center tracking-widest uppercase"
-                  style={{ ...sty, color: submitMsg.includes('Only') ? '#ef4444' : '#4ade80' }}>
+                  style={{ ...sty, color: submitMsg.includes('Not') ? '#ef4444' : submitMsg.includes('Already') ? '#FFD700' : '#4ade80' }}>
                   {submitMsg}
                 </div>
               )}
             </div>
           )}
+
+          {/* Wrong answer feedback */}
+          {gs.last_submission?.result === 'wrong' && !pendingDecision && (
+            <div className="w-full px-3 py-2 rounded-xl border border-red-500/40 bg-red-500/10 text-center">
+              <div className="text-[7px] tracking-widest text-red-400 uppercase" style={sty}>Not on the board</div>
+              <div className="font-heading text-sm text-red-300 mt-1">"{gs.last_submission.submittedAnswer}"</div>
+            </div>
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── DECISION BANNER ── */
+function DecisionBanner({ pendingDecision, iAmDecisionPlayer, gs, onAccept, onDecline }) {
+  const { answeredText, points, familyTeam, seatNumber: buzzSeat, oppositeFamilyTeam } = pendingDecision;
+  const myTeamName = familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
+  const oppTeamName = oppositeFamilyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
+
+  return (
+    <div className="rounded-2xl border-2 border-[#4ade80] bg-[#4ade80]/5 overflow-hidden"
+      style={{ boxShadow: '0 0 30px rgba(74,222,128,0.25), 0 0 60px rgba(74,222,128,0.1)' }}>
+
+      <div className="px-6 py-4 text-center border-b border-[#4ade80]/20">
+        <div className="text-[8px] tracking-[0.3em] text-[#4ade80]/70 uppercase mb-1" style={sty}>✓ On The Board!</div>
+        <div className="font-heading text-3xl md:text-4xl text-white tracking-widest uppercase" style={{ textShadow: '0 0 20px rgba(74,222,128,0.4)' }}>
+          {answeredText}
+        </div>
+        <div className="font-heading text-xl text-[#FF5F1F] mt-1">{points} pts</div>
+        <div className="text-[7px] tracking-widest text-white/40 uppercase mt-1" style={sty}>
+          Seat {buzzSeat} — {myTeamName}
+        </div>
+      </div>
+
+      <div className="px-6 py-4">
+        {iAmDecisionPlayer ? (
+          <div className="space-y-3">
+            <div className="text-[8px] tracking-[0.25em] text-white/60 uppercase text-center" style={sty}>
+              Your call — play the board or pass?
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={onAccept}
+                className="py-4 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all active:scale-95 hover:scale-105"
+                style={{ borderColor: '#4ade80', color: '#4ade80', background: '#4ade8015', boxShadow: '0 0 15px rgba(74,222,128,0.2)' }}>
+                ✓ PLAY<br />
+                <span className="text-[7px] opacity-60" style={sty}>My team plays</span>
+              </button>
+              <button onClick={onDecline}
+                className="py-4 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all active:scale-95 hover:scale-105"
+                style={{ borderColor: '#ef4444', color: '#ef4444', background: '#ef444415', boxShadow: '0 0 15px rgba(239,68,68,0.2)' }}>
+                ✗ PASS<br />
+                <span className="text-[7px] opacity-60" style={sty}>{oppTeamName} plays</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-2">
+            <div className="text-[8px] tracking-[0.25em] text-white/50 uppercase animate-pulse" style={sty}>
+              Waiting for Seat {buzzSeat} to decide…
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
