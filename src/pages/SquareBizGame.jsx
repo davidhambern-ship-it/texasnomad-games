@@ -233,21 +233,19 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   const popup = gs.popup;
   const sty = { fontFamily: "'Press Start 2P', monospace" };
 
-  // Determine my role from game state
   const sbPlayers = gs.sb_players || [];
   const sbQueue = gs.sb_queue || [];
   const myRecord = sbPlayers.find(p => p.playerId === playerId);
-  const myRole = myRecord?.role || null; // 'X' | 'O' | 'viewer' | null (unassigned)
+  const myRole = myRecord?.role || null; // 'X' | 'O' | 'viewer' | 'queued' | null
   const myQueueRecord = sbQueue.find(p => p.playerId === playerId);
   const myQueuePos = myQueueRecord?.queuePosition || null;
 
-  const [roleChoice, setRoleChoice] = useState(null); // 'queue' | 'viewer' | null — for the prompt
-  const [joinedQueue, setJoinedQueue] = useState(false);
+  const [roleChoice, setRoleChoice] = useState(null);
 
   const xPlayer = sbPlayers.find(p => p.role === 'X');
   const oPlayer = sbPlayers.find(p => p.role === 'O');
 
-  // Auto-assign role when joining board mode (only if chosenRole is 'participant')
+  // Auto-assign role when joining board mode
   useEffect(() => {
     if (!isSeated || !playerId || myRole) return;
     if (gs.display_mode !== 'board') return;
@@ -256,7 +254,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     const xTaken = !!xPlayer;
     const oTaken = !!oPlayer;
 
-    // First participant gets X, second gets O
     if (!xTaken) {
       const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
@@ -264,7 +261,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
       const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'O', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
     }
-    // else: both taken — show the prompt (myRole stays null)
   }, [isSeated, playerId, gs.display_mode, sbPlayers, chosenRole, xPlayer, oPlayer]);
 
   const handleJoinQueue = async () => {
@@ -273,7 +269,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     const newPlayers = [...sbPlayers, { playerId, seatNumber, role: 'queued', joinedAt: Date.now(), lastActionAt: Date.now() }];
     await updateState({ sb_queue: newQueue, sb_players: newPlayers });
     setRoleChoice('queue');
-    setJoinedQueue(true);
   };
 
   const handleWatchOnly = async () => {
@@ -282,77 +277,69 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
     setRoleChoice('viewer');
   };
 
+  // Board unlocked by host after CORRECT → player places marker → board locks, turn auto-switches
   const handleCellClick = async (idx) => {
     if (boardLocked || board[idx] || gs.winner) return;
-    if (myRole !== currentTurn) return; // not your turn
+    if (myRole !== currentTurn) return;
 
     const newBoard = [...board];
     newBoard[idx] = currentTurn;
     const winner = checkWinner(newBoard);
     const nextTurn = currentTurn === 'X' ? 'O' : 'X';
-
     const updatedPlayers = sbPlayers.map(p => p.playerId === playerId ? { ...p, lastActionAt: Date.now() } : p);
-
-    // If X just played, show question and choices for O's turn
-    const xJustPlayed = currentTurn === 'X';
 
     await updateState({
       board: newBoard,
-      current_turn: nextTurn,
+      current_turn: winner ? currentTurn : nextTurn,
       winner: winner || null,
       board_locked: true,
-      show_question: xJustPlayed,
-      show_choices: xJustPlayed,
+      show_question: false,
+      show_choices: false,
       answer_result: null,
+      selected_answer: null,
+      current_question: null,
+      current_choices: null,
+      correct_answer: null,
+      current_category: null,
       last_action_seat: seatNumber,
       last_action_player_id: playerId,
       sb_players: updatedPlayers,
-      ...(winner ? {} : { auto_next_question: Date.now() }),
     });
   };
 
+  // Player answers — only the active player (whose turn it is) may answer
   const handleAnswerSelect = async (letter) => {
-    // Only Player O can select answers, and only on their turn
-    if (myRole !== 'O' || !isMyTurn) return;
-    
-    const isCorrect = letter === gs.correct_answer;
-    if (isCorrect) {
-      // Correct: show popup, then unlock board for marker placement
-      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
-      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
-    } else {
-      // Wrong: show popup, switch turn, stay locked, auto-fetch next question
-      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: 'X', board_locked: true, selected_answer: letter });
-      setTimeout(() => updateState({ popup: null }), 2000);
-      setTimeout(() => updateState({ auto_next_question: Date.now() }), 2200);
-    }
+    if (myRole !== currentTurn) return; // only the active player can answer
+    if (gs.selected_answer) return; // already answered
+    // Signal to host panel — host decides CORRECT/WRONG
+    await updateState({ selected_answer: letter });
   };
 
-  const cellDisplay = (v, idx) => {
-    if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
-    if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
-    // Empty square - bright with orange border and purple glow
-    const isHovered = isMyTurn && canControl && !gs.winner;
-    return { 
-      char: '', 
-      color: '#ffffff80', 
-      border: '#FF5F1F', 
-      glow: isHovered 
-        ? '0 0 25px rgba(188,19,254,0.9), inset 0 0 20px rgba(255,95,31,0.3)' 
-        : '0 0 15px rgba(188,19,254,0.5), inset 0 0 10px rgba(255,95,31,0.15)'
-    };
-  };
+  // O taps board to reveal question (when it's O's turn and board is locked, no question yet)
+  const canRevealQuestion = myRole === 'O' && currentTurn === 'O' && boardLocked && !gs.show_question && !gs.winner && !popup;
 
   const isMyTurn = myRole === currentTurn;
   const canControl = myRole === 'X' || myRole === 'O';
   const xTaken = !!xPlayer;
   const oTaken = !!oPlayer;
   const showPrompt = isSeated && !myRole && !myQueueRecord && xTaken && oTaken && roleChoice === null;
-  // Player O can tap to reveal question when board is locked and no question showing
-  const canRevealQuestion = myRole === 'O' && boardLocked && !gs.show_question && !gs.winner && !popup && isMyTurn;
 
   const roleColor = myRole === 'X' ? '#BC13FE' : myRole === 'O' ? '#FF5F1F' : myRole === 'queued' ? '#FFD700' : '#ffffff40';
-  const roleLabel = myRole === 'X' ? 'You are X' : myRole === 'O' ? 'You are O' : myRole === 'queued' ? `Queued — Position ${myQueuePos}` : myRole === 'viewer' ? 'You are Viewer' : null;
+  const roleLabel = myRole === 'X' ? 'Player X — Host' : myRole === 'O' ? 'Player O — Contestant' : myRole === 'queued' ? `Queue — Position ${myQueuePos}` : myRole === 'viewer' ? 'Viewer' : null;
+
+  const cellDisplay = (v) => {
+    if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
+    const active = !boardLocked && isMyTurn && canControl && !gs.winner;
+    return {
+      char: '',
+      color: '#ffffff80',
+      border: '#FF5F1F',
+      glow: active
+        ? '0 0 25px rgba(188,19,254,0.9), inset 0 0 20px rgba(255,95,31,0.3)'
+        : '0 0 15px rgba(188,19,254,0.5), inset 0 0 10px rgba(255,95,31,0.15)'
+    };
+  };
 
   return (
     <div className="flex-1 flex items-stretch p-4 gap-4 relative">
@@ -372,7 +359,7 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
           <div className="max-w-sm w-full mx-4 p-8 rounded-2xl border-2 border-[#FFD700]/40 bg-black text-center space-y-5"
             style={{ boxShadow: '0 0 40px rgba(255,215,0,0.15)' }}>
             <div className="font-heading text-lg tracking-widest text-white uppercase">Game In Progress</div>
-            <p className="font-body text-white/60 text-sm">This game already has two active players. Would you like to join the queue to play next?</p>
+            <p className="font-body text-white/60 text-sm">Both players are active. Join the queue to play next?</p>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={handleJoinQueue}
                 className="py-4 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
@@ -389,22 +376,22 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
         </div>
       )}
 
-      {/* LEFT — Question + Choices + Role badge */}
+      {/* LEFT — Question / Choices / Role info */}
       <div className="flex-1 flex flex-col justify-center gap-3 min-w-0">
-        {/* My role badge */}
+        {/* Role badge */}
         {roleLabel && (
-          <div className="px-4 py-3 rounded-xl border-2 text-center mb-2"
+          <div className="px-4 py-3 rounded-xl border-2 text-center"
             style={{ borderColor: `${roleColor}50`, background: `${roleColor}10` }}>
-            <div className="font-heading text-base tracking-widest uppercase" style={{ color: roleColor, ...sty, fontSize: '10px' }}>{roleLabel}</div>
+            <div className="font-heading text-sm tracking-widest uppercase" style={{ color: roleColor, ...sty, fontSize: '9px' }}>{roleLabel}</div>
             {canControl && (
               <div className="text-[7px] tracking-widest text-white/30 uppercase mt-1" style={sty}>
-                {isMyTurn ? '▶ Your turn' : 'Waiting for your turn…'}
+                {isMyTurn ? '▶ Your turn' : 'Waiting…'}
               </div>
             )}
           </div>
         )}
 
-        {/* Viewer join queue button */}
+        {/* Viewer: join queue */}
         {myRole === 'viewer' && !myQueueRecord && (
           <button onClick={handleJoinQueue}
             className="px-4 py-3 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
@@ -413,129 +400,137 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
           </button>
         )}
 
-        {gs.show_question && gs.current_question ? (
+        {/* Question */}
+        {gs.show_question && gs.current_question && (
           <>
-            <div className="font-heading text-xs tracking-[0.25em] text-[#FFD700]/70 uppercase mb-1">Question</div>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#FFD700]/70 uppercase">Question</div>
             <div className="px-5 py-5 rounded-xl border-2 border-[#FFD700]/30 bg-[#FFD700]/5 font-heading text-xl tracking-wide text-white leading-snug"
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
-            {/* Show Choices button - appears when question is revealed and choices not yet shown */}
-            {!gs.show_choices && !popup && (
+            {/* O's turn: Show Choices button (only before choices appear) */}
+            {!gs.show_choices && !popup && currentTurn === 'O' && myRole === 'O' && (
               <button
                 onClick={() => updateState({ show_choices: true })}
-                className="mt-2 px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
-                style={{ boxShadow: '0 0 15px rgba(138,34,255,0.3)' }}>
+                className="mt-1 px-6 py-3 rounded-xl border-2 border-[#FF5F1F] text-[#FF5F1F] font-heading text-sm tracking-widest uppercase hover:bg-[#FF5F1F]/20 transition-all active:scale-95"
+                style={{ boxShadow: '0 0 15px rgba(255,95,31,0.3)' }}>
                 Show Choices
               </button>
             )}
           </>
-        ) : null}
+        )}
 
+        {/* Choices */}
         {gs.show_choices && gs.current_choices && (
           <>
-            <div className="font-heading text-xs tracking-[0.25em] text-[#8a22ff]/70 uppercase mb-1 mt-3">Choices</div>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#8a22ff]/70 uppercase mt-2">Choices</div>
             {['A','B','C','D'].map((letter) => {
               const text = gs.current_choices[letter];
               if (!text) return null;
               const isSelected = gs.selected_answer === letter;
               const isCorrect = letter === gs.correct_answer;
-              const canClick = myRole === 'O' && isMyTurn && !gs.selected_answer;
+              const canClick = isMyTurn && canControl && !gs.selected_answer;
+              // Host has judged: show result highlights
+              const hostJudged = gs.answer_result === true || gs.answer_result === false;
+
+              let style = 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] opacity-50'; // default: dimmed
+              if (canClick) style = 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] hover:scale-[1.02] hover:border-[#8a22ff]';
+              if (isSelected && !hostJudged) style = 'border-[#FFD700]/60 bg-[#FFD700]/10 text-[#FFD700]'; // pending
+              if (hostJudged && isSelected && gs.answer_result) style = 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'; // correct
+              if (hostJudged && isSelected && !gs.answer_result) style = 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'; // wrong
+              if (hostJudged && isCorrect && gs.answer_result) style = 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'; // correct reveal
+
               return (
-                <button
-                  key={letter}
+                <button key={letter}
                   onClick={() => canClick && handleAnswerSelect(letter)}
-                  disabled={!canClick || isSelected}
-                  className={`w-full px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide text-left transition-all active:scale-95 disabled:cursor-default ${
-                    isSelected
-                      ? isCorrect
-                        ? 'border-[#4ade80] bg-[#4ade80]/20 text-[#4ade80]'
-                        : 'border-[#ef4444] bg-[#ef4444]/10 text-[#ef4444]'
-                      : canClick
-                        ? 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] hover:scale-105 hover:border-[#8a22ff]'
-                        : 'border-[#8a22ff40] bg-[#8a22ff10] text-[#ffffffcc] opacity-50'
-                  }`}
-                  style={!isSelected ? { boxShadow: canClick ? '0 0 15px rgba(138,34,255,0.3)' : 'none' } : {}}>
-                  <span className={isCorrect && isSelected ? 'text-[#4ade80]' : 'text-[#8a22ff]'}>{letter}.</span>{text}
+                  disabled={!canClick || !!gs.selected_answer}
+                  className={`w-full px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide text-left transition-all active:scale-95 disabled:cursor-default ${style}`}
+                  style={{ boxShadow: canClick ? '0 0 15px rgba(138,34,255,0.3)' : 'none' }}>
+                  <span className="mr-2" style={{ color: '#8a22ff' }}>{letter}.</span>{text}
                 </button>
               );
             })}
+            {/* Waiting for host to judge */}
+            {gs.selected_answer && gs.answer_result === null && !popup && (
+              <div className="px-4 py-3 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
+                <div className="text-[8px] tracking-widest text-[#FFD700] uppercase animate-pulse" style={sty}>
+                  Waiting for host…
+                </div>
+              </div>
+            )}
           </>
         )}
 
-        {/* Not your turn message */}
-        {canControl && !isMyTurn && !gs.winner && (
+        {/* Not your turn */}
+        {canControl && !isMyTurn && !gs.winner && !gs.show_question && (
           <div className="px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-center">
-            <div className="text-[8px] tracking-widest text-white/30 uppercase" style={sty}>
-              It is not your turn
-            </div>
+            <div className="text-[8px] tracking-widest text-white/30 uppercase" style={sty}>It is not your turn</div>
           </div>
         )}
       </div>
 
       {/* CENTER — Board */}
       <div className="flex flex-col items-center justify-center gap-4 shrink-0">
+        {/* Turn indicator — highly visible */}
+        <div className="px-6 py-3 rounded-xl border-2 text-center min-w-[220px]"
+          style={{
+            borderColor: currentTurn === 'X' ? '#BC13FE' : '#FF5F1F',
+            background: currentTurn === 'X' ? 'rgba(188,19,254,0.1)' : 'rgba(255,95,31,0.1)',
+            boxShadow: `0 0 20px ${currentTurn === 'X' ? 'rgba(188,19,254,0.4)' : 'rgba(255,95,31,0.4)'}`
+          }}>
+          <div className="text-[8px] tracking-[0.3em] text-white/40 uppercase mb-1" style={sty}>Current Turn</div>
+          <div className="font-heading text-3xl font-bold tracking-widest"
+            style={{ color: currentTurn === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 20px ${currentTurn === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
+            {currentTurn === 'X' ? 'PLAYER X' : 'PLAYER O'}
+          </div>
+          <div className="text-[7px] tracking-widest text-white/30 uppercase mt-1" style={sty}>
+            {currentTurn === 'X' ? 'HOST' : 'CONTESTANT'}
+          </div>
+        </div>
+
         {/* Player slots */}
         <div className="flex gap-3">
-          {[{ role: 'X', color: '#BC13FE', player: xPlayer }, { role: 'O', color: '#FF5F1F', player: oPlayer }].map(({ role, color, player }) => (
-            <div key={role} className="px-3 py-2 rounded-lg border text-center min-w-[80px]"
+          {[{ role: 'X', color: '#BC13FE', player: xPlayer, label: 'HOST' }, { role: 'O', color: '#FF5F1F', player: oPlayer, label: 'CONTESTANT' }].map(({ role, color, player, label }) => (
+            <div key={role} className="px-3 py-2 rounded-lg border text-center min-w-[90px]"
               style={{ borderColor: currentTurn === role ? color : `${color}30`, background: currentTurn === role ? `${color}15` : 'transparent' }}>
-              <div className="font-heading text-lg" style={{ color, textShadow: currentTurn === role ? `0 0 12px ${color}` : 'none' }}>{role}</div>
-              <div className="text-[7px] text-white/40 uppercase" style={sty}>
-                {player ? `Seat ${player.seatNumber}` : 'Open'}
-              </div>
+              <div className="font-heading text-xl" style={{ color, textShadow: currentTurn === role ? `0 0 12px ${color}` : 'none' }}>{role}</div>
+              <div className="text-[6px] text-white/30 uppercase mt-0.5" style={sty}>{label}</div>
+              <div className="text-[6px] text-white/40 uppercase" style={sty}>{player ? `Seat ${player.seatNumber}` : 'Open'}</div>
             </div>
           ))}
         </div>
 
-        <div className="text-center">
-          <div className="font-heading text-xs tracking-[0.25em] text-white/40 uppercase mb-1">Turn</div>
-          <div className="font-heading text-4xl font-bold"
-            style={{ color: currentTurn === 'X' ? '#BC13FE' : '#FF5F1F', textShadow: `0 0 24px ${currentTurn === 'X' ? '#BC13FE' : '#FF5F1F'}` }}>
-            {currentTurn}
-          </div>
-        </div>
-
+        {/* Board grid */}
         <div className="relative" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
           <div
             onClick={() => canRevealQuestion && updateState({ show_question: true })}
             className={`grid grid-cols-3 gap-3 ${canRevealQuestion ? 'cursor-pointer' : ''}`}
           >
             {board.map((cell, idx) => {
-              const { char, color, border, glow } = cellDisplay(cell, idx);
+              const { char, color, border, glow } = cellDisplay(cell);
               const canClick = !boardLocked && !cell && !gs.winner && isMyTurn && canControl;
               return (
                 <div key={idx}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (canClick) handleCellClick(idx);
-                  }}
+                  onClick={(e) => { e.stopPropagation(); if (canClick) handleCellClick(idx); }}
                   className={`aspect-square flex items-center justify-center rounded-xl border-4 font-heading transition-all ${canClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
-                  style={{ 
-                    fontSize: 'clamp(2rem, 5vw, 5rem)', 
-                    borderColor: cell ? border : border, 
-                    color, 
-                    background: cell ? `${color}20` : '#0a0a0a', 
-                    boxShadow: glow,
-                    fontWeight: cell ? 'bold' : 'normal'
-                  }}>
+                  style={{ fontSize: 'clamp(2rem, 5vw, 5rem)', borderColor: border, color, background: cell ? `${color}20` : '#0a0a0a', boxShadow: glow, fontWeight: cell ? 'bold' : 'normal' }}>
                   {char}
                 </div>
               );
             })}
           </div>
 
-          {/* Board open indicator */}
+          {/* Board open glow */}
           {!boardLocked && !gs.winner && isMyTurn && canControl && (
             <div className="absolute inset-0 rounded-xl pointer-events-none"
               style={{ boxShadow: '0 0 0 3px #4ade80, 0 0 20px rgba(74,222,128,0.3)' }} />
           )}
 
-          {/* Tap hint for Player O */}
+          {/* O: tap to reveal question */}
           {canRevealQuestion && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl pointer-events-none">
-              <div className="font-heading text-lg tracking-widest text-[#FFD700] uppercase animate-pulse"
-                style={{ textShadow: '0 0 20px rgba(255,215,0,0.5)' }}>
+              <div className="font-heading text-lg tracking-widest text-[#FF5F1F] uppercase animate-pulse"
+                style={{ textShadow: '0 0 20px rgba(255,95,31,0.8)' }}>
                 TAP TO REVEAL
               </div>
             </div>
@@ -556,7 +551,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
           </div>
         </div>
 
-        {/* Queue count */}
         {sbQueue.length > 0 && (
           <div className="text-[7px] text-white/30 uppercase tracking-widest text-center" style={sty}>
             {sbQueue.length} in queue
