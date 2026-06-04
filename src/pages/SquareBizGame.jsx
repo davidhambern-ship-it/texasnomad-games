@@ -200,8 +200,6 @@ function PanelModeBoard({ gs }) {
 function BoardModeBoard({ gs, updateState }) {
   const board = gs.board || Array(9).fill('');
   const [showControlPanel, setShowControlPanel] = useState(false);
-  const [choicesButtonVisible, setChoicesButtonVisible] = useState(false);
-  const timerRef = useRef(null);
 
   const currentTurn = gs.current_turn || 'X';
   const popup = gs.popup;
@@ -209,31 +207,13 @@ function BoardModeBoard({ gs, updateState }) {
   // Phase derived from game state
   const roundPhase = !gs.show_question ? 'idle' : !gs.show_choices ? 'question' : 'choices';
 
-  // When phase goes back to idle, reset the choices button
-  useEffect(() => {
-    if (roundPhase === 'idle') {
-      setChoicesButtonVisible(false);
-      if (timerRef.current) clearTimeout(timerRef.current);
-    }
-  }, [roundPhase]);
-
-  useEffect(() => {
-    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-  }, []);
-
   const handlePlay = () => {
     if (!gs.current_question) return;
     updateState({ show_question: true, show_choices: false });
-    setChoicesButtonVisible(false);
-    // After 5 seconds, show the CHOICES button
-    timerRef.current = setTimeout(() => {
-      setChoicesButtonVisible(true);
-    }, 5000);
   };
 
   const handleShowChoices = () => {
     updateState({ show_choices: true });
-    setChoicesButtonVisible(false);
   };
 
   const handleCellClick = (idx) => {
@@ -347,8 +327,8 @@ function BoardModeBoard({ gs, updateState }) {
           )}
         </div>
 
-        {/* CHOICES button — appears 5s after PLAY, disappears once choices are shown */}
-        {roundPhase === 'question' && choicesButtonVisible && (
+        {/* CHOICES button — shown whenever question is active but choices not yet revealed */}
+        {roundPhase === 'question' && (
           <button
             onClick={handleShowChoices}
             className="px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-lg tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
