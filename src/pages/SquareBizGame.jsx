@@ -321,10 +321,9 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
       await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true, selected_answer: letter });
       setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
     } else {
-      // Wrong: show popup, switch turn, stay locked, auto-fetch next question
-      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: 'X', board_locked: true, selected_answer: letter });
-      setTimeout(() => updateState({ popup: null }), 2000);
-      setTimeout(() => updateState({ auto_next_question: Date.now() }), 2200);
+      // Wrong: show popup, but still O's turn to place marker (just no points)
+      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, selected_answer: letter });
+      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
     }
   };
 
