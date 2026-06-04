@@ -116,6 +116,20 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
     }
   }, [gs.show_question]);
 
+  // Host clicks an answer — auto-resolves correct/wrong
+  const handleHostAnswerSelect = async (letter) => {
+    const isCorrect = letter === gs.correct_answer;
+    await updateState({ selected_answer: letter, answer_result: isCorrect });
+    if (isCorrect) {
+      await updateState({ popup: 'correct' });
+      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
+    } else {
+      const nextTurn = currentTurn === 'X' ? 'O' : 'X';
+      await updateState({ popup: 'wrong', current_turn: nextTurn, board_locked: true });
+      setTimeout(() => updateState({ popup: null }), 2000);
+    }
+  };
+
   // ── MODE SELECT ──
   if (!displayMode) {
     return (
@@ -289,7 +303,7 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
             )}
             <div className="font-heading text-sm tracking-wide text-[#FFD700] leading-snug">★ {gs.current_question}</div>
 
-            {/* Choices — display only, player selects on game board */}
+            {/* Choices — host can click to select player's answer (auto-resolves) */}
             {gs.current_choices && (
               <div className="grid grid-cols-2 gap-2 mt-2">
                 {['A','B','C','D'].map((letter) => {
@@ -298,19 +312,23 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
                   const isSelected = gs.selected_answer === letter;
                   const isCorrect = letter === gs.correct_answer;
                   const hasAnswered = gs.selected_answer && (gs.answer_result === true || gs.answer_result === false);
+                  const canClick = !hasAnswered;
 
-                  let cls = 'border-[#ffffff20] bg-[#ffffff08] text-[#ffffffcc]';
-                  if (isSelected && gs.answer_result === true) cls = 'border-[#4ade80]/70 bg-[#4ade80]/15 text-[#4ade80]';
-                  if (isSelected && gs.answer_result === false) cls = 'border-[#ef4444]/70 bg-[#ef4444]/10 text-[#ef4444]';
+                  let cls = 'border-[#ffffff20] bg-[#ffffff08] text-[#ffffffcc] hover:border-[#FF5F1F] hover:bg-[#FF5F1F]/10 cursor-pointer';
+                  if (isSelected && gs.answer_result === true) cls = 'border-[#4ade80]/70 bg-[#4ade80]/15 text-[#4ade80] cursor-default';
+                  if (isSelected && gs.answer_result === false) cls = 'border-[#ef4444]/70 bg-[#ef4444]/10 text-[#ef4444] cursor-default';
                   if (!isSelected && isCorrect && hasAnswered) cls = 'border-[#4ade80]/40 bg-[#4ade80]/5 text-[#4ade80]';
 
                   return (
-                    <div key={letter} className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left ${cls}`}>
+                    <button key={letter}
+                      onClick={() => canClick && handleHostAnswerSelect(letter)}
+                      disabled={!canClick}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:cursor-default ${cls}`}>
                       <span className="font-bold">{letter}.</span>
                       <span className="truncate">{answerText}</span>
                       {isSelected && gs.answer_result === true && <span className="ml-auto text-[#4ade80]">✓</span>}
                       {isSelected && gs.answer_result === false && <span className="ml-auto text-[#ef4444]">✗</span>}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
