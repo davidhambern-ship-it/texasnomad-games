@@ -339,7 +339,7 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   };
 
   const isMyTurn = myRole === currentTurn;
-  const showPlayButton = boardLocked && !gs.show_question && !gs.winner && !popup;
+  const showPlayButton = boardLocked && gs.show_question && !gs.winner && !popup && isMyTurn;
   const canControl = myRole === 'X' || myRole === 'O';
   const xTaken = !!sbPlayers.find(p => p.role === 'X');
   const oTaken = !!sbPlayers.find(p => p.role === 'O');
@@ -417,6 +417,22 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
           </>
         ) : null}
 
+        {gs.show_choices && gs.current_choices && (
+          <>
+            <div className="font-heading text-xs tracking-[0.25em] text-[#8a22ff]/70 uppercase mb-1 mt-3">Choices</div>
+            {['A','B','C','D'].map((letter) => {
+              const text = gs.current_choices[letter];
+              if (!text) return null;
+              return (
+                <div key={letter} className="px-5 py-4 rounded-xl border-2 font-heading text-lg tracking-wide"
+                  style={{ borderColor: '#8a22ff40', background: '#8a22ff10', color: '#ffffffcc' }}>
+                  <span className="text-[#8a22ff] mr-3">{letter}.</span>{text}
+                </div>
+              );
+            })}
+          </>
+        )}
+
         {/* Not your turn message */}
         {canControl && !isMyTurn && !gs.winner && (
           <div className="px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-center">
@@ -467,7 +483,7 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
           </div>
 
           {/* PLAY button */}
-          {showPlayButton && canControl && isMyTurn && (
+          {showPlayButton && canControl && (
             <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-xl">
               <button
                 onClick={handlePlayClick}

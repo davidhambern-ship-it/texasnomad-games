@@ -346,11 +346,11 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
-          <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!gs.current_question || loadingTrivia}>Show Question</Btn>
-          <Btn onClick={() => fetchOTDBQuestion()} color="#BC13FE" disabled={loadingTrivia}>{loadingTrivia ? 'Loading…' : 'Fetch Question'}</Btn>
+        <div className="grid grid-cols-3 gap-3">
+          <Btn onClick={() => fetchOTDBQuestion()} color="#BC13FE" disabled={loadingTrivia} className="col-span-1">{loadingTrivia ? 'Loading…' : 'Fetch Question'}</Btn>
+          <Btn onClick={() => updateState({ show_question: true, show_choices: false })} color="#4ade80" disabled={!gs.current_question || loadingTrivia} className="col-span-1">Show Question</Btn>
+          <Btn onClick={() => updateState({ show_question: true, show_choices: true })} color="#8a22ff" disabled={!gs.current_question || loadingTrivia} className="col-span-1">Show Choices</Btn>
         </div>
-        <Btn onClick={() => updateState({ show_question: true, show_choices: true })} color="#8a22ff" disabled={!gs.current_question || loadingTrivia} className="w-full">Show Choices</Btn>
       </div>
 
       {/* Music */}
