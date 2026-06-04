@@ -218,6 +218,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
   );
   const buzzAlreadyWon = !!buzzWinner;
   const iAmBuzzWinner = buzzWinner?.playerId === playerId;
+  const iAmAnsweringPlayer = isSeated && playerId && gs.answering_player_id === playerId;
 
   // Buzzer handler
   const handleBuzz = async () => {
@@ -235,11 +236,19 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     });
   };
 
+  // Stream typing live
+  const handleTyping = async (value) => {
+    setAnswerInput(value);
+    if (iAmAnsweringPlayer) {
+      await updateState({ current_typing: value });
+    }
+  };
+
   // Answer submit
   const handleSubmitAnswer = async (method = 'typed') => {
     const answer = answerInput.trim();
     if (!answer) return;
-    if (!iAmBuzzWinner) { setSubmitMsg('Only the buzz-in winner can answer.'); setTimeout(() => setSubmitMsg(''), 3000); return; }
+    if (!iAmAnsweringPlayer) { setSubmitMsg('Wait — host will assign your turn.'); setTimeout(() => setSubmitMsg(''), 3000); return; }
     await updateState({
       last_submission: {
         playerId,
@@ -249,6 +258,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         inputMethod: method,
         timestamp: Date.now(),
       },
+      current_typing: '',
     });
     setAnswerInput('');
     setSubmitMsg('Answer submitted!');
@@ -292,8 +302,8 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     buzzerSubtext = "Waiting for your team's faceoff player.";
   }
 
-  // Answer input visibility: only show when buzz winner is set and this player won the buzz
-  const showAnswerInput = !!buzzWinner && gs.phase === 'playing';
+  // Answer input visibility: show when host assigns this player as answering player
+  const showAnswerInput = !!gs.answering_player_id && gs.phase === 'playing';
 
   return (
     <div className="flex-1 flex flex-col p-4 md:p-6 gap-5 max-w-5xl mx-auto w-full relative">
@@ -411,29 +421,29 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
           {showAnswerInput && (
             <div className="w-full space-y-2">
               <div className="text-[7px] tracking-widest text-center uppercase mb-1"
-                style={{ ...sty, color: iAmBuzzWinner ? '#4ade80' : '#ffffff30' }}>
-                {iAmBuzzWinner ? '✓ Your turn to answer' : 'Only buzz winner answers'}
+                style={{ ...sty, color: iAmAnsweringPlayer ? '#4ade80' : '#ffffff30' }}>
+                {iAmAnsweringPlayer ? '✓ Your turn to answer' : 'Stand by…'}
               </div>
               <input
                 className="w-full px-3 py-2 rounded-lg bg-black/80 border-2 text-white font-body text-sm focus:outline-none transition-colors"
-                style={{ borderColor: iAmBuzzWinner ? '#4ade80' : '#ffffff15', color: iAmBuzzWinner ? 'white' : '#ffffff30' }}
+                style={{ borderColor: iAmAnsweringPlayer ? '#4ade80' : '#ffffff15', color: iAmAnsweringPlayer ? 'white' : '#ffffff30' }}
                 value={answerInput}
-                onChange={(e) => setAnswerInput(e.target.value)}
-                placeholder={iAmBuzzWinner ? 'Your answer…' : '—'}
-                disabled={!iAmBuzzWinner || locked}
+                onChange={(e) => handleTyping(e.target.value)}
+                placeholder={iAmAnsweringPlayer ? 'Your answer…' : '—'}
+                disabled={!iAmAnsweringPlayer || locked}
                 onKeyDown={(e) => e.key === 'Enter' && handleSubmitAnswer('typed')}
               />
               <div className="flex gap-2">
                 <button
                   onClick={toggleVoice}
-                  disabled={!iAmBuzzWinner || locked}
+                  disabled={!iAmAnsweringPlayer || locked}
                   className="flex-1 py-2 rounded-lg border-2 font-heading text-xs transition-all disabled:opacity-30"
                   style={{ borderColor: isListening ? '#ef4444' : '#22d3ee40', color: isListening ? '#ef4444' : '#22d3ee70' }}>
                   {isListening ? '🔴' : '🎙'}
                 </button>
                 <button
                   onClick={() => handleSubmitAnswer('typed')}
-                  disabled={!iAmBuzzWinner || !answerInput.trim() || locked}
+                  disabled={!iAmAnsweringPlayer || !answerInput.trim() || locked}
                   className="flex-1 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all disabled:opacity-30"
                   style={{ borderColor: '#4ade80', color: '#4ade80' }}>
                   SUBMIT

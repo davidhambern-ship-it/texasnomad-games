@@ -37,6 +37,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   // Split players by family
   const family1Players = players.filter(p => p.familyTeam === 1 || p.familyTeam === '1');
   const family2Players = players.filter(p => p.familyTeam === 2 || p.familyTeam === '2');
+  const unassignedPlayers = players.filter(p => !p.familyTeam);
 
   useEffect(() => {
     setLoadingSurveys(true);
@@ -145,7 +146,12 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   };
 
   const clearBuzz = async () => {
-    await updateState({ buzz_winner: null });
+    await updateState({ buzz_winner: null, answering_player_id: null, current_typing: '' });
+  };
+
+  const assignAnsweringPlayer = async (playerId) => {
+    const current = gs.answering_player_id;
+    await updateState({ answering_player_id: current === playerId ? null : playerId, current_typing: '' });
   };
 
   const loadSurvey = async (idx) => {
@@ -291,21 +297,23 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
               {/* Family 1 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-2" style={sty}>{gs.family1 || 'Family 1'}</div>
-                {family1Players.length === 0
+                {family1Players.length === 0 && unassignedPlayers.length === 0
                   ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
                   : <div className="flex flex-wrap gap-2">
-                      {family1Players.map(p => {
+                      {[...family1Players, ...unassignedPlayers].map(p => {
                         const selected = gs.faceoff_player1_id === p.playerId;
+                        const isUnassigned = !p.familyTeam;
                         return (
                           <button key={p.playerId} onClick={() => setFaceoffPlayer(1, selected ? '' : p.playerId)}
                             className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
                             style={{
-                              borderColor: selected ? '#BC13FE' : '#BC13FE30',
-                              color: selected ? '#BC13FE' : '#ffffff50',
+                              borderColor: selected ? '#BC13FE' : isUnassigned ? '#ffffff20' : '#BC13FE30',
+                              color: selected ? '#BC13FE' : isUnassigned ? '#ffffff40' : '#ffffff50',
                               background: selected ? '#BC13FE20' : 'transparent',
                               boxShadow: selected ? '0 0 10px rgba(188,19,254,0.3)' : 'none',
                             }}>
                             SEAT {p.seatNumber}
+                            {isUnassigned && <span className="ml-1 text-[6px] text-white/30">?</span>}
                             <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
                           </button>
                         );
@@ -321,21 +329,23 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
               {/* Family 2 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#FF5F1F]/70 uppercase mb-2" style={sty}>{gs.family2 || 'Family 2'}</div>
-                {family2Players.length === 0
+                {family2Players.length === 0 && unassignedPlayers.length === 0
                   ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
                   : <div className="flex flex-wrap gap-2">
-                      {family2Players.map(p => {
+                      {[...family2Players, ...unassignedPlayers].map(p => {
                         const selected = gs.faceoff_player2_id === p.playerId;
+                        const isUnassigned = !p.familyTeam;
                         return (
                           <button key={p.playerId} onClick={() => setFaceoffPlayer(2, selected ? '' : p.playerId)}
                             className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
                             style={{
-                              borderColor: selected ? '#FF5F1F' : '#FF5F1F30',
-                              color: selected ? '#FF5F1F' : '#ffffff50',
+                              borderColor: selected ? '#FF5F1F' : isUnassigned ? '#ffffff20' : '#FF5F1F30',
+                              color: selected ? '#FF5F1F' : isUnassigned ? '#ffffff40' : '#ffffff50',
                               background: selected ? '#FF5F1F20' : 'transparent',
                               boxShadow: selected ? '0 0 10px rgba(255,95,31,0.3)' : 'none',
                             }}>
                             SEAT {p.seatNumber}
+                            {isUnassigned && <span className="ml-1 text-[6px] text-white/30">?</span>}
                             <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
                           </button>
                         );
@@ -352,16 +362,53 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
 
             {/* Buzz Winner */}
             {buzzWinner ? (
-              <div className="p-3 border-2 border-[#BC13FE] rounded-xl bg-[#BC13FE]/10 flex items-center justify-between"
-                style={{ boxShadow: '0 0 20px rgba(188,19,254,0.3)' }}>
-                <div>
-                  <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-1" style={sty}>⚡ Buzz Winner</div>
-                  <div className="font-heading text-xl text-white">
-                    Seat {buzzWinner.seatNumber} — {buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}
+              <div className="space-y-3">
+                <div className="p-3 border-2 border-[#BC13FE] rounded-xl bg-[#BC13FE]/10 flex items-center justify-between"
+                  style={{ boxShadow: '0 0 20px rgba(188,19,254,0.3)' }}>
+                  <div>
+                    <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-1" style={sty}>⚡ Buzz Winner</div>
+                    <div className="font-heading text-xl text-white">
+                      Seat {buzzWinner.seatNumber} — {buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}
+                    </div>
+                    <div className="text-[8px] text-white/40 mt-0.5" style={sty}>{new Date(buzzWinner.timestamp).toLocaleTimeString()}</div>
                   </div>
-                  <div className="text-[8px] text-white/40 mt-0.5" style={sty}>{new Date(buzzWinner.timestamp).toLocaleTimeString()}</div>
+                  <Btn onClick={clearBuzz} color="#ffffff" size="sm">Clear</Btn>
                 </div>
-                <Btn onClick={clearBuzz} color="#ffffff" size="sm">Clear</Btn>
+
+                {/* Assign answering player */}
+                <div className="p-3 border border-[#4ade80]/30 rounded-xl bg-black/60 space-y-2">
+                  <div className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={sty}>
+                    Assign Answering Player {gs.answering_player_id ? '✓' : '— pick who answers'}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {players.map(p => {
+                      const selected = gs.answering_player_id === p.playerId;
+                      const teamColor = (p.familyTeam === 1 || p.familyTeam === '1') ? '#BC13FE' : (p.familyTeam === 2 || p.familyTeam === '2') ? '#FF5F1F' : '#ffffff';
+                      return (
+                        <button key={p.playerId} onClick={() => assignAnsweringPlayer(p.playerId)}
+                          className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
+                          style={{
+                            borderColor: selected ? '#4ade80' : `${teamColor}40`,
+                            color: selected ? '#4ade80' : `${teamColor}aa`,
+                            background: selected ? '#4ade8020' : 'transparent',
+                            boxShadow: selected ? '0 0 10px rgba(74,222,128,0.3)' : 'none',
+                          }}>
+                          SEAT {p.seatNumber}
+                          {!p.familyTeam && <span className="ml-1 text-[6px] text-white/30">?</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Live typing preview */}
+                  {gs.answering_player_id && (
+                    <div className="mt-2 px-3 py-2 rounded-lg border border-[#22d3ee]/30 bg-[#22d3ee]/5 min-h-[2.5rem] flex items-center gap-2">
+                      <span className="text-[8px] text-[#22d3ee]/60 uppercase shrink-0" style={sty}>Typing:</span>
+                      <span className="font-heading text-base text-white tracking-widest">
+                        {gs.current_typing || <span className="text-white/20 text-sm">…</span>}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="text-center text-[9px] tracking-widest text-white/20 uppercase py-2" style={sty}>
