@@ -3,10 +3,10 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
+import BYEDisplay from '@/components/game/BYEDisplay.jsx';
 
 const sty = { fontFamily: "'Press Start 2P', monospace" };
 
-// ── Fuzzy answer matcher ──
 function normalize(text) {
   return String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -28,7 +28,6 @@ export default function BFFGame() {
 function BFFViewer({ roomCode }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
-
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'bff', updateState);
 
   const familyKey = `tn_bff_family_${roomCode}_${playerId || 'anon'}`;
@@ -36,7 +35,6 @@ function BFFViewer({ roomCode }) {
     const v = localStorage.getItem(familyKey);
     return v ? Number(v) : null;
   });
-
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
 
@@ -178,6 +176,32 @@ function FamilySelect({ family1, family2, seatNumber, isSeated, onChoose }) {
   );
 }
 
+/* ── WRONG X POPUP ── */
+function WrongXPopup({ show }) {
+  if (!show) return null;
+  return (
+    <div className="fixed inset-0 z-[95] flex items-center justify-center pointer-events-none">
+      <div className="font-heading" style={{
+        ...sty,
+        fontSize: '35vw',
+        color: '#ef4444',
+        textShadow: '0 0 60px #ef4444, 0 0 120px rgba(239,68,68,0.5)',
+        animation: 'wrongXAnim 1.2s ease-out forwards',
+      }}>
+        ✗
+      </div>
+      <style>{`
+        @keyframes wrongXAnim {
+          0%   { opacity: 0; transform: scale(2); }
+          25%  { opacity: 1; transform: scale(1); }
+          70%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(0.8); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 /* ── GAME BOARD ── */
 function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated, locked, updateState, onChangeFamily }) {
   const [revealAnim, setRevealAnim] = useState({});
@@ -186,6 +210,8 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
   const [isListening, setIsListening] = useState(false);
   const [submitMsg, setSubmitMsg] = useState('');
   const [buzzAnim, setBuzzAnim] = useState(false);
+  const [showWrongX, setShowWrongX] = useState(false);
+  const prevByeCount = useRef(gs.bye_count || 0);
   const recognitionRef = useRef(null);
 
   // Reveal animation
@@ -200,19 +226,39 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     prevAnswersRef.current = answers;
   }, [answers]);
 
+  // Watch for bye_count increase → show wrong X
+  useEffect(() => {
+    const curr = gs.bye_count || 0;
+    if (curr > prevByeCount.current) {
+      setShowWrongX(true);
+      setTimeout(() => setShowWrongX(false), 1200);
+    }
+    prevByeCount.current = curr;
+  }, [gs.bye_count]);
+
   const players = gs.players || [];
   const faceoffMode = gs.faceoff_mode || false;
   const buzzWinner = gs.buzz_winner || null;
+  const buzzAlreadyWon = !!buzzWinner;
+
+  // After faceoff: buzzer disabled, show whose turn it is
+  const activeTurn = gs.active_turn || 1;
+  const activeFamilyName = activeTurn === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
+  const activeFamilyColor = activeTurn === 1 ? '#BC13FE' : '#FF5F1F';
+
   const myFaceoffId = selectedFamily === 1 ? gs.faceoff_player1_id : gs.faceoff_player2_id;
   const faceoffPlayersAssigned = !!(gs.faceoff_player1_id || gs.faceoff_player2_id);
   const iAmFaceoffPlayer = isSeated && playerId && (!faceoffPlayersAssigned || myFaceoffId === playerId);
-  const buzzAlreadyWon = !!buzzWinner;
   const iAmBuzzWinner = buzzWinner?.playerId === playerId;
   const iAmAnsweringPlayer = isSeated && playerId && gs.answering_player_id === playerId;
-  const canAnswer = iAmAnsweringPlayer || iAmBuzzWinner;
+  const canAnswer = iAmAnsweringPlayer || (iAmBuzzWinner && !gs.answering_player_id);
 
   const pendingDecision = gs.pending_decision || null;
   const iAmDecisionPlayer = pendingDecision && pendingDecision.playerId === playerId;
+
+  const byeCount = gs.bye_count || 0;
+  const byeFlash = gs.bye_flash || 0;
+  const byeComplete = byeCount >= 3;
 
   // ── Buzzer ──
   const handleBuzz = async () => {
@@ -222,6 +268,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     await updateState({
       buzz_winner: { playerId, seatNumber, familyTeam: selectedFamily, timestamp: Date.now() },
       faceoff_mode: false,
+      answering_player_id: playerId, // buzz winner answers first
     });
   };
 
@@ -240,7 +287,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     const alreadyRevealed = matchIdx !== -1 && answers[matchIdx].revealed;
 
     if (matchIdx !== -1 && !alreadyRevealed) {
-      // ✅ CORRECT — reveal it and set pending decision
+      // ✅ CORRECT — reveal + pending decision
       const ans = answers[matchIdx];
       const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
       const newBank = (gs.round_bank || 0) + (ans.points || 0);
@@ -259,9 +306,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
           result: 'correct',
         },
         pending_decision: {
-          playerId,
-          seatNumber,
-          familyTeam: selectedFamily,
+          playerId, seatNumber, familyTeam: selectedFamily,
           answeredText: ans.text || ans.answer,
           points: ans.points || 0,
           nextInFamilyId: nextInFamily?.playerId || null,
@@ -269,13 +314,16 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
           oppositeFamilyTeam: selectedFamily === 1 ? 2 : 1,
         },
         answering_player_id: null,
+        buzz_winner: null,
       });
       setAnswerInput('');
     } else if (alreadyRevealed) {
       setSubmitMsg('Already on the board!');
       setTimeout(() => setSubmitMsg(''), 2500);
     } else {
-      // ❌ WRONG
+      // ❌ WRONG — host will add BYE; player just gets told wrong
+      setShowWrongX(true);
+      setTimeout(() => setShowWrongX(false), 1200);
       await updateState({
         last_submission: {
           playerId, seatNumber, familyTeam: selectedFamily,
@@ -284,6 +332,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         },
         current_typing: '',
         answering_player_id: null,
+        buzz_winner: null,
       });
       setAnswerInput('');
       setSubmitMsg('Not on the board!');
@@ -304,7 +353,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     });
   };
 
-  // ── Decline: opposing team plays, no choice ──
+  // ── Decline: opposing team plays ──
   const handleDecline = async () => {
     if (!pendingDecision) return;
     const { oppositeFamilyTeam } = pendingDecision;
@@ -332,26 +381,42 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
     recognitionRef.current = r; r.start();
   };
 
-  // Buzzer display state
-  let buzzerLabel = 'BUZZ IN', buzzerColor = '#FF5F1F', buzzerDisabled = true, buzzerSubtext = '';
-  if (!faceoffMode && !buzzWinner) {
-    buzzerSubtext = 'Stand by…';
+  // Buzzer state
+  // Buzzer is only active during faceoff mode
+  const buzzerActive = faceoffMode && iAmFaceoffPlayer && !buzzAlreadyWon;
+  let buzzerLabel = 'BUZZ IN';
+  let buzzerColor = '#FF5F1F';
+  let buzzerSubtext = '';
+
+  if (faceoffMode && !buzzAlreadyWon) {
+    if (iAmFaceoffPlayer) {
+      buzzerColor = '#FF5F1F';
+      buzzerSubtext = 'BUZZ FIRST!';
+    } else {
+      buzzerColor = '#ffffff20';
+      buzzerSubtext = 'Waiting for faceoff…';
+    }
+  } else if (!faceoffMode && !buzzAlreadyWon) {
+    buzzerColor = '#ffffff15';
+    // Show who's answering
+    if (gs.answering_player_id) {
+      const ap = players.find(p => p.playerId === gs.answering_player_id);
+      buzzerSubtext = ap ? `Seat ${ap.seatNumber} answering` : 'Answering…';
+    } else {
+      buzzerSubtext = `${activeFamilyName}'s turn`;
+    }
   } else if (buzzAlreadyWon) {
     buzzerColor = '#BC13FE';
     buzzerLabel = iAmBuzzWinner ? 'YOU BUZZED!' : `SEAT ${buzzWinner.seatNumber} BUZZED`;
     buzzerSubtext = buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2');
-  } else if (faceoffMode && iAmFaceoffPlayer) {
-    buzzerDisabled = false;
-    buzzerSubtext = faceoffPlayersAssigned ? 'You are in the faceoff!' : 'First to buzz wins!';
-  } else if (faceoffMode && !iAmFaceoffPlayer) {
-    buzzerSubtext = "Waiting for faceoff player…";
   }
 
-  const showAnswerInput = gs.phase === 'playing' && !pendingDecision && (iAmBuzzWinner || iAmAnsweringPlayer || !!gs.answering_player_id);
+  const showAnswerInput = gs.phase === 'playing' && !pendingDecision && !byeComplete && (canAnswer || !!gs.answering_player_id);
   const myFamilyColor = selectedFamily === 1 ? '#BC13FE' : '#FF5F1F';
 
   return (
     <div className="flex-1 flex flex-col p-4 md:p-6 gap-5 max-w-5xl mx-auto w-full relative">
+      <WrongXPopup show={showWrongX} />
 
       {/* Locked overlay */}
       {locked && (
@@ -369,13 +434,26 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
       {/* Scoreboard */}
       <div className="grid grid-cols-3 gap-4 items-center">
         <FamilyScore name={gs.family1 || 'Family 1'} score={gs.score1 || 0} isActive={gs.active_turn === 1} color="#BC13FE" isMyTeam={selectedFamily === 1} />
-        <div className="text-center">
-          <div className="font-heading text-xs tracking-[0.25em] text-white/30 uppercase mb-1" style={sty}>Bank</div>
+        <div className="text-center space-y-1">
+          <div className="font-heading text-xs tracking-[0.25em] text-white/30 uppercase" style={sty}>Bank</div>
           <div className="font-heading text-3xl text-[#FF5F1F]" style={{ textShadow: '0 0 15px rgba(255,95,31,0.5)' }}>{gs.round_bank || 0}</div>
-          {gs.byes > 0 && <div className="mt-1 text-[9px] text-red-400 tracking-widest uppercase" style={sty}>BYE x{gs.byes}</div>}
+          {/* BYE display in scoreboard center */}
+          <div className="pt-2">
+            <BYEDisplay byeCount={byeCount} byeFlash={byeFlash} />
+          </div>
         </div>
         <FamilyScore name={gs.family2 || 'Family 2'} score={gs.score2 || 0} isActive={gs.active_turn === 2} color="#FF5F1F" isMyTeam={selectedFamily === 2} />
       </div>
+
+      {/* BYE complete notice */}
+      {byeComplete && (
+        <div className="px-5 py-3 rounded-xl border-2 border-[#FF5F1F] bg-[#FF5F1F]/10 text-center"
+          style={{ boxShadow: '0 0 30px rgba(255,95,31,0.3)' }}>
+          <div className="font-heading text-lg tracking-widest text-[#FF5F1F] uppercase animate-pulse" style={sty}>
+            ✗ BYE — Host deciding next action
+          </div>
+        </div>
+      )}
 
       {/* Question */}
       {gs.current_question && (
@@ -385,7 +463,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         </div>
       )}
 
-      {/* ── PENDING DECISION BANNER ── */}
+      {/* PENDING DECISION BANNER */}
       {pendingDecision && (
         <DecisionBanner
           pendingDecision={pendingDecision}
@@ -410,7 +488,7 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
       {/* Main layout */}
       <div className="flex gap-5 items-start">
 
-        {/* LEFT: Answer Board */}
+        {/* Answer Board */}
         <div className="flex-1 min-w-0">
           {answers.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -432,39 +510,51 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={handleBuzz}
-              disabled={buzzerDisabled || locked}
+              disabled={!buzzerActive || locked}
               className="relative w-36 h-36 md:w-44 md:h-44 rounded-full border-4 flex flex-col items-center justify-center transition-all duration-200 select-none"
               style={{
-                borderColor: buzzAlreadyWon ? '#BC13FE' : buzzerDisabled ? '#ffffff15' : '#FF5F1F',
-                background: buzzAlreadyWon
-                  ? 'radial-gradient(circle, #BC13FE20, #BC13FE08)'
-                  : buzzerDisabled
-                    ? 'radial-gradient(circle, #ffffff05, transparent)'
-                    : 'radial-gradient(circle, #FF5F1F25, #FF5F1F08)',
-                boxShadow: buzzAlreadyWon
-                  ? '0 0 30px rgba(188,19,254,0.6), 0 0 60px rgba(188,19,254,0.3), inset 0 0 20px rgba(188,19,254,0.1)'
-                  : buzzerDisabled ? 'none'
-                    : `0 0 ${buzzAnim ? '50px' : '20px'} rgba(255,95,31,0.5), 0 0 ${buzzAnim ? '80px' : '40px'} rgba(255,95,31,0.2)`,
+                borderColor: buzzerActive ? '#FF5F1F' : buzzAlreadyWon ? '#BC13FE' : '#ffffff10',
+                background: buzzerActive
+                  ? 'radial-gradient(circle, #FF5F1F25, #FF5F1F08)'
+                  : buzzAlreadyWon
+                    ? 'radial-gradient(circle, #BC13FE20, #BC13FE08)'
+                    : 'radial-gradient(circle, #ffffff05, transparent)',
+                boxShadow: buzzerActive
+                  ? `0 0 ${buzzAnim ? '50px' : '20px'} rgba(255,95,31,0.5), 0 0 ${buzzAnim ? '80px' : '40px'} rgba(255,95,31,0.2)`
+                  : buzzAlreadyWon
+                    ? '0 0 30px rgba(188,19,254,0.6), 0 0 60px rgba(188,19,254,0.3)'
+                    : 'none',
                 transform: buzzAnim ? 'scale(0.93)' : 'scale(1)',
-                cursor: buzzerDisabled || locked ? 'not-allowed' : 'pointer',
-                opacity: buzzerDisabled && !buzzAlreadyWon && !faceoffMode ? 0.3 : 1,
+                cursor: (!buzzerActive || locked) ? 'not-allowed' : 'pointer',
+                opacity: !buzzerActive && !buzzAlreadyWon && !faceoffMode ? 0.3 : 1,
               }}
             >
-              <div className="font-heading text-center leading-tight"
+              <div className="font-heading text-center leading-tight px-2"
                 style={{
                   ...sty,
-                  fontSize: buzzAlreadyWon ? '9px' : '13px',
-                  color: buzzAlreadyWon ? '#BC13FE' : buzzerDisabled ? '#ffffff20' : '#FF5F1F',
-                  textShadow: buzzAlreadyWon ? '0 0 15px rgba(188,19,254,0.8)' : !buzzerDisabled ? '0 0 10px rgba(255,95,31,0.6)' : 'none',
+                  fontSize: buzzerActive ? '13px' : buzzAlreadyWon ? '9px' : '10px',
+                  color: buzzerActive ? '#FF5F1F' : buzzAlreadyWon ? '#BC13FE' : '#ffffff20',
+                  textShadow: buzzerActive ? '0 0 10px rgba(255,95,31,0.6)' : buzzAlreadyWon ? '0 0 15px rgba(188,19,254,0.8)' : 'none',
                 }}>
                 {buzzerLabel}
               </div>
-              {!buzzerDisabled && !buzzAlreadyWon && (
+              {buzzerActive && (
                 <div className="absolute inset-0 rounded-full animate-ping opacity-20" style={{ background: '#FF5F1F', animationDuration: '1.5s' }} />
               )}
             </button>
-            <div className="text-[7px] text-center tracking-widest uppercase px-2" style={{ ...sty, color: buzzAlreadyWon ? '#BC13FE' : '#ffffff30', maxWidth: '160px' }}>
-              {buzzerSubtext}
+
+            {/* Subtext / whose turn */}
+            <div className="text-center px-2 space-y-1">
+              <div className="text-[7px] tracking-widest uppercase" style={{ ...sty, color: buzzerActive ? '#FF5F1F' : buzzAlreadyWon ? '#BC13FE' : '#ffffff30', maxWidth: '160px' }}>
+                {buzzerSubtext}
+              </div>
+              {/* Whose turn display when not in faceoff */}
+              {!faceoffMode && !pendingDecision && (
+                <div className="px-2 py-1 rounded border text-[7px] tracking-widest uppercase text-center"
+                  style={{ borderColor: `${activeFamilyColor}40`, color: activeFamilyColor, background: `${activeFamilyColor}10`, ...sty }}>
+                  {activeFamilyName}'s TURN
+                </div>
+              )}
             </div>
           </div>
 
@@ -541,7 +631,6 @@ function DecisionBanner({ pendingDecision, iAmDecisionPlayer, gs, onAccept, onDe
   return (
     <div className="rounded-2xl border-2 border-[#4ade80] bg-[#4ade80]/5 overflow-hidden"
       style={{ boxShadow: '0 0 30px rgba(74,222,128,0.25), 0 0 60px rgba(74,222,128,0.1)' }}>
-
       <div className="px-6 py-4 text-center border-b border-[#4ade80]/20">
         <div className="text-[8px] tracking-[0.3em] text-[#4ade80]/70 uppercase mb-1" style={sty}>✓ On The Board!</div>
         <div className="font-heading text-3xl md:text-4xl text-white tracking-widest uppercase" style={{ textShadow: '0 0 20px rgba(74,222,128,0.4)' }}>
@@ -552,25 +641,20 @@ function DecisionBanner({ pendingDecision, iAmDecisionPlayer, gs, onAccept, onDe
           Seat {buzzSeat} — {myTeamName}
         </div>
       </div>
-
       <div className="px-6 py-4">
         {iAmDecisionPlayer ? (
           <div className="space-y-3">
-            <div className="text-[8px] tracking-[0.25em] text-white/60 uppercase text-center" style={sty}>
-              Your call — play the board or pass?
-            </div>
+            <div className="text-[8px] tracking-[0.25em] text-white/60 uppercase text-center" style={sty}>Your call — play the board or pass?</div>
             <div className="grid grid-cols-2 gap-3">
               <button onClick={onAccept}
                 className="py-4 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all active:scale-95 hover:scale-105"
                 style={{ borderColor: '#4ade80', color: '#4ade80', background: '#4ade8015', boxShadow: '0 0 15px rgba(74,222,128,0.2)' }}>
-                ✓ PLAY<br />
-                <span className="text-[7px] opacity-60" style={sty}>My team plays</span>
+                ✓ PLAY<br /><span className="text-[7px] opacity-60" style={sty}>My team plays</span>
               </button>
               <button onClick={onDecline}
                 className="py-4 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all active:scale-95 hover:scale-105"
                 style={{ borderColor: '#ef4444', color: '#ef4444', background: '#ef444415', boxShadow: '0 0 15px rgba(239,68,68,0.2)' }}>
-                ✗ PASS<br />
-                <span className="text-[7px] opacity-60" style={sty}>{oppTeamName} plays</span>
+                ✗ PASS<br /><span className="text-[7px] opacity-60" style={sty}>{oppTeamName} plays</span>
               </button>
             </div>
           </div>

@@ -15,6 +15,33 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = ''
 };
 
 const sty = { fontFamily: "'Press Start 2P', monospace" };
+const BYE_LETTERS = ['B', 'Y', 'E'];
+const BYE_COLORS = ['#FF5F1F', '#BC13FE', '#FFD700'];
+
+// BYE indicator for host panel
+function HostBYEIndicator({ byeCount = 0 }) {
+  return (
+    <div className="flex items-center gap-3">
+      {BYE_LETTERS.map((l, i) => {
+        const active = i < byeCount;
+        return (
+          <div key={l} className="font-heading transition-all duration-300"
+            style={{
+              ...sty,
+              fontSize: '2rem',
+              color: active ? BYE_COLORS[i] : '#ffffff10',
+              textShadow: active ? `0 0 15px ${BYE_COLORS[i]}` : 'none',
+            }}>
+            {l}
+          </div>
+        );
+      })}
+      <span className="text-[9px] tracking-widest text-white/30 uppercase ml-2" style={sty}>
+        {byeCount}/3
+      </span>
+    </div>
+  );
+}
 
 export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const [surveys, setSurveys] = useState([]);
@@ -33,6 +60,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const players = gs.players || [];
   const faceoffMode = gs.faceoff_mode || false;
   const buzzWinner = gs.buzz_winner || null;
+  const byeCount = gs.bye_count || 0;
 
   // Split players by family
   const family1Players = players.filter(p => p.familyTeam === 1 || p.familyTeam === '1');
@@ -94,7 +122,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     recognitionRef.current = r; r.start();
   };
 
-  // Auto-select faceoff players: next unselected player per family (rotate)
   const getNextFaceoffPlayer = (familyPlayers, currentFaceoffId) => {
     if (!familyPlayers.length) return null;
     const idx = familyPlayers.findIndex(p => p.playerId === currentFaceoffId);
@@ -104,7 +131,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
   const startGame = async () => {
     if (!family1Input.trim() || !family2Input.trim()) return;
     const firstSurvey = surveys[0];
-    // Auto-pick faceoff players
     const f1 = family1Players[0] || null;
     const f2 = family2Players[0] || null;
     await updateState({
@@ -124,18 +150,19 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       faceoff_player1_id: f1?.playerId || null,
       faceoff_player2_id: f2?.playerId || null,
       buzz_winner: null,
-      byes: 0,
+      bye_count: 0,
+      bye_flash: 0,
     });
   };
 
   const startFaceoff = async () => {
-    // Rotate faceoff players
     const f1 = getNextFaceoffPlayer(family1Players, gs.faceoff_player1_id);
     const f2 = getNextFaceoffPlayer(family2Players, gs.faceoff_player2_id);
     await updateState({
       faceoff_mode: true,
       buzz_winner: null,
       last_submission: null,
+      answering_player_id: null,
       faceoff_player1_id: f1?.playerId || gs.faceoff_player1_id || null,
       faceoff_player2_id: f2?.playerId || gs.faceoff_player2_id || null,
     });
@@ -149,9 +176,38 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     await updateState({ buzz_winner: null, answering_player_id: null, current_typing: '' });
   };
 
-  const assignAnsweringPlayer = async (playerId) => {
+  const assignAnsweringPlayer = async (pid) => {
     const current = gs.answering_player_id;
-    await updateState({ answering_player_id: current === playerId ? null : playerId, current_typing: '' });
+    await updateState({ answering_player_id: current === pid ? null : pid, current_typing: '' });
+  };
+
+  // ── BYE controls ──
+  const addByeStrike = async () => {
+    const newCount = Math.min(3, byeCount + 1);
+    await updateState({ bye_count: newCount, answering_player_id: null });
+  };
+
+  const removeByeStrike = async () => {
+    const newCount = Math.max(0, byeCount - 1);
+    await updateState({ bye_count: newCount });
+  };
+
+  const clearBye = async () => {
+    await updateState({ bye_count: 0 });
+  };
+
+  const triggerByeAnimation = async () => {
+    await updateState({ bye_flash: Date.now() });
+  };
+
+  // Mark wrong — adds BYE strike automatically
+  const markWrong = async () => {
+    const newCount = Math.min(3, byeCount + 1);
+    await updateState({
+      bye_count: newCount,
+      answering_player_id: null,
+      last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
+    });
   };
 
   const loadSurvey = async (idx) => {
@@ -165,6 +221,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       faceoff_mode: true,
       buzz_winner: null,
       last_submission: null,
+      bye_count: 0,
+      bye_flash: 0,
+      answering_player_id: null,
+      pending_decision: null,
     });
   };
 
@@ -188,21 +248,16 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
       phase: 'setup', score1: 0, score2: 0,
       active_turn: 1, round_bank: 0,
       current_question: '', answers: [], round: 1, current_survey_idx: 0,
-      last_submission: null, faceoff_mode: false, buzz_winner: null, byes: 0,
+      last_submission: null, faceoff_mode: false, buzz_winner: null,
+      bye_count: 0, bye_flash: 0,
     });
   };
 
-  const addBye = async () => {
-    await updateState({ byes: (gs.byes || 0) + 1 });
-  };
-  const clearByes = async () => { await updateState({ byes: 0 }); };
-
-  const setFaceoffPlayer = async (family, playerId) => {
+  const setFaceoffPlayer = async (family, pid) => {
     const key = family === 1 ? 'faceoff_player1_id' : 'faceoff_player2_id';
-    await updateState({ [key]: playerId });
+    await updateState({ [key]: pid });
   };
 
-  // Helper to find player by id
   const getPlayer = (id) => players.find(p => p.playerId === id);
   const getFaceoff1 = () => getPlayer(gs.faceoff_player1_id);
   const getFaceoff2 = () => getPlayer(gs.faceoff_player2_id);
@@ -225,7 +280,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                 value={family2Input} onChange={(e) => setFamily2Input(e.target.value)} placeholder="e.g. The Johnsons" onKeyDown={(e) => e.key === 'Enter' && startGame()} />
             </div>
           </div>
-          {/* Player roster preview */}
           {players.length > 0 && (
             <div className="mb-5 p-3 border border-white/10 rounded-lg bg-black/40 space-y-2">
               <div className="text-[9px] tracking-widest text-white/40 uppercase mb-2" style={sty}>{players.length} Player{players.length !== 1 ? 's' : ''} in lobby</div>
@@ -256,12 +310,11 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
     const fo1 = getFaceoff1();
     const fo2 = getFaceoff2();
     const lastSub = gs.last_submission;
-    const buzzWinnerPlayer = buzzWinner ? getPlayer(buzzWinner.playerId) : null;
 
     return (
       <div className="max-w-4xl mx-auto space-y-4">
 
-        {/* Round + Faceoff Status Bar */}
+        {/* Round + Status Bar */}
         <div className="p-4 border rounded-xl bg-black/60 flex flex-wrap items-center gap-4 justify-between"
           style={{ borderColor: faceoffMode ? '#FF5F1F' : '#BC13FE30', boxShadow: faceoffMode ? '0 0 15px rgba(255,95,31,0.2)' : 'none' }}>
           <div className="flex items-center gap-4">
@@ -271,22 +324,60 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
             </div>
             <div className="w-px h-8 bg-white/10" />
             <div className={`px-3 py-1 rounded border text-[9px] tracking-widest uppercase ${faceoffMode ? 'border-[#FF5F1F] text-[#FF5F1F] bg-[#FF5F1F]/10' : 'border-white/20 text-white/30'}`} style={sty}>
-              {faceoffMode ? '⚡ FACEOFF MODE' : 'PLAYING'}
+              {faceoffMode ? '⚡ FACEOFF' : 'PLAYING'}
             </div>
-            {gs.byes > 0 && (
-              <div className="px-3 py-1 rounded border border-red-500/40 text-red-400 text-[9px] tracking-widest uppercase" style={sty}>
-                BYE x{gs.byes}
-              </div>
-            )}
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
             {!faceoffMode
               ? <Btn onClick={startFaceoff} color="#FF5F1F" size="sm">⚡ Start Faceoff</Btn>
               : <Btn onClick={endFaceoff} color="#ffffff" size="sm">End Faceoff</Btn>
             }
-            <Btn onClick={addBye} color="#ef4444" size="sm">+ BYE</Btn>
-            {gs.byes > 0 && <Btn onClick={clearByes} color="#ef444450" size="sm">Clear Byes</Btn>}
           </div>
+        </div>
+
+        {/* ── BYE CONTROLS ── */}
+        <div className="p-4 border-2 rounded-xl bg-black/60 space-y-3"
+          style={{ borderColor: byeCount >= 3 ? '#FF5F1F' : byeCount > 0 ? '#FF5F1F60' : '#BC13FE30', boxShadow: byeCount >= 3 ? '0 0 20px rgba(255,95,31,0.3)' : 'none' }}>
+          <div className="flex items-center justify-between">
+            <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">BYE Strikes</h3>
+            {byeCount >= 3 && (
+              <div className="px-2 py-1 rounded border border-[#FF5F1F] bg-[#FF5F1F]/10 text-[#FF5F1F] text-[8px] tracking-widest uppercase animate-pulse" style={sty}>
+                BYE COMPLETE
+              </div>
+            )}
+          </div>
+
+          {/* BYE display */}
+          <div className="flex justify-center py-2">
+            <HostBYEIndicator byeCount={byeCount} />
+          </div>
+
+          {/* Controls */}
+          <div className="grid grid-cols-2 gap-2">
+            <Btn onClick={addByeStrike} color="#ef4444" size="sm" disabled={byeCount >= 3}>
+              ✗ Add BYE Strike
+            </Btn>
+            <Btn onClick={markWrong} color="#ef4444" size="sm" disabled={byeCount >= 3}>
+              Mark Wrong + BYE
+            </Btn>
+            <Btn onClick={removeByeStrike} color="#FFD700" size="sm" disabled={byeCount === 0}>
+              − Remove Strike
+            </Btn>
+            <Btn onClick={clearBye} color="#ffffff40" size="sm" disabled={byeCount === 0}>
+              Clear BYE
+            </Btn>
+          </div>
+          <Btn onClick={triggerByeAnimation} color="#FF5F1F" size="sm" className="w-full">
+            🎬 Trigger BYE Animation
+          </Btn>
+
+          {byeCount >= 3 && (
+            <div className="px-3 py-2 rounded-lg border border-[#FF5F1F]/40 bg-[#FF5F1F]/10 text-center">
+              <div className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={sty}>
+                BYE complete — prepare steal or award round
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Faceoff Players */}
@@ -294,10 +385,9 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
           <div className="p-4 border border-[#FF5F1F]/40 rounded-xl bg-black/60 space-y-3">
             <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/70 uppercase">⚡ Faceoff Players</h3>
             <div className="grid grid-cols-2 gap-4">
-              {/* Family 1 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-2" style={sty}>{gs.family1 || 'Family 1'}</div>
-                {family1Players.length === 0 && unassignedPlayers.length === 0
+                {[...family1Players, ...unassignedPlayers].length === 0
                   ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
                   : <div className="flex flex-wrap gap-2">
                       {[...family1Players, ...unassignedPlayers].map(p => {
@@ -306,12 +396,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                         return (
                           <button key={p.playerId} onClick={() => setFaceoffPlayer(1, selected ? '' : p.playerId)}
                             className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
-                            style={{
-                              borderColor: selected ? '#BC13FE' : isUnassigned ? '#ffffff20' : '#BC13FE30',
-                              color: selected ? '#BC13FE' : isUnassigned ? '#ffffff40' : '#ffffff50',
-                              background: selected ? '#BC13FE20' : 'transparent',
-                              boxShadow: selected ? '0 0 10px rgba(188,19,254,0.3)' : 'none',
-                            }}>
+                            style={{ borderColor: selected ? '#BC13FE' : isUnassigned ? '#ffffff20' : '#BC13FE30', color: selected ? '#BC13FE' : isUnassigned ? '#ffffff40' : '#ffffff50', background: selected ? '#BC13FE20' : 'transparent' }}>
                             SEAT {p.seatNumber}
                             {isUnassigned && <span className="ml-1 text-[6px] text-white/30">?</span>}
                             <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
@@ -320,16 +405,11 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                       })}
                     </div>
                 }
-                {fo1 && (
-                  <div className="mt-2 px-2 py-1 rounded border border-[#BC13FE]/30 bg-[#BC13FE]/10 text-[8px] text-[#BC13FE] text-center" style={sty}>
-                    ⚡ SEAT {fo1.seatNumber} in faceoff
-                  </div>
-                )}
+                {fo1 && <div className="mt-2 px-2 py-1 rounded border border-[#BC13FE]/30 bg-[#BC13FE]/10 text-[8px] text-[#BC13FE] text-center" style={sty}>⚡ SEAT {fo1.seatNumber} in faceoff</div>}
               </div>
-              {/* Family 2 faceoff */}
               <div>
                 <div className="text-[8px] tracking-widest text-[#FF5F1F]/70 uppercase mb-2" style={sty}>{gs.family2 || 'Family 2'}</div>
-                {family2Players.length === 0 && unassignedPlayers.length === 0
+                {[...family2Players, ...unassignedPlayers].length === 0
                   ? <div className="text-[8px] text-white/20 py-2" style={sty}>No players yet</div>
                   : <div className="flex flex-wrap gap-2">
                       {[...family2Players, ...unassignedPlayers].map(p => {
@@ -338,12 +418,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                         return (
                           <button key={p.playerId} onClick={() => setFaceoffPlayer(2, selected ? '' : p.playerId)}
                             className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
-                            style={{
-                              borderColor: selected ? '#FF5F1F' : isUnassigned ? '#ffffff20' : '#FF5F1F30',
-                              color: selected ? '#FF5F1F' : isUnassigned ? '#ffffff40' : '#ffffff50',
-                              background: selected ? '#FF5F1F20' : 'transparent',
-                              boxShadow: selected ? '0 0 10px rgba(255,95,31,0.3)' : 'none',
-                            }}>
+                            style={{ borderColor: selected ? '#FF5F1F' : isUnassigned ? '#ffffff20' : '#FF5F1F30', color: selected ? '#FF5F1F' : isUnassigned ? '#ffffff40' : '#ffffff50', background: selected ? '#FF5F1F20' : 'transparent' }}>
                             SEAT {p.seatNumber}
                             {isUnassigned && <span className="ml-1 text-[6px] text-white/30">?</span>}
                             <span className="ml-1.5" style={{ color: p.connected !== false ? '#4ade80' : '#ef4444' }}>●</span>
@@ -352,15 +427,11 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                       })}
                     </div>
                 }
-                {fo2 && (
-                  <div className="mt-2 px-2 py-1 rounded border border-[#FF5F1F]/30 bg-[#FF5F1F]/10 text-[8px] text-[#FF5F1F] text-center" style={sty}>
-                    ⚡ SEAT {fo2.seatNumber} in faceoff
-                  </div>
-                )}
+                {fo2 && <div className="mt-2 px-2 py-1 rounded border border-[#FF5F1F]/30 bg-[#FF5F1F]/10 text-[8px] text-[#FF5F1F] text-center" style={sty}>⚡ SEAT {fo2.seatNumber} in faceoff</div>}
               </div>
             </div>
 
-            {/* Buzz Winner */}
+            {/* Buzz Winner section */}
             {buzzWinner ? (
               <div className="space-y-3">
                 <div className="p-3 border-2 border-[#BC13FE] rounded-xl bg-[#BC13FE]/10 flex items-center justify-between"
@@ -370,7 +441,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                     <div className="font-heading text-xl text-white">
                       Seat {buzzWinner.seatNumber} — {buzzWinner.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}
                     </div>
-                    <div className="text-[8px] text-white/40 mt-0.5" style={sty}>{new Date(buzzWinner.timestamp).toLocaleTimeString()}</div>
                   </div>
                   <Btn onClick={clearBuzz} color="#ffffff" size="sm">Clear</Btn>
                 </div>
@@ -387,19 +457,12 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
                       return (
                         <button key={p.playerId} onClick={() => assignAnsweringPlayer(p.playerId)}
                           className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
-                          style={{
-                            borderColor: selected ? '#4ade80' : `${teamColor}40`,
-                            color: selected ? '#4ade80' : `${teamColor}aa`,
-                            background: selected ? '#4ade8020' : 'transparent',
-                            boxShadow: selected ? '0 0 10px rgba(74,222,128,0.3)' : 'none',
-                          }}>
+                          style={{ borderColor: selected ? '#4ade80' : `${teamColor}40`, color: selected ? '#4ade80' : `${teamColor}aa`, background: selected ? '#4ade8020' : 'transparent' }}>
                           SEAT {p.seatNumber}
-                          {!p.familyTeam && <span className="ml-1 text-[6px] text-white/30">?</span>}
                         </button>
                       );
                     })}
                   </div>
-                  {/* Live typing preview */}
                   {gs.answering_player_id && (
                     <div className="mt-2 px-3 py-2 rounded-lg border border-[#22d3ee]/30 bg-[#22d3ee]/5 min-h-[2.5rem] flex items-center gap-2">
                       <span className="text-[8px] text-[#22d3ee]/60 uppercase shrink-0" style={sty}>Typing:</span>
@@ -420,17 +483,27 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
 
         {/* Player Submission */}
         {lastSub && (
-          <div className="p-4 border-2 border-[#22d3ee] rounded-xl bg-[#22d3ee]/10 flex items-center gap-3"
-            style={{ boxShadow: '0 0 20px rgba(34,211,238,0.2)' }}>
-            <div className="text-2xl">💬</div>
+          <div className={`p-4 border-2 rounded-xl flex items-center gap-3`}
+            style={{
+              borderColor: lastSub.result === 'wrong' ? '#ef4444' : '#22d3ee',
+              background: lastSub.result === 'wrong' ? '#ef444410' : '#22d3ee10',
+              boxShadow: `0 0 20px ${lastSub.result === 'wrong' ? 'rgba(239,68,68,0.2)' : 'rgba(34,211,238,0.2)'}`,
+            }}>
+            <div className="text-2xl">{lastSub.result === 'wrong' ? '❌' : '💬'}</div>
             <div className="flex-1">
-              <div className="font-heading text-xs tracking-[0.2em] text-[#22d3ee]/70 uppercase mb-0.5">
-                Seat {lastSub.seatNumber} ({lastSub.familyTeam === 1 ? gs.family1 : gs.family2}) answered:
+              <div className="font-heading text-xs tracking-[0.2em] uppercase mb-0.5"
+                style={{ color: lastSub.result === 'wrong' ? '#ef4444' : '#22d3ee' }}>
+                Seat {lastSub.seatNumber} ({lastSub.familyTeam === 1 ? gs.family1 : gs.family2}) — {lastSub.result || 'answered'}:
               </div>
               <div className="font-heading text-xl text-white tracking-widest uppercase">"{lastSub.submittedAnswer}"</div>
               <div className="text-[8px] text-white/30 mt-0.5" style={sty}>{lastSub.inputMethod} · {new Date(lastSub.timestamp).toLocaleTimeString()}</div>
             </div>
-            <Btn onClick={() => updateState({ last_submission: null })} color="#ffffff" size="sm">✕</Btn>
+            <div className="flex flex-col gap-2">
+              {lastSub.result !== 'wrong' && (
+                <Btn onClick={markWrong} color="#ef4444" size="sm" disabled={byeCount >= 3}>✗ Mark Wrong</Btn>
+              )}
+              <Btn onClick={() => updateState({ last_submission: null })} color="#ffffff" size="sm">✕</Btn>
+            </div>
           </div>
         )}
 
@@ -461,6 +534,38 @@ export default function BFFHostPanel({ gs, updateState, sendCommand }) {
             <Btn onClick={() => updateState({ active_turn: 2 })} color={gs.active_turn === 2 ? '#FFD700' : '#FF5F1F'}>{gs.family2 || 'Family 2'}</Btn>
           </div>
         </div>
+
+        {/* Assign Answering Player (outside faceoff) */}
+        {!faceoffMode && (
+          <div className="p-4 border border-[#4ade80]/30 rounded-xl bg-black/60 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-heading text-xs tracking-[0.2em] text-[#4ade80]/70 uppercase">Who Answers Now?</h3>
+              {gs.answering_player_id && <Btn onClick={() => updateState({ answering_player_id: null })} color="#ffffff40" size="sm">Clear</Btn>}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {players.map(p => {
+                const selected = gs.answering_player_id === p.playerId;
+                const teamColor = (p.familyTeam === 1 || p.familyTeam === '1') ? '#BC13FE' : (p.familyTeam === 2 || p.familyTeam === '2') ? '#FF5F1F' : '#ffffff';
+                return (
+                  <button key={p.playerId} onClick={() => assignAnsweringPlayer(p.playerId)}
+                    className="px-3 py-2 rounded-lg border-2 font-heading text-xs tracking-widest uppercase transition-all"
+                    style={{ borderColor: selected ? '#4ade80' : `${teamColor}40`, color: selected ? '#4ade80' : `${teamColor}aa`, background: selected ? '#4ade8020' : 'transparent' }}>
+                    SEAT {p.seatNumber}
+                    {!p.familyTeam && <span className="ml-1 text-[6px] text-white/30">?</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {gs.answering_player_id && (
+              <div className="mt-2 px-3 py-2 rounded-lg border border-[#22d3ee]/30 bg-[#22d3ee]/5 min-h-[2.5rem] flex items-center gap-2">
+                <span className="text-[8px] text-[#22d3ee]/60 uppercase shrink-0" style={sty}>Typing:</span>
+                <span className="font-heading text-base text-white tracking-widest">
+                  {gs.current_typing || <span className="text-white/20 text-sm">…</span>}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Round Bank */}
         <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 space-y-3">
@@ -564,15 +669,14 @@ function PlayerRoster({ players, gs }) {
   const family1Players = players.filter(p => p.familyTeam === 1 || p.familyTeam === '1');
   const family2Players = players.filter(p => p.familyTeam === 2 || p.familyTeam === '2');
   const unassigned = players.filter(p => !p.familyTeam);
-
   return (
     <div className="p-4 border border-white/10 rounded-xl bg-black/40 space-y-4">
       <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Player Roster ({players.length})</h3>
       <div className="grid grid-cols-2 gap-4">
         <RosterColumn title={gs.family1 || 'Family 1'} color="#BC13FE" players={family1Players}
-          faceoffId={gs.faceoff_player1_id} buzzWinnerId={gs.buzz_winner?.playerId} />
+          faceoffId={gs.faceoff_player1_id} buzzWinnerId={gs.buzz_winner?.playerId} answeringId={gs.answering_player_id} />
         <RosterColumn title={gs.family2 || 'Family 2'} color="#FF5F1F" players={family2Players}
-          faceoffId={gs.faceoff_player2_id} buzzWinnerId={gs.buzz_winner?.playerId} />
+          faceoffId={gs.faceoff_player2_id} buzzWinnerId={gs.buzz_winner?.playerId} answeringId={gs.answering_player_id} />
       </div>
       {unassigned.length > 0 && (
         <div>
@@ -590,7 +694,7 @@ function PlayerRoster({ players, gs }) {
   );
 }
 
-function RosterColumn({ title, color, players, faceoffId, buzzWinnerId }) {
+function RosterColumn({ title, color, players, faceoffId, buzzWinnerId, answeringId }) {
   return (
     <div>
       <div className="text-[8px] tracking-widest uppercase mb-2" style={{ color, fontFamily: "'Press Start 2P', monospace" }}>{title} ({players.length})</div>
@@ -599,13 +703,15 @@ function RosterColumn({ title, color, players, faceoffId, buzzWinnerId }) {
         : players.map(p => {
           const isFaceoff = p.playerId === faceoffId;
           const isBuzz = p.playerId === buzzWinnerId;
+          const isAnswering = p.playerId === answeringId;
           return (
             <div key={p.playerId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg mb-1 border"
-              style={{ borderColor: isBuzz ? '#BC13FE' : isFaceoff ? color : '#ffffff10', background: isBuzz ? '#BC13FE10' : isFaceoff ? `${color}10` : 'transparent' }}>
+              style={{ borderColor: isAnswering ? '#4ade80' : isBuzz ? '#BC13FE' : isFaceoff ? color : '#ffffff10', background: isAnswering ? '#4ade8010' : isBuzz ? '#BC13FE10' : isFaceoff ? `${color}10` : 'transparent' }}>
               <div className="w-2 h-2 rounded-full shrink-0" style={{ background: p.connected !== false ? '#4ade80' : '#ef4444' }} />
               <span className="text-[8px] text-white/80" style={{ fontFamily: "'Press Start 2P', monospace" }}>SEAT {p.seatNumber}</span>
-              {isFaceoff && <span className="text-[7px] text-[#FF5F1F]" style={{ fontFamily: "'Press Start 2P', monospace" }}>⚡</span>}
-              {isBuzz && <span className="text-[7px] text-[#BC13FE]" style={{ fontFamily: "'Press Start 2P', monospace" }}>BUZZ</span>}
+              {isAnswering && <span className="text-[7px] text-[#4ade80]" style={{ fontFamily: "'Press Start 2P', monospace" }}>ANSWERING</span>}
+              {isFaceoff && !isAnswering && <span className="text-[7px] text-[#FF5F1F]" style={{ fontFamily: "'Press Start 2P', monospace" }}>⚡</span>}
+              {isBuzz && !isAnswering && <span className="text-[7px] text-[#BC13FE]" style={{ fontFamily: "'Press Start 2P', monospace" }}>BUZZ</span>}
             </div>
           );
         })
