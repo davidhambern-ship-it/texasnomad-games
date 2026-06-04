@@ -296,16 +296,13 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
               {['A','B','C','D'].map((letter) => {
                 const answerText = currentTrivia.choices?.[letter];
                 if (!answerText) return null;
-                const isCorrect = currentTrivia.correctLetter === letter;
                 return (
                   <button key={letter}
                     onClick={() => handleAnswerSelect(letter)}
                     disabled={!gs.show_choices}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-heading text-left transition-all active:scale-95 disabled:opacity-40 disabled:cursor-default hover:enabled:scale-105"
-                    style={{ borderColor: isCorrect ? '#4ade80' : '#ffffff15', background: isCorrect ? '#4ade8015' : 'transparent', color: isCorrect ? '#4ade80' : '#ffffff80' }}>
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#ffffff15] bg-transparent text-xs font-heading text-left text-[#ffffff80] transition-all active:scale-95 disabled:opacity-40 disabled:cursor-default hover:enabled:scale-105">
                     <span className="font-bold">{letter}.</span>
                     <span className="truncate">{answerText}</span>
-                    {isCorrect && <span className="ml-auto">✓</span>}
                   </button>
                 );
               })}
