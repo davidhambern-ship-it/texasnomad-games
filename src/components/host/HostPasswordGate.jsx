@@ -20,16 +20,11 @@ export default function HostPasswordGate({ onSuccess }) {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div
-            className="w-16 h-16 rounded-full bg-[#BC13FE]/20 border-2 border-[#FFD700] flex items-center justify-center mx-auto mb-4"
-            style={{ boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}
-          >
-            <span className="font-display text-[#FFD700] text-xl">TN</span>
-          </div>
-          <h1 className="font-heading text-3xl md:text-4xl tracking-[0.15em] text-white uppercase">
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-20 h-20 object-contain mx-auto mb-4 drop-shadow-[0_0_20px_rgba(188,19,254,0.5)]" />
+          <h1 className="text-3xl md:text-4xl tracking-wider text-white uppercase" style={{ fontFamily: "'Rye', serif" }}>
             TexasNomad
           </h1>
-          <p className="font-heading text-sm tracking-[0.25em] text-[#FF5F1F] uppercase mt-1">
+          <p className="text-[10px] tracking-[0.25em] text-[#FF5F1F] uppercase mt-2" style={{ fontFamily: "'Press Start 2P', monospace" }}>
             Host Control Panel
           </p>
         </div>
@@ -40,7 +35,7 @@ export default function HostPasswordGate({ onSuccess }) {
           className={`p-6 border border-[#BC13FE]/40 rounded-xl bg-black/60 ${shake ? 'animate-shake' : ''}`}
           style={{ boxShadow: '0 0 30px rgba(188,19,254,0.15)' }}
         >
-          <label className="block font-heading text-xs tracking-[0.25em] text-white/60 uppercase mb-2">
+          <label className="block text-[9px] tracking-[0.25em] text-white/60 uppercase mb-2" style={{ fontFamily: "'Press Start 2P', monospace" }}>
             Enter Password
           </label>
           <input
@@ -60,7 +55,7 @@ export default function HostPasswordGate({ onSuccess }) {
           )}
           <button
             type="submit"
-            className="mt-4 w-full py-3 bg-[#BC13FE] text-white font-heading text-lg tracking-[0.2em] uppercase rounded-lg hover:bg-[#BC13FE]/80 transition-all"
+            className="mt-4 w-full py-3 bg-[#BC13FE] text-white uppercase rounded-lg hover:bg-[#BC13FE]/80 transition-all text-[10px] tracking-[0.2em]" style={{ fontFamily: "'Press Start 2P', monospace" }}
             style={{ boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}
           >
             CONNECT

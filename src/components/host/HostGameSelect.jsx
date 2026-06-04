@@ -61,14 +61,14 @@ export default function HostGameSelect({ onSelect, currentGame }) {
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
             <div className="text-5xl mb-2">{pendingGame.emoji}</div>
-            <h2 className="font-heading text-2xl tracking-[0.2em] uppercase mb-1" style={{ color: pendingGame.color }}>
+            <h2 className="text-xl tracking-[0.15em] uppercase mb-1" style={{ color: pendingGame.color, fontFamily: "'Press Start 2P', monospace", textShadow: `0 0 15px ${pendingGame.color}` }}>
               {pendingGame.title}
             </h2>
-            <p className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">{pendingGame.subtitle}</p>
+            <p className="text-[8px] tracking-[0.2em] text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{pendingGame.subtitle}</p>
           </div>
 
           <div className="p-6 border border-white/10 rounded-xl bg-black/60 space-y-4">
-            <label className="block font-heading text-xs tracking-widest text-white/50 uppercase">Room Code</label>
+            <label className="block text-[9px] tracking-widest text-white/50 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>Room Code</label>
             <input
               className="w-full px-4 py-3 rounded-lg bg-black/80 border-2 border-white/20 text-white font-mono text-2xl tracking-[0.3em] uppercase text-center focus:outline-none transition-colors"
               style={{ borderColor: error ? '#ef4444' : roomCode ? pendingGame.color : undefined }}
@@ -83,14 +83,14 @@ export default function HostGameSelect({ onSelect, currentGame }) {
 
             <button
               onClick={handleGenerateCode}
-              className="w-full py-2 border border-white/20 rounded-lg font-heading text-xs tracking-[0.2em] text-white/50 uppercase hover:border-white/40 hover:text-white/70 transition-all"
+              className="w-full py-2 border border-white/20 rounded-lg text-[8px] tracking-[0.2em] text-white/50 uppercase hover:border-white/40 hover:text-white/70 transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}
             >
               ↻ Generate New Code
             </button>
 
             <button
               onClick={handleConnect}
-              className="w-full py-3 rounded-lg font-heading text-base tracking-[0.2em] uppercase transition-all hover:opacity-90 active:scale-95"
+              className="w-full py-3 rounded-lg text-[9px] tracking-[0.2em] uppercase transition-all hover:opacity-90 active:scale-95" style={{ fontFamily: "'Press Start 2P', monospace" }}
               style={{ background: pendingGame.color, color: '#000' }}
             >
               Connect to Room
@@ -99,7 +99,7 @@ export default function HostGameSelect({ onSelect, currentGame }) {
 
           <button
             onClick={() => setPendingGame(null)}
-            className="w-full text-center font-heading text-xs tracking-widest text-white/30 uppercase hover:text-white/60 transition-all"
+            className="w-full text-center text-[8px] tracking-widest text-white/30 uppercase hover:text-white/60 transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}
           >
             ← Back to Game Select
           </button>
@@ -110,10 +110,10 @@ export default function HostGameSelect({ onSelect, currentGame }) {
 
   return (
     <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
-      <h2 className="font-heading text-2xl md:text-3xl tracking-[0.2em] text-[#FFD700] uppercase mb-2">
+      <h2 className="text-2xl md:text-3xl tracking-[0.15em] text-[#FFD700] uppercase mb-2" style={{ fontFamily: "'Monoton', cursive", textShadow: '0 0 15px #FFD700' }}>
         Select Game
       </h2>
-      <p className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase mb-10">
+      <p className="text-[9px] tracking-[0.2em] text-white/40 uppercase mb-10" style={{ fontFamily: "'Press Start 2P', monospace" }}>
         Choose a game to host
       </p>
 
@@ -138,12 +138,12 @@ export default function HostGameSelect({ onSelect, currentGame }) {
           >
             <span className="text-5xl mb-3">{game.emoji}</span>
             <span
-              className="font-heading text-2xl tracking-widest uppercase"
+              className="text-xl tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}
               style={{ color: game.color, textShadow: `0 0 15px ${game.color}60` }}
             >
               {game.title}
             </span>
-            <span className="font-heading text-[10px] tracking-[0.25em] text-white/50 uppercase mt-1">
+            <span className="text-[8px] tracking-[0.2em] text-white/50 uppercase mt-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>
               {game.subtitle}
             </span>
           </button>

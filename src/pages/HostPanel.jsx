@@ -43,12 +43,10 @@ export default function HostPanel() {
         <div className="px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link to="/" className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-[#BC13FE]/20 border-2 border-[#FFD700] flex items-center justify-center">
-                <span className="font-bold text-[#FFD700] text-xs">TN</span>
-              </div>
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-9 h-9 object-contain" />
               <div className="hidden sm:block">
-                <span className="font-heading text-sm tracking-widest text-white uppercase leading-none">TEXASNOMAD</span>
-                <span className="block text-[9px] tracking-[0.3em] text-[#FF5F1F] uppercase">HOST CONTROL</span>
+                <span className="tracking-widest text-white uppercase leading-none text-sm" style={{ fontFamily: "'Rye', serif" }}>TEXASNOMAD</span>
+                <span className="block text-[8px] tracking-[0.2em] text-kinetic-orange uppercase leading-none mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>HOST CONTROL</span>
               </div>
             </Link>
             {activeRoom && selectedGame && (
@@ -65,14 +63,14 @@ export default function HostPanel() {
               {activeRoom && !changingRoom && (
                 <button
                   onClick={handleChangeRoom}
-                  className="px-3 py-1 border border-[#FFD700]/50 text-[#FFD700] text-xs font-bold tracking-widest uppercase rounded hover:bg-[#FFD700]/10 transition-all"
+                  className="px-3 py-1 border border-[#FFD700]/50 text-[#FFD700] rounded hover:bg-[#FFD700]/10 transition-all text-[9px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}
                 >
                   ⇄ CHANGE ROOM
                 </button>
               )}
               <button
                 onClick={handleDisconnect}
-                className="px-3 py-1 border border-red-500/50 text-red-400 text-xs font-bold tracking-widest uppercase rounded hover:bg-red-500/20 transition-all"
+                className="px-3 py-1 border border-red-500/50 text-red-400 rounded hover:bg-red-500/20 transition-all text-[9px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}
               >
                 DISCONNECT
               </button>
