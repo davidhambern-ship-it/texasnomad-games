@@ -213,40 +213,49 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
         </div>
       )}
 
-      {/* Live Status */}
-      <div className="grid grid-cols-4 gap-3 px-1">
-        <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
-          <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Current Turn</div>
-          <div className="font-heading text-2xl font-bold"
-            style={{ color: currentTurn === 'X' ? '#BC13FE' : '#FF5F1F' }}>{currentTurn}</div>
-        </div>
-        <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
-          <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Board</div>
-          <div className="font-heading text-sm tracking-widest"
-            style={{ color: boardLocked ? '#ef4444' : '#4ade80' }}>
-            {boardLocked ? 'LOCKED' : 'OPEN'}
+      {/* Enhanced Room Status */}
+      <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 mb-4">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-heading text-lg tracking-[0.15em] text-[#BC13FE] uppercase">Room Status</h2>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[#4ade80] animate-pulse" />
+            <span className="font-heading text-[9px] tracking-widest text-[#4ade80]/70 uppercase">LIVE</span>
           </div>
         </div>
-        <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
-          <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Last Answer</div>
-          <div className="font-heading text-sm tracking-widest"
-            style={{ color: gs.answer_result === true ? '#4ade80' : gs.answer_result === false ? '#ef4444' : '#ffffff30' }}>
-            {gs.answer_result === true ? '✓ CORRECT' : gs.answer_result === false ? '✗ WRONG' : '—'}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Room Code</div>
+            <div className="font-heading text-xl text-[#FFD700]" style={{ fontFamily: "'Press Start 2P', monospace" }}>{room?.room_code}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Status</div>
+            <div className="font-heading text-sm tracking-widest text-[#4ade80]">{room?.status || 'active'}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Mode</div>
+            <div className="font-heading text-sm tracking-widest" style={{ color: displayMode === 'panel' ? '#BC13FE' : '#FF5F1F' }}>{displayMode === 'panel' ? 'PANEL' : 'BOARD'}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/5 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-[#4ade80]/60 uppercase mb-1">Host</div>
+            <div className="font-heading text-sm tracking-widest text-[#4ade80]">CONNECTED</div>
           </div>
         </div>
-        <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
-          <div className="font-heading text-[9px] tracking-widest text-white/30 uppercase mb-1">Players</div>
-          <div className="flex flex-col gap-1 mt-1">
-            {xPlayer ? (
-              <div className="text-[7px] tracking-widest" style={{ color: '#BC13FE' }}>X: Seat {xPlayer.seatNumber}</div>
-            ) : (
-              <div className="text-[7px] tracking-widest text-white/20">X: Open</div>
-            )}
-            {oPlayer ? (
-              <div className="text-[7px] tracking-widest" style={{ color: '#FF5F1F' }}>O: Seat {oPlayer.seatNumber}</div>
-            ) : (
-              <div className="text-[7px] tracking-widest text-white/20">O: Open</div>
-            )}
+        <div className="grid grid-cols-4 gap-3 mt-3">
+          <div className="p-3 rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/5 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-[#BC13FE]/60 uppercase mb-1">X Player</div>
+            <div className="font-heading text-lg" style={{ color: xPlayer ? '#BC13FE' : '#ffffff40' }}>{xPlayer ? `Seat ${xPlayer.seatNumber}` : 'Waiting'}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-[#FF5F1F]/60 uppercase mb-1">O Player</div>
+            <div className="font-heading text-lg" style={{ color: oPlayer ? '#FF5F1F' : '#ffffff40' }}>{oPlayer ? `Seat ${oPlayer.seatNumber}` : 'Waiting'}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Players</div>
+            <div className="font-heading text-xl text-white">{roomPlayers.length}</div>
+          </div>
+          <div className="p-3 rounded-lg border border-white/10 bg-black/40 text-center">
+            <div className="font-heading text-[8px] tracking-widest text-white/30 uppercase mb-1">Watchers</div>
+            <div className="font-heading text-xl text-white/50">{viewerPlayers}</div>
           </div>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { generateRoomCode } from '@/lib/roomUtils';
+import { generateRoomCode, getDefaultGameState } from '@/lib/roomUtils';
+import { base44 } from '@/api/base44Client';
 
 // This list is the single source of truth for ALL games on the platform.
 // When a new game is added, add it here and it automatically appears in the Host Panel.
@@ -41,13 +42,45 @@ export default function HostGameSelect({ onSelect, currentGame }) {
     setError('');
   };
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     const code = roomCode.trim().toUpperCase();
     if (!code) {
       setError('Enter a room code');
       return;
     }
-    onSelect(pendingGame, code);
+    
+    // Create room in database
+    try {
+      const user = await base44.auth.me();
+      const gameMode = pendingGame.id === 'square-biz' ? 'board' : null;
+      const initialGameState = getDefaultGameState(pendingGame.id);
+      
+      // For Square Biz, set board mode and initialize player arrays with host as X
+      if (pendingGame.id === 'square-biz') {
+        initialGameState.display_mode = 'board';
+        initialGameState.sb_players = [{ playerId: 'host', seatNumber: 1, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
+        initialGameState.sb_queue = [];
+        initialGameState.board_locked = true;
+        initialGameState.current_turn = 'X';
+      }
+      
+      await base44.entities.GameRoom.create({
+        room_code: code,
+        game_id: pendingGame.id,
+        status: 'active',
+        host_connected: true,
+        screen_connected: false,
+        players_connected: 0,
+        created_from_host_panel: true,
+        created_by_user_id: user?.id || null,
+        game_state: initialGameState,
+        last_command: null,
+      });
+      
+      onSelect(pendingGame, code);
+    } catch (err) {
+      setError('Failed to create room: ' + err.message);
+    }
   };
 
   const handleGenerateCode = () => {

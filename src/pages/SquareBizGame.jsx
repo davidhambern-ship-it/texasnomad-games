@@ -170,10 +170,10 @@ function PanelModeBoard({ gs }) {
 
   const cellDisplay = (v, idx) => {
     const isSelected = gs.selected_square === idx;
-    if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
-    if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 24px rgba(255,95,31,0.7)' };
-    if (isSelected) return { char: '', color: '#FFD700', glow: '0 0 16px rgba(255,215,0,0.5)' };
-    return { char: '', color: '#ffffff10', glow: 'none' };
+    if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
+    if (isSelected) return { char: '', color: '#FFD700', border: '#FFD700', glow: '0 0 24px rgba(255,215,0,0.6)' };
+    return { char: '', color: '#ffffff80', border: '#FF5F1F', glow: '0 0 15px rgba(188,19,254,0.5), inset 0 0 10px rgba(255,95,31,0.15)' };
   };
 
   return (
@@ -213,10 +213,10 @@ function PanelModeBoard({ gs }) {
         </div>
         <div className="grid grid-cols-3 gap-3" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
           {board.map((cell, idx) => {
-            const { char, color, glow } = cellDisplay(cell, idx);
+            const { char, color, border, glow } = cellDisplay(cell, idx);
             return (
-              <div key={idx} className="aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all"
-                style={{ fontSize: 'clamp(2rem, 5vw, 5rem)', borderColor: cell ? color : gs.selected_square === idx ? '#FFD700' : '#ffffff10', color, background: cell ? `${color}15` : '#00000060', boxShadow: glow }}>
+              <div key={idx} className="aspect-square flex items-center justify-center rounded-xl border-4 font-heading transition-all"
+                style={{ fontSize: 'clamp(2rem, 5vw, 5rem)', borderColor: border || '#FF5F1F', color, background: cell ? `${color}20` : '#0a0a0a', boxShadow: glow, fontWeight: cell ? 'bold' : 'normal' }}>
                 {char}
               </div>
             );
@@ -328,18 +328,29 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   };
 
   const handlePlayClick = async () => {
-    if (myRole !== currentTurn) return;
-    await updateState({ auto_next_question: Date.now(), show_question: false, answer_result: null });
+    if (myRole !== 'O') return; // Only O player can click PLAY
+    // Trigger auto-fetch and show question
+    await updateState({ auto_next_question: Date.now(), show_question: false, show_choices: false, answer_result: null });
   };
 
-  const cellDisplay = (v) => {
-    if (v === 'X') return { char: 'X', color: '#BC13FE', glow: '0 0 24px rgba(188,19,254,0.7)' };
-    if (v === 'O') return { char: 'O', color: '#FF5F1F', glow: '0 0 24px rgba(255,95,31,0.7)' };
-    return { char: '', color: '#ffffff10', glow: 'none' };
+  const cellDisplay = (v, idx) => {
+    if (v === 'X') return { char: 'X', color: '#BC13FE', border: '#BC13FE', glow: '0 0 20px rgba(188,19,254,0.8), inset 0 0 15px rgba(188,19,254,0.2)' };
+    if (v === 'O') return { char: 'O', color: '#FF5F1F', border: '#FF5F1F', glow: '0 0 20px rgba(255,95,31,0.8), inset 0 0 15px rgba(255,95,31,0.2)' };
+    // Empty square - bright with orange border and purple glow
+    const isHovered = isMyTurn && canControl && !gs.winner;
+    return { 
+      char: '', 
+      color: '#ffffff80', 
+      border: '#FF5F1F', 
+      glow: isHovered 
+        ? '0 0 25px rgba(188,19,254,0.9), inset 0 0 20px rgba(255,95,31,0.3)' 
+        : '0 0 15px rgba(188,19,254,0.5), inset 0 0 10px rgba(255,95,31,0.15)'
+    };
   };
 
   const isMyTurn = myRole === currentTurn;
-  const showPlayButton = boardLocked && gs.show_question && !gs.winner && !popup && isMyTurn;
+  // PLAY button: Only show when it's O's turn, board is locked, question is showing, no popup, no winner
+  const showPlayButton = myRole === 'O' && boardLocked && gs.show_question && !gs.show_choices && !gs.winner && !popup && isMyTurn;
   const canControl = myRole === 'X' || myRole === 'O';
   const xTaken = !!sbPlayers.find(p => p.role === 'X');
   const oTaken = !!sbPlayers.find(p => p.role === 'O');
@@ -414,6 +425,15 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
+            {/* Show Choices button - only for O player, when choices not yet shown */}
+            {isMyTurn && !gs.show_choices && !gs.show_choices && (
+              <button
+                onClick={() => updateState({ show_choices: true })}
+                className="mt-2 px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
+                style={{ boxShadow: '0 0 15px rgba(138,34,255,0.3)' }}>
+                Show Choices
+              </button>
+            )}
           </>
         ) : null}
 
@@ -469,13 +489,20 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
         <div className="relative" style={{ width: 'clamp(240px, 30vw, 400px)' }}>
           <div className="grid grid-cols-3 gap-3">
             {board.map((cell, idx) => {
-              const { char, color, glow } = cellDisplay(cell);
+              const { char, color, border, glow } = cellDisplay(cell, idx);
               const canClick = !boardLocked && !cell && !gs.winner && isMyTurn && canControl;
               return (
                 <div key={idx}
                   onClick={() => canClick && handleCellClick(idx)}
-                  className={`aspect-square flex items-center justify-center rounded-xl border-2 font-heading transition-all ${canClick ? 'cursor-pointer hover:scale-105 hover:border-white/40' : 'cursor-default'}`}
-                  style={{ fontSize: 'clamp(2rem, 5vw, 5rem)', borderColor: cell ? color : '#ffffff10', color, background: cell ? `${color}15` : '#00000060', boxShadow: glow }}>
+                  className={`aspect-square flex items-center justify-center rounded-xl border-4 font-heading transition-all ${canClick ? 'cursor-pointer hover:scale-105' : 'cursor-default'}`}
+                  style={{ 
+                    fontSize: 'clamp(2rem, 5vw, 5rem)', 
+                    borderColor: cell ? border : border, 
+                    color, 
+                    background: cell ? `${color}20` : '#0a0a0a', 
+                    boxShadow: glow,
+                    fontWeight: cell ? 'bold' : 'normal'
+                  }}>
                   {char}
                 </div>
               );
