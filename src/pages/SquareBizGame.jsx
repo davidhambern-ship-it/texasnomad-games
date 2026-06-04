@@ -293,13 +293,16 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
 
     const updatedPlayers = sbPlayers.map(p => p.playerId === playerId ? { ...p, lastActionAt: Date.now() } : p);
 
+    // If X just played, show question and choices for O's turn
+    const xJustPlayed = currentTurn === 'X';
+
     await updateState({
       board: newBoard,
       current_turn: nextTurn,
       winner: winner || null,
       board_locked: true,
-      show_question: false,
-      show_choices: false,
+      show_question: xJustPlayed,
+      show_choices: xJustPlayed,
       answer_result: null,
       last_action_seat: seatNumber,
       last_action_player_id: playerId,
