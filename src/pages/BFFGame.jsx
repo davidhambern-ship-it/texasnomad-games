@@ -342,6 +342,20 @@ function GameBoard({ gs, answers, selectedFamily, seatNumber, playerId, isSeated
         </div>
       )}
 
+      {/* Live typing display — visible to everyone */}
+      {gs.answering_player_id && gs.phase === 'playing' && (
+        <div className="px-5 py-3 rounded-xl border border-[#22d3ee]/30 bg-[#22d3ee]/5 flex items-center gap-3 min-h-[3rem]">
+          <span className="text-[7px] tracking-widest text-[#22d3ee]/50 uppercase shrink-0" style={sty}>Typing:</span>
+          <span className="font-heading text-xl tracking-widest text-white flex-1">
+            {gs.current_typing
+              ? gs.current_typing
+              : <span className="text-white/15">…</span>
+            }
+          </span>
+          <span className="w-2 h-5 bg-[#22d3ee]/60 animate-pulse rounded-sm shrink-0" />
+        </div>
+      )}
+
       {/* Main layout: answers LEFT + buzzer/actions RIGHT */}
       <div className="flex gap-5 items-start">
 
