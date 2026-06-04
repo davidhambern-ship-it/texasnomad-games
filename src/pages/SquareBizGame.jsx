@@ -202,18 +202,33 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated }) {
 
     const xTaken = !!sbPlayers.find(p => p.role === 'X');
     const oTaken = !!sbPlayers.find(p => p.role === 'O');
+    const activeCount = sbPlayers.filter(p => p.role === 'X' || p.role === 'O').length;
 
-    if (!xTaken) {
-      // Assign X
+    // If only 1 active player and host is connected, auto-assign host as the other player
+    const roomPlayers = gs.players || [];
+    const hostPlayer = roomPlayers.find(p => p.role === 'hostPlayer');
+    const hostPid = hostPlayer?.playerId;
+
+    if (activeCount === 1 && !xTaken) {
+      // Assign X to this player
       const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'X', joinedAt: Date.now(), lastActionAt: Date.now() }];
       updateState({ sb_players: newPlayers });
-    } else if (!oTaken) {
-      // Assign O
+    } else if (activeCount === 1 && !oTaken) {
+      // Assign O to this player
       const newPlayers = [...sbPlayers.filter(p => p.playerId !== playerId), { playerId, seatNumber, role: 'O', joinedAt: Date.now(), lastActionAt: Date.now() }];
+      updateState({ sb_players: newPlayers });
+    } else if (activeCount === 1 && hostPid && !sbPlayers.find(p => p.playerId === hostPid)) {
+      // Auto-assign host as the second player (opposite role)
+      const myAssignedRole = xTaken ? 'O' : 'X';
+      const newPlayers = [
+        ...sbPlayers.filter(p => p.playerId !== playerId),
+        { playerId, seatNumber, role: myAssignedRole, joinedAt: Date.now(), lastActionAt: Date.now() },
+        { playerId: hostPid, seatNumber: 99, role: myAssignedRole === 'X' ? 'O' : 'X', joinedAt: Date.now(), lastActionAt: Date.now() }
+      ];
       updateState({ sb_players: newPlayers });
     }
     // else: both taken — show the prompt (myRole stays null)
-  }, [isSeated, playerId, gs.display_mode, gs.sb_players]);
+  }, [isSeated, playerId, gs.display_mode, gs.sb_players, gs.players]);
 
   const handleJoinQueue = async () => {
     const nextPos = sbQueue.length + 1;
@@ -259,6 +274,25 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated }) {
   const handlePlayClick = async () => {
     if (myRole !== currentTurn) return;
     await updateState({ auto_next_question: Date.now(), show_question: false, answer_result: null });
+  };
+
+  const handleShowChoices = async () => {
+    if (myRole !== currentTurn) return;
+    await updateState({ show_choices: true });
+  };
+
+  const handleSelectAnswer = async (letter) => {
+    if (myRole !== currentTurn) return;
+    const isCorrect = letter === gs.correct_answer;
+    if (isCorrect) {
+      await updateState({ popup: 'correct', show_question: false, show_choices: false, answer_result: true });
+      setTimeout(() => updateState({ popup: null, board_locked: false }), 2000);
+    } else {
+      const nextTurn = currentTurn === 'X' ? 'O' : 'X';
+      await updateState({ popup: 'wrong', show_question: false, show_choices: false, answer_result: false, current_turn: nextTurn, board_locked: true });
+      setTimeout(() => updateState({ popup: null }), 2000);
+      setTimeout(() => updateState({ auto_next_question: Date.now() }), 2200);
+    }
   };
 
   const cellDisplay = (v) => {
@@ -343,20 +377,30 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated }) {
               style={{ boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
               {gs.current_question}
             </div>
-            {gs.show_choices && gs.current_choices && (
+            {gs.show_choices && gs.current_choices ? (
               <div className="space-y-2 mt-2">
                 {['A','B','C','D'].map((letter) => {
                   const text = gs.current_choices?.[letter];
                   if (!text) return null;
+                  const isCorrect = letter === gs.correct_answer;
                   return (
-                    <div key={letter} className="px-4 py-3 rounded-lg border font-heading text-base"
-                      style={{ borderColor: '#8a22ff60', background: '#8a22ff10', color: '#ffffffcc' }}>
-                      <span className="text-[#8a22ff] mr-2">{letter}.</span>{text}
-                    </div>
+                    <button
+                      key={letter}
+                      onClick={() => handleSelectAnswer(letter)}
+                      disabled={!isMyTurn || !canControl}
+                      className="w-full text-left px-4 py-3 rounded-lg border-2 font-heading text-base transition-all active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:scale-102"
+                      style={{ borderColor: isCorrect ? '#4ade80' : '#8a22ff60', background: isCorrect ? '#4ade8015' : '#8a22ff10', color: isCorrect ? '#4ade80' : '#ffffffcc' }}>
+                      <span className="font-bold">{letter}.</span>{' '}{text}
+                    </button>
                   );
                 })}
               </div>
-            )}
+            ) : isMyTurn && canControl && gs.current_choices ? (
+              <button onClick={handleShowChoices}
+                className="px-4 py-3 rounded-lg border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95">
+                Show Choices
+              </button>
+            ) : null}
           </>
         ) : null}
 
