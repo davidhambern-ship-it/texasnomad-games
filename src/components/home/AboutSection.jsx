@@ -23,7 +23,7 @@ export default function AboutSection({ aboutBg }) {
           {/* Text */}
           <div className="text-center md:text-left">
             <h3 className="text-base md:text-lg tracking-[0.1em] text-outlaw-gold mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
-              ABOUT TEXASNOMAD
+              ABOUT TEXASNOMAD GAMES
             </h3>
             <p className="text-xs md:text-sm leading-relaxed text-white/80 max-w-xl font-body">
               TexasNomad Games is a livestream gaming network built for interactive competition,
