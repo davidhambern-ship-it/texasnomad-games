@@ -46,13 +46,6 @@ function SquareBizViewer({ roomCode }) {
   const displayMode = gs.display_mode;
   const createdFromHostPanel = room?.created_from_host_panel || false;
 
-  const assignMarker = async (marker) => {
-    const newPlayers = sbPlayers.map(p => 
-      p.playerId === playerId ? { ...p, role: marker, marker, lastActionAt: Date.now() } : p
-    );
-    await updateState({ sb_players: newPlayers });
-  };
-
   // Auto-assign X/O based on room creation type and player choice
   useEffect(() => {
     if (!isSeated || !playerId || chosenRole !== 'participant') return;
@@ -62,34 +55,22 @@ function SquareBizViewer({ roomCode }) {
     const oPlayer = sbPlayers.find(p => p.role === 'O');
     const myRecord = sbPlayers.find(p => p.playerId === playerId);
     
-    // Already assigned a marker
+    // Already assigned a marker or someone else is assigning
     if (myRecord && (myRecord.role === 'X' || myRecord.role === 'O')) return;
 
     const xTaken = !!xPlayer;
     const oTaken = !!oPlayer;
 
-    // Auto-assign logic based on room creation type
-    if (createdFromHostPanel) {
-      // Host-created room: Host is X, first participant is O
-      const hostPlayer = roomPlayers.find(p => p.role === 'hostPlayer');
-      const hostHasX = hostPlayer && hostPlayer.playerId === xPlayer?.playerId;
-      
-      if (!xTaken && !hostHasX) {
-        // No X yet — assign X to this player
-        assignMarker('X');
-      } else if (!oTaken) {
-        // X is taken (by host), assign O to this player
-        assignMarker('O');
-      }
-    } else {
-      // Player-created room: first participant is X, second is O
-      if (!xTaken) {
-        assignMarker('X');
-      } else if (!oTaken) {
-        assignMarker('O');
-      }
-    }
-  }, [isSeated, playerId, chosenRole, displayMode, createdFromHostPanel, sbPlayers, roomPlayers, assignMarker]);
+    // Debounce to prevent rate limiting
+    const timeoutId = setTimeout(async () => {
+      const newPlayers = sbPlayers.map(p => 
+        p.playerId === playerId ? { ...p, role: xTaken ? 'O' : 'X', marker: xTaken ? 'O' : 'X', lastActionAt: Date.now() } : p
+      );
+      await updateState({ sb_players: newPlayers });
+    }, 100);
+
+    return () => clearTimeout(timeoutId);
+  }, [isSeated, playerId, chosenRole, displayMode, createdFromHostPanel, sbPlayers.length]);
 
   const handleChooseRole = async (role) => {
     setRoleLoading(true);
@@ -352,8 +333,6 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
   // PLAY button: Only show when it's O's turn, board is locked, question is showing, no popup, no winner
   const showPlayButton = myRole === 'O' && boardLocked && gs.show_question && !gs.show_choices && !gs.winner && !popup && isMyTurn;
   const canControl = myRole === 'X' || myRole === 'O';
-  const xTaken = !!sbPlayers.find(p => p.role === 'X');
-  const oTaken = !!sbPlayers.find(p => p.role === 'O');
   const showPrompt = isSeated && !myRole && !myQueueRecord && xTaken && oTaken && roleChoice === null;
 
   const roleColor = myRole === 'X' ? '#BC13FE' : myRole === 'O' ? '#FF5F1F' : myRole === 'queued' ? '#FFD700' : '#ffffff40';
@@ -426,7 +405,7 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
               {gs.current_question}
             </div>
             {/* Show Choices button - only for O player, when choices not yet shown */}
-            {isMyTurn && !gs.show_choices && !gs.show_choices && (
+            {isMyTurn && !gs.show_choices && !popup && (
               <button
                 onClick={() => updateState({ show_choices: true })}
                 className="mt-2 px-6 py-3 rounded-xl border-2 border-[#8a22ff] text-[#8a22ff] font-heading text-sm tracking-widest uppercase hover:bg-[#8a22ff]/20 transition-all active:scale-95"
