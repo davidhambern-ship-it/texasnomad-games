@@ -8,7 +8,7 @@ import LiveStatus from '../components/home/LiveStatus';
 import AboutSection from '../components/home/AboutSection';
 import Footer from '../components/home/Footer';
 
-const HERO_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b3513c9bc_generated_6e198e91.png';
+const HERO_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/a6f87a083_Logo.png';
 const CROWN_LOGO = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/a6f87a083_Logo.png';
 const ABOUT_BG = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/301dda749_generated_b80b5902.png';
 
