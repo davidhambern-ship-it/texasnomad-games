@@ -48,7 +48,7 @@ export default function HostConsole({ game, roomCode, onDisconnect }) {
       {/* Game-specific Panel */}
       <div className="flex-1 p-4 md:p-6">
         {game.id === 'bff' && (
-          <BFFHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} />
+          <BFFHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} roomCode={roomCode} />
         )}
         {game.id === 'square-biz' && (
           <SquareBizHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} />
