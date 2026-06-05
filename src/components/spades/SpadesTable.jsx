@@ -151,18 +151,18 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Top (Seat 3) - Hand on table (card backs only) - horizontal fan (mirrors seat 1) */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 600, height: 120 }}>
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 z-20 flex justify-center" style={{ width: 700, height: 140 }}>
             <div className="flex" style={{ transform: 'scale(1) rotate(180deg)' }}>
               {getPlayerAtSeat(3).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length);
+                const overlap = getHorizontalOverlap(arr.length) * 0.7;
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl"
                     style={{
-                      width: 52, height: 73,
+                      width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
+                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
                     }}
                   >
                     <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -187,15 +187,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Left (Seat 2) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
-          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 520 }}>
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ width: 120, height: 600 }}>
             {getPlayerAtSeat(2).hand.map((card, i, arr) => {
-              const overlap = getVerticalOverlap(arr.length);
+              const overlap = getVerticalOverlap(arr.length) * 0.7;
               return (
                 <div
                   key={card.id || i}
-                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl"
                   style={{
-                    width: 52, height: 73,
+                    width: 64, height: 90,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
                     transform: `rotate(-90deg)`,
                   }}
@@ -221,15 +221,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Right (Seat 4) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(4)?.hand?.length > 0 && (
-          <div className="absolute right-20 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 520 }}>
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ width: 120, height: 600 }}>
             {getPlayerAtSeat(4).hand.map((card, i, arr) => {
-              const overlap = getVerticalOverlap(arr.length);
+              const overlap = getVerticalOverlap(arr.length) * 0.7;
               return (
                 <div
                   key={card.id || i}
-                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl"
                   style={{
-                    width: 52, height: 73,
+                    width: 64, height: 90,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
                     transform: `rotate(90deg)`,
                   }}
@@ -255,16 +255,16 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Bottom (Seat 1) - Hand on table (card backs only) - wider spread */}
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 700, height: 120 }}>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 flex justify-center" style={{ width: 700, height: 140 }}>
             <div className="flex" style={{ transform: 'scale(1)' }}>
               {getPlayerAtSeat(1).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length) * 0.6;
+                const overlap = getHorizontalOverlap(arr.length) * 0.5;
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl"
                     style={{
-                      width: 52, height: 73,
+                      width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
                       transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
                     }}
