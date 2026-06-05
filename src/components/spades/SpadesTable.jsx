@@ -318,7 +318,12 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                       transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
                     }}
                   >
-                    <img src={getCardImage(card)} alt={`${card.suit} ${card.value}`} className="w-full h-full object-cover" />
+                    <img 
+                      src={getCardImage(card)} 
+                      alt={`${card.suit} ${card.value}`} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.src = getCardBack(); }}
+                    />
                     {isMyTurn && (
                       <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                         <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
@@ -346,6 +351,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             <SpadesDealAnimation
               deck={gs.deck}
               players={players}
+              mySeatNumber={mySeatNumber}
               onComplete={() => setDealPhase('idle')}
             />
           )}

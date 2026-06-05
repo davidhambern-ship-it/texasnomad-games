@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { getCardBack } from '@/lib/spadesCardImages';
+import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -11,7 +11,7 @@ const SEAT_POSITIONS = {
   4: { x: 240, y: 0, rotation: 270, label: 'Right' },   // Right
 };
 
-export default function SpadesDealAnimation({ deck, players, onComplete }) {
+export default function SpadesDealAnimation({ deck, players, mySeatNumber, onComplete }) {
   const [dealtCards, setDealtCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   
@@ -39,11 +39,17 @@ export default function SpadesDealAnimation({ deck, players, onComplete }) {
       const playerIndex = currentIndex % seatedPlayers.length;
       const player = seatedPlayers[playerIndex];
       
+      const indexInHand = currentIndex < deck.length
+        ? Math.floor(currentIndex / seatedPlayers.length)
+        : 0;
+      const card = deck[currentIndex];
+
       setDealtCards(prev => [
         ...prev,
         {
           seatNumber: player.seatNumber,
           indexInHand: prev.filter(c => c.seatNumber === player.seatNumber).length,
+          card,
           timestamp: Date.now(),
         }
       ]);
@@ -103,6 +109,9 @@ export default function SpadesDealAnimation({ deck, players, onComplete }) {
         const finalX = pos.x + (pos.rotation === 0 || pos.rotation === 180 ? fanOffset : 0);
         const finalY = pos.y + (pos.rotation === 90 || pos.rotation === 270 ? fanOffset : 0);
         
+        const isMyCard = deal.seatNumber === mySeatNumber;
+        const cardSrc = isMyCard && deal.card ? getCardImage(deal.card) : getCardBack();
+
         return (
           <div
             key={i}
@@ -117,20 +126,11 @@ export default function SpadesDealAnimation({ deck, players, onComplete }) {
               transform: `translate(${finalX}px, ${finalY}px) rotate(${pos.rotation + fanAngle}deg)`,
               opacity: 1,
               zIndex: 20 + deal.indexInHand,
-              animation: `card-fly-deal 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards, card-reveal 0.5s ease-out forwards`,
-              animationDelay: `${(i * DEAL_SPEED) / 1000}s, ${(i * DEAL_SPEED) / 1000 + 0.35}s`,
+              animation: `card-fly-deal 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
               filter: 'brightness(1.08) contrast(1.02)',
-              backfaceVisibility: 'hidden',
             }}
           >
-            <div className="w-full h-full relative" style={{ transformStyle: 'preserve-3d', transform: 'rotateY(0deg)', animation: `card-flip 0.5s ease-out forwards`, animationDelay: `${(i * DEAL_SPEED) / 1000 + 0.35}s` }}>
-              <div className="absolute inset-0 w-full h-full" style={{ backfaceVisibility: 'hidden' }}>
-                <img src={getCardBack()} alt="Card back" className="w-full h-full object-cover" />
-              </div>
-              <div className="absolute inset-0 w-full h-full" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-              </div>
-            </div>
+            <img src={cardSrc} alt="Card" className="w-full h-full object-cover" onError={(e) => { e.target.src = getCardBack(); }} />
           </div>
         );
       })}
