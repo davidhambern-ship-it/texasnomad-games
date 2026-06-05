@@ -27,7 +27,7 @@ export default function SpadesCabinetImage() {
       {/* Curved text along top edge */}
       <svg viewBox="0 0 200 60" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 200, height: 60, pointerEvents: 'none', zIndex: 30 }}>
         <defs>
-          <path id="curve" d="M 10,10 Q 100,50 190,10" />
+          <path id="curve" d="M 10,40 Q 100,10 190,40" />
         </defs>
         <text fill="#FFD700" fontSize="9" fontFamily="'Rye', serif" letterSpacing="1.5" textAnchor="middle">
           <textPath href="#curve" startOffset="50%">TexasNomad Spades</textPath>
