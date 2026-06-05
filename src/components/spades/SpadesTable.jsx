@@ -73,6 +73,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
             {gs.phase === 'setup' || !gs.phase ? '⏳ Waiting for Host to Deal...' : gs.phase.toUpperCase()}
           </div>
+          {gs.first_hand_no_bid && (
+            <div className="text-[6px] tracking-widest text-[#FFD700]/50 uppercase mt-1" style={PS2}>
+              First Hand - No Bidding
+            </div>
+          )}
         </div>
       )}
 

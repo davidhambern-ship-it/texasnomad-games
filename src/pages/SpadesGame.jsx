@@ -99,25 +99,17 @@ function SpadesViewer({ roomCode }) {
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
     
-    // "First hand bids itself" - auto-bid for all players
-    const autoBidPlayers = updatedPlayers.map(p => {
+    // First hand - no bidding, player to left of dealer starts playing
+    const noBidPlayers = updatedPlayers.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-      // Simple auto-bid logic: count spades and high cards
-      const spadesCount = (p.hand || []).filter(c => c.suit === '♠').length;
-      const aces = (p.hand || []).filter(c => c.value === 'A').length;
-      const kings = (p.hand || []).filter(c => c.value === 'K').length;
-      const autoBid = Math.min(13, spadesCount + Math.floor((aces + kings) / 2));
-      return { ...p, bid: autoBid };
+      return { ...p, bid: 0 }; // Set bid to 0 for first hand
     });
     
-    // Calculate team bids (players without team are team 2)
-    const team1Bid = autoBidPlayers.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
-    const team2Bid = autoBidPlayers.filter(p => p.team === 2 || !p.team).reduce((sum, p) => sum + (p.bid || 0), 0);
-    
     await updateState({
-      players: autoBidPlayers, phase: 'playing', status: 'active',
+      players: noBidPlayers, phase: 'playing', status: 'active',
       deck: [], current_trick: [], current_turn_seat: firstBidder,
-      tricks_played: 0, bid1: team1Bid, bid2: team2Bid, books1: 0, books2: 0, shuffle_count: 0,
+      tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
+      first_hand_no_bid: true, // Flag to track first hand
     });
   };
 
