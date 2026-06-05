@@ -187,7 +187,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
     if (isShuffling) return;
     setIsShuffling(true);
     const deck = shuffleDeck(generateFullDeck());
-    await updateState({ deck, deck_shuffled: true });
+    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
     setIsShuffling(false);
   };
 

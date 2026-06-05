@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SpadesSeat from './SpadesSeat';
 import SpadesCardArea from './SpadesCardArea';
 import SpadesPlayerControls from './SpadesPlayerControls';
@@ -23,6 +23,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   const [shufflePhase, setShufflePhase] = useState('idle');
   const [dealPhase, setDealPhase] = useState('idle');
+  const prevShuffleTs = useRef(gs.shuffle_ts);
+
+  // Auto-trigger shuffle animation whenever host shuffles (via timestamp change)
+  useEffect(() => {
+    if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
+      setShufflePhase('shuffling');
+    }
+    prevShuffleTs.current = gs.shuffle_ts;
+  }, [gs.shuffle_ts]);
 
   const showCPUChoice = isPlayer && availableSeats.length > 0 && isSetup && cpuChoiceShown;
 
