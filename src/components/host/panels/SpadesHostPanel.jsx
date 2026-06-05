@@ -1,25 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
+import { generateFullDeck, shuffleDeck as shuffleDeckRules, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
-const SUITS = ['♠', '♥', '♦', '♣'];
-const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-
-function generateFullDeck() {
-  const deck = [];
-  for (const suit of SUITS) {
-    for (const value of VALUES) {
-      if ((suit === '♥' || suit === '♦') && value === '2') continue;
-      deck.push({ suit, value, id: `${suit}${value}` });
-    }
-  }
-  deck.push({ suit: 'Joker', value: 'BJ', id: 'BigJoker' });
-  deck.push({ suit: 'Joker', value: 'LJ', id: 'LittleJoker' });
-  return deck;
-}
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -34,14 +20,6 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = ''
   );
 };
 
-function shuffleDeck(deck) {
-  const d = [...deck];
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-  return d;
-}
 
 const HOST_PLAYER_ID = 'host_player_spades';
 
@@ -97,9 +75,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const [team1Name, setTeam1Name] = useState(gs.team1Name || 'Team 1');
   const [team2Name, setTeam2Name] = useState(gs.team2Name || 'Team 2');
   const [targetScore, setTargetScore] = useState(gs.targetScore || 500);
-  const [cpuProcessing, setCpuProcessing] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
   const [shufflePhase, setShufflePhase] = useState('idle');
+  const [newPlayerAlert, setNewPlayerAlert] = useState(null);
+  const prevPlayerIdsRef = useRef(new Set());
 
   const players = gs.players || [];
   const isSetup = !gs.phase || gs.phase === 'setup';
@@ -113,57 +92,140 @@ export default function SpadesHostPanel({ gs, updateState }) {
 
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
 
-  // CPU AI Execution
+
+
+  // Detect new human players joining (to notify host)
   useEffect(() => {
-    const cpuPlayers = players.filter(p => p.playerType === 'cpu');
-    if (cpuPlayers.length === 0 || cpuProcessing) return;
-
-    const executeCPUAction = async () => {
-      if (isBidding && gs.current_bidder_seat) {
-        const cpuPlayer = cpuPlayers.find(p => p.seatNumber === gs.current_bidder_seat && p.bid == null);
-        if (cpuPlayer && cpuPlayer.hand?.length > 0) {
-          setCpuProcessing(true);
-          setTimeout(async () => {
-            const teamBid = cpuPlayer.team === 1 ? (gs.bid1 || 0) : (gs.bid2 || 0);
-            const bid = calculateCPUBid(cpuPlayer.hand, teamBid);
-            await setPlayerBid(cpuPlayer.playerId, bid);
-            setCpuProcessing(false);
-          }, CPU_ACTION_DELAY);
-        }
+    const humanPlayers = players.filter(p => p.playerType === 'human' && p.playerId !== HOST_PLAYER_ID);
+    humanPlayers.forEach(p => {
+      if (!prevPlayerIdsRef.current.has(p.playerId)) {
+        setNewPlayerAlert(p);
+        setTimeout(() => setNewPlayerAlert(null), 8000);
       }
-      
-      if (isPlaying && gs.current_turn_seat) {
-        const cpuPlayer = cpuPlayers.find(p => p.seatNumber === gs.current_turn_seat);
-        if (cpuPlayer && cpuPlayer.hand?.length > 0) {
-          setCpuProcessing(true);
-          setTimeout(async () => {
-            const card = selectCPUCard(
-              cpuPlayer.hand,
-              gs.current_trick || [],
-              cpuPlayer.team === 1 ? (gs.bid1 || 0) : (gs.bid2 || 0),
-              cpuPlayer.bid || 0,
-              cpuPlayer.tricksWon || 0
-            );
-            if (card) {
-              const trick = gs.current_trick || [];
-              const updatedPlayers = players.map(p =>
-                p.playerId === cpuPlayer.playerId
-                  ? { ...p, hand: p.hand.filter(c => c.id !== card.id), lastActionAt: Date.now() }
-                  : p
-              );
-              await updateState({
-                players: updatedPlayers,
-                current_trick: [...trick, { playerId: cpuPlayer.playerId, seatNumber: cpuPlayer.seatNumber, card }],
-              });
-            }
-            setCpuProcessing(false);
-          }, CPU_ACTION_DELAY);
-        }
-      }
-    };
+    });
+    prevPlayerIdsRef.current = new Set(players.map(p => p.playerId));
+  }, [players.map(p => p.playerId).join(',')]);
 
-    executeCPUAction();
-  }, [gs.current_bidder_seat, gs.current_turn_seat, gs.phase, players, cpuProcessing]);
+  // AUTO GAME LOOP: CPU trick completion & round scoring
+  useEffect(() => {
+    if (!gs.cpu_enabled || gs.phase !== 'playing') return;
+    const trick = gs.current_trick || [];
+    const seated = players.filter(p => p.seatNumber != null);
+    if (trick.length !== seated.length || seated.length === 0) return;
+
+    const timer = setTimeout(async () => {
+      const activeSuit = getActiveSuit(trick);
+      const winner = determineTrickWinner(trick, activeSuit);
+      if (!winner) return;
+      const winningSeat = winner.seatNumber;
+      const winningTeam = getTeamFromSeat(winningSeat);
+      const updatedPlayers = players.map(p =>
+        p.seatNumber === winningSeat ? { ...p, tricksWon: (p.tricksWon || 0) + 1 } : p
+      );
+      const newTricksPlayed = (gs.tricks_played || 0) + 1;
+      const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
+      const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
+      await updateState({
+        players: updatedPlayers,
+        current_trick: [],
+        current_turn_seat: winningSeat,
+        tricks_played: newTricksPlayed,
+        books1: newBooks1, books2: newBooks2,
+        spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled]);
+
+  // AUTO GAME LOOP: Score round when 13 tricks done
+  useEffect(() => {
+    if (!gs.cpu_enabled || gs.phase !== 'playing') return;
+    if ((gs.tricks_played || 0) < 13) return;
+    const timer = setTimeout(async () => {
+      const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+      const bid1 = gs.bid1 || 0, bid2 = gs.bid2 || 0;
+      const b1 = gs.books1 || 0, b2 = gs.books2 || 0;
+      const s1 = b1 >= bid1 ? bid1 * 10 + (b1 - bid1) : -bid1 * 10;
+      const s2 = b2 >= bid2 ? bid2 * 10 + (b2 - bid2) : -bid2 * 10;
+      const newScore1 = (gs.score1 || 0) + s1;
+      const newScore2 = (gs.score2 || 0) + s2;
+      // Rotate dealer
+      const curDealer = gs.dealer_seat || 1;
+      const nextDealer = curDealer >= 4 ? 1 : curDealer + 1;
+      await updateState({
+        score1: newScore1, score2: newScore2, phase: 'setup',
+        current_trick: [], tricks_played: 0, books1: 0, books2: 0, bid1: null, bid2: null,
+        dealer_seat: nextDealer,
+        players: seated.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [gs.tricks_played, gs.phase, gs.cpu_enabled]);
+
+  // AUTO GAME LOOP: Auto-deal next round after scoring
+  useEffect(() => {
+    if (!gs.cpu_enabled || gs.phase !== 'setup') return;
+    if (!gs.dealer_seat) return;
+    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const allHandsEmpty = seated.length >= 2 && seated.every(p => !p.hand || p.hand.length === 0);
+    if (!allHandsEmpty) return;
+    const timer = setTimeout(async () => {
+      const deck = shuffleDeckRules(generateFullDeck());
+      const cardsPerPlayer = Math.floor(deck.length / seated.length);
+      const updatedPlayers = players.map(p => {
+        if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+        const idx = seated.findIndex(s => s.playerId === p.playerId);
+        return { ...p, hand: deck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+      });
+      const firstSeat = seated[(seated.findIndex(s => s.seatNumber === gs.dealer_seat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber;
+      const hasCPU = seated.some(p => p.playerType === 'cpu');
+      await updateState({
+        players: updatedPlayers, phase: hasCPU ? 'playing' : 'bidding', status: 'active',
+        deck: [], current_trick: [], current_turn_seat: firstSeat,
+        current_bidder_seat: hasCPU ? null : firstSeat,
+        tricks_played: 0, bid1: hasCPU ? 0 : null, bid2: hasCPU ? 0 : null,
+        books1: 0, books2: 0, first_hand_no_bid: hasCPU, spades_broken: false,
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [gs.phase, gs.dealer_seat, gs.cpu_enabled]);
+
+  // AUTO GAME LOOP: CPU card play
+  useEffect(() => {
+    if (!gs.cpu_enabled || gs.phase !== 'playing') return;
+    const currentTurnSeat = gs.current_turn_seat;
+    if (!currentTurnSeat) return;
+    const currentPlayer = players.find(p => p.seatNumber === currentTurnSeat);
+    if (!currentPlayer || currentPlayer.playerType !== 'cpu') return;
+    const hasPlayed = (gs.current_trick || []).some(p => p.seatNumber === currentTurnSeat);
+    if (hasPlayed) return;
+    const timer = setTimeout(async () => {
+      const hand = currentPlayer.hand || [];
+      if (hand.length === 0) return;
+      const activeSuit = getActiveSuit(gs.current_trick || []);
+      let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false);
+      if (!cardToPlay) {
+        const valid = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, (gs.current_trick || []).length === 0).valid);
+        if (!valid) return;
+        cardToPlay = valid;
+      }
+      const seated = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+      const idx = seated.findIndex(p => p.seatNumber === currentTurnSeat);
+      const nextPlayer = seated[(idx + 1) % seated.length];
+      const updatedPlayers = players.map(p =>
+        p.playerId === currentPlayer.playerId
+          ? { ...p, hand: p.hand.filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
+          : p
+      );
+      await updateState({
+        players: updatedPlayers,
+        current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
+        current_turn_seat: nextPlayer?.seatNumber || currentTurnSeat,
+        spades_broken: gs.spades_broken || cardToPlay.suit === '♠',
+      });
+    }, CPU_ACTION_DELAY);
+    return () => clearTimeout(timer);
+  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled]);
 
   const hostSitIn = async (seatNum) => {
     const newPlayer = { playerId: HOST_PLAYER_ID, seatNumber: seatNum, role: 'hostPlayer', connected: true, joinedAt: Date.now(), lastActionAt: Date.now(), hand: [], bid: null, tricksWon: 0 };
@@ -190,7 +252,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
     if (isShuffling) return;
     setIsShuffling(true);
     setShufflePhase('shuffling');
-    const deck = shuffleDeck(generateFullDeck());
+    const deck = shuffleDeckRules(generateFullDeck());
     await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
     // isShuffling reset happens when animation completes via onComplete
   };
@@ -205,7 +267,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleDeal = async () => {
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
     if (seated.length < 2) return;
-    const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeck(generateFullDeck());
+    const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeckRules(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
@@ -290,6 +352,44 @@ export default function SpadesHostPanel({ gs, updateState }) {
 
   return (
     <div className="max-w-4xl mx-auto space-y-4">
+      {/* New Player Alert */}
+      {newPlayerAlert && (
+        <div className="p-4 border-2 border-[#4ade80] rounded-xl bg-[#4ade80]/10 animate-pulse"
+          style={{ boxShadow: '0 0 20px rgba(74,222,128,0.3)' }}>
+          <div className="font-heading text-sm text-[#4ade80] uppercase tracking-widest mb-2">
+            🙋 New Player Joined!
+          </div>
+          <div className="text-[7px] text-white/60 uppercase mb-3" style={PS2}>
+            Seat {newPlayerAlert.seatNumber ?? '–'} · ID: {newPlayerAlert.playerId?.slice(0, 8)}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {/* Offer to replace a CPU with this player */}
+            {players.filter(p => p.playerType === 'cpu').map(cpu => (
+              <button key={cpu.playerId}
+                onClick={async () => {
+                  // Move new player into CPU's seat, remove CPU
+                  const updated = players
+                    .filter(p => p.playerId !== cpu.playerId)
+                    .map(p => p.playerId === newPlayerAlert.playerId
+                      ? { ...p, seatNumber: cpu.seatNumber, role: 'player', team: cpu.team }
+                      : p
+                    );
+                  await updateState({ players: updated });
+                  setNewPlayerAlert(null);
+                }}
+                className="px-3 py-1.5 rounded border border-[#4ade80] text-[#4ade80] text-[7px] font-heading uppercase hover:bg-[#4ade80]/20 transition-all"
+                style={PS2}>
+                Replace CPU Seat {cpu.seatNumber}
+              </button>
+            ))}
+            <button onClick={() => setNewPlayerAlert(null)}
+              className="px-3 py-1.5 rounded border border-white/20 text-white/40 text-[7px] font-heading uppercase hover:bg-white/10 transition-all"
+              style={PS2}>
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
       {isSetup && (
         <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
           <h3 className="font-heading text-xs tracking-[0.2em] text-[#BC13FE]/80 uppercase">Team Names</h3>
@@ -407,7 +507,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
       <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 space-y-3">
         <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">🤖 CPU Players</h3>
         <div className="text-[7px] tracking-widest text-white/30 uppercase mb-2" style={PS2}>
-          {cpuProcessing ? '⚙ CPU thinking...' : 'CPU opponents will auto-play'}
+          CPU opponents will auto-play
         </div>
         <div className="flex flex-wrap gap-2">
           <Btn
@@ -417,7 +517,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
             }}
             color="#4ade80"
             size="sm"
-            disabled={cpuProcessing || availableSeats.length === 0}
+            disabled={availableSeats.length === 0}
           >
             🤖 Fill Empty Seats w/ CPU
           </Btn>
@@ -431,7 +531,6 @@ export default function SpadesHostPanel({ gs, updateState }) {
               }}
               color="#4ade80"
               size="sm"
-              disabled={cpuProcessing}
             >
               + CPU Seat {s}
             </Btn>
@@ -443,7 +542,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
             }} 
             color="#FF5F1F" 
             size="sm"
-            disabled={cpuProcessing || !players.some(p => p.playerType === 'cpu')}
+            disabled={!players.some(p => p.playerType === 'cpu')}
           >
             Remove All CPUs
           </Btn>
