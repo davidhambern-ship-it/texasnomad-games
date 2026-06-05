@@ -92,22 +92,26 @@ function SpadesViewer({ roomCode }) {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
       return { ...p, hand: [], bid: null, tricksWon: 0 };
     });
-    await updateState({ players: initializedPlayers });
+    await updateState({ players: initializedPlayers, deck: workingDeck });
     
-    // Deal cards one by one
+    // Deal cards one by one in rounds
     const playerHands = seated.map(() => []);
-    for (let i = 0; i < cardsPerPlayer; i++) {
+    for (let round = 0; round < cardsPerPlayer; round++) {
       for (let j = 0; j < seated.length; j++) {
-        const cardIndex = i * seated.length + j;
+        const cardIndex = round * seated.length + j;
         if (cardIndex < workingDeck.length) {
           playerHands[j].push(workingDeck[cardIndex]);
-          const updatedPlayers = (gs.players || []).map(p => {
-            if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-            const idx = seated.findIndex(s => s.playerId === p.playerId);
-            return { ...p, hand: [...playerHands[idx]] };
+          const updatedPlayers = seated.map((p, idx) => ({
+            ...p,
+            hand: [...playerHands[idx]]
+          }));
+          // Merge back with all players
+          const allPlayers = (gs.players || []).map(p => {
+            const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
+            return seatedIdx >= 0 ? updatedPlayers[seatedIdx] : p;
           });
-          await updateState({ players: updatedPlayers });
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await updateState({ players: allPlayers });
+          await new Promise(resolve => setTimeout(resolve, 150));
         }
       }
     }
@@ -115,14 +119,14 @@ function SpadesViewer({ roomCode }) {
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
     
-    // First hand - no bidding, player to left of dealer starts playing
-    const noBidPlayers = (gs.players || []).map(p => {
+    // First hand - no bidding
+    const finalPlayers = (gs.players || []).map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
       return { ...p, bid: 0 };
     });
     
     await updateState({
-      players: noBidPlayers, phase: 'playing', status: 'active',
+      players: finalPlayers, phase: 'playing', status: 'active',
       deck: [], current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
       first_hand_no_bid: true,
