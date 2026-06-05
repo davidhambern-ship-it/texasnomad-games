@@ -18,10 +18,10 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         {/* Logo / Branding */}
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-10 h-10 object-contain" />
-          <div className="hidden sm:block">
-            <span className="tracking-widest text-white uppercase leading-none text-base" style={{ fontFamily: "'Rye', serif" }}>TEXASNOMAD</span>
-            <span className="block text-[8px] tracking-[0.2em] text-kinetic-orange uppercase leading-none mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PRODUCTIONS</span>
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+          <div className="flex flex-col leading-tight">
+            <span className="tracking-widest text-white uppercase text-xs sm:text-base" style={{ fontFamily: "'Rye', serif" }}>TEXAS<span className="hidden xs:inline">NOMAD</span></span>
+            <span className="text-[6px] sm:text-[8px] tracking-[0.2em] text-kinetic-orange uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>PRODUCTIONS</span>
           </div>
         </Link>
 
