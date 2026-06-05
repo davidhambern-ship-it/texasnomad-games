@@ -43,14 +43,20 @@ export default function SpadesCardArea({ trick, players }) {
             const isRed = !isSpade && !isClub;
             return (
               <div key={i}
-                className="absolute rounded-lg shadow-xl overflow-hidden"
-                style={{ ...pos, position: 'absolute', width: 52, height: 72 }}>
+                className="absolute rounded-lg shadow-2xl overflow-hidden border-2 border-white/20"
+                style={{ 
+                  ...pos, 
+                  position: 'absolute', 
+                  width: 104, 
+                  height: 144,
+                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))'
+                }}>
                 {getCardImage(play.card) ? (
                   <img src={getCardImage(play.card)} alt={`${play.card?.value}${play.card?.suit}`} className="w-full h-full object-cover rounded-lg" />
                 ) : (
                   <div className="w-full h-full rounded-lg bg-white border-2 border-gray-300 flex flex-col items-center justify-center">
-                    <span className={`text-lg leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.suit}</span>
-                    <span className={`text-xs leading-none font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.value}</span>
+                    <span className={`text-3xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.suit}</span>
+                    <span className={`text-lg leading-none font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.value}</span>
                   </div>
                 )}
               </div>
