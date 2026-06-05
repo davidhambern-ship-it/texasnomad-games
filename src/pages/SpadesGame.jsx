@@ -90,9 +90,9 @@ function SpadesViewer({ roomCode }) {
     const workingDeck = shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     
-    // Initialize empty hands
+    // Initialize empty hands for all seated players (including CPU)
     const initializedPlayers = (gs.players || []).map(p => {
-      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      if (p.seatNumber == null) return p;
       return { ...p, hand: [], bid: null, tricksWon: 0 };
     });
     await updateState({ players: initializedPlayers, deck: workingDeck });
@@ -127,9 +127,9 @@ function SpadesViewer({ roomCode }) {
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
     
-    // First hand - no bidding
+    // First hand - no bidding - set bid to 0 for all seated players
     const finalPlayers = (gs.players || []).map(p => {
-      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      if (p.seatNumber == null) return p;
       return { ...p, bid: 0 };
     });
     
@@ -211,7 +211,7 @@ function SpadesViewer({ roomCode }) {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     
     const trick = gs.current_trick || [];
-    const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null);
     if (trick.length !== seatedPlayers.length) return;
     
     // All players have played - determine winner
