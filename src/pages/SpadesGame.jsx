@@ -94,24 +94,29 @@ function SpadesViewer({ roomCode }) {
     });
     await updateState({ players: initializedPlayers, deck: workingDeck });
     
-    // Deal cards one by one in rounds (faster - 50ms per card)
+    // Deal cards in batches (every 4 cards to avoid rate limit)
     const playerHands = seated.map(() => []);
+    let cardCount = 0;
     for (let round = 0; round < cardsPerPlayer; round++) {
       for (let j = 0; j < seated.length; j++) {
         const cardIndex = round * seated.length + j;
         if (cardIndex < workingDeck.length) {
           playerHands[j].push(workingDeck[cardIndex]);
-          const updatedPlayers = seated.map((p, idx) => ({
-            ...p,
-            hand: [...playerHands[idx]]
-          }));
-          // Merge back with all players
-          const allPlayers = (gs.players || []).map(p => {
-            const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
-            return seatedIdx >= 0 ? updatedPlayers[seatedIdx] : p;
-          });
-          await updateState({ players: allPlayers });
-          await new Promise(resolve => setTimeout(resolve, 50));
+          cardCount++;
+          
+          // Update state every 4 cards to avoid rate limit
+          if (cardCount % 4 === 0 || cardCount === workingDeck.length) {
+            const updatedPlayers = seated.map((p, idx) => ({
+              ...p,
+              hand: [...playerHands[idx]]
+            }));
+            const allPlayers = (gs.players || []).map(p => {
+              const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
+              return seatedIdx >= 0 ? updatedPlayers[seatedIdx] : p;
+            });
+            await updateState({ players: allPlayers });
+            await new Promise(resolve => setTimeout(resolve, 80));
+          }
         }
       }
     }
