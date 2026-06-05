@@ -279,6 +279,7 @@ function SpadesViewer({ roomCode }) {
     const currentPlayers = gs.players || [];
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
     await updateState({ players: filledPlayers, cpu_enabled: true });
+    setCpuChoiceShown(false);
     setNotification({ message: 'CPU players joined the table', type: 'success' });
   };
 
@@ -296,11 +297,74 @@ function SpadesViewer({ roomCode }) {
     if (isPlayer && availableSeats.length > 0 && !gs.cpu_enabled && !cpuChoiceShown) {
       setCpuChoiceShown(true);
     }
-  }, [isPlayer, availableSeats.length, gs.cpu_enabled, cpuChoiceShown]);
+  }, [isPlayer, availableSeats.length, gs.cpu_enabled, cpuChoiceShown, myRole]);
+
+  // Reset cpuChoiceShown when leaving the game
+  useEffect(() => {
+    if (!isPlayer) {
+      setCpuChoiceShown(false);
+    }
+  }, [isPlayer]);
+
+  // Show role selection when user hasn't chosen yet
+  const showRoleSelection = myRole === null && !loading && room;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
       <SeatNotification notification={notification} />
+
+      {/* Role Selection Modal */}
+      {showRoleSelection && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#BC13FE]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3), inset 0 0 60px rgba(0,0,0,0.8)' }}>
+            <div className="text-center mb-6">
+              <div className="text-2xl font-heading text-[#BC13FE] uppercase tracking-widest mb-2" style={PS2}>
+                🎮 Join Game
+              </div>
+              <div className="text-white/60 text-sm">
+                Choose how you want to join
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              {availableSeats.length > 0 ? (
+                <button
+                  onClick={handleChooseSit}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105"
+                  style={PS2}
+                >
+                  🎯 Play (Join Seat)
+                </button>
+              ) : (
+                <button
+                  onClick={handleChooseSpectate}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105"
+                  style={PS2}
+                >
+                  👁 Start Spectating
+                </button>
+              )}
+              {availableSeats.length > 0 && (
+                <button
+                  onClick={handleChooseSpectate}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105"
+                  style={PS2}
+                >
+                  👁 Spectate Only
+                </button>
+              )}
+            </div>
+            
+            {availableSeats.length === 0 && (
+              <div className="mt-4 text-[#FFD700]/60 text-xs text-center" style={PS2}>
+                All seats full - you will spectate
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <SpadesHeader
         roomCode={roomCode}
         room={room}
@@ -331,6 +395,8 @@ function SpadesViewer({ roomCode }) {
             cpuChoiceShown={cpuChoiceShown}
             onPlayAgainstCPU={handlePlayAgainstCPU}
             onWaitForRealPlayers={handleWaitForRealPlayers}
+            onChooseSpectate={handleChooseSpectate}
+            onChooseSit={handleChooseSit}
           />
 
         </div>

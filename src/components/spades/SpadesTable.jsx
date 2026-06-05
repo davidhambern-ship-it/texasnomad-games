@@ -16,7 +16,7 @@ const SEAT_POSITIONS = {
   4: 'right',
 };
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -26,7 +26,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
   const [dealPhase, setDealPhase] = useState('idle');
   const [animatingCard, setAnimatingCard] = useState(null);
 
-  const showCPUChoice = isPlayer && availableSeats.length > 0 && isSetup && !cpuChoiceShown;
+  const showCPUChoice = isPlayer && availableSeats.length > 0 && isSetup && cpuChoiceShown;
 
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
 
