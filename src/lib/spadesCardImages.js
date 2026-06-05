@@ -34,6 +34,22 @@ const HEARTS_IMAGES = {
   'A': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/0bcc16c68_hearts-A.png',
 };
 
+const DIAMONDS_IMAGES = {
+  '2': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/e0ca7025b_diamonds-2.png',
+  '3': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1a00a0d46_diamonds-3.png',
+  '4': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/07365cea2_diamonds-4.png',
+  '5': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/589949d24_diamonds-5.png',
+  '6': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/cda427d97_diamonds-6.png',
+  '7': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1b272df26_diamonds-7.png',
+  '8': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/393115af6_diamonds-8.png',
+  '9': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6743b5917_diamonds-9.png',
+  '10': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/8f3a3bb3a_diamonds-10.png',
+  'J': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/dd1de24bb_diamonds-J.png',
+  'Q': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c4d98f8d5_diamonds-Q.png',
+  'K': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/d0d98c669_diamonds-K.png',
+  'A': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/e1ecc1e89_diamonds-A.png',
+};
+
 export function getCardImage(card) {
   if (!card) return null;
   if (card.suit === '♠') {
@@ -41,6 +57,9 @@ export function getCardImage(card) {
   }
   if (card.suit === '♥') {
     return HEARTS_IMAGES[card.value] || null;
+  }
+  if (card.suit === '♦') {
+    return DIAMONDS_IMAGES[card.value] || null;
   }
   return null;
 }
