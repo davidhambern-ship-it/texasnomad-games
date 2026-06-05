@@ -217,27 +217,25 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Right (Seat 4) - Hand on table (card backs only) */}
+        {/* Right (Seat 4) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(4)?.hand?.length > 0 && (
-          <div className="absolute right-14 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 100, height: 460 }}>
-            <div className="flex flex-col" style={{ transform: 'scale(1) rotate(-90deg)' }}>
-              {getPlayerAtSeat(4).hand.map((card, i, arr) => {
-                const overlap = getVerticalOverlap(arr.length);
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 52, height: 73,
-                      marginTop: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
-                    }}
-                  >
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-                  </div>
-                );
-              })}
-            </div>
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 80, height: 440 }}>
+            {getPlayerAtSeat(4).hand.map((card, i, arr) => {
+              const overlap = getVerticalOverlap(arr.length);
+              return (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 52, height: 73,
+                    marginTop: i > 0 ? `-${overlap}px` : '0',
+                    transform: `rotate(90deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
