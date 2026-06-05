@@ -463,7 +463,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
           </div>
           <div className="flex flex-wrap gap-2">
             {[...hostInSeat.hand].sort((a, b) => {
-              const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
+              const suitOrder = { '♠': 0, '♦': 1, '♣': 2, '♥': 3, 'Joker': 4 };
               const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
               const suitDiff = (suitOrder[a.suit] ?? 5) - (suitOrder[b.suit] ?? 5);
               return suitDiff !== 0 ? suitDiff : (valueOrder[a.value] ?? 0) - (valueOrder[b.value] ?? 0);
