@@ -226,14 +226,10 @@ function SpadesViewer({ roomCode }) {
     
     if (!nextPlayer) return;
     
-    // Rotate turn to next player
-    const timer = setTimeout(async () => {
-      await updateState({
-        current_turn_seat: nextPlayer.seatNumber,
-      });
-    }, 500);
-    
-    return () => clearTimeout(timer);
+    // Rotate turn to next player immediately (no delay for smooth gameplay)
+    updateState({
+      current_turn_seat: nextPlayer.seatNumber,
+    });
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
   // Handle trick completion and turn rotation
