@@ -45,8 +45,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       console.log('Already shuffling, returning');
       return;
     }
-    if (seatedPlayers.length < 2) {
-      console.log('Not enough players:', seatedPlayers.length);
+    const allSeated = (gs.players || []).filter(p => p.seatNumber != null);
+    if (allSeated.length < 2) {
+      console.log('Not enough players:', allSeated.length);
       alert('Need at least 2 players to deal');
       return;
     }
@@ -64,16 +65,16 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     await new Promise(resolve => setTimeout(resolve, 2500));
     
     // Prepare dealt hands
-    const cardsPerPlayer = Math.floor(deck.length / seatedPlayers.length);
+    const cardsPerPlayer = Math.floor(deck.length / allSeated.length);
     const updatedPlayers = (gs.players || []).map(p => {
-      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-      const idx = seatedPlayers.findIndex(s => s.playerId === p.playerId);
+      if (p.seatNumber == null) return p;
+      const idx = allSeated.findIndex(s => s.playerId === p.playerId);
       const hand = deck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer);
       return { ...p, hand, bid: null, tricksWon: 0 };
     });
     
-    const dealerSeat = seatedPlayers[0]?.seatNumber || 1;
-    const firstBidder = seatedPlayers[1]?.seatNumber || seatedPlayers[0]?.seatNumber;
+    const dealerSeat = allSeated[0]?.seatNumber || 1;
+    const firstBidder = allSeated[1]?.seatNumber || allSeated[0]?.seatNumber;
     
     // Update state with deck visible for deal animation
     await updateState({
@@ -101,7 +102,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
   const handleDeal = async () => {
     console.log('handleDeal called');
-    const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const seated = (gs.players || []).filter(p => p.seatNumber != null);
     console.log('Seated players:', seated);
     if (seated.length < 2) {
       console.log('Not enough players to deal');

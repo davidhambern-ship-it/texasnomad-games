@@ -85,7 +85,7 @@ function SpadesViewer({ roomCode }) {
   }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
 
   const handleAutoDeal = async () => {
-    const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const seated = (gs.players || []).filter(p => p.seatNumber != null);
     if (seated.length < 2) return;
     const workingDeck = shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
