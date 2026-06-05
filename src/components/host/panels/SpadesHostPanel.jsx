@@ -209,10 +209,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
       // Rotate dealer
       const curDealer = gs.dealer_seat || 1;
       const nextDealer = curDealer >= 4 ? 1 : curDealer + 1;
-      // Save first-hand books for bidding order if not already saved
-      const firstHandBooks = gs.first_hand_books || Object.fromEntries(
-        seated.map(p => [p.seatNumber, p.tricksWon || 0])
-      );
+      // Always save the first-hand books (from whichever round just finished) if not already set
+      const firstHandBooks = gs.first_hand_books && Object.keys(gs.first_hand_books).length > 0
+        ? gs.first_hand_books
+        : Object.fromEntries(seated.map(p => [p.seatNumber, p.tricksWon || 0]));
       await updateState({
         score1: newScore1, score2: newScore2, phase: 'setup',
         current_trick: [], tricks_played: 0, books1: 0, books2: 0, bid1: null, bid2: null,
@@ -239,16 +239,17 @@ export default function SpadesHostPanel({ gs, updateState }) {
         const idx = seated.findIndex(s => s.playerId === p.playerId);
         return { ...p, hand: deck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
       });
-      const hasCPU = seated.some(p => p.playerType === 'cpu');
-      const firstSeat = hasCPU
-        ? (seated[(seated.findIndex(s => s.seatNumber === gs.dealer_seat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber)
+      const isFirstRound = !gs.first_hand_books || Object.keys(gs.first_hand_books).length === 0;
+      const seatAfterDealer = seated[(seated.findIndex(s => s.seatNumber === gs.dealer_seat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber;
+      const firstSeat = isFirstRound
+        ? seatAfterDealer
         : getFirstBidderSeat(seated, gs.dealer_seat, gs.first_hand_books);
       await updateState({
-        players: updatedPlayers, phase: hasCPU ? 'playing' : 'bidding', status: 'active',
+        players: updatedPlayers, phase: isFirstRound ? 'playing' : 'bidding', status: 'active',
         deck: [], current_trick: [], current_turn_seat: firstSeat,
-        current_bidder_seat: hasCPU ? null : firstSeat,
-        tricks_played: 0, bid1: hasCPU ? 0 : null, bid2: hasCPU ? 0 : null,
-        books1: 0, books2: 0, first_hand_no_bid: hasCPU, spades_broken: false,
+        current_bidder_seat: isFirstRound ? null : firstSeat,
+        tricks_played: 0, bid1: isFirstRound ? 0 : null, bid2: isFirstRound ? 0 : null,
+        books1: 0, books2: 0, first_hand_no_bid: isFirstRound, spades_broken: false,
       });
     }, 1500);
     return () => clearTimeout(timer);
@@ -368,12 +369,25 @@ export default function SpadesHostPanel({ gs, updateState }) {
       return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
     });
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
-    const firstSeat = getFirstBidderSeat(seated, dealerSeat, gs.first_hand_books);
-    await updateState({
-      players: updatedPlayers, phase: 'bidding', status: 'active', team1Name, team2Name, targetScore,
-      deck: [], current_trick: [], current_bidder_seat: firstSeat, current_turn_seat: firstSeat, dealer_seat: dealerSeat,
-      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
-    });
+    // First round: no bidding — play first, then bid from round 2 onwards
+    const isFirstRound = !gs.first_hand_books || Object.keys(gs.first_hand_books).length === 0;
+    if (isFirstRound) {
+      const firstSeat = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber;
+      await updateState({
+        players: updatedPlayers, phase: 'playing', status: 'active', team1Name, team2Name, targetScore,
+        deck: [], current_trick: [], current_turn_seat: firstSeat, dealer_seat: dealerSeat,
+        tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0,
+        first_hand_no_bid: true, current_bidder_seat: null, spades_broken: false,
+      });
+    } else {
+      const firstSeat = getFirstBidderSeat(seated, dealerSeat, gs.first_hand_books);
+      await updateState({
+        players: updatedPlayers, phase: 'bidding', status: 'active', team1Name, team2Name, targetScore,
+        deck: [], current_trick: [], current_bidder_seat: firstSeat, current_turn_seat: firstSeat, dealer_seat: dealerSeat,
+        tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
+        first_hand_no_bid: false, spades_broken: false,
+      });
+    }
   };
 
   const setPlayerBid = async (playerId, bid) => {
@@ -426,10 +440,9 @@ export default function SpadesHostPanel({ gs, updateState }) {
     const bid2 = gs.bid2 || 0;
     const s1 = team1Books >= bid1 ? bid1 * 10 + (team1Books - bid1) : -bid1 * 10;
     const s2 = team2Books >= bid2 ? bid2 * 10 + (team2Books - bid2) : -bid2 * 10;
-    // Save first-hand books for bidding order if not already saved
-    const firstHandBooks = gs.first_hand_books || Object.fromEntries(
-      seated.map(p => [p.seatNumber, p.tricksWon || 0])
-    );
+    const firstHandBooks = gs.first_hand_books && Object.keys(gs.first_hand_books).length > 0
+      ? gs.first_hand_books
+      : Object.fromEntries(seated.map(p => [p.seatNumber, p.tricksWon || 0]));
     await updateState({
       score1: (gs.score1 || 0) + s1, score2: (gs.score2 || 0) + s2, phase: 'setup',
       first_hand_books: firstHandBooks,
