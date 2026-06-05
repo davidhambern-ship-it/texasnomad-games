@@ -149,26 +149,27 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Top (Seat 3) - Hand on table (card backs only) - vertical fan */}
+        {/* Top (Seat 3) - Hand on table (card backs only) - horizontal fan (mirrors seat 1) */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex flex-col items-center" style={{ width: 80, height: 440 }}>
-            {getPlayerAtSeat(3).hand.map((card, i, arr) => {
-              const overlap = getVerticalOverlap(arr.length);
-              const fanAngle = (i - (arr.length - 1) / 2) * 3;
-              return (
-                <div
-                  key={card.id || i}
-                  className="relative rounded-lg overflow-hidden shadow-lg"
-                  style={{
-                    width: 52, height: 73,
-                    marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(${180 + fanAngle}deg)`,
-                  }}
-                >
-                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-                </div>
-              );
-            })}
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 500, height: 100 }}>
+            <div className="flex" style={{ transform: 'scale(1) rotate(180deg)' }}>
+              {getPlayerAtSeat(3).hand.map((card, i, arr) => {
+                const overlap = getHorizontalOverlap(arr.length);
+                return (
+                  <div
+                    key={card.id || i}
+                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      width: 52, height: 73,
+                      marginLeft: i > 0 ? `-${overlap}px` : '0',
+                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
+                    }}
+                  >
+                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
