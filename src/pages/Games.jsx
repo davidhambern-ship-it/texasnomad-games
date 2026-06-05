@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import { base44 } from '@/api/base44Client';
+import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
 
 // ── Particle System ──────────────────────────────────────────────────────────
 function Particles() {
@@ -152,7 +153,9 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
             style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)' }} />
           {/* Screen content */}
           <div className="absolute inset-0 z-0">
-            {game.image ? (
+            {game.screenComponent ? (
+              game.screenComponent
+            ) : game.image ? (
               <img src={game.image} alt={game.title} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
@@ -310,7 +313,7 @@ const GAMES = [
     id: 'spades',
     title: 'Spades',
     tagline: 'Classic Card Trick-Taking',
-    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/2b111c7de_BFFCover-2.png',
+    screenComponent: <SpadesCabinetImage />,
     color: '#4a4a8a',
     color2: '#6a6aaa',
     marqueeText: 'BID SMART • PLAY TOGETHER • WIN TRICKS • DOMINATE THE TABLE',
