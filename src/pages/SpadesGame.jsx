@@ -140,8 +140,8 @@ function SpadesViewer({ roomCode }) {
     const currentTurnSeat = gs.current_turn_seat;
     if (!currentTurnSeat) return;
     
-    // Find player whose turn it is
-    const currentPlayer = players.find(p => p.seatNumber === currentTurnSeat);
+    // Find player whose turn it is from gs.players
+    const currentPlayer = (gs.players || []).find(p => p.seatNumber === currentTurnSeat);
     if (!currentPlayer || currentPlayer.playerType !== 'cpu') return;
     
     // Don't act if already played this trick
@@ -157,7 +157,7 @@ function SpadesViewer({ roomCode }) {
       if (!cardToPlay) return;
       
       // Play the card
-      const updatedPlayers = players.map(p =>
+      const updatedPlayers = (gs.players || []).map(p =>
         p.playerId === currentPlayer.playerId
           ? { ...p, hand: (p.hand || []).filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
           : p
@@ -170,7 +170,7 @@ function SpadesViewer({ roomCode }) {
     }, CPU_ACTION_DELAY);
     
     return () => clearTimeout(timer);
-  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, players, room]);
+  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
   // Handle trick completion and turn rotation
   useEffect(() => {
@@ -194,7 +194,7 @@ function SpadesViewer({ roomCode }) {
       const winningTeam = winningSeat === 1 || winningSeat === 3 ? 1 : 2;
       
       // Update books and tricks
-      const updatedPlayers = players.map(p => 
+      const updatedPlayers = (gs.players || []).map(p => 
         p.seatNumber === winningSeat 
           ? { ...p, tricksWon: (p.tricksWon || 0) + 1 }
           : p
@@ -207,7 +207,7 @@ function SpadesViewer({ roomCode }) {
       await updateState({
         players: updatedPlayers,
         current_trick: [],
-        current_turn_seat: winningSeat, // Winner leads next trick
+        current_turn_seat: winningSeat,
         tricks_played: newTricksPlayed,
         books1: newBooks1,
         books2: newBooks2,
@@ -215,7 +215,7 @@ function SpadesViewer({ roomCode }) {
     }, 1500);
     
     return () => clearTimeout(timer);
-  }, [gs.current_trick, gs.phase, gs.cpu_enabled, players, room]);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
   // Detect when round ends and rotate dealer
   useEffect(() => {
