@@ -157,14 +157,16 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
           <div className="absolute inset-0 pointer-events-none z-10"
             style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)' }} />
           {/* Screen content */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 text-center z-0">
-            <div className="text-4xl">{game.emoji}</div>
-            <div className="font-heading text-sm tracking-widest uppercase" style={{ color: glowColor, textShadow: `0 0 10px ${glowColor}` }}>
-              {game.screenText}
-            </div>
-            <div className="text-[7px] tracking-wide text-white/40 leading-relaxed max-w-xs" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-              {game.screenSub}
-            </div>
+          <div className="absolute inset-0 z-0">
+            {game.image ? (
+              <img src={game.image} alt={game.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="font-heading text-sm tracking-widest uppercase" style={{ color: glowColor, textShadow: `0 0 10px ${glowColor}` }}>
+                  {game.screenText}
+                </div>
+              </div>
+            )}
           </div>
           {/* CRT glow overlay */}
           <div className="absolute inset-0 pointer-events-none rounded-xl"
@@ -272,12 +274,11 @@ const GAMES = [
     id: 'square-biz',
     title: 'Square Biz!',
     tagline: 'Trivia Powered Strategy',
-    emoji: '⬛',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1d89f0420_generated_image.png',
     color: '#BC13FE',
     color2: '#7700cc',
     marqueeText: 'ANSWER TRIVIA • CLAIM THE BOARD • 3 IN A ROW WINS',
     screenText: 'TRIVIA × STRATEGY',
-    screenSub: 'ANSWER CORRECTLY\nTO PLACE YOUR MARK',
     description: 'Answer trivia questions to earn the right to place an X or O. Get three in a row before your opponent and claim victory.',
     tags: ['1v1', 'Livestream', 'Strategy'],
     path: '/games/square-biz',
@@ -287,12 +288,11 @@ const GAMES = [
     id: 'bff',
     title: 'BFF',
     tagline: 'Survey Says... You Win?',
-    emoji: '🎯',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/2b111c7de_BFFCover-2.png',
     color: '#FF5F1F',
     color2: '#FF9A00',
     marqueeText: 'BUZZ IN • ANSWER FAST • STEAL THE BANK • WIN IT ALL',
     screenText: 'SURVEY SHOWDOWN',
-    screenSub: 'MOST POPULAR\nANSWERS WIN',
     description: 'Uncover the most popular survey answers. Buzz in, build your Round Bank, and pray nobody steals it from you.',
     tags: ['Groups', 'Family', 'Community'],
     path: '/games/bff',
@@ -302,12 +302,11 @@ const GAMES = [
     id: 'hangman',
     title: 'Hangman',
     tagline: 'Every Letter Counts',
-    emoji: '🪢',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/2c3663fd0_generated_image.png',
     color: '#22d3ee',
     color2: '#0ea5e9',
     marqueeText: 'GUESS THE WORD • AVOID THE BYE • ONE LETTER AT A TIME',
     screenText: 'WORD DETECTIVE',
-    screenSub: 'CHOOSE WISELY\nWRONG = BYE',
     description: 'Guess the hidden word before the BYE system completes. Every wrong letter brings you closer to defeat.',
     tags: ['Small Groups', 'Casual', 'Audience'],
     path: '/games/hangman',
