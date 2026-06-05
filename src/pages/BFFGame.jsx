@@ -111,6 +111,13 @@ function BFFViewer({ roomCode }) {
 
   const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
+  // Helper: get steal player from opposing family
+  const getStealPlayerForFamily = (byeFamily, currentPlayers) => {
+    const oppFam = byeFamily === 1 ? 2 : 1;
+    const oppPlayers = currentPlayers.filter(p => (Number(p.familyTeam) === oppFam) && p.role === 'participant');
+    return oppPlayers.length > 0 ? { player: oppPlayers[0], family: oppFam } : null;
+  };
+
   const submitAnswer = async (guess) => {
     if (!guess.trim() || !canAnswer || isSubmitting) return;
     setIsSubmitting(true);
@@ -119,22 +126,123 @@ function BFFViewer({ roomCode }) {
     const answers = gs.answers || [];
     const cleanGuess = normalize(guess);
     const matchIdx = answers.findIndex((a) => {
+      if (a.revealed) return false; // already revealed
       const cleanAns = normalize(a.answer || a.text);
       return cleanAns === cleanGuess || (cleanAns.length >= 4 && cleanGuess.includes(cleanAns)) || (cleanGuess.length >= 4 && cleanAns.includes(cleanGuess));
     });
 
     const me = players.find(p => p.playerId === playerId);
-    const submission = {
-      playerId,
-      seatNumber,
-      familyTeam: me?.familyTeam,
-      submittedAnswer: guess,
-      timestamp: Date.now(),
-      inputMethod: isListening ? 'voice' : 'keyboard',
-      result: null,
-    };
 
-    await updateState({ last_submission: submission, current_typing: '' });
+    if (matchIdx !== -1) {
+      // ── HIT: auto-reveal answer, add to bank ──
+      const ans = answers[matchIdx];
+      const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+      const newBank = (gs.round_bank || 0) + (ans.points || 0);
+
+      // Check if this was a steal attempt
+      const wasSteal = gs.steal_mode;
+
+      const submission = {
+        playerId, seatNumber, familyTeam: me?.familyTeam,
+        submittedAnswer: guess, timestamp: Date.now(),
+        inputMethod: isListening ? 'voice' : 'keyboard', result: 'correct',
+      };
+
+      if (wasSteal) {
+        // Steal correct: award entire bank to steal family
+        const stealFam = gs.steal_family || (me?.familyTeam);
+        const scoreKey = stealFam === 1 ? 'score1' : 'score2';
+        await updateState({
+          answers: newAnswers,
+          round_bank: 0,
+          [scoreKey]: (gs[scoreKey] || 0) + newBank,
+          last_submission: submission,
+          steal_mode: false, steal_player_id: null,
+          answering_player_id: null, current_typing: '',
+          steal_result: 'correct',
+        });
+      } else {
+        await updateState({
+          answers: newAnswers, round_bank: newBank,
+          last_submission: submission,
+          answering_player_id: null, current_typing: '',
+        });
+      }
+      setSubmitResult('hit');
+    } else {
+      // ── MISS: auto-add BYE strike ──
+      const is2P = gs.two_player_mode || false;
+      const currentFamilyTeam = me?.familyTeam || gs.active_turn || 1;
+      const wasSteal = gs.steal_mode;
+
+      const submission = {
+        playerId, seatNumber, familyTeam: me?.familyTeam,
+        submittedAnswer: guess, timestamp: Date.now(),
+        inputMethod: isListening ? 'voice' : 'keyboard', result: 'wrong',
+      };
+
+      if (wasSteal) {
+        // Steal wrong: bank is lost, round ends
+        await updateState({
+          last_submission: submission,
+          steal_mode: false, steal_player_id: null,
+          round_bank: 0, answering_player_id: null, current_typing: '',
+          steal_result: 'wrong',
+        });
+      } else if (is2P) {
+        // 2P mode: per-player BYE tracking
+        const byeCounts2P = gs.bye_counts_2p || {};
+        const playerByes = (byeCounts2P[playerId] || 0) + 1;
+        const newBye2P = { ...byeCounts2P, [playerId]: playerByes };
+
+        if (playerByes >= 3) {
+          // BYE complete — trigger steal by opponent
+          const stealInfo = getStealPlayerForFamily(currentFamilyTeam, players);
+          await updateState({
+            bye_counts_2p: newBye2P, bye_count: playerByes,
+            last_submission: submission, buzz_winner: null,
+            steal_mode: !!stealInfo, steal_player_id: stealInfo?.player?.playerId || null,
+            steal_family: stealInfo?.family || (currentFamilyTeam === 1 ? 2 : 1),
+            answering_player_id: stealInfo?.player?.playerId || null,
+            active_turn: stealInfo?.family || (currentFamilyTeam === 1 ? 2 : 1),
+            steal_result: null, current_typing: '',
+          });
+        } else {
+          await updateState({
+            bye_counts_2p: newBye2P, bye_count: playerByes,
+            last_submission: submission, buzz_winner: null,
+            answering_player_id: null, current_typing: '',
+          });
+        }
+      } else {
+        // Full family mode: shared BYE count
+        const newByeCount = Math.min(3, (gs.bye_count || 0) + 1);
+
+        if (newByeCount >= 3) {
+          // BYE complete — trigger steal
+          const stealInfo = getStealPlayerForFamily(currentFamilyTeam, players);
+          await updateState({
+            bye_count: newByeCount, last_submission: submission,
+            buzz_winner: null, answering_player_id: stealInfo?.player?.playerId || null,
+            steal_mode: !!stealInfo, steal_player_id: stealInfo?.player?.playerId || null,
+            steal_family: stealInfo?.family || (currentFamilyTeam === 1 ? 2 : 1),
+            active_turn: stealInfo?.family || (currentFamilyTeam === 1 ? 2 : 1),
+            steal_result: null, current_typing: '',
+          });
+        } else {
+          // Pass to next player on same family
+          const sameFamPlayers = players.filter(p => Number(p.familyTeam) === currentFamilyTeam && p.role === 'participant' && p.playerId !== playerId);
+          const nextPlayer = sameFamPlayers.length > 0 ? sameFamPlayers[0] : null;
+          await updateState({
+            bye_count: newByeCount, last_submission: submission,
+            buzz_winner: null, answering_player_id: nextPlayer?.playerId || null,
+            current_typing: '',
+          });
+        }
+      }
+      setSubmitResult('miss');
+    }
+
     setAnswerInput('');
     setIsSubmitting(false);
     setTimeout(() => setSubmitResult(null), 3000);
@@ -334,13 +442,11 @@ function GameScreen({ gs, playerId, seatNumber, players, isParticipant, canAnswe
         ))}
       </div>
 
-      {/* Round Bank */}
-      {(gs.round_bank || 0) > 0 && (
-        <div className="px-4 py-2 border border-[#FF5F1F]/40 rounded-xl bg-[#FF5F1F]/5 text-center">
-          <div className="text-[8px] tracking-widest text-[#FF5F1F]/70 uppercase mb-1" style={PS2}>Round Bank</div>
-          <div className="font-heading text-2xl text-[#FF5F1F]">{gs.round_bank}</div>
-        </div>
-      )}
+      {/* Round Bank — always visible during a round */}
+      <div className="px-4 py-2 border border-[#FF5F1F]/40 rounded-xl bg-[#FF5F1F]/5 text-center">
+        <div className="text-[8px] tracking-widest text-[#FF5F1F]/70 uppercase mb-1" style={PS2}>Round Bank</div>
+        <div className="font-heading text-2xl text-[#FF5F1F]">{gs.round_bank || 0}</div>
+      </div>
 
       {/* Question */}
       {gs.current_question && (

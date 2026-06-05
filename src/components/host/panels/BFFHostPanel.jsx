@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
-import { pickFaceoffPlayers, getNextPlayer, getActivePlayers, getStealPlayer } from '@/lib/bffRotation';
+import { pickFaceoffPlayers, getNextPlayer, getActivePlayers } from '@/lib/bffRotation';
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -56,13 +56,11 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
   const faceoffMode = gs.faceoff_mode || false;
   const buzzWinner = gs.buzz_winner || null;
   const byeCount = gs.bye_count || 0;
-  const onPlayerMode = gs.one_player_mode || false;
   const stealMode = gs.steal_mode || false;
-  const hostPlayerMode = gs.host_player_id ? true : false;
 
   // 2P mode: auto-detect 2 active participants
   const participantPlayers = players.filter(p => p.role === 'participant' || p.role === 'hostPlayer');
-  const is2PMode = participantPlayers.length === 2;
+  const is2PMode = gs.two_player_mode || participantPlayers.length === 2;
   const byeCounts2P = gs.bye_counts_2p || {};
 
   const family1Players = getActivePlayers(players, 1);
@@ -90,19 +88,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     setTimeout(() => setCheckResult(null), 5000);
   };
 
-  const revealAnswer = async (idx) => {
-    if (answers[idx].revealed) return;
-    const ans = answers[idx];
-    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: true } : a);
-    await updateState({ answers: newAnswers, round_bank: (gs.round_bank || 0) + (ans.points || 0) });
-  };
-
-  const hideAnswer = async (idx) => {
-    if (!answers[idx].revealed) return;
-    const newAnswers = answers.map((a, i) => i === idx ? { ...a, revealed: false } : a);
-    await updateState({ answers: newAnswers, round_bank: Math.max(0, (gs.round_bank || 0) - (answers[idx].points || 0)) });
-  };
-
   const toggleVoice = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) { setCheckResult({ type: 'warn', message: 'Voice needs Chrome/Edge' }); return; }
@@ -122,37 +107,44 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     return { player1, player2, nextIdx1, nextIdx2 };
   };
 
-  const startGame = async (forceOnPlayerMode = false) => {
-    if (!family1Input.trim() || !family2Input.trim()) return;
-    const firstSurvey = surveys[0];
-    const { player1, player2, nextIdx1, nextIdx2 } = autoPickFaceoff();
-    const totalActive = players.filter(p => p.active !== false).length;
-    const use1P = forceOnPlayerMode || totalActive <= 1;
+  const pickRandomSurvey = (usedIds = []) => {
+    const unused = surveys.filter(s => !usedIds.includes(s.id));
+    const pool = unused.length > 0 ? unused : surveys;
+    return pool[Math.floor(Math.random() * pool.length)];
+  };
 
-    const use2P = !use1P && participantPlayers.length === 2;
+  const startGame = async () => {
+    if (!family1Input.trim() || !family2Input.trim()) return;
+    const firstSurvey = pickRandomSurvey([]);
+    const { player1, player2, nextIdx1, nextIdx2 } = autoPickFaceoff();
+
+    const use2P = participantPlayers.length === 2;
     const initBye2P = {};
     if (use2P) participantPlayers.forEach(p => { initBye2P[p.playerId] = 0; });
+
+    const surveyIdx = surveys.indexOf(firstSurvey);
 
     await updateState({
       phase: 'playing', status: 'active',
       family1: family1Input.trim(), family2: family2Input.trim(),
       score1: 0, score2: 0,
       active_turn: 1, round_bank: 0, round: 1,
-      current_survey_idx: 0,
+      current_survey_idx: surveyIdx >= 0 ? surveyIdx : 0,
+      used_survey_ids: firstSurvey ? [firstSurvey.id] : [],
       current_question: firstSurvey?.question || '',
       answers: firstSurvey ? firstSurvey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })) : [],
       last_submission: null,
-      faceoff_mode: !use1P && !use2P,
+      faceoff_mode: !use2P,
       faceoff_player1_id: player1?.playerId || null,
       faceoff_player2_id: player2?.playerId || null,
       faceoff_round_idx1: nextIdx1,
       faceoff_round_idx2: nextIdx2,
       buzz_winner: null,
       bye_count: 0, bye_flash: 0,
-      one_player_mode: use1P,
+      one_player_mode: false,
       two_player_mode: use2P,
       bye_counts_2p: use2P ? initBye2P : {},
-      answering_player_id: use1P ? (players[0]?.playerId || null) : (use2P ? (participantPlayers[0]?.playerId || null) : null),
+      answering_player_id: use2P ? (participantPlayers[0]?.playerId || null) : null,
       steal_mode: false, steal_player_id: null, steal_result: null,
     });
   };
@@ -187,112 +179,25 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     });
   };
 
-  // ── BYE controls ──
-  const addByeStrike = async () => {
-    const newCount = Math.min(3, byeCount + 1);
-    await updateState({ bye_count: newCount, answering_player_id: null });
-  };
 
-  const removeByeStrike = async () => {
-    await updateState({ bye_count: Math.max(0, byeCount - 1) });
-  };
 
-  const clearBye = async () => { await updateState({ bye_count: 0 }); };
-  const triggerByeAnimation = async () => { await updateState({ bye_flash: Date.now() }); };
-
-  // Mark wrong — auto BYE + auto advance rotation (supports 2P per-player BYE)
-  const markWrong = async () => {
-    const currentAnsweringId = gs.answering_player_id || gs.buzz_winner?.playerId;
-    const currentFamilyTeam = gs.active_turn || 1;
-
-    if (is2PMode && currentAnsweringId) {
-      // 2P mode: increment this specific player's BYE count
-      const playerByes = byeCounts2P[currentAnsweringId] || 0;
-      const newPlayerByes = Math.min(3, playerByes + 1);
-      const newBye2P = { ...byeCounts2P, [currentAnsweringId]: newPlayerByes };
-
-      if (newPlayerByes >= 3) {
-        // BYE complete for this player — auto-trigger steal by opponent
-        const oppFam = currentFamilyTeam === 1 ? 2 : 1;
-        const { player: stealPlayer, nextIdx, stealFamily } = getStealPlayer(players, currentFamilyTeam, gs) || {};
-        await updateState({
-          bye_counts_2p: newBye2P,
-          bye_count: newPlayerByes,
-          answering_player_id: stealPlayer?.playerId || null,
-          buzz_winner: null,
-          last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
-          steal_mode: !!stealPlayer,
-          steal_player_id: stealPlayer?.playerId || null,
-          steal_family: stealFamily || oppFam,
-          steal_round_idx: nextIdx,
-          steal_result: null,
-          active_turn: stealFamily || oppFam,
-        });
-      } else {
-        await updateState({
-          bye_counts_2p: newBye2P,
-          bye_count: newPlayerByes,
-          buzz_winner: null,
-          last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
-        });
-      }
-      return;
-    }
-
-    // Standard mode
-    const newCount = Math.min(3, byeCount + 1);
-    let nextPlayer = null;
-    let nextNextPlayer = null;
-    if (newCount < 3 && currentAnsweringId) {
-      nextPlayer = getNextPlayer(players, currentFamilyTeam, currentAnsweringId);
-      nextNextPlayer = nextPlayer ? getNextPlayer(players, currentFamilyTeam, nextPlayer.playerId) : null;
-    }
-
-    await updateState({
-      bye_count: newCount,
-      answering_player_id: nextPlayer?.playerId || null,
-      next_answering_player_id: nextNextPlayer?.playerId || null,
-      buzz_winner: null,
-      last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
-      steal_mode: newCount >= 3 ? false : gs.steal_mode,
-    });
-  };
-
-  // Trigger steal mode for opposing family
-  const triggerSteal = async () => {
-    const byeFamilyTeam = gs.active_turn || 1;
-    const { player: stealPlayer, nextIdx, stealFamily } = getStealPlayer(players, byeFamilyTeam, gs) || {};
-    if (!stealPlayer) return;
-    await updateState({
-      steal_mode: true,
-      steal_player_id: stealPlayer.playerId,
-      steal_family: stealFamily,
-      steal_round_idx: nextIdx,
-      answering_player_id: stealPlayer.playerId,
-      active_turn: stealFamily,
-      faceoff_mode: false,
-    });
-  };
-
-  const endSteal = async () => {
-    await updateState({ steal_mode: false, steal_player_id: null, answering_player_id: null });
-  };
-
-  const loadSurvey = async (idx) => {
-    const survey = surveys[idx];
+  const loadNextRound = async () => {
+    const usedIds = gs.used_survey_ids || [];
+    const survey = pickRandomSurvey(usedIds);
     if (!survey) return;
     const { player1, player2, nextIdx1, nextIdx2 } = autoPickFaceoff();
-    const use1P = onPlayerMode;
     const use2P = is2PMode;
     const resetBye2P = {};
     if (use2P) participantPlayers.forEach(p => { resetBye2P[p.playerId] = 0; });
+    const newUsedIds = [...usedIds, survey.id];
 
     await updateState({
-      current_survey_idx: idx,
+      current_survey_idx: surveys.indexOf(survey),
+      used_survey_ids: newUsedIds,
       current_question: survey.question,
       answers: survey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })),
       round_bank: 0,
-      faceoff_mode: !use1P && !use2P,
+      faceoff_mode: !use2P,
       faceoff_player1_id: player1?.playerId || null,
       faceoff_player2_id: player2?.playerId || null,
       faceoff_round_idx1: nextIdx1 ?? gs.faceoff_round_idx1,
@@ -300,10 +205,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
       buzz_winner: null, last_submission: null,
       bye_count: 0, bye_flash: 0,
       bye_counts_2p: use2P ? resetBye2P : {},
-      answering_player_id: use1P ? (players[0]?.playerId || null) : (use2P ? (participantPlayers[0]?.playerId || null) : null),
-      pending_decision: null,
+      answering_player_id: use2P ? (participantPlayers[0]?.playerId || null) : null,
       steal_mode: false, steal_player_id: null, steal_result: null,
-      next_answering_player_id: null,
+      next_answering_player_id: null, current_typing: '',
+      round: (gs.round || 1) + 1,
     });
   };
 
@@ -311,9 +216,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     const extra = answers.reduce((sum, a) => sum + (a.revealed ? 0 : (a.points || 0)), 0);
     await updateState({ answers: answers.map(a => ({ ...a, revealed: true })), round_bank: (gs.round_bank || 0) + extra });
   };
-
-  const nextSurvey = async () => { await loadSurvey((currentSurveyIdx + 1) % surveys.length); };
-  const prevSurvey = async () => { await loadSurvey((currentSurveyIdx - 1 + surveys.length) % surveys.length); };
 
   const awardBank = async (family) => {
     const bank = gs.round_bank || 0;
@@ -408,13 +310,17 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
           }
 
           <div className="space-y-3">
-            <Btn onClick={() => startGame(false)} color="#4ade80" size="lg" className="w-full"
-              disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0}>
-              ▶ START GAME (FULL)
-            </Btn>
-            <Btn onClick={() => startGame(true)} color="#FFD700" size="lg" className="w-full"
-              disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0 || !canStart1P}>
-              ⭐ START 1 PLAYER MODE
+            <div className="px-4 py-3 rounded-lg border border-white/10 bg-white/5 text-center">
+              <div className="text-[8px] tracking-widest text-white/40 uppercase mb-1" style={sty}>
+                Mode Auto-Detection
+              </div>
+              <div className="font-heading text-sm text-white/60">
+                {participantPlayers.length === 2 ? '⚔ 2 Player Mode' : participantPlayers.length >= 6 ? '👨‍👩‍👧 Full Family Mode' : `${participantPlayers.length} participant${participantPlayers.length !== 1 ? 's' : ''} — need 2 or 6+`}
+              </div>
+            </div>
+            <Btn onClick={startGame} color="#4ade80" size="lg" className="w-full"
+              disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0 || (participantPlayers.length !== 2 && participantPlayers.length < 2)}>
+              ▶ START GAME
             </Btn>
           </div>
         </div>
@@ -444,7 +350,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
 
         {/* Status Bar */}
         <div className="p-4 border rounded-xl bg-black/60 flex flex-wrap items-center gap-3 justify-between"
-          style={{ borderColor: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : '#BC13FE30' }}>
+          style={{ borderColor: faceoffMode ? '#FF5F1F' : '#BC13FE30' }}>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="text-center">
               <div className="text-[8px] tracking-widest text-white/40 uppercase" style={sty}>Round</div>
@@ -453,12 +359,12 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
             <div className="w-px h-8 bg-white/10" />
             <div className={`px-3 py-1 rounded border text-[9px] tracking-widest uppercase`} style={{
               ...sty,
-              borderColor: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : is2PMode ? '#4ade80' : '#ffffff30',
-              color: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : is2PMode ? '#4ade80' : '#ffffff40',
+              borderColor: faceoffMode ? '#FF5F1F' : is2PMode ? '#4ade80' : stealMode ? '#FF5F1F' : '#ffffff30',
+              color: faceoffMode ? '#FF5F1F' : is2PMode ? '#4ade80' : stealMode ? '#FF5F1F' : '#ffffff40',
             }}>
-              {faceoffMode ? '⚡ FACEOFF' : onPlayerMode ? '⭐ 1P MODE' : stealMode ? '🎯 STEAL' : is2PMode ? '⚔ 2P MODE' : 'PLAYING'}
+              {faceoffMode ? '⚡ FACEOFF' : stealMode ? '🎯 STEAL' : is2PMode ? '⚔ 2P MODE' : 'PLAYING'}
             </div>
-            {is2PMode && gs.answering_player_id && (
+            {gs.answering_player_id && (
               <div className="px-2 py-1 rounded border border-[#4ade80]/40 bg-[#4ade80]/5 text-[8px] text-[#4ade80] tracking-widest uppercase" style={sty}>
                 SEAT {players.find(p => p.playerId === gs.answering_player_id)?.seatNumber || '?'} answering
               </div>
@@ -470,10 +376,8 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
             )}
           </div>
           <div className="flex gap-2 flex-wrap">
-            {!faceoffMode && !onPlayerMode && !stealMode && <Btn onClick={startFaceoff} color="#FF5F1F" size="sm">⚡ Faceoff</Btn>}
+            {!faceoffMode && !stealMode && !is2PMode && <Btn onClick={startFaceoff} color="#FF5F1F" size="sm">⚡ Start Round</Btn>}
             {faceoffMode && <Btn onClick={endFaceoff} color="#ffffff" size="sm">End Faceoff</Btn>}
-            {!onPlayerMode && <Btn onClick={() => updateState({ one_player_mode: true, faceoff_mode: false })} color="#FFD700" size="sm">⭐ 1P</Btn>}
-            {onPlayerMode && <Btn onClick={() => updateState({ one_player_mode: false })} color="#ffffff40" size="sm">End 1P</Btn>}
           </div>
         </div>
 
@@ -512,19 +416,18 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
           )}
         </div>
 
-        {/* ── BYE CONTROLS ── */}
-        <div className="p-4 border-2 rounded-xl bg-black/60 space-y-3"
-          style={{ borderColor: byeCount >= 3 ? '#FF5F1F' : byeCount > 0 ? '#FF5F1F60' : '#BC13FE30', boxShadow: byeCount >= 3 ? '0 0 20px rgba(255,95,31,0.3)' : 'none' }}>
+        {/* ── BYE STATUS (read-only — automated) ── */}
+        <div className="p-4 border rounded-xl bg-black/60 space-y-3"
+          style={{ borderColor: byeCount >= 3 ? '#FF5F1F80' : byeCount > 0 ? '#FF5F1F40' : '#ffffff10' }}>
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">
-              BYE Strikes {is2PMode && <span className="text-[#4ade80]">— 2P Mode</span>}
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">
+              BYE Strikes {is2PMode ? '— 2P Mode' : '— Full Family'}
             </h3>
             {byeCount >= 3 && (
               <div className="px-2 py-1 rounded border border-[#FF5F1F] bg-[#FF5F1F]/10 text-[#FF5F1F] text-[8px] tracking-widest uppercase animate-pulse" style={sty}>BYE COMPLETE</div>
             )}
           </div>
 
-          {/* 2P per-player BYE display */}
           {is2PMode ? (
             <div className="grid grid-cols-2 gap-3">
               {[
@@ -545,50 +448,32 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
                       ))}
                     </div>
                     {isActive && <div className="text-[6px] text-[#4ade80] tracking-widest uppercase" style={sty}>▶ Answering</div>}
-                    {byes >= 3 && <div className="text-[6px] animate-pulse tracking-widest uppercase" style={{ ...sty, color }}>BYE!</div>}
                   </div>
                 );
               })}
             </div>
           ) : (
-          <div className="flex justify-center py-2">
-            <HostBYEIndicator byeCount={byeCount} />
-          </div>
-          )}
-          <div className="grid grid-cols-2 gap-2">
-            <Btn onClick={markWrong} color="#ef4444" size="sm" disabled={byeCount >= 3}>✗ Mark Wrong + BYE</Btn>
-            <Btn onClick={addByeStrike} color="#ef4444" size="sm" disabled={byeCount >= 3}>+ BYE Strike</Btn>
-            <Btn onClick={removeByeStrike} color="#FFD700" size="sm" disabled={byeCount === 0}>− Remove Strike</Btn>
-            <Btn onClick={clearBye} color="#ffffff40" size="sm" disabled={byeCount === 0}>Clear BYE</Btn>
-          </div>
-          <Btn onClick={triggerByeAnimation} color="#FF5F1F" size="sm" className="w-full">🎬 Trigger BYE Animation</Btn>
-          {byeCount >= 3 && !is2PMode && (
-            <div className="space-y-2">
-              <div className="px-3 py-2 rounded-lg border border-[#FF5F1F]/40 bg-[#FF5F1F]/10 text-center">
-                <div className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={sty}>BYE complete — prepare steal or award round</div>
-              </div>
-              <Btn onClick={triggerSteal} color="#FF5F1F" size="sm" className="w-full">🎯 Trigger Steal</Btn>
-            </div>
-          )}
-
-          {/* 2P steal result */}
-          {is2PMode && gs.steal_result && (
-            <div className={`p-3 rounded-xl border text-center ${gs.steal_result === 'correct' ? 'border-green-400/50 bg-green-400/10' : 'border-red-500/50 bg-red-500/10'}`}>
-              <div className="text-[8px] tracking-widest uppercase" style={{ ...sty, color: gs.steal_result === 'correct' ? '#4ade80' : '#ef4444' }}>
-                {gs.steal_result === 'correct' ? '✓ Steal Correct — Award Bank!' : '✗ Steal Missed — Bank Lost'}
-              </div>
+            <div className="flex justify-center py-2">
+              <HostBYEIndicator byeCount={byeCount} />
             </div>
           )}
 
           {stealMode && stealPlayer && (
-            <div className="p-3 border border-[#FF5F1F] rounded-xl bg-[#FF5F1F]/10 flex items-center justify-between">
-              <div>
-                <div className="text-[8px] text-[#FF5F1F] tracking-widest uppercase" style={sty}>🎯 Steal: Seat {stealPlayer.seatNumber}</div>
-                <div className="text-[7px] text-white/30 uppercase mt-0.5" style={sty}>
-                  {stealPlayer.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')}
-                </div>
+            <div className="p-3 border border-[#FF5F1F] rounded-xl bg-[#FF5F1F]/10 text-center">
+              <div className="text-[8px] text-[#FF5F1F] tracking-widest uppercase" style={sty}>
+                🎯 Steal in Progress — Seat {stealPlayer.seatNumber}
               </div>
-              <Btn onClick={endSteal} color="#ffffff" size="sm">End Steal</Btn>
+              <div className="text-[7px] text-white/40 uppercase mt-1" style={sty}>
+                {stealPlayer.familyTeam === 1 ? (gs.family1 || 'Family 1') : (gs.family2 || 'Family 2')} is attempting steal
+              </div>
+            </div>
+          )}
+
+          {gs.steal_result && (
+            <div className={`p-3 rounded-xl border text-center ${gs.steal_result === 'correct' ? 'border-green-400/50 bg-green-400/10' : 'border-red-500/50 bg-red-500/10'}`}>
+              <div className="text-[8px] tracking-widest uppercase" style={{ ...sty, color: gs.steal_result === 'correct' ? '#4ade80' : '#ef4444' }}>
+                {gs.steal_result === 'correct' ? '✓ Steal Correct — Bank Awarded!' : '✗ Steal Missed — Bank Lost'}
+              </div>
             </div>
           )}
         </div>
@@ -647,22 +532,19 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
           </div>
         )}
 
-        {/* Player Submission */}
+        {/* Player Submission — auto-judged, read-only */}
         {lastSub && (
           <div className="p-4 border-2 rounded-xl flex items-center gap-3"
-            style={{ borderColor: lastSub.result === 'wrong' ? '#ef4444' : '#22d3ee', background: lastSub.result === 'wrong' ? '#ef444410' : '#22d3ee10' }}>
-            <div className="text-2xl">{lastSub.result === 'wrong' ? '❌' : '💬'}</div>
+            style={{ borderColor: lastSub.result === 'wrong' ? '#ef4444' : lastSub.result === 'correct' ? '#4ade80' : '#22d3ee', background: lastSub.result === 'wrong' ? '#ef444410' : lastSub.result === 'correct' ? '#4ade8010' : '#22d3ee10' }}>
+            <div className="text-2xl">{lastSub.result === 'wrong' ? '❌' : lastSub.result === 'correct' ? '✅' : '💬'}</div>
             <div className="flex-1">
-              <div className="font-heading text-xs tracking-[0.2em] uppercase mb-0.5" style={{ color: lastSub.result === 'wrong' ? '#ef4444' : '#22d3ee' }}>
-                Seat {lastSub.seatNumber} ({lastSub.familyTeam === 1 ? gs.family1 : gs.family2}) — {lastSub.result || 'answered'}:
+              <div className="font-heading text-xs tracking-[0.2em] uppercase mb-0.5" style={{ color: lastSub.result === 'wrong' ? '#ef4444' : lastSub.result === 'correct' ? '#4ade80' : '#22d3ee' }}>
+                Seat {lastSub.seatNumber} ({lastSub.familyTeam === 1 ? gs.family1 : gs.family2}) — {lastSub.result || 'pending'}:
               </div>
               <div className="font-heading text-xl text-white tracking-widest uppercase">"{lastSub.submittedAnswer}"</div>
               <div className="text-[8px] text-white/30 mt-0.5" style={sty}>{lastSub.inputMethod} · {new Date(lastSub.timestamp).toLocaleTimeString()}</div>
             </div>
-            <div className="flex flex-col gap-2">
-              {lastSub.result !== 'wrong' && <Btn onClick={markWrong} color="#ef4444" size="sm" disabled={byeCount >= 3}>✗ Mark Wrong</Btn>}
-              <Btn onClick={() => updateState({ last_submission: null })} color="#ffffff" size="sm">✕</Btn>
-            </div>
+            <Btn onClick={() => updateState({ last_submission: null })} color="#ffffff" size="sm">✕</Btn>
           </div>
         )}
 
@@ -793,43 +675,45 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
           )}
         </div>
 
-        {/* Survey Selector */}
-        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-3">
+        {/* Current Question */}
+        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-2">
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Survey {currentSurveyIdx + 1} / {surveys.length}</h3>
-            <div className="flex gap-2">
-              <Btn onClick={prevSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>◀ Prev</Btn>
-              <Btn onClick={nextSurvey} color="#BC13FE" size="sm" disabled={surveys.length <= 1}>Next ▶</Btn>
-            </div>
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Current Question</h3>
+            <div className="text-[8px] tracking-widest text-white/20 uppercase" style={sty}>Round {gs.round || 1} — {surveys.length} total surveys</div>
           </div>
-          {gs.current_question && (
+          {gs.current_question ? (
             <div className="px-4 py-3 rounded-lg bg-[#FFD700]/10 border border-[#FFD700]/30 font-heading text-base text-[#FFD700] tracking-wide">★ {gs.current_question}</div>
+          ) : (
+            <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase py-3">No question loaded</div>
           )}
-          <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-            {surveys.map((s, i) => (
-              <button key={s.id} onClick={() => loadSurvey(i)}
-                className="w-full text-left px-3 py-2 rounded-lg font-heading text-xs tracking-wide transition-all border"
-                style={{ borderColor: i === currentSurveyIdx ? '#FFD700' : '#ffffff15', background: i === currentSurveyIdx ? '#FFD70015' : 'transparent', color: i === currentSurveyIdx ? '#FFD700' : '#ffffff60' }}>
-                {i + 1}. {s.question}
-              </button>
-            ))}
-          </div>
         </div>
 
-        {/* Host Answer Board */}
+        {/* Answer Board — auto-revealed by player answers (read-only preview) */}
         <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Answer Board — click to reveal</h3>
-            {answers.some(a => !a.revealed) && <Btn onClick={revealAll} color="#4ade80" size="sm">Reveal All</Btn>}
+            <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Answer Board Preview</h3>
+            {answers.some(a => !a.revealed) && <Btn onClick={revealAll} color="#FFD700" size="sm">🎬 Dead Reveal All</Btn>}
           </div>
           {answers.length > 0 ? (
             <div className="space-y-2">
               {answers.map((ans, i) => (
-                <HostAnswerRow key={i} rank={i + 1} answer={ans} onReveal={() => revealAnswer(i)} onHide={() => hideAnswer(i)} />
+                <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-300"
+                  style={{ borderColor: ans.revealed ? '#FFD700' : '#BC13FE30', background: ans.revealed ? 'rgba(255,215,0,0.08)' : 'rgba(188,19,254,0.03)' }}>
+                  <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-heading text-sm"
+                    style={{ background: ans.revealed ? '#FFD700' : '#BC13FE20', color: ans.revealed ? '#000' : '#BC13FE' }}>{i + 1}</div>
+                  <div className="flex-1 font-heading text-base tracking-wide uppercase" style={{ color: ans.revealed ? '#FFD700' : '#ffffffcc' }}>
+                    {ans.text || ans.answer}
+                  </div>
+                  <div className="font-heading text-sm shrink-0" style={{ color: ans.revealed ? '#FF5F1F' : '#FF5F1F60' }}>{ans.points} pts</div>
+                  <div className="px-2 py-1 rounded border font-heading text-[9px] tracking-widest uppercase shrink-0"
+                    style={{ borderColor: ans.revealed ? '#FFD700' : '#BC13FE30', color: ans.revealed ? '#FFD700' : '#BC13FE50' }}>
+                    {ans.revealed ? '✓' : '–'}
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
-            <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase py-4">Load a survey to see answers</div>
+            <div className="text-center font-heading text-xs tracking-widest text-white/20 uppercase py-4">Start a round to see answers</div>
           )}
         </div>
 
@@ -838,7 +722,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
 
         {/* Actions */}
         <div className="grid grid-cols-2 gap-3">
-          <Btn onClick={nextSurvey} color="#FF5F1F" size="lg" disabled={surveys.length <= 1}>▶ Next Survey</Btn>
+          <Btn onClick={loadNextRound} color="#FF5F1F" size="lg" disabled={surveys.length === 0}>▶ Next Round</Btn>
           <Btn onClick={newGame} color="#ffffff" size="lg">↺ New Game</Btn>
         </div>
       </div>
@@ -905,24 +789,6 @@ function RosterColumn({ title, color, players, faceoffId, buzzWinnerId, answerin
           );
         })
       }
-    </div>
-  );
-}
-
-function HostAnswerRow({ rank, answer, onReveal, onHide }) {
-  const revealed = answer.revealed;
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition-all duration-300 cursor-pointer"
-      style={{ borderColor: revealed ? '#FFD700' : '#BC13FE40', background: revealed ? 'rgba(255,215,0,0.1)' : 'rgba(188,19,254,0.05)' }}
-      onClick={revealed ? onHide : onReveal}>
-      <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 font-heading text-sm"
-        style={{ background: revealed ? '#FFD700' : '#BC13FE30', color: revealed ? '#000' : '#BC13FE' }}>{rank}</div>
-      <div className="flex-1 font-heading text-base tracking-wide uppercase" style={{ color: revealed ? '#FFD700' : '#ffffffcc' }}>{answer.text || answer.answer}</div>
-      <div className="font-heading text-sm shrink-0" style={{ color: revealed ? '#FF5F1F' : '#FF5F1F80' }}>{answer.points} pts</div>
-      <div className="px-2 py-1 rounded border font-heading text-[9px] tracking-widest uppercase shrink-0"
-        style={{ borderColor: revealed ? '#FFD700' : '#BC13FE50', color: revealed ? '#FFD700' : '#BC13FE80' }}>
-        {revealed ? '✓ REVEALED' : 'REVEAL'}
-      </div>
     </div>
   );
 }
