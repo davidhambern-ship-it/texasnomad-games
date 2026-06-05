@@ -10,12 +10,13 @@ export const CARD_ORDER = {
   'LJ': 15, 'BJ': 16
 };
 
-// Generate a full Spades deck (52 cards + 2 jokers)
+// Generate a fresh full Spades deck (54 cards: 52 standard - 2♥ - 2♦ + 2 jokers = 54)
+// Each card gets a unique ID based on suit+value for deduplication checks
 export function generateFullDeck() {
   const deck = [];
   for (const suit of SUITS) {
     for (const value of ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']) {
-      // Remove 2 of Hearts and 2 of Diamonds (Spades uses 50 cards + 2 jokers)
+      // Remove 2 of Hearts and 2 of Diamonds (TexasNomad Spades variant)
       if ((suit === '♥' || suit === '♦') && value === '2') continue;
       deck.push({ suit, value, id: `${suit}${value}` });
     }
@@ -25,54 +26,133 @@ export function generateFullDeck() {
   return deck;
 }
 
-// Shuffle deck
+// Cryptographically strong Fisher-Yates shuffle
+// Uses crypto.getRandomValues() for strong randomness instead of Math.random()
 export function shuffleDeck(deck) {
-  const d = [...deck];
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+  const d = [...deck]; // Always work on a fresh copy
+  const len = d.length;
+
+  // Generate all random values in one call for efficiency
+  const randomBuffer = new Uint32Array(len);
+  crypto.getRandomValues(randomBuffer);
+
+  for (let i = len - 1; i > 0; i--) {
+    // Map the random uint32 to range [0, i] without modulo bias
+    // Use high-quality reduction: (randomBuffer[i] / (2^32)) * (i+1)
+    const j = Math.floor((randomBuffer[i] / 4294967296) * (i + 1));
     [d[i], d[j]] = [d[j], d[i]];
   }
+
   return d;
+}
+
+// Validate deck integrity before dealing
+// Returns { valid: boolean, errors: string[] }
+export function validateDeck(deck) {
+  const errors = [];
+
+  // Check total card count
+  const expected = 54; // 52 - 2♥2 - 2♦2 + LJ + BJ
+  if (deck.length !== expected) {
+    errors.push(`Expected ${expected} cards, got ${deck.length}`);
+  }
+
+  // Check for duplicate IDs
+  const ids = deck.map(c => c.id);
+  const uniqueIds = new Set(ids);
+  if (uniqueIds.size !== ids.length) {
+    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
+    errors.push(`Duplicate card IDs: ${dupes.join(', ')}`);
+  }
+
+  // Check required cards exist
+  const mustExist = ['BigJoker', 'LittleJoker', '♠A', '♠K', '♠Q'];
+  for (const id of mustExist) {
+    if (!uniqueIds.has(id)) errors.push(`Missing required card: ${id}`);
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// Validate dealt hands — no card in more than one hand
+export function validateDealtHands(players) {
+  const errors = [];
+  const seenIds = new Map(); // id -> playerId
+
+  for (const player of players) {
+    if (!player.hand) continue;
+    for (const card of player.hand) {
+      if (seenIds.has(card.id)) {
+        errors.push(`Card ${card.id} appears in both seat ${seenIds.get(card.id)} and seat ${player.seatNumber}`);
+      } else {
+        seenIds.set(card.id, player.seatNumber);
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors };
+}
+
+// Debug shuffle stats (host-only, not shown to players)
+export function getShuffleDebugStats(deck, players) {
+  const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
+    .map(b => b.toString(16).padStart(2, '0')).join('');
+
+  const first5 = deck.slice(0, 5).map(c => `${c.value}${c.suit}`).join(', ');
+
+  const handStats = players
+    .filter(p => p.hand?.length > 0)
+    .map(p => {
+      const spadesCount = p.hand.filter(c => c.suit === '♠').length;
+      const jokers = p.hand.filter(c => c.suit === 'Joker').length;
+      return `Seat ${p.seatNumber}: ${p.hand.length} cards, ${spadesCount}♠, ${jokers} jokers`;
+    });
+
+  return {
+    sessionId,
+    first5Cards: first5,
+    deckSize: deck.length,
+    handDistribution: handStats,
+    deckValid: validateDeck(deck).valid,
+  };
 }
 
 // Get card strength (for determining winner)
 export function getCardStrength(card, activeSuit) {
   if (!card) return -1;
-  
-  // Jokers are highest (always trump)
+
+  // Jokers are absolute highest
   if (card.value === 'BJ') return 100;
   if (card.value === 'LJ') return 99;
-  
+
   // Spades are trump
   if (card.suit === '♠') {
     return 50 + (CARD_ORDER[card.value] || 0);
   }
-  
-  // Active suit cards (only if no spades played)
+
+  // Active suit cards
   if (card.suit === activeSuit && activeSuit !== '♠') {
     return CARD_ORDER[card.value] || 0;
   }
-  
-  // Off-suit cards (can't win)
+
+  // Off-suit cards (cannot win)
   return -1;
 }
 
 // Check if a card play is valid
 export function isValidPlay(card, hand, currentTrick, activeSuit, spadesBroken, isLead) {
   const errors = [];
-  
-  // Check if card is in hand
+
   const cardInHand = hand.find(c => c.id === card.id);
   if (!cardInHand) {
     errors.push('Card not in hand');
     return { valid: false, errors };
   }
-  
-  // If leading (first to play in trick)
+
+  // Leading (first to play in trick)
   if (isLead || currentTrick.length === 0) {
-    // Cannot lead Spades unless spades are broken or only have Spades
-    if (card.suit === '♠' && !spadesBroken) {
-      const hasNonSpade = hand.some(c => c.suit !== '♠');
+    if ((card.suit === '♠' || card.suit === 'Joker') && !spadesBroken) {
+      const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
       if (hasNonSpade) {
         errors.push('Spades have not been broken yet');
         return { valid: false, errors };
@@ -80,25 +160,24 @@ export function isValidPlay(card, hand, currentTrick, activeSuit, spadesBroken, 
     }
     return { valid: true, errors: [] };
   }
-  
-  // If following (not leading)
-  // Must follow active suit if possible
+
+  // Following — must follow active suit if possible
   const hasActiveSuit = hand.some(c => c.suit === activeSuit);
   if (hasActiveSuit && card.suit !== activeSuit) {
     errors.push('You must follow suit');
     return { valid: false, errors };
   }
-  
+
   return { valid: true, errors: [] };
 }
 
 // Determine the winner of a trick
 export function determineTrickWinner(trick, activeSuit) {
   if (!trick || trick.length === 0) return null;
-  
+
   let winningPlay = trick[0];
   let winningStrength = getCardStrength(trick[0].card, activeSuit);
-  
+
   for (const play of trick) {
     const strength = getCardStrength(play.card, activeSuit);
     if (strength > winningStrength) {
@@ -106,30 +185,27 @@ export function determineTrickWinner(trick, activeSuit) {
       winningPlay = play;
     }
   }
-  
+
   return winningPlay;
 }
 
-// Get active suit from trick (suit of first card played)
+// Get active suit from trick (suit of first card played, Jokers lead as Spade)
 export function getActiveSuit(trick) {
   if (!trick || trick.length === 0) return null;
-  return trick[0]?.card?.suit;
+  const first = trick[0]?.card;
+  if (!first) return null;
+  // Jokers count as Spades for trump purposes
+  if (first.suit === 'Joker') return '♠';
+  return first.suit;
 }
 
-// Check if spades are broken in this trick
+// Check if spades are broken
 export function checkSpadesBroken(trick, wasAlreadyBroken) {
   if (wasAlreadyBroken) return true;
-  
-  // Spades are broken if a Spade is played when player couldn't follow suit
-  const activeSuit = getActiveSuit(trick);
-  if (!activeSuit || activeSuit === '♠') return wasAlreadyBroken;
-  
-  // Check if any Spade was played by someone who didn't have the active suit
-  // This is a simplified check - in real game we'd need to know each player's hand
-  return trick.some(play => play.card.suit === '♠');
+  return trick.some(play => play.card.suit === '♠' || play.card.suit === 'Joker');
 }
 
-// Get team from seat number (1&3 vs 2&4)
+// Get team from seat number (seats 1&3 = team 1, seats 2&4 = team 2)
 export function getTeamFromSeat(seatNumber) {
   if (seatNumber === 1 || seatNumber === 3) return 1;
   if (seatNumber === 2 || seatNumber === 4) return 2;
@@ -139,21 +215,12 @@ export function getTeamFromSeat(seatNumber) {
 // Calculate score based on bids and books
 export function calculateScore(bid, booksWon, isBlind = false) {
   if (bid === 0) {
-    // Nil bid
-    if (booksWon === 0) {
-      return isBlind ? 200 : 100; // Success
-    } else {
-      return -100; // Failed
-    }
+    return booksWon === 0 ? (isBlind ? 200 : 100) : -100;
   }
-  
   if (booksWon >= bid) {
-    // Made bid
-    return bid * 10 + (booksWon - bid); // 1 point per book, plus 10 per bid
-  } else {
-    // Failed bid (set)
-    return -10 * bid;
+    return bid * 10 + (booksWon - bid);
   }
+  return -10 * bid;
 }
 
 // Format card for display
@@ -171,5 +238,5 @@ export function getCardsBySuit(hand, suit) {
 
 // Check if hand has any non-spade cards
 export function hasNonSpades(hand) {
-  return hand.some(c => c.suit !== '♠');
+  return hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
 }

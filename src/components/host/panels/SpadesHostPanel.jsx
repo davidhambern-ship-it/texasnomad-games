@@ -296,7 +296,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
       const hand = currentPlayer.hand || [];
       if (hand.length === 0) return;
       const activeSuit = getActiveSuit(gs.current_trick || []);
-      let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false);
+      let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
       if (!cardToPlay) {
         const valid = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, (gs.current_trick || []).length === 0).valid);
         if (!valid) return;

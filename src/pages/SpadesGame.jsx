@@ -196,23 +196,12 @@ function SpadesViewer({ roomCode }) {
       const activeSuit = getActiveSuit(gs.current_trick || []);
       
       // Select card using CPU logic (already validates rules)
-      const cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false);
-      if (!cardToPlay) {
-        console.log('CPU turn: selectCPUCard returned null');
-        return;
-      }
+      let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
       
-      // Double-check with rule engine
-      const validation = isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead);
-      if (!validation.valid) {
-        console.log('CPU turn: invalid play -', validation.errors);
-        // Fallback: find any valid card
-        const validCard = hand.find(c => {
-          const v = isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead);
-          return v.valid;
-        });
-        if (!validCard) return;
-        cardToPlay = validCard;
+      // Double-check with rule engine; fallback to any valid card
+      if (!cardToPlay || !isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid) {
+        cardToPlay = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
+        if (!cardToPlay) return;
       }
       
       console.log('CPU turn: Playing card', cardToPlay);
