@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
@@ -6,6 +6,28 @@ import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU
 import { generateFullDeck, shuffleDeck as shuffleDeckRules, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+// Determine first bidder: player with fewest books in first hand.
+// Tiebreaker: closest clockwise from dealer.
+function getFirstBidderSeat(seated, dealerSeat, firstHandBooks) {
+  if (!firstHandBooks || Object.keys(firstHandBooks).length === 0) {
+    // Fallback: seat left of dealer
+    const sorted = [...seated].sort((a, b) => a.seatNumber - b.seatNumber);
+    const dealerIdx = sorted.findIndex(p => p.seatNumber === dealerSeat);
+    return sorted[(dealerIdx + 1) % sorted.length]?.seatNumber;
+  }
+  // Build clockwise order starting left of dealer
+  const sorted = [...seated].sort((a, b) => a.seatNumber - b.seatNumber);
+  const dealerIdx = sorted.findIndex(p => p.seatNumber === dealerSeat);
+  const clockwise = [];
+  for (let i = 1; i <= sorted.length; i++) {
+    clockwise.push(sorted[(dealerIdx + i) % sorted.length]);
+  }
+  const minBooks = Math.min(...clockwise.map(p => firstHandBooks[p.seatNumber] ?? 99));
+  // First in clockwise order with min books
+  const firstBidder = clockwise.find(p => (firstHandBooks[p.seatNumber] ?? 99) === minBooks);
+  return firstBidder?.seatNumber || clockwise[0]?.seatNumber;
+}
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -23,35 +45,70 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = ''
 
 const HOST_PLAYER_ID = 'host_player_spades';
 
-function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, currentTurnSeat, isBidding, onSetBid }) {
+function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, currentBidderSeat, currentTurnSeat, isBidding, isPlaying, onSetBid }) {
   const [bidInput, setBidInput] = useState('');
-  const isMyTurn = currentTurnSeat === seatNumber;
+  const [countdown, setCountdown] = useState(15);
+  const isBiddingTurn = isBidding && currentBidderSeat === seatNumber;
+  const isPlayingTurn = isPlaying && currentTurnSeat === seatNumber;
+  const isHighlighted = isBiddingTurn || isPlayingTurn;
   const occupied = !!player;
   const isCPU = player?.playerType === 'cpu';
 
+  // 15s countdown timer for current bidder
+  useEffect(() => {
+    if (!isBiddingTurn || !occupied || player?.bid != null) {
+      setCountdown(15);
+      return;
+    }
+    setCountdown(15);
+    const interval = setInterval(() => {
+      setCountdown(c => {
+        if (c <= 1) {
+          clearInterval(interval);
+          onSetBid(player.playerId, 3); // auto-bid 3
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isBiddingTurn, player?.playerId]);
+
   return (
     <div className={`px-3 py-2 rounded-xl border-2 text-center min-w-[90px] transition-all ${
-      isMyTurn ? 'border-[#FFD700] bg-[#FFD700]/15' : occupied ? 'border-[#BC13FE]/40 bg-[#BC13FE]/05' : 'border-white/10 bg-white/5'
+      isHighlighted ? 'border-[#FFD700] bg-[#FFD700]/15' : occupied ? 'border-[#BC13FE]/40 bg-[#BC13FE]/05' : 'border-white/10 bg-white/5'
     }`}
-      style={{ boxShadow: isMyTurn ? '0 0 15px rgba(255,215,0,0.3)' : 'none' }}>
+      style={{ boxShadow: isHighlighted ? '0 0 15px rgba(255,215,0,0.3)' : 'none' }}>
       <div className="text-[7px] text-white/40 uppercase mb-1" style={PS2}>Seat {seatNumber}</div>
       {occupied ? (
         <>
           <div className="font-heading text-xs text-white flex items-center justify-center gap-1">
             {player.role === 'hostPlayer' ? '🎛 HOST' : isCPU ? '🤖 CPU' : `👤 SEAT ${seatNumber}`}
           </div>
-          {player.bid != null && (
-            <div className="text-[6px] text-[#FFD700]/60 mt-0.5" style={PS2}>Bid: {player.bid} | Books: {player.tricksWon || 0}</div>
+          {/* Bid visibility: show bid if set, "Waiting..." if others have bid, or input if it's this seat's turn */}
+          {isBidding && (
+            <>
+              {player.bid != null ? (
+                <div className="text-[6px] text-[#4ade80] mt-0.5 font-heading uppercase" style={PS2}>Bid: {player.bid}</div>
+              ) : isBiddingTurn ? (
+                <>
+                  <div className="text-[6px] text-[#FFD700] mt-0.5" style={PS2}>⏱ {countdown}s</div>
+                  <div className="mt-1 flex gap-1">
+                    <input type="number" min="0" max="13"
+                      className="w-10 px-1 py-0.5 rounded bg-black/80 border border-white/20 text-white text-xs text-center focus:outline-none"
+                      value={bidInput} onChange={e => setBidInput(e.target.value)} placeholder="0" />
+                    <button onClick={() => { onSetBid(player.playerId, Number(bidInput)); setBidInput(''); }}
+                      className="px-1.5 py-0.5 rounded border border-[#4ade80]/60 text-[#4ade80] text-[7px] hover:bg-[#4ade80]/20 font-heading"
+                      style={PS2}>SET</button>
+                  </div>
+                </>
+              ) : (
+                <div className="text-[6px] text-white/30 mt-0.5" style={PS2}>Waiting...</div>
+              )}
+            </>
           )}
-          {isBidding && player.bid == null && (
-            <div className="mt-1 flex gap-1">
-              <input type="number" min="0" max="13"
-                className="w-10 px-1 py-0.5 rounded bg-black/80 border border-white/20 text-white text-xs text-center focus:outline-none"
-                value={bidInput} onChange={e => setBidInput(e.target.value)} placeholder="0" />
-              <button onClick={() => { onSetBid(player.playerId, Number(bidInput)); setBidInput(''); }}
-                className="px-1.5 py-0.5 rounded border border-[#4ade80]/60 text-[#4ade80] text-[7px] hover:bg-[#4ade80]/20 font-heading"
-                style={PS2}>SET</button>
-            </div>
+          {isPlaying && player.bid != null && (
+            <div className="text-[6px] text-[#FFD700]/60 mt-0.5" style={PS2}>Bid: {player.bid} | Books: {player.tricksWon || 0}</div>
           )}
           <div className="flex gap-1 mt-1 justify-center flex-wrap">
             <button onClick={() => onForceTurn(seatNumber)}
@@ -152,10 +209,15 @@ export default function SpadesHostPanel({ gs, updateState }) {
       // Rotate dealer
       const curDealer = gs.dealer_seat || 1;
       const nextDealer = curDealer >= 4 ? 1 : curDealer + 1;
+      // Save first-hand books for bidding order if not already saved
+      const firstHandBooks = gs.first_hand_books || Object.fromEntries(
+        seated.map(p => [p.seatNumber, p.tricksWon || 0])
+      );
       await updateState({
         score1: newScore1, score2: newScore2, phase: 'setup',
         current_trick: [], tricks_played: 0, books1: 0, books2: 0, bid1: null, bid2: null,
         dealer_seat: nextDealer,
+        first_hand_books: firstHandBooks,
         players: seated.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
       });
     }, 2000);
@@ -177,8 +239,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
         const idx = seated.findIndex(s => s.playerId === p.playerId);
         return { ...p, hand: deck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
       });
-      const firstSeat = seated[(seated.findIndex(s => s.seatNumber === gs.dealer_seat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber;
       const hasCPU = seated.some(p => p.playerType === 'cpu');
+      const firstSeat = hasCPU
+        ? (seated[(seated.findIndex(s => s.seatNumber === gs.dealer_seat) + 1) % seated.length]?.seatNumber || seated[0]?.seatNumber)
+        : getFirstBidderSeat(seated, gs.dealer_seat, gs.first_hand_books);
       await updateState({
         players: updatedPlayers, phase: hasCPU ? 'playing' : 'bidding', status: 'active',
         deck: [], current_trick: [], current_turn_seat: firstSeat,
@@ -189,6 +253,35 @@ export default function SpadesHostPanel({ gs, updateState }) {
     }, 1500);
     return () => clearTimeout(timer);
   }, [gs.phase, gs.dealer_seat, gs.cpu_enabled]);
+
+  // AUTO GAME LOOP: CPU bidding
+  useEffect(() => {
+    if (!gs.cpu_enabled || gs.phase !== 'bidding') return;
+    const currentBidderSeat = gs.current_bidder_seat;
+    if (!currentBidderSeat) return;
+    const currentBidder = players.find(p => p.seatNumber === currentBidderSeat);
+    if (!currentBidder || currentBidder.playerType !== 'cpu') return;
+    if (currentBidder.bid != null) return;
+
+    const timer = setTimeout(async () => {
+      const bid = calculateCPUBid(currentBidder.hand || [], currentBidder.tricksWon || 0);
+      // Call setPlayerBid logic inline to avoid stale closure
+      const updated = players.map(p => p.playerId === currentBidder.playerId ? { ...p, bid } : p);
+      const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
+      const currentIdx = seated.findIndex(p => p.playerId === currentBidder.playerId);
+      const nextBidder = seated[(currentIdx + 1) % seated.length];
+      const allBid = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').every(p => p.bid != null);
+      if (allBid) {
+        const team1Bid = updated.filter(p => [1,3].includes(p.seatNumber)).reduce((sum, p) => sum + (p.bid || 0), 0);
+        const team2Bid = updated.filter(p => [2,4].includes(p.seatNumber)).reduce((sum, p) => sum + (p.bid || 0), 0);
+        const firstBidderSeat = gs.current_bidder_seat || seated[0]?.seatNumber;
+        await updateState({ players: updated, phase: 'playing', bid1: team1Bid, bid2: team2Bid, current_turn_seat: firstBidderSeat, current_bidder_seat: null });
+      } else {
+        await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
+      }
+    }, CPU_ACTION_DELAY);
+    return () => clearTimeout(timer);
+  }, [gs.current_bidder_seat, gs.phase, gs.cpu_enabled]);
 
   // AUTO GAME LOOP: CPU card play
   useEffect(() => {
@@ -274,28 +367,32 @@ export default function SpadesHostPanel({ gs, updateState }) {
       const idx = seated.findIndex(s => s.playerId === p.playerId);
       return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
     });
-    const dealerSeat = seated[0]?.seatNumber || 1;
-    const firstSeat = seated[1]?.seatNumber || seated[0]?.seatNumber;
+    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
+    const firstSeat = getFirstBidderSeat(seated, dealerSeat, gs.first_hand_books);
     await updateState({
       players: updatedPlayers, phase: 'bidding', status: 'active', team1Name, team2Name, targetScore,
-      deck: [], current_trick: [], current_bidder_seat: firstSeat, dealer_seat: dealerSeat,
+      deck: [], current_trick: [], current_bidder_seat: firstSeat, current_turn_seat: firstSeat, dealer_seat: dealerSeat,
       tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
     });
   };
 
   const setPlayerBid = async (playerId, bid) => {
     const updated = players.map(p => p.playerId === playerId ? { ...p, bid } : p);
+    // Bidding order: clockwise from first bidder (current_bidder_seat is the anchor)
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
-    const bidderIdx = seated.findIndex(p => p.playerId === playerId);
-    const nextBidder = seated[(bidderIdx + 1) % seated.length];
+    const currentBidder = players.find(p => p.playerId === playerId);
+    const currentBidderIdx = seated.findIndex(p => p.playerId === playerId);
+    const nextBidder = seated[(currentBidderIdx + 1) % seated.length];
     const allBid = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').every(p => p.bid != null);
 
     if (allBid) {
-      const team1Bid = updated.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
-      const team2Bid = updated.filter(p => p.team === 2).reduce((sum, p) => sum + (p.bid || 0), 0);
+      const team1Bid = updated.filter(p => [1,3].includes(p.seatNumber)).reduce((sum, p) => sum + (p.bid || 0), 0);
+      const team2Bid = updated.filter(p => [2,4].includes(p.seatNumber)).reduce((sum, p) => sum + (p.bid || 0), 0);
+      // First bidder leads the first trick
+      const firstBidderSeat = gs.current_bidder_seat || seated[0]?.seatNumber;
       await updateState({
         players: updated, phase: 'playing', bid1: team1Bid, bid2: team2Bid,
-        current_turn_seat: seated[0]?.seatNumber, current_bidder_seat: null,
+        current_turn_seat: firstBidderSeat, current_bidder_seat: null,
       });
     } else {
       await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
@@ -329,8 +426,13 @@ export default function SpadesHostPanel({ gs, updateState }) {
     const bid2 = gs.bid2 || 0;
     const s1 = team1Books >= bid1 ? bid1 * 10 + (team1Books - bid1) : -bid1 * 10;
     const s2 = team2Books >= bid2 ? bid2 * 10 + (team2Books - bid2) : -bid2 * 10;
+    // Save first-hand books for bidding order if not already saved
+    const firstHandBooks = gs.first_hand_books || Object.fromEntries(
+      seated.map(p => [p.seatNumber, p.tricksWon || 0])
+    );
     await updateState({
       score1: (gs.score1 || 0) + s1, score2: (gs.score2 || 0) + s2, phase: 'setup',
+      first_hand_books: firstHandBooks,
       current_trick: [], players: seated.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
     });
   };
@@ -390,6 +492,33 @@ export default function SpadesHostPanel({ gs, updateState }) {
           </div>
         </div>
       )}
+      {isBidding && (
+        <div className="p-3 border border-[#FFD700]/30 rounded-xl bg-[#FFD700]/5">
+          <div className="text-[7px] text-[#FFD700]/70 uppercase mb-2" style={PS2}>📋 Bidding Order</div>
+          <div className="flex gap-2 flex-wrap">
+            {(() => {
+              const seated = seatedPlayers.sort((a, b) => a.seatNumber - b.seatNumber);
+              const firstBidder = gs.current_bidder_seat;
+              const firstIdx = seated.findIndex(p => p.seatNumber === firstBidder);
+              if (firstIdx < 0) return null;
+              return Array.from({ length: seated.length }, (_, i) => {
+                const p = seated[(firstIdx + i) % seated.length];
+                const hasBid = p.bid != null;
+                const isCurrent = p.seatNumber === gs.current_bidder_seat;
+                return (
+                  <div key={p.seatNumber} className={`px-2 py-1 rounded border text-[6px] font-heading uppercase ${
+                    isCurrent ? 'border-[#FFD700] text-[#FFD700] bg-[#FFD700]/15' :
+                    hasBid ? 'border-[#4ade80]/40 text-[#4ade80]/60' : 'border-white/10 text-white/30'
+                  }`} style={PS2}>
+                    {i + 1}. Seat {p.seatNumber} {hasBid ? `→ ${p.bid}` : isCurrent ? '⏳' : '...'}
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        </div>
+      )}
+
       {isSetup && (
         <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
           <h3 className="font-heading text-xs tracking-[0.2em] text-[#BC13FE]/80 uppercase">Team Names</h3>
@@ -433,13 +562,13 @@ export default function SpadesHostPanel({ gs, updateState }) {
       <div className="relative bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817]"
         style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)', minHeight: 380 }}>
         <div className="absolute top-3 left-1/2 -translate-x-1/2">
-          <HostSeatSlot seatNumber={3} player={getPlayerAtSeat(3)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
+          <HostSeatSlot seatNumber={3} player={getPlayerAtSeat(3)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={setPlayerBid} />
         </div>
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
-          <HostSeatSlot seatNumber={2} player={getPlayerAtSeat(2)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
+          <HostSeatSlot seatNumber={2} player={getPlayerAtSeat(2)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={setPlayerBid} />
         </div>
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <HostSeatSlot seatNumber={4} player={getPlayerAtSeat(4)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
+          <HostSeatSlot seatNumber={4} player={getPlayerAtSeat(4)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={setPlayerBid} />
         </div>
         {shufflePhase !== 'idle' ? (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 z-20">
@@ -452,7 +581,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <SpadesCardArea trick={gs.current_trick || []} players={players} />
         )}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-          <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
+          <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={setPlayerBid} />
         </div>
       </div>
 
