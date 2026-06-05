@@ -94,7 +94,7 @@ function SpadesViewer({ roomCode }) {
     });
     await updateState({ players: initializedPlayers, deck: workingDeck });
     
-    // Deal cards one by one in rounds
+    // Deal cards one by one in rounds (faster - 50ms per card)
     const playerHands = seated.map(() => []);
     for (let round = 0; round < cardsPerPlayer; round++) {
       for (let j = 0; j < seated.length; j++) {
@@ -111,7 +111,7 @@ function SpadesViewer({ roomCode }) {
             return seatedIdx >= 0 ? updatedPlayers[seatedIdx] : p;
           });
           await updateState({ players: allPlayers });
-          await new Promise(resolve => setTimeout(resolve, 150));
+          await new Promise(resolve => setTimeout(resolve, 50));
         }
       }
     }

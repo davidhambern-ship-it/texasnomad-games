@@ -175,7 +175,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     await updateState({
       phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null, deck: [],
       players: (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
-      dealer_seat: null, // Clear dealer to prevent auto-deal
+      dealer_seat: null,
+      current_turn_seat: null,
+      shuffle_count: 0,
     });
   };
 
@@ -190,7 +192,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         <Btn onClick={handleShuffleAndDeal} color="#FFD700" size="sm" disabled={!isSetup || isShuffling}>
           {isShuffling ? '🔀 Shuffling...' : '🃏 Shuffle & Deal'}
         </Btn>
-        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!hasCards && !hasBid}>
+        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={isSetup && !hasCards && !hasBid}>
           ↺ Reset
         </Btn>
       </div>
