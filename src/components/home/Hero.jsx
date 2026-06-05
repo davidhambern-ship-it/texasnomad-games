@@ -15,12 +15,12 @@ export default function Hero({ heroBg, crownLogo }) {
         <img src={crownLogo} alt="Crown B Logo" className="w-32 h-32 md:w-44 md:h-44 object-contain mb-2 drop-shadow-[0_0_30px_rgba(188,19,254,0.6)]" />
 
         {/* Title */}
-        <h1 className="text-6xl sm:text-7xl md:text-8xl lg:text-9xl tracking-wider uppercase leading-none"
-          style={{ fontFamily: "'Rye', serif", color: '#E5870E', textShadow: '0 0 10px rgba(229,135,14,0.5), 0 0 20px rgba(229,135,14,0.3), 0 0 40px rgba(229,135,14,0.2)' }}>
+        <h1 className="text-4xl xs:text-5xl sm:text-7xl md:text-8xl lg:text-9xl tracking-wider uppercase leading-none w-full text-center"
+          style={{ fontFamily: "'Rye', serif", color: '#E5870E', textShadow: '0 0 10px rgba(229,135,14,0.5), 0 0 20px rgba(229,135,14,0.3), 0 0 40px rgba(229,135,14,0.2)', fontSize: 'clamp(2rem, 12vw, 8rem)' }}>
           TEXASNOMAD
         </h1>
-        <h2 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl tracking-wider uppercase leading-none mt-[-0.1em]"
-          style={{ fontFamily: "'Monoton', cursive", color: '#ffffff', textShadow: '0 0 10px #BC13FE, 0 0 20px #BC13FE, 0 0 40px #BC13FE' }}>
+        <h2 className="tracking-wider uppercase leading-none mt-[-0.1em] w-full text-center"
+          style={{ fontFamily: "'Monoton', cursive", color: '#ffffff', textShadow: '0 0 10px #BC13FE, 0 0 20px #BC13FE, 0 0 40px #BC13FE', fontSize: 'clamp(1.6rem, 10vw, 6rem)' }}>
           GAMES
         </h2>
 
