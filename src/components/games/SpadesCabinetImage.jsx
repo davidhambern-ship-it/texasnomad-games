@@ -17,12 +17,12 @@ const BACK_CARDS = [
 
 export default function SpadesCabinetImage() {
   return (
-    <div className="w-full h-full flex items-center justify-center bg-[#020106]"
-      style={{ minHeight: 130, position: 'relative' }}>
+    <div className="w-full h-full flex items-center justify-center"
+      style={{ minHeight: 130, position: 'relative', background: '#0a1a0a', boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)', border: '3px solid #3d2817' }}>
       
-      {/* Background glow */}
+      {/* Felt texture overlay */}
       <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at 50% 80%, rgba(74,74,138,0.4) 0%, transparent 70%)' }} />
+        style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(20,50,20,0.3) 0%, rgba(0,0,0,0.4) 100%)' }} />
 
       <div className="relative flex items-end justify-center" style={{ width: 200, height: 110 }}>
         
