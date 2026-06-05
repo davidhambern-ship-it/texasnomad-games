@@ -175,7 +175,22 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
   // Collect all played cards across all tricks for memory
   const playedCardIds = collectPlayedCards(gameState, trick);
 
-  const context = buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds);
+  // Get team info from game state
+  const players = gameState.players || [];
+  const myTeam = getTeamFromSeat(mySeatNumber);
+  const teamSeats = myTeam === 1 ? [1, 3] : [2, 4];
+  const oppSeats = myTeam === 1 ? [2, 4] : [1, 3];
+  
+  // Get actual team bids from game state
+  const actualTeamBid = (gameState.bid1 || 0) + (gameState.bid2 || 0);
+  const teamBooksWon = (gameState.books1 || 0) + (gameState.books2 || 0);
+  
+  // Calculate partner's bid
+  const partnerSeat = mySeatNumber === 1 ? 3 : mySeatNumber === 3 ? 1 : mySeatNumber === 2 ? 4 : 2;
+  const partner = players.find(p => p.seatNumber === partnerSeat);
+  const actualPartnerBid = partner?.bid || 0;
+
+  const context = buildContext(hand, trick, actualPartnerBid, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds);
 
   if (trick.length === 0) {
     return selectLeadCard(context);
@@ -241,14 +256,21 @@ function collectPlayedCards(gameState, currentTrick) {
   for (const play of (currentTrick || [])) {
     if (play.card?.id) ids.add(play.card.id);
   }
-  // Ideally we'd have a played_cards log; for now rely on what's visible
+  // Also check completed_books for historical plays
+  const completedBooks = gameState.completed_books || [];
+  for (const book of completedBooks) {
+    const cardsPlayed = book.cardsPlayed || [];
+    for (const play of cardsPlayed) {
+      if (play.card?.id) ids.add(play.card.id);
+    }
+  }
   return ids;
 }
 
 // ─── LEADING ────────────────────────────────────────────────────────────────
 
 function selectLeadCard(ctx) {
-  const { hand, bySuit, myBid, booksWon, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, remainingHigh } = ctx;
+  const { hand, bySuit, myBid, booksWon, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, remainingHigh, tricksLeft, playedCardIds } = ctx;
 
   const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
 
@@ -258,6 +280,20 @@ function selectLeadCard(ctx) {
   }
 
   // ── Team still needs books: lead offensively ──
+
+  // Late game desperation (≤3 tricks left) — lead highest available card
+  if (tricksLeft <= 3 && teamNeedsBooksMore > 0) {
+    // Check for sure winners first
+    for (const suit of ['♥', '♦', '♣']) {
+      const cards = bySuit[suit];
+      if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
+        return cards[0]; // Ace still good
+      }
+    }
+    // Lead highest spade if no side aces
+    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
+    if (spades.length > 0) return spades[0];
+  }
 
   // Lead a Joker if we really need the book and are far behind
   if (teamNeedsBooksMore >= 3 && bySuit['Joker'].length > 0) {
@@ -274,27 +310,23 @@ function selectLeadCard(ctx) {
   for (const suit of ['♥', '♦', '♣']) {
     const cards = bySuit[suit];
     if (cards.length >= 2 && cardVal(cards[0]) === 13) {
-      const aceGone = ctx.playedCardIds.has(`${suit}A`);
+      const aceGone = playedCardIds.has(`${suit}A`);
       if (aceGone) return cards[0];
     }
   }
 
-  // Lead from void suit to force — lead from shortest non-spade
+  // Lead from long strong suit to establish winners
   const nonSpades = ['♥', '♦', '♣'].filter(s => bySuit[s].length > 0);
   if (nonSpades.length > 0 && hasNonSpade) {
-    // Lead from longest non-trump suit to establish winners
     const longest = nonSpades.reduce((a, b) => bySuit[a].length >= bySuit[b].length ? a : b);
     const cards = bySuit[longest];
-    if (cardVal(cards[0]) >= 13) return cards[0]; // Lead high from long suit
-    // Otherwise lead low from short suit
-    const shortest = nonSpades.reduce((a, b) => bySuit[a].length <= bySuit[b].length ? a : b);
-    return bySuit[shortest][bySuit[shortest].length - 1];
+    if (cards.length >= 3 && cardVal(cards[0]) >= 13) return cards[0]; // Lead high from long suit
   }
 
-  // If spades are broken and we need books, lead high spade
+  // If spades are broken and we need books, lead high spade to pull trump
   if (spadesBroken && bySuit['♠'].length > 0 && teamNeedsBooksMore > 0) {
-    const highSpade = bySuit['♠'].find(c => c.value !== 'BJ' && c.value !== 'LJ');
-    if (highSpade) return highSpade;
+    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
+    if (spades.length > 0) return spades[0]; // Lead highest non-joker spade
   }
 
   // Must lead spades (only suit) or spades broken
@@ -338,7 +370,7 @@ function selectFollowCard(ctx) {
 
 function followWithSuit(ctx, suitCards) {
   // suitCards are sorted descending (highest first)
-  const { activeSuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, trick } = ctx;
+  const { activeSuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, trick, myBid, booksWon, tricksLeft } = ctx;
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
 
   // Find lowest card that can beat current winner
@@ -346,14 +378,13 @@ function followWithSuit(ctx, suitCards) {
   const winningCards = suitCards.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
   const losingCards = suitCards.filter(c => getCardStrength(c, activeSuit) <= winnerStrength);
 
-  // Partner is already winning — don't overtake, play lowest
+  // Partner is already winning — don't overtake unless we desperately need the book
   if (partnerIsWinning && !iNeedBook) {
     return suitCards[suitCards.length - 1];
   }
 
-  // Partner winning and we need book — only overtake if we have a much higher card
+  // Partner winning and we need book — let partner win, save high cards
   if (partnerIsWinning && iNeedBook) {
-    // Let partner win; only play highest if partner might be beaten later
     return suitCards[suitCards.length - 1];
   }
 
@@ -362,18 +393,23 @@ function followWithSuit(ctx, suitCards) {
     return winningCards[winningCards.length - 1]; // lowest card that wins
   }
 
-  // We don't need the book — play lowest to avoid bag
+  // We've already made our bid — play absolute lowest to avoid bags
   if (teamHasMadeBid) {
     return suitCards[suitCards.length - 1];
   }
 
-  // Default: if we can win, play lowest winner; otherwise play lowest
+  // Critical: we're short on books and tricks are running out — be aggressive
+  if (iNeedBook && tricksLeft <= 3 && winningCards.length > 0) {
+    return winningCards[winningCards.length - 1];
+  }
+
+  // Default: if we can win cheaply, do it; otherwise dump lowest
   if (winningCards.length > 0) return winningCards[winningCards.length - 1];
   return suitCards[suitCards.length - 1];
 }
 
 function voidPlay(ctx) {
-  const { bySuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, activeSuit } = ctx;
+  const { bySuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, activeSuit, tricksLeft, myBid, booksWon } = ctx;
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
 
   const spades = bySuit['♠'] || [];
@@ -381,25 +417,37 @@ function voidPlay(ctx) {
   const allTrump = [...jokers, ...spades]; // sorted highest first
   allTrump.sort((a, b) => cardVal(b) - cardVal(a));
 
-  // Partner is already winning — just sluff garbage
+  // Partner is already winning — just sluff garbage (don't waste trump)
   if (partnerIsWinning) {
     return sluffLowest(bySuit);
   }
 
-  // We need the book — cut with trump
+  // We've made our bid — sluff lowest to avoid bags (never cut)
+  if (teamHasMadeBid) {
+    return sluffLowest(bySuit);
+  }
+
+  // We need the book — cut with trump if we can win
   if (iNeedBook && allTrump.length > 0) {
-    // Use lowest trump that can win over current winning card
     const winnerStrength = currentWinner ? getCardStrength(currentWinner.card, activeSuit) : -1;
     const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
     if (winningTrump.length > 0) {
       // Use lowest winning trump (save big ones for later)
       return winningTrump[winningTrump.length - 1];
     }
-    // Can't win even with trump — sluff
+    // Can't win even with trump — sluff lowest instead of wasting trump
     return sluffLowest(bySuit);
   }
 
-  // Don't need the book — sluff lowest non-trump
+  // Late game desperation — if we're short on books and have high trump, use it
+  if (iNeedBook && tricksLeft <= 3 && allTrump.length > 0) {
+    const highTrump = allTrump.filter(c => cardVal(c) >= 13); // King or better
+    if (highTrump.length > 0) {
+      return highTrump[highTrump.length - 1]; // lowest of the high trump
+    }
+  }
+
+  // Default: sluff lowest non-trump
   return sluffLowest(bySuit);
 }
 
