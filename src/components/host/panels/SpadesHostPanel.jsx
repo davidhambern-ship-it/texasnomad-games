@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
-import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
+import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SUITS = ['♠', '♥', '♦', '♣'];
@@ -394,10 +394,36 @@ export default function SpadesHostPanel({ gs, updateState }) {
           {cpuProcessing ? '⚙ CPU thinking...' : 'CPU opponents will auto-play'}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Btn
+            onClick={async () => {
+              const filled = fillEmptySeatsWithCPU(players, gs);
+              await updateState({ players: filled, cpu_enabled: true });
+            }}
+            color="#4ade80"
+            size="sm"
+            disabled={cpuProcessing || availableSeats.length === 0}
+          >
+            🤖 Fill Empty Seats w/ CPU
+          </Btn>
+          {availableSeats.map(s => (
+            <Btn
+              key={s}
+              onClick={async () => {
+                const team = [1, 3].includes(s) ? 1 : 2;
+                const cpu = createCPUPlayer(s, team);
+                await updateState({ players: [...players, cpu], cpu_enabled: true });
+              }}
+              color="#4ade80"
+              size="sm"
+              disabled={cpuProcessing}
+            >
+              + CPU Seat {s}
+            </Btn>
+          ))}
           <Btn 
             onClick={async () => {
               const newPlayers = players.filter(p => p.playerType !== 'cpu');
-              await updateState({ players: newPlayers });
+              await updateState({ players: newPlayers, cpu_enabled: newPlayers.some(p => p.playerType === 'cpu') });
             }} 
             color="#FF5F1F" 
             size="sm"
