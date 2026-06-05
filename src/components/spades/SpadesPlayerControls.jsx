@@ -52,7 +52,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   // DEAL: Trigger deal animation and progressively add cards to hands
   const handleDeal = async () => {
     if (isDealing) return;
-    const allSeated = (gs.players || []).filter(p => p.seatNumber != null);
+    const currentPlayers = gs.players || [];
+    const allSeated = currentPlayers.filter(p => p.seatNumber != null);
     if (allSeated.length < 2) {
       alert('Need at least 2 players to deal');
       return;
@@ -65,7 +66,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     setIsDealing(true);
 
     // Reset hands to empty so animation can build them up
-    const clearedPlayers = (gs.players || []).map(p =>
+    const clearedPlayers = currentPlayers.map(p =>
       p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p
     );
     const dealerSeat = allSeated[0]?.seatNumber || 1;
@@ -98,7 +99,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         if (cardIdx >= workingDeck.length) break;
         playerHands[j].push(workingDeck[cardIdx]);
 
-        const updatedPlayers = (gs.players || []).map(p => {
+        const updatedPlayers = currentPlayers.map(p => {
           const si = allSeated.findIndex(s => s.playerId === p.playerId);
           return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
         });
@@ -109,7 +110,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     }
 
     // Transition to bidding/playing
-    const finalPlayers = (gs.players || []).map(p => {
+    const finalPlayers = currentPlayers.map(p => {
       const si = allSeated.findIndex(s => s.playerId === p.playerId);
       return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: hasCpu ? 0 : null, tricksWon: 0 } : p;
     });
