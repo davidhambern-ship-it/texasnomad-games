@@ -28,6 +28,7 @@ const HEARTS_IMAGES = {
   '7': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/558934f0e_hearts-7.png',
   '8': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/561cdc8de_hearts-8.png',
   '9': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/cd985c7d9_hearts-9.png',
+  '10': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/4b8e8e8e8_hearts-10.png',
   'J': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/8dd0b4d5d_hearts-J.png',
   'Q': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/32394a79e_hearts-Q.png',
   'K': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/5119c6ee6_hearts-K.png',

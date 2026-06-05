@@ -39,6 +39,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   const myPlayer = players.find(p => p.playerId === playerId);
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
+  
+  // Sort hand by suit (clubs, diamonds, hearts, spades) then by value
+  const sortedHand = myHand.length > 0 ? [...myHand].sort((a, b) => {
+    const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
+    const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
+    const suitDiff = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
+    if (suitDiff !== 0) return suitDiff;
+    return (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
+  }) : [];
 
   return (
     <div className="flex flex-col items-center p-4 gap-4 max-w-4xl mx-auto w-full">
@@ -154,14 +163,14 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
 
           {/* Hand */}
-          {myHand.length > 0 && (
-            <div className="w-full p-4 border border-[#4ade80]/30 rounded-xl bg-black/40">
-              <div className="text-[8px] tracking-widest text-[#4ade80]/60 uppercase mb-3" style={PS2}>
-                Your Hand — {myHand.length} cards
-                {gs.current_turn_seat === mySeatNumber && <span className="ml-3 text-[#FFD700]">▶ YOUR TURN</span>}
+          {sortedHand.length > 0 && (
+            <div className="w-full p-4 border-2 border-[#4ade80]/50 rounded-xl bg-gradient-to-b from-white/10 to-black/40 backdrop-blur-sm">
+              <div className="text-[8px] tracking-widest text-[#4ade80] uppercase mb-3 font-bold" style={PS2}>
+                Your Hand — {sortedHand.length} cards
+                {gs.current_turn_seat === mySeatNumber && <span className="ml-3 text-[#FFD700] animate-pulse">▶ YOUR TURN</span>}
               </div>
-              <div className="flex flex-wrap gap-2 justify-center">
-                {myHand.map((card, i) => {
+              <div className="flex flex-wrap gap-3 justify-center">
+                {sortedHand.map((card, i) => {
                   const imgSrc = getCardImage(card);
                   const isRed = card.suit === '♥' || card.suit === '♦';
                   const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
@@ -170,19 +179,27 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                       key={card.id || i}
                       onClick={() => playCard(card)}
                       disabled={!isMyTurn}
-                      className="relative rounded-lg overflow-hidden transition-all hover:scale-110 hover:-translate-y-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-xl"
+                      className="relative rounded-xl overflow-hidden transition-all hover:scale-110 hover:-translate-y-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl"
                       style={{
-                        width: 64, height: 90,
-                        border: isMyTurn ? '2px solid #4ade80' : '2px solid transparent',
-                        boxShadow: isMyTurn ? '0 0 14px rgba(74,222,128,0.5)' : '0 4px 12px rgba(0,0,0,0.5)',
+                        width: 72, height: 100,
+                        border: isMyTurn ? '3px solid #4ade80' : '2px solid rgba(255,255,255,0.3)',
+                        boxShadow: isMyTurn 
+                          ? '0 0 20px rgba(74,222,128,0.6), 0 8px 16px rgba(0,0,0,0.4)' 
+                          : '0 4px 16px rgba(0,0,0,0.5), inset 0 0 8px rgba(255,255,255,0.1)',
+                        filter: 'brightness(1.15) contrast(1.05)',
                       }}
                     >
                       {imgSrc ? (
-                        <img src={imgSrc} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" />
+                        <img 
+                          src={imgSrc} 
+                          alt={`${card.value}${card.suit}`} 
+                          className="w-full h-full object-cover"
+                          style={{ filter: 'brightness(1.1) contrast(1.05)' }}
+                        />
                       ) : (
-                        <div className="w-full h-full bg-white flex flex-col items-center justify-center">
-                          <span className={`text-xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                          <span className={`text-sm leading-none font-bold mt-0.5 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.value}</span>
+                        <div className="w-full h-full bg-gradient-to-br from-white to-gray-100 flex flex-col items-center justify-center rounded-xl">
+                          <span className={`text-2xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                          <span className={`text-base leading-none font-bold mt-1 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.value}</span>
                         </div>
                       )}
                     </button>
