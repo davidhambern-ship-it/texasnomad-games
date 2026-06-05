@@ -53,7 +53,7 @@ function MarqueeStrip({ text, color = '#BC13FE', speed = 20 }) {
   return (
     <div className="overflow-hidden w-full py-1" style={{ background: `${color}20`, borderTop: `1px solid ${color}40`, borderBottom: `1px solid ${color}40` }}>
       <div className="flex whitespace-nowrap" style={{ animation: `marquee-scroll ${speed}s linear infinite` }}>
-        <span className="text-[7px] tracking-[0.25em] uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color, textShadow: `0 0 8px ${color}` }}>
+        <span className="text-[7px] tracking-[0.25em] uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: '#ffffff', textShadow: `0 0 8px ${color}` }}>
           {repeated}&nbsp;&nbsp;&nbsp;{repeated}
         </span>
       </div>
