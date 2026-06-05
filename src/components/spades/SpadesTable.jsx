@@ -215,6 +215,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                       width: 52, height: 73,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
                       transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
+                      filter: 'brightness(1.25)',
                     }}
                   >
                     <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -250,6 +251,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
                     transform: `rotate(-90deg) scaleX(-1) scaleY(-1)`,
+                    filter: 'brightness(1.25)',
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -284,6 +286,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
                     transform: `rotate(90deg) scaleX(-1) scaleY(-1)`,
+                    filter: 'brightness(1.25)',
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -312,6 +315,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               {sortedHand.map((card, i, arr) => {
                 const overlap = getHorizontalOverlap(arr.length) * 0.5;
                 const isMyTurn = gs.current_turn_seat === 1 && gs.phase === 'playing';
+                const isBidding = gs.phase === 'bidding';
+                const hasBid = myPlayer?.bid != null;
                 return (
                   <div
                     key={card.id || i}
@@ -319,12 +324,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
                       isMyTurn 
                         ? 'hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
-                        : 'opacity-60 cursor-not-allowed'
+                        : isBidding && !hasBid
+                        ? 'hover:-translate-y-2'
+                        : 'opacity-90 cursor-not-allowed'
                     }`}
                     style={{
                       width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
                       transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
+                      filter: isBidding && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.25)',
                     }}
                   >
                     <img 
