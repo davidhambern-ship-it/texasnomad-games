@@ -253,12 +253,12 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Bottom (Seat 1) - Hand on table (card backs only) */}
+        {/* Bottom (Seat 1) - Hand on table (card backs only) - wider spread */}
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 600, height: 120 }}>
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 700, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1)' }}>
               {getPlayerAtSeat(1).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length);
+                const overlap = getHorizontalOverlap(arr.length) * 0.6;
                 return (
                   <div
                     key={card.id || i}
@@ -266,7 +266,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     style={{
                       width: 52, height: 73,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
+                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
                     }}
                   >
                     <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -276,18 +276,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             </div>
           </div>
         )}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
-          <SpadesSeat
-            seatNumber={1}
-            player={getPlayerAtSeat(1)}
-            isMe={mySeatNumber === 1}
-            isAvailable={availableSeats.includes(1)}
-            isSpectator={isSpectator}
-            onSit={() => onSitInSeat(1)}
-            currentTurnSeat={gs.current_turn_seat}
-            isPlaying={isPlaying}
-          />
-        </div>
 
         {/* Center area with animations */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20">
