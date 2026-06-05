@@ -119,7 +119,36 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Top (Seat 3) */}
+        {/* Top (Seat 3) - Hand on table */}
+        {getPlayerAtSeat(3)?.hand?.length > 0 && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
+            <div className="flex" style={{ transform: 'scale(1.15)' }}>
+              {getPlayerAtSeat(3).hand.map((card, i) => {
+                const imgSrc = getCardImage(card);
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                return (
+                  <div
+                    key={card.id || i}
+                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      width: 60, height: 84,
+                      marginLeft: i > 0 ? '-66px' : '0',
+                      transform: `rotate(${(i - 6) * 2}deg)`,
+                    }}
+                  >
+                    {imgSrc ? (
+                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-white flex items-center justify-center">
+                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <SpadesSeat
             seatNumber={3}
@@ -133,7 +162,36 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Left (Seat 2) */}
+        {/* Left (Seat 2) - Hand on table */}
+        {getPlayerAtSeat(2)?.hand?.length > 0 && (
+          <div className="absolute left-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
+            <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(90deg)' }}>
+              {getPlayerAtSeat(2).hand.map((card, i) => {
+                const imgSrc = getCardImage(card);
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                return (
+                  <div
+                    key={card.id || i}
+                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      width: 60, height: 84,
+                      marginTop: i > 0 ? '-66px' : '0',
+                      transform: `rotate(${(i - 6) * 2}deg)`,
+                    }}
+                  >
+                    {imgSrc ? (
+                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-white flex items-center justify-center">
+                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
           <SpadesSeat
             seatNumber={2}
@@ -147,7 +205,36 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Right (Seat 4) */}
+        {/* Right (Seat 4) - Hand on table */}
+        {getPlayerAtSeat(4)?.hand?.length > 0 && (
+          <div className="absolute right-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
+            <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(-90deg)' }}>
+              {getPlayerAtSeat(4).hand.map((card, i) => {
+                const imgSrc = getCardImage(card);
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                return (
+                  <div
+                    key={card.id || i}
+                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      width: 60, height: 84,
+                      marginTop: i > 0 ? '-66px' : '0',
+                      transform: `rotate(${(i - 6) * 2}deg)`,
+                    }}
+                  >
+                    {imgSrc ? (
+                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-white flex items-center justify-center">
+                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
           <SpadesSeat
             seatNumber={4}
@@ -156,6 +243,49 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             isAvailable={availableSeats.includes(4)}
             isSpectator={isSpectator}
             onSit={() => onSitInSeat(4)}
+            currentTurnSeat={gs.current_turn_seat}
+            isPlaying={isPlaying}
+          />
+        </div>
+
+        {/* Bottom (Seat 1) - Hand on table */}
+        {getPlayerAtSeat(1)?.hand?.length > 0 && (
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
+            <div className="flex" style={{ transform: 'scale(1.15)' }}>
+              {getPlayerAtSeat(1).hand.map((card, i) => {
+                const imgSrc = getCardImage(card);
+                const isRed = card.suit === '♥' || card.suit === '♦';
+                return (
+                  <div
+                    key={card.id || i}
+                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    style={{
+                      width: 60, height: 84,
+                      marginLeft: i > 0 ? '-66px' : '0',
+                      transform: `rotate(${(i - 6) * 2}deg)`,
+                    }}
+                  >
+                    {imgSrc ? (
+                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full bg-white flex items-center justify-center">
+                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
+          <SpadesSeat
+            seatNumber={1}
+            player={getPlayerAtSeat(1)}
+            isMe={mySeatNumber === 1}
+            isAvailable={availableSeats.includes(1)}
+            isSpectator={isSpectator}
+            onSit={() => onSitInSeat(1)}
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
           />
@@ -188,42 +318,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           )}
         </div>
 
-        {/* Cards spread across bottom of table */}
-        {sortedHand.length > 0 && (
-          <div className="absolute bottom-0 left-0 right-0 h-32 z-10 pointer-events-none">
-            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-0.5">
-              {sortedHand.map((card, i) => {
-                const imgSrc = getCardImage(card);
-                const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
-                const rotation = (i - sortedHand.length / 2) * 2;
-                return (
-                  <button
-                    key={card.id || i}
-                    onClick={() => isMyTurn && playCard(card)}
-                    disabled={!isMyTurn}
-                    className="relative rounded-lg overflow-hidden transition-all hover:scale-110 hover:-translate-y-4 active:scale-95 disabled:opacity-60 pointer-events-auto"
-                    style={{
-                      width: 56, height: 80,
-                      border: isMyTurn ? '2px solid #4ade80' : '1px solid rgba(255,255,255,0.2)',
-                      boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
-                      marginLeft: i > 0 ? '-32px' : '0',
-                      transform: `rotate(${rotation}deg)`,
-                      transformOrigin: 'bottom center',
-                    }}
-                  >
-                    {imgSrc ? (
-                      <img src={imgSrc} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white rounded-lg flex items-center justify-center">
-                        <span className="text-xl">{card.suit}</span>
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Player Controls (below table) */}
@@ -238,20 +332,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             onShuffleStart={() => setShufflePhase('shuffling')}
             onDealStart={() => setDealPhase('dealing')}
           />
-        </div>
-      )}
-
-      {/* Spectator note */}
-      {isSpectator && (
-        <div className="w-full text-center px-4 py-3 border border-white/10 rounded-xl bg-white/5">
-          <div className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>👁 Spectating — no controls</div>
-        </div>
-      )}
-
-      {/* Player is seated but waiting for host to deal */}
-      {isPlayer && myHand.length === 0 && (
-        <div className="w-full text-center px-4 py-3 border border-[#BC13FE]/20 rounded-xl bg-[#BC13FE]/5">
-          <div className="text-[8px] tracking-widest text-[#BC13FE]/50 uppercase" style={PS2}>🃏 Seated — Waiting for cards...</div>
         </div>
       )}
     </div>
