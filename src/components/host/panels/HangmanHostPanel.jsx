@@ -21,22 +21,25 @@ const Btn = ({ children, onClick, color = '#FFD700', size = 'md', className = ''
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 const PARTS = [
-  <line key="rope" x1="120" y1="20" x2="120" y2="60" stroke="#BC13FE" strokeWidth="3" />,
   <circle key="head" cx="120" cy="75" r="15" stroke="#FFD700" strokeWidth="3" fill="none" />,
   <line key="body" x1="120" y1="90" x2="120" y2="140" stroke="#FFD700" strokeWidth="3" />,
   <line key="arm-l" x1="120" y1="100" x2="90" y2="125" stroke="#FFD700" strokeWidth="3" />,
   <line key="arm-r" x1="120" y1="100" x2="150" y2="125" stroke="#FFD700" strokeWidth="3" />,
   <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
   <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
+  <line key="foot-l" x1="90" y1="175" x2="75" y2="170" stroke="#FFD700" strokeWidth="3" />,
 ];
 
 function HangmanSVG({ wrongCount }) {
   return (
     <svg width="160" height="190">
+      {/* Static gallows */}
       <line x1="20" y1="180" x2="140" y2="180" stroke="#ffffff15" strokeWidth="3" />
       <line x1="55" y1="180" x2="55" y2="10" stroke="#ffffff15" strokeWidth="3" />
       <line x1="55" y1="10" x2="120" y2="10" stroke="#ffffff15" strokeWidth="3" />
       <line x1="120" y1="10" x2="120" y2="20" stroke="#ffffff15" strokeWidth="3" />
+      {/* Rope — always visible once game starts */}
+      <line x1="120" y1="20" x2="120" y2="60" stroke="#BC13FE" strokeWidth="3" />
       {PARTS.slice(0, wrongCount)}
     </svg>
   );
