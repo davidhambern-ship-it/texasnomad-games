@@ -152,7 +152,8 @@ function SpadesViewer({ roomCode }) {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     
     const trick = gs.current_trick || [];
-    if (trick.length !== 4 || trick.length < (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer').length) return;
+    const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    if (trick.length !== seatedPlayers.length) return;
     
     // All players have played - determine winner
     const spades = trick.filter(t => t.card?.suit === '♠');
@@ -274,7 +275,13 @@ function SpadesViewer({ roomCode }) {
     // Fill empty seats with CPU players
     const currentPlayers = gs.players || [];
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
-    await updateState({ players: filledPlayers, cpu_enabled: true });
+    // Set dealer to seat 1 (host) if not set, then trigger auto-deal
+    await updateState({ 
+      players: filledPlayers, 
+      cpu_enabled: true,
+      dealer_seat: gs.dealer_seat || 1,
+      phase: 'setup'
+    });
     setCpuChoiceShown(false);
   };
 
