@@ -122,10 +122,10 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
       )}
 
       {/* Cabinet Body */}
-      <div className="relative rounded-t-3xl rounded-b-xl overflow-hidden border-2"
-        style={{
-          borderColor: hovered ? glowColor : `${glowColor}50`,
-          background: `linear-gradient(180deg, #0a0510 0%, #050208 100%)`,
+      <div className="relative rounded-t-3xl rounded-b-xl overflow-hidden border-2 scanline-overlay"
+      style={{
+        borderColor: hovered ? glowColor : `${glowColor}50`,
+        background: `linear-gradient(180deg, #050208 0%, #020106 100%)`,
           boxShadow: hovered
             ? `0 0 40px ${glowColor}60, inset 0 0 30px ${glowColor}10`
             : `0 0 15px ${glowColor}20, inset 0 0 10px ${glowColor}05`,
@@ -138,8 +138,8 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
           style={{ background: `linear-gradient(135deg, ${glowColor}30, ${glowColor2}30)`, borderBottom: `2px solid ${glowColor}50` }}>
           <div className="absolute inset-0 opacity-30"
             style={{ background: `repeating-linear-gradient(90deg, transparent, transparent 8px, ${glowColor}20 8px, ${glowColor}20 9px)` }} />
-          <div className="relative font-heading tracking-[0.2em] uppercase"
-            style={{ fontSize: featured ? '1.6rem' : '1.3rem', color: '#FFD700', textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
+          <div className="relative font-heading tracking-[0.2em] uppercase text-outlaw-gold"
+            style={{ fontSize: featured ? '1.6rem' : '1.3rem', textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
             {game.title}
           </div>
           <div className="text-[7px] tracking-[0.3em] uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace", color: `${glowColor}cc` }}>
@@ -152,7 +152,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
 
         {/* Screen */}
         <div className="mx-3 my-3 rounded-xl overflow-hidden relative"
-          style={{ border: `2px solid ${glowColor}40`, minHeight: featured ? 160 : 130, background: '#010108' }}>
+        style={{ border: `2px solid ${glowColor}40`, minHeight: featured ? 160 : 130, background: '#020106' }}>
           {/* Scanlines */}
           <div className="absolute inset-0 pointer-events-none z-10"
             style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)' }} />
@@ -173,11 +173,11 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
 
         {/* Description */}
         <div className="px-4 pb-2">
-          <p className="text-white/60 text-xs leading-relaxed font-body text-center">{game.description}</p>
+          <p className="text-white/50 text-xs leading-relaxed font-body text-center">{game.description}</p>
           <div className="flex flex-wrap gap-1 justify-center mt-2">
             {game.tags.map(tag => (
               <span key={tag} className="px-2 py-0.5 rounded text-[7px] tracking-widest uppercase"
-                style={{ fontFamily: "'Press Start 2P', monospace", background: `${glowColor}15`, color: `${glowColor}cc`, border: `1px solid ${glowColor}30` }}>
+                style={{ fontFamily: "'Press Start 2P', monospace", background: `${glowColor}15`, color: `${glowColor}cc`, border: `1px solid ${glowColor}40` }}>
                 {tag}
               </span>
             ))}
@@ -373,7 +373,7 @@ export default function Games() {
   const otherGames = GAMES.filter(g => !g.featured);
 
   return (
-    <div className="min-h-screen bg-[#030109] text-white overflow-x-hidden">
+    <div className="min-h-screen bg-midnight-void text-white overflow-x-hidden">
       <Header />
 
       {/* Ambient background */}
@@ -389,6 +389,8 @@ export default function Games() {
         {/* Floor grid */}
         <div className="absolute inset-0 opacity-5"
           style={{ backgroundImage: 'linear-gradient(rgba(188,19,254,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(188,19,254,0.5) 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+        {/* Scanline overlay */}
+        <div className="absolute inset-0 scanline-overlay pointer-events-none" />
       </div>
 
       <div className="relative z-10">
@@ -398,15 +400,16 @@ export default function Games() {
             <div className="absolute top-4 left-8 opacity-40"><NeonSign text="PLAY" color="#BC13FE" size="sm" /></div>
             <div className="absolute top-8 right-12 opacity-40"><NeonSign text="WIN" color="#FF5F1F" size="sm" /></div>
             <div className="absolute bottom-4 left-1/4 opacity-30"><NeonSign text="NOMAD" color="#FFD700" size="sm" /></div>
+
           </div>
 
           <div className="relative">
-            <div className="text-[9px] tracking-[0.5em] uppercase mb-3 text-[#BC13FE]"
+            <div className="text-[9px] tracking-[0.5em] uppercase mb-3 text-cyber-purple"
               style={{ fontFamily: "'Press Start 2P', monospace", textShadow: '0 0 15px #BC13FE' }}>
               ✦ TEXASNOMAD ARCADE ✦
             </div>
-            <h1 className="font-heading text-6xl sm:text-8xl md:text-9xl tracking-wider uppercase leading-none"
-              style={{ color: '#FFD700', textShadow: '0 0 20px #FFD700, 0 0 60px #FFD70050' }}>
+            <h1 className="font-heading text-6xl sm:text-8xl md:text-9xl tracking-wider uppercase leading-none text-glow-gold"
+              style={{ color: '#FFD700' }}>
               THE GAMES
             </h1>
             <div className="font-heading text-xl sm:text-3xl tracking-[0.3em] uppercase mt-1 text-white/50">
@@ -425,11 +428,10 @@ export default function Games() {
           <section className="px-4 py-8">
             <div className="max-w-7xl mx-auto">
               <div className="text-center mb-8">
-                <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full border border-[#FFD700]/40 bg-[#FFD700]/5 mb-2"
-                  style={{ boxShadow: '0 0 20px rgba(255,215,0,0.2)' }}>
-                  <span className="text-[#FFD700] text-lg">⭐</span>
-                  <span className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase">Featured Game</span>
-                  <span className="text-[#FFD700] text-lg">⭐</span>
+                <div className="inline-flex items-center gap-3 px-6 py-2 rounded-full border border-outlaw-gold/40 bg-outlaw-gold/5 mb-2 box-glow-gold">
+                  <span className="text-outlaw-gold text-lg">⭐</span>
+                  <span className="font-heading text-2xl tracking-widest text-outlaw-gold uppercase">Featured Game</span>
+                  <span className="text-outlaw-gold text-lg">⭐</span>
                 </div>
               </div>
               <div className="flex justify-center">
@@ -451,7 +453,9 @@ export default function Games() {
         <section className="px-4 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-10">
-              <NeonSign text="— ALL GAMES —" color="#BC13FE" size="md" />
+              <div className="text-xl tracking-[0.2em] uppercase text-outlaw-gold text-glow-gold" style={{ fontFamily: "'Monoton', cursive" }}>
+                — ALL GAMES —
+              </div>
             </div>
             <div className="flex flex-wrap justify-center gap-8">
               {otherGames.map(game => (
@@ -475,10 +479,10 @@ export default function Games() {
           <div className="absolute inset-0 flex items-center">
             <div className="w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, #BC13FE60, #FF5F1F60, transparent)' }} />
           </div>
-          <div className="relative inline-flex items-center gap-4 px-6 py-2 bg-[#030109]">
-            <span className="text-[#BC13FE] text-xl">✦</span>
-            <NeonSign text="COMING SOON" color="#FFD700" size="sm" />
-            <span className="text-[#FF5F1F] text-xl">✦</span>
+          <div className="relative inline-flex items-center gap-4 px-6 py-2 bg-midnight-void">
+            <span className="text-cyber-purple text-xl">✦</span>
+            <span className="text-lg tracking-[0.25em] uppercase text-outlaw-gold text-glow-gold" style={{ fontFamily: "'Monoton', cursive" }}>COMING SOON</span>
+            <span className="text-kinetic-orange text-xl">✦</span>
           </div>
         </div>
 
@@ -486,7 +490,7 @@ export default function Games() {
         <section className="px-4 py-8 pb-16">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-4">
-              <p className="text-white/30 text-xs tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              <p className="text-white/30 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 More cabinets arriving soon
               </p>
             </div>
@@ -502,8 +506,8 @@ export default function Games() {
       {/* Mute button */}
       <button
         onClick={toggleMute}
-        className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full border flex items-center justify-center text-sm transition-all hover:scale-110"
-        style={{ borderColor: '#BC13FE60', background: '#030109cc', color: '#BC13FE', boxShadow: '0 0 10px rgba(188,19,254,0.3)' }}
+        className="fixed bottom-6 right-6 z-50 w-10 h-10 rounded-full border border-cyber-purple/60 flex items-center justify-center text-sm transition-all hover:scale-110 box-glow-purple"
+        style={{ background: 'rgba(5,2,8,0.9)', color: '#BC13FE' }}
         title={muted ? 'Unmute' : 'Mute'}
       >
         {muted ? '🔇' : '🔊'}
