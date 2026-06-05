@@ -3,7 +3,8 @@ import React from 'react';
 export default function ConnectionStatus({ room, roomCode, gameId }) {
   const hostOk = room?.host_connected;
   const screenOk = room?.screen_connected;
-  const players = room?.players_connected || 0;
+  // Derive live player count from game_state.players (players_connected field is never kept in sync)
+  const players = (room?.game_state?.players || []).length;
   const status = room?.status || 'waiting';
 
   const Dot = ({ on, label }) => (
