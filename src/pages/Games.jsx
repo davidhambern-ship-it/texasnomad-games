@@ -446,7 +446,7 @@ export default function Games() {
         <section className="px-4 py-8">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-10">
-              <div className="text-xl tracking-[0.2em] uppercase text-outlaw-gold text-glow-gold" style={{ fontFamily: "'Monoton', cursive" }}>
+              <div className="text-xl tracking-[0.2em] uppercase text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive", textShadow: '0 0 12px #FFD700, 0 0 24px #FFD700, 0 0 48px #FFD700, 0 0 60px #FFD700' }}>
                 — ALL GAMES —
               </div>
             </div>
