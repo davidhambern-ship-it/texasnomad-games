@@ -1,8 +1,8 @@
 import React from 'react';
 
 const CARD_BACK = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/711c24400_BackDesign.png';
-const BIG_JOKER = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/857028cf9_BigJoker.png';
-const LITTLE_JOKER = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/f18ea1d80_LittleJoker.png';
+const KING_SPADES = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/442e05070_King-spades.png';
+const FOUR_HEARTS = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/86f65cd37_hearts-4.png';
 
 // Back cards fanned behind
 const BACK_CARDS = [
@@ -47,10 +47,10 @@ export default function SpadesCabinetImage() {
           />
         ))}
 
-        {/* Little Joker — left foreground */}
+        {/* 4 of Hearts — left foreground */}
         <img
-          src={LITTLE_JOKER}
-          alt="Little Joker"
+          src={FOUR_HEARTS}
+          alt="4 of Hearts"
           style={{
             position: 'absolute',
             bottom: 0,
@@ -65,10 +65,10 @@ export default function SpadesCabinetImage() {
           }}
         />
 
-        {/* Big Joker — right foreground */}
+        {/* King of Spades — right foreground */}
         <img
-          src={BIG_JOKER}
-          alt="Big Joker"
+          src={KING_SPADES}
+          alt="King of Spades"
           style={{
             position: 'absolute',
             bottom: 0,
