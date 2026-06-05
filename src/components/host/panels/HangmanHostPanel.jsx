@@ -21,7 +21,6 @@ const Btn = ({ children, onClick, color = '#FFD700', size = 'md', className = ''
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 const PARTS = [
-  <line key="rope" x1="120" y1="20" x2="120" y2="60" stroke="#BC13FE" strokeWidth="3" />,
   <circle key="head" cx="120" cy="75" r="15" stroke="#FFD700" strokeWidth="3" fill="none" />,
   <line key="body" x1="120" y1="90" x2="120" y2="140" stroke="#FFD700" strokeWidth="3" />,
   <line key="arm-l" x1="120" y1="100" x2="90" y2="125" stroke="#FFD700" strokeWidth="3" />,
