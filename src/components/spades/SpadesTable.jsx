@@ -149,20 +149,20 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Top (Seat 3) - Hand on table (card backs only) */}
+        {/* Top (Seat 3) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 500, height: 100 }}>
-            <div className="flex" style={{ transform: 'scale(1)' }}>
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 460 }}>
+            <div className="flex flex-col" style={{ transform: 'scale(1) rotate(180deg)' }}>
               {getPlayerAtSeat(3).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length);
+                const overlap = getVerticalOverlap(arr.length);
                 return (
                   <div
                     key={card.id || i}
                     className="relative rounded-lg overflow-hidden shadow-lg"
                     style={{
                       width: 52, height: 73,
-                      marginLeft: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
+                      marginTop: i > 0 ? `-${overlap}px` : '0',
+                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
                     }}
                   >
                     <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -185,9 +185,9 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Left (Seat 2) - Hand on table (card backs only) */}
+        {/* Left (Seat 2) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
-          <div className="absolute left-14 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 100, height: 460 }}>
+          <div className="absolute left-14 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center justify-center" style={{ width: 100, height: 460 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1) rotate(90deg)' }}>
               {getPlayerAtSeat(2).hand.map((card, i, arr) => {
                 const overlap = getVerticalOverlap(arr.length);
