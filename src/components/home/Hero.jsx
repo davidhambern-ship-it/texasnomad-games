@@ -25,10 +25,15 @@ export default function Hero({ heroBg, crownLogo }) {
         </h2>
 
         {/* Game icons row */}
-        <div className="flex items-center gap-3 mt-4">
-          <span className="text-3xl">🃏</span>
-          <span className="text-3xl">❌⭕</span>
-          <span className="text-3xl">♠️</span>
+        <div className="flex items-center gap-4 mt-4">
+          {/* Orange X */}
+          <span className="text-4xl font-bold leading-none" style={{ color: '#FF5F1F', textShadow: '0 0 10px rgba(255,95,31,0.6)', fontFamily: 'serif' }}>✕</span>
+          {/* Card back */}
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/711c24400_BackDesign.png" alt="Card Back" className="h-12 w-auto rounded shadow-lg" />
+          {/* Purple O */}
+          <span className="text-4xl font-bold leading-none" style={{ color: '#BC13FE', textShadow: '0 0 10px rgba(188,19,254,0.6)', fontFamily: 'serif' }}>○</span>
+          {/* Big Joker */}
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/857028cf9_BigJoker.png" alt="Big Joker" className="h-12 w-auto rounded shadow-lg" />
         </div>
 
         {/* Marquee Banner */}
