@@ -135,26 +135,52 @@ function SpadesViewer({ roomCode }) {
 
   // CPU turn handler - play card when it's CPU's turn
   useEffect(() => {
-    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
+    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') {
+      console.log('CPU turn: skipping - room:', !!room, 'cpu_enabled:', gs.cpu_enabled, 'phase:', gs.phase);
+      return;
+    }
     
     const currentTurnSeat = gs.current_turn_seat;
-    if (!currentTurnSeat) return;
+    if (!currentTurnSeat) {
+      console.log('CPU turn: no current_turn_seat');
+      return;
+    }
     
     // Find player whose turn it is from gs.players
     const currentPlayer = (gs.players || []).find(p => p.seatNumber === currentTurnSeat);
-    if (!currentPlayer || currentPlayer.playerType !== 'cpu') return;
+    if (!currentPlayer) {
+      console.log('CPU turn: no player found for seat', currentTurnSeat);
+      return;
+    }
+    if (currentPlayer.playerType !== 'cpu') {
+      console.log('CPU turn: player is not CPU -', currentPlayer.playerType);
+      return;
+    }
     
     // Don't act if already played this trick
     const hasPlayed = (gs.current_trick || []).some(p => p.seatNumber === currentTurnSeat);
-    if (hasPlayed) return;
+    if (hasPlayed) {
+      console.log('CPU turn: already played this trick');
+      return;
+    }
+    
+    console.log('CPU turn: Seat', currentTurnSeat, 'is thinking... hand size:', currentPlayer.hand?.length || 0);
     
     const timer = setTimeout(async () => {
       const hand = currentPlayer.hand || [];
-      if (hand.length === 0) return;
+      if (hand.length === 0) {
+        console.log('CPU turn: empty hand');
+        return;
+      }
       
       // Select card using CPU logic
       const cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0);
-      if (!cardToPlay) return;
+      if (!cardToPlay) {
+        console.log('CPU turn: selectCPUCard returned null');
+        return;
+      }
+      
+      console.log('CPU turn: Playing card', cardToPlay);
       
       // Play the card
       const updatedPlayers = (gs.players || []).map(p =>
