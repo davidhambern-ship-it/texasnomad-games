@@ -208,10 +208,11 @@ function BFFViewer({ roomCode }) {
             steal_result: null, current_typing: '',
           });
         } else {
+          // Keep answering player the same — in 2P mode they play until full BYE
           await updateState({
             bye_counts_2p: newBye2P, bye_count: playerByes,
             last_submission: submission, buzz_winner: null,
-            answering_player_id: null, current_typing: '',
+            answering_player_id: playerId, current_typing: '',
           });
         }
       } else {
