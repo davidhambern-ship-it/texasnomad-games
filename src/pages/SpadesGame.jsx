@@ -68,15 +68,17 @@ function SpadesViewer({ roomCode }) {
     // Only auto-deal if in setup phase AND CPU is enabled
     if (gs.phase === 'setup' || !gs.phase) {
       const timer = setTimeout(async () => {
-        // Shuffle 3 times then deal
+        // Shuffle 3 times then deal (with longer delays to avoid rate limit)
         for (let i = 0; i < 3; i++) {
           const deck = generateFullDeck();
           await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
-          await new Promise(resolve => setTimeout(resolve, 400));
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
+        // Wait a bit before dealing to avoid rate limit
+        await new Promise(resolve => setTimeout(resolve, 500));
         // After shuffling, deal the cards
         await handleAutoDeal();
-      }, 500);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);

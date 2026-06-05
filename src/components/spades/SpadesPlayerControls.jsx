@@ -53,17 +53,17 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     
     setIsShuffling(true);
     
-    // Generate and set shuffled deck FIRST
+    // Generate and set shuffled deck
     const deck = shuffleDeck(generateFullDeck());
     await updateState({ deck, deck_shuffled: true });
     
-    // NOW start shuffle animation (after state update)
+    // Start shuffle animation
     setTimeout(() => onShuffleStart?.(), 100);
     
-    // Wait for shuffle animation (2.5 seconds)
+    // Wait for shuffle animation
     await new Promise(resolve => setTimeout(resolve, 2500));
     
-    // Prepare dealt hands FIRST
+    // Prepare dealt hands
     const cardsPerPlayer = Math.floor(deck.length / seatedPlayers.length);
     const updatedPlayers = (gs.players || []).map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
@@ -75,7 +75,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const dealerSeat = seatedPlayers[0]?.seatNumber || 1;
     const firstBidder = seatedPlayers[1]?.seatNumber || seatedPlayers[0]?.seatNumber;
     
-    // Update state WITH deck visible for deal animation
+    // Update state with deck visible for deal animation
     await updateState({
       players: updatedPlayers, phase: 'bidding', status: 'active',
       deck: deck,
@@ -83,10 +83,10 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
     });
     
-    // NOW start deal animation (after state update)
+    // Start deal animation
     setTimeout(() => onDealStart?.(), 100);
     
-    // Wait for deal animation (~4.5 seconds for 52 cards at 80ms each)
+    // Wait for deal animation
     await new Promise(resolve => setTimeout(resolve, 4500));
     
     // Clear deck after deal
