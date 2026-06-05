@@ -4,6 +4,7 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SpadesTable from '@/components/spades/SpadesTable';
+import { fillEmptySeatsWithCPU } from '@/lib/spadesCPU';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -39,6 +40,10 @@ function SpadesViewer({ roomCode }) {
   const [overlayState, setOverlayState] = useState('choosing');
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
   const [mySeatNumber, setMySeatNumber] = useState(null);
+
+  // CPU choice state
+  const [showCPUChoice, setShowCPUChoice] = useState(false);
+  const [selectedSeat, setSelectedSeat] = useState(null);
 
   const containerRef = useRef(null);
   const gs = room?.game_state || {};
@@ -99,6 +104,9 @@ function SpadesViewer({ roomCode }) {
     }
     const seat = availableSeats[0];
     await sitInSeat(seat);
+    // After sitting, show CPU choice
+    setShowCPUChoice(true);
+    setSelectedSeat(seat);
   };
 
   const sitInSeat = async (seatNum) => {
@@ -107,19 +115,36 @@ function SpadesViewer({ roomCode }) {
       playerId,
       seatNumber: seatNum,
       role: 'player',
+      playerType: 'human',
       connected: true,
       joinedAt: Date.now(),
       lastActionAt: Date.now(),
     };
     const existing = players.find(p => p.playerId === playerId);
     const updatedPlayers = existing
-      ? players.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', connected: true } : p)
+      ? players.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true } : p)
       : [...players, newPlayer];
     await updateState({ players: updatedPlayers });
     localStorage.setItem(`spades_role_${roomCode}`, 'player');
     setMyRole('player');
     setMySeatNumber(seatNum);
     setOverlayState('done');
+  };
+
+  const handlePlayAgainstCPU = async () => {
+    if (!room) return;
+    // Fill empty seats with CPU players
+    const currentPlayers = gs.players || [];
+    const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
+    await updateState({ players: filledPlayers, cpu_enabled: true });
+    setShowCPUChoice(false);
+    setNotification({ message: 'CPU players joined the table', type: 'success' });
+  };
+
+  const handleWaitForRealPlayers = async () => {
+    if (!room) return;
+    setShowCPUChoice(false);
+    setNotification({ message: 'Waiting for more players...', type: 'info' });
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
@@ -197,6 +222,39 @@ function SpadesViewer({ roomCode }) {
                     style={{ borderColor: '#BC13FE', color: '#BC13FE', background: 'rgba(188,19,254,0.08)' }}
                   >
                     Spectate
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* CPU Choice Overlay */}
+          {showCPUChoice && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="max-w-md w-full mx-4 p-8 rounded-2xl border-2 border-[#FFD700]/60 bg-[#070311]/95 text-center"
+                style={{ boxShadow: '0 0 60px rgba(255,215,0,0.3)' }}>
+                <div className="text-4xl mb-4">🤠</div>
+                <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2">PLAY MODE</div>
+                <div className="text-[8px] tracking-widest text-white/40 uppercase mb-6" style={PS2}>
+                  ROOM {roomCode} — SEAT {selectedSeat}
+                </div>
+                <div className="font-heading text-lg tracking-widest text-white uppercase mb-6">
+                  Would you like to play against the computer while waiting for more players?
+                </div>
+                <div className="flex gap-4">
+                  <button
+                    onClick={handlePlayAgainstCPU}
+                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
+                    style={{ borderColor: '#4ade80', color: '#4ade80', background: 'rgba(74,222,128,0.08)' }}
+                  >
+                    Play Against CPU
+                  </button>
+                  <button
+                    onClick={handleWaitForRealPlayers}
+                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
+                    style={{ borderColor: '#BC13FE', color: '#BC13FE', background: 'rgba(188,19,254,0.08)' }}
+                  >
+                    Wait For Real Players
                   </button>
                 </div>
               </div>
