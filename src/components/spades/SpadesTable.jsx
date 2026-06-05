@@ -161,7 +161,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                   style={{
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
+                    transform: `rotate(180deg)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
