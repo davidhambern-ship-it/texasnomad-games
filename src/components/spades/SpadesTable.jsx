@@ -35,10 +35,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     const me = players.find(p => p.playerId === playerId);
     if (!me) return;
     
-    // Start card play animation
     setAnimatingCard({ card, fromSeat: mySeatNumber });
-    
-    // Wait for animation to complete
     await new Promise(resolve => setTimeout(resolve, 400));
     
     const trick = gs.current_trick || [];
@@ -57,7 +54,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
   const myPlayer = players.find(p => p.playerId === playerId);
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
 
-  // Sort hand by suit (clubs, diamonds, hearts, spades) then by value
+  // Sort hand by suit then value for clean display
   const sortedHand = myHand.length > 0 ? [...myHand].sort((a, b) => {
     const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
     const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
@@ -155,7 +152,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Top (Seat 3) - Hand on table */}
+        {/* Top (Seat 3) - Hand on table (card backs only) */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1.15)' }}>
@@ -169,7 +166,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     transform: `rotate(${(i - 6) * 2}deg)`,
                   }}
                 >
-                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
@@ -188,7 +185,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Left (Seat 2) - Hand on table */}
+        {/* Left (Seat 2) - Hand on table (card backs only) */}
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
           <div className="absolute left-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(90deg)' }}>
@@ -202,7 +199,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     transform: `rotate(${(i - 6) * 2}deg)`,
                   }}
                 >
-                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
@@ -221,7 +218,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Right (Seat 4) - Hand on table */}
+        {/* Right (Seat 4) - Hand on table (card backs only) */}
         {getPlayerAtSeat(4)?.hand?.length > 0 && (
           <div className="absolute right-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(-90deg)' }}>
@@ -235,7 +232,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     transform: `rotate(${(i - 6) * 2}deg)`,
                   }}
                 >
-                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
@@ -254,7 +251,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Bottom (Seat 1) - Hand on table */}
+        {/* Bottom (Seat 1) - Hand on table (card backs only) */}
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1.15)' }}>
@@ -268,7 +265,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     transform: `rotate(${(i - 6) * 2}deg)`,
                   }}
                 >
-                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
                 </div>
               ))}
             </div>
