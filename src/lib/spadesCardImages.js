@@ -66,8 +66,16 @@ const CLUBS_IMAGES = {
   'A': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/a05e77b99_Clubs-A.png',
 };
 
+const JOKER_IMAGES = {
+  'BJ': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/857028cf9_BigJoker.png',
+  'LJ': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/f18ea1d80_LittleJoker.png',
+};
+
 export function getCardImage(card) {
   if (!card) return null;
+  if (card.value === 'BJ' || card.value === 'LJ') {
+    return JOKER_IMAGES[card.value] || null;
+  }
   if (card.suit === '♠') {
     return SPADES_IMAGES[card.value] || null;
   }
