@@ -64,9 +64,10 @@ function SpadesViewer({ roomCode }) {
   // Auto-deal when it's setup phase (CPU or human dealer) - ONLY for CPU games
   useEffect(() => {
     if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
+    if (gs.phase !== 'setup' && gs.phase) return;
     
-    // Only auto-deal if in setup phase AND CPU is enabled
-    if (gs.phase === 'setup' || !gs.phase) {
+    // Only auto-deal if in setup phase AND no deck exists yet (human hasn't started dealing)
+    if (!gs.deck || gs.deck.length === 0) {
       const timer = setTimeout(async () => {
         // Shuffle 3 times then deal (with longer delays to avoid rate limit)
         for (let i = 0; i < 3; i++) {
