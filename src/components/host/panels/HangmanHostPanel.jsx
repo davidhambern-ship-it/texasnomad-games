@@ -27,7 +27,6 @@ const PARTS = [
   <line key="arm-r" x1="120" y1="100" x2="150" y2="125" stroke="#FFD700" strokeWidth="3" />,
   <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
   <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
-  <line key="foot-l" x1="90" y1="175" x2="75" y2="170" stroke="#FFD700" strokeWidth="3" />,
 ];
 
 function HangmanSVG({ wrongCount }) {
@@ -49,7 +48,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const isSetup = !gs.phase || gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
   const wrongCount = (gs.wrong_letters || []).length;
-  const maxWrong = gs.max_wrong || 7;
+  const maxWrong = gs.max_wrong || 6;
   const guessed = gs.guessed_letters || [];
   const wrong = gs.wrong_letters || [];
   const secretWord = (gs.secret_word || '').toUpperCase();

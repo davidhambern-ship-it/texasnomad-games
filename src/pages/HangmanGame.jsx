@@ -51,7 +51,7 @@ function HangmanViewer({ roomCode }) {
   const word = gs.secret_word || '';
   const guessed = gs.guessed_letters || [];
   const wrong = gs.wrong_letters || [];
-  const maxWrong = gs.max_wrong || 7;
+  const maxWrong = gs.max_wrong || 6;
   const wrongCount = wrong.length;
   const maskedWord = word.split('').map(ch => ch === ' ' ? ' ' : (guessed.includes(ch) || gs.word_revealed ? ch : '_'));
 
@@ -122,7 +122,7 @@ function HangmanViewer({ roomCode }) {
     });
   };
 
-  // Hangman SVG parts (rope is static, these 7 parts draw on each miss)
+  // Hangman SVG parts (rope is static gallows, these 6 parts draw on each miss)
   const parts = [
     <circle key="head" cx="120" cy="75" r="15" stroke="#FFD700" strokeWidth="3" fill="none" />,
     <line key="body" x1="120" y1="90" x2="120" y2="140" stroke="#FFD700" strokeWidth="3" />,
@@ -130,7 +130,6 @@ function HangmanViewer({ roomCode }) {
     <line key="arm-r" x1="120" y1="100" x2="150" y2="125" stroke="#FFD700" strokeWidth="3" />,
     <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
     <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
-    <line key="foot-l" x1="90" y1="175" x2="75" y2="170" stroke="#FFD700" strokeWidth="3" />,
   ];
 
   return (
