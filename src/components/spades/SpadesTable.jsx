@@ -16,7 +16,7 @@ const SEAT_POSITIONS = {
   4: 'right',
 };
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -25,6 +25,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
   const [shufflePhase, setShufflePhase] = useState('idle');
   const [dealPhase, setDealPhase] = useState('idle');
   const [animatingCard, setAnimatingCard] = useState(null);
+
+  const showCPUChoice = isPlayer && availableSeats.length > 0 && isSetup && !cpuChoiceShown;
 
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
 
@@ -66,6 +68,40 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   return (
     <div className="flex flex-col items-center p-4 gap-4 max-w-4xl mx-auto w-full">
+
+      {/* CPU Choice Modal */}
+      {showCPUChoice && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#FFD700]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3), inset 0 0 60px rgba(0,0,0,0.8)' }}>
+            <div className="text-center mb-6">
+              <div className="text-2xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>
+                🃏 Ready to Play?
+              </div>
+              <div className="text-white/60 text-sm">
+                {availableSeats.length} seat{availableSeats.length > 1 ? 's' : ''} available
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={onPlayAgainstCPU}
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105"
+                style={PS2}
+              >
+                🤖 Play vs CPU
+              </button>
+              <button
+                onClick={onWaitForRealPlayers}
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105"
+                style={PS2}
+              >
+                👥 Wait for Players
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Waiting / Status Banner */}
       {!isPlaying && !isBidding && (

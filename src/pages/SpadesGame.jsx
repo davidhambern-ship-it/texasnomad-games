@@ -39,9 +39,7 @@ function SpadesViewer({ roomCode }) {
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
   const [mySeatNumber, setMySeatNumber] = useState(null);
 
-  // CPU choice state
-  const [showCPUChoice, setShowCPUChoice] = useState(false);
-  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [cpuChoiceShown, setCpuChoiceShown] = useState(false);
 
   const containerRef = useRef(null);
   const gs = room?.game_state || {};
@@ -281,18 +279,24 @@ function SpadesViewer({ roomCode }) {
     const currentPlayers = gs.players || [];
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
     await updateState({ players: filledPlayers, cpu_enabled: true });
-    setShowCPUChoice(false);
     setNotification({ message: 'CPU players joined the table', type: 'success' });
   };
 
   const handleWaitForRealPlayers = async () => {
     if (!room) return;
-    setShowCPUChoice(false);
+    setCpuChoiceShown(false);
     setNotification({ message: 'Waiting for more players...', type: 'info' });
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
   const isSpectator = myRole === 'spectator';
+
+  // Show CPU choice when player sits and there are empty seats
+  useEffect(() => {
+    if (isPlayer && availableSeats.length > 0 && !gs.cpu_enabled && !cpuChoiceShown) {
+      setCpuChoiceShown(true);
+    }
+  }, [isPlayer, availableSeats.length, gs.cpu_enabled, cpuChoiceShown]);
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
@@ -324,6 +328,9 @@ function SpadesViewer({ roomCode }) {
             availableSeats={availableSeats}
             onSitInSeat={sitInSeat}
             roomCode={roomCode}
+            cpuChoiceShown={cpuChoiceShown}
+            onPlayAgainstCPU={handlePlayAgainstCPU}
+            onWaitForRealPlayers={handleWaitForRealPlayers}
           />
 
         </div>
