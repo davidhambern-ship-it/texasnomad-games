@@ -468,12 +468,18 @@ export default function SpadesHostPanel({ gs, updateState }) {
                 <button key={card.id || i} disabled={!isMyTurn}
                   onClick={async () => {
                     const trick = gs.current_trick || [];
+                    const newTrick = [...trick, { playerId: HOST_PLAYER_ID, seatNumber: hostInSeat.seatNumber, card }];
                     const updatedPlayers = players.map(p =>
                       p.playerId === HOST_PLAYER_ID ? { ...p, hand: p.hand.filter(c => c.id !== card.id) } : p
                     );
+                    // Advance turn to next seated player (to the left)
+                    const seated = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+                    const idx = seated.findIndex(p => p.seatNumber === hostInSeat.seatNumber);
+                    const nextSeat = seated[(idx + 1) % seated.length]?.seatNumber;
                     await updateState({
                       players: updatedPlayers,
-                      current_trick: [...trick, { playerId: HOST_PLAYER_ID, seatNumber: hostInSeat.seatNumber, card }],
+                      current_trick: newTrick,
+                      current_turn_seat: nextSeat || hostInSeat.seatNumber,
                     });
                   }}
                   className={`w-12 h-16 rounded-lg overflow-hidden border-2 transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-default shadow-md`}
