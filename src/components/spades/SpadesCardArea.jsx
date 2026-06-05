@@ -1,4 +1,5 @@
 import React from 'react';
+import { getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -42,14 +43,16 @@ export default function SpadesCardArea({ trick, players }) {
             const isRed = !isSpade && !isClub;
             return (
               <div key={i}
-                className="absolute w-12 h-16 rounded bg-white border-2 border-gray-300 flex flex-col items-center justify-center shadow-lg"
-                style={{ ...pos, position: 'absolute' }}>
-                <span className={`text-lg leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                  {play.card?.suit}
-                </span>
-                <span className={`text-xs leading-none font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-                  {play.card?.value}
-                </span>
+                className="absolute rounded-lg shadow-xl overflow-hidden"
+                style={{ ...pos, position: 'absolute', width: 52, height: 72 }}>
+                {getCardImage(play.card) ? (
+                  <img src={getCardImage(play.card)} alt={`${play.card?.value}${play.card?.suit}`} className="w-full h-full object-cover rounded-lg" />
+                ) : (
+                  <div className="w-full h-full rounded-lg bg-white border-2 border-gray-300 flex flex-col items-center justify-center">
+                    <span className={`text-lg leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.suit}</span>
+                    <span className={`text-xs leading-none font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{play.card?.value}</span>
+                  </div>
+                )}
               </div>
             );
           })}
