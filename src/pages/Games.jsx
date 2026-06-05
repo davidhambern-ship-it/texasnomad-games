@@ -404,7 +404,7 @@ export default function Games() {
           </div>
 
           <div className="relative">
-            <div className="text-[9px] tracking-[0.5em] uppercase mb-3 text-cyber-purple"
+            <div className="text-[9px] tracking-[0.5em] uppercase mb-3 text-kinetic-orange"
               style={{ fontFamily: "'Press Start 2P', monospace", textShadow: '0 0 15px #BC13FE' }}>
               ✦ TEXASNOMAD ARCADE ✦
             </div>
