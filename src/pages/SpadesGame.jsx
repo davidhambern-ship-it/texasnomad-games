@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
-import SeatNotification from '@/components/game/SeatNotification.jsx';
-import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SpadesTable from '@/components/spades/SpadesTable';
 import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
 
@@ -34,7 +32,6 @@ function SpadesViewer({ roomCode }) {
   });
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [notification, setNotification] = useState(null);
 
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
   const [mySeatNumber, setMySeatNumber] = useState(null);
@@ -245,7 +242,6 @@ function SpadesViewer({ roomCode }) {
     if (!room) return;
     if (availableSeats.length === 0) {
       await handleChooseSpectate();
-      setNotification({ message: 'All seats full — you are spectating', type: 'info' });
       return;
     }
     const seat = availableSeats[0];
@@ -280,13 +276,11 @@ function SpadesViewer({ roomCode }) {
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
     await updateState({ players: filledPlayers, cpu_enabled: true });
     setCpuChoiceShown(false);
-    setNotification({ message: 'CPU players joined the table', type: 'success' });
   };
 
   const handleWaitForRealPlayers = async () => {
     if (!room) return;
     setCpuChoiceShown(false);
-    setNotification({ message: 'Waiting for more players...', type: 'info' });
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
@@ -311,8 +305,6 @@ function SpadesViewer({ roomCode }) {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
-      <SeatNotification notification={notification} />
-
       {/* Role Selection Modal */}
       {showRoleSelection && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
