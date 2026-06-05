@@ -24,6 +24,16 @@ export default function SpadesCabinetImage() {
       <div className="absolute inset-0 pointer-events-none"
         style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(20,50,20,0.3) 0%, rgba(0,0,0,0.4) 100%)' }} />
 
+      {/* Curved text along top edge */}
+      <svg viewBox="0 0 200 60" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 200, height: 60, pointerEvents: 'none', zIndex: 30 }}>
+        <defs>
+          <path id="curve" d="M 10,10 Q 100,50 190,10" />
+        </defs>
+        <text fill="#FFD700" fontSize="9" fontFamily="'Rye', serif" letterSpacing="1.5" textAnchor="middle">
+          <textPath href="#curve" startOffset="50%">TexasNomad Spades</textPath>
+        </text>
+      </svg>
+
       <div className="relative flex items-end justify-center" style={{ width: 200, height: 110 }}>
         
         {/* Back-of-deck cards fanned */}
