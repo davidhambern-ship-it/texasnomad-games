@@ -264,7 +264,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl cursor-pointer"
+                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)] cursor-pointer"
                     style={{
                       width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
