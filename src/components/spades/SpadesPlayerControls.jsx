@@ -15,7 +15,7 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'sm', disabled = fal
   );
 };
 
-export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat }) {
+export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onDealStart }) {
   const [bidInput, setBidInput] = useState('');
   const [blindAmount, setBlindAmount] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
@@ -53,17 +53,48 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     
     setIsShuffling(true);
     
-    // Shuffle 3 times with animation
-    for (let i = 0; i < 3; i++) {
-      console.log('Shuffle iteration', i + 1);
-      const deck = generateFullDeck();
-      await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
-      await new Promise(resolve => setTimeout(resolve, 400));
-    }
+    // Start shuffle animation
+    onShuffleStart?.();
     
-    // Auto-deal after shuffling
-    console.log('Shuffling done, dealing cards...');
-    await handleDeal();
+    // Generate and set shuffled deck
+    const deck = shuffleDeck(generateFullDeck());
+    await updateState({ deck, deck_shuffled: true });
+    
+    // Wait for shuffle animation (2.5 seconds)
+    await new Promise(resolve => setTimeout(resolve, 2500));
+    
+    // Start deal animation
+    onDealStart?.();
+    
+    // Prepare dealt hands
+    const cardsPerPlayer = Math.floor(deck.length / seatedPlayers.length);
+    const updatedPlayers = (gs.players || []).map(p => {
+      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      const idx = seatedPlayers.findIndex(s => s.playerId === p.playerId);
+      const hand = deck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer);
+      return { ...p, hand, bid: null, tricksWon: 0 };
+    });
+    
+    const dealerSeat = seatedPlayers[0]?.seatNumber || 1;
+    const firstBidder = seatedPlayers[1]?.seatNumber || seatedPlayers[0]?.seatNumber;
+    
+    // Update state (deal animation shows cards flying from deck)
+    await updateState({
+      players: updatedPlayers, phase: 'bidding', status: 'active',
+      deck: deck, // Keep deck visible during deal animation
+      current_trick: [], current_bidder_seat: firstBidder, dealer_seat: dealerSeat,
+      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
+    });
+    
+    // Wait for deal animation (~4.5 seconds for 52 cards at 80ms each)
+    await new Promise(resolve => setTimeout(resolve, 4500));
+    
+    // Clear deck after deal
+    await updateState({
+      deck: [],
+      current_bidder_seat: firstBidder,
+    });
+    
     setIsShuffling(false);
     console.log('Deal complete');
   };
@@ -156,7 +187,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       
       <div className="flex flex-wrap gap-2 justify-center">
         <Btn onClick={handleShuffleAndDeal} color="#FFD700" size="sm" disabled={!isSetup || isShuffling}>
-          {isShuffling ? `🔀 Shuffling... (${gs.shuffle_count || 0}/3)` : '🔀 Shuffle & Deal'}
+          {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle & Deal'}
         </Btn>
         <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!hasCards && !hasBid}>
           ↺ Reset

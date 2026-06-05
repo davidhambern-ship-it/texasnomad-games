@@ -168,3 +168,78 @@
     radial-gradient(circle, #FFD700 2px, transparent 2px);
   background-size: 16px 16px;
 }
+
+/* Spades shuffle animations */
+@keyframes deck-spin {
+  0% { transform: rotate(0deg) scale(1); }
+  50% { transform: rotate(180deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+@keyframes particle-fade {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-30px) scale(0.5); }
+}
+
+@keyframes card-fly {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.8) rotate(0deg);
+  }
+  10% {
+    opacity: 1;
+    transform: translate(var(--start-x), var(--start-y)) scale(0.9) rotate(var(--start-rotation));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(var(--end-x), var(--end-y)) scale(1) rotate(var(--end-rotation));
+  }
+}
+
+@keyframes card-land {
+  0% {
+    transform: translate(var(--end-x), var(--end-y)) scale(1.05) rotate(var(--end-rotation));
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) scale(1) rotate(var(--end-rotation));
+  }
+}
+
+@keyframes card-play-fly {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), var(--start-y)) 
+      scale(1) rotate(var(--start-rotation));
+  }
+  10% {
+    opacity: 1;
+    transform: translate(
+      calc(var(--start-x) * 0.9), 
+      calc(var(--start-y) * 0.9)
+    ) scale(1.1) rotate(var(--start-rotation));
+  }
+  50% {
+    transform: translate(
+      calc(var(--start-x) * 0.5 + var(--end-x) * 0.5), 
+      calc(var(--start-y) * 0.5 + var(--end-y) * 0.5)
+    ) scale(1.15) rotate(calc(var(--start-rotation) * 0.5));
+  }
+  100% {
+    opacity: 1;
+    transform: translate(var(--end-x), var(--end-y)) 
+      scale(1) rotate(var(--end-rotation));
+  }
+}
+
+@keyframes card-play-land {
+  0% {
+    transform: translate(var(--end-x), var(--end-y)) 
+      scale(1.05) rotate(var(--end-rotation));
+    filter: brightness(1.3);
+  }
+  100% {
+    transform: translate(var(--end-x), var(--end-y)) 
+      scale(1) rotate(var(--end-rotation));
+    filter: brightness(1);
+  }
+}

@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import SpadesSeat from './SpadesSeat';
 import SpadesCardArea from './SpadesCardArea';
 import SpadesPlayerControls from './SpadesPlayerControls';
+import SpadesShuffleAnimation from './SpadesShuffleAnimation';
+import SpadesDealAnimation from './SpadesDealAnimation';
 import { getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -18,6 +20,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
+  const isSetup = !gs.phase || gs.phase === 'setup';
+
+  const [shufflePhase, setShufflePhase] = useState('idle');
+  const [dealPhase, setDealPhase] = useState('idle');
+  const [animatingCard, setAnimatingCard] = useState(null);
 
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
 
@@ -25,6 +32,13 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     if (!isPlayer || gs.current_turn_seat !== mySeatNumber) return;
     const me = players.find(p => p.playerId === playerId);
     if (!me) return;
+    
+    // Start card play animation
+    setAnimatingCard({ card, fromSeat: mySeatNumber });
+    
+    // Wait for animation to complete
+    await new Promise(resolve => setTimeout(resolve, 400));
+    
     const trick = gs.current_trick || [];
     const updatedPlayers = players.map(p =>
       p.playerId === playerId
@@ -35,6 +49,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       players: updatedPlayers,
       current_trick: [...trick, { playerId, seatNumber: mySeatNumber, card }],
     });
+    setAnimatingCard(null);
   };
 
   const myPlayer = players.find(p => p.playerId === playerId);
@@ -90,6 +105,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       <div className="relative w-full bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817] overflow-visible"
         style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)', minHeight: 400 }}>
 
+        {/* Table center logo */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-20">
+          <img 
+            src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" 
+            alt="TexasNomad Games" 
+            className="w-24 h-24 object-contain"
+          />
+        </div>
+
         {/* Top (Seat 3) */}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
           <SpadesSeat
@@ -132,8 +156,32 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Center trick area */}
-        <SpadesCardArea trick={gs.current_trick || []} players={players} />
+        {/* Center area with animations */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20">
+          {/* Shuffle animation */}
+          {shufflePhase !== 'idle' && (
+            <SpadesShuffleAnimation
+              phase={shufflePhase}
+              onComplete={() => setShufflePhase('idle')}
+            />
+          )}
+          
+          {/* Deal animation */}
+          {dealPhase !== 'idle' && gs.deck && (
+            <SpadesDealAnimation
+              deck={gs.deck}
+              players={players}
+              onComplete={() => setDealPhase('idle')}
+            />
+          )}
+          
+          {/* Card play animation placeholder - to be added */}
+          
+          {/* Trick cards (when no animation) */}
+          {!shufflePhase && !dealPhase && !animatingCard && (
+            <SpadesCardArea trick={gs.current_trick || []} players={players} />
+          )}
+        </div>
 
         {/* Bottom (Seat 1) */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
@@ -160,6 +208,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             gs={gs}
             updateState={updateState}
             isMySeat={true}
+            onShuffleStart={() => setShufflePhase('shuffling')}
+            onDealStart={() => setDealPhase('dealing')}
           />
 
           {/* Hand */}
