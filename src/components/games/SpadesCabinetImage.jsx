@@ -25,11 +25,11 @@ export default function SpadesCabinetImage() {
         style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(20,50,20,0.3) 0%, rgba(0,0,0,0.4) 100%)' }} />
 
       {/* Curved text along top edge */}
-      <svg viewBox="0 0 200 60" style={{ position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)', width: 200, height: 60, pointerEvents: 'none', zIndex: 30 }}>
+      <svg viewBox="0 0 300 55" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 55, pointerEvents: 'none', zIndex: 30 }}>
         <defs>
-          <path id="curve" d="M 10,40 Q 100,10 190,40" />
+          <path id="curve" d="M 5,45 Q 150,8 295,45" />
         </defs>
-        <text fill="#FFD700" fontSize="9" fontFamily="'Rye', serif" letterSpacing="1.5" textAnchor="middle">
+        <text fill="#FFD700" fontSize="14" fontFamily="'Rye', serif" letterSpacing="2" textAnchor="middle">
           <textPath href="#curve" startOffset="50%">TexasNomad Spades</textPath>
         </text>
       </svg>
