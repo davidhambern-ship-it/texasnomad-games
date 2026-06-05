@@ -151,25 +151,23 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Top (Seat 3) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 460 }}>
-            <div className="flex flex-col" style={{ transform: 'scale(1) rotate(180deg)' }}>
-              {getPlayerAtSeat(3).hand.map((card, i, arr) => {
-                const overlap = getVerticalOverlap(arr.length);
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 52, height: 73,
-                      marginTop: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
-                    }}
-                  >
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-                  </div>
-                );
-              })}
-            </div>
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex flex-col items-center" style={{ width: 80, height: 440 }}>
+            {getPlayerAtSeat(3).hand.map((card, i, arr) => {
+              const overlap = getVerticalOverlap(arr.length);
+              return (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 52, height: 73,
+                    marginTop: i > 0 ? `-${overlap}px` : '0',
+                    transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10">
@@ -187,25 +185,23 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Left (Seat 2) - Hand on table (card backs only) - vertical fan */}
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
-          <div className="absolute left-14 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center justify-center" style={{ width: 100, height: 460 }}>
-            <div className="flex flex-col" style={{ transform: 'scale(1) rotate(90deg)' }}>
-              {getPlayerAtSeat(2).hand.map((card, i, arr) => {
-                const overlap = getVerticalOverlap(arr.length);
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 52, height: 73,
-                      marginTop: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
-                    }}
-                  >
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-                  </div>
-                );
-              })}
-            </div>
+          <div className="absolute left-16 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 80, height: 440 }}>
+            {getPlayerAtSeat(2).hand.map((card, i, arr) => {
+              const overlap = getVerticalOverlap(arr.length);
+              return (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 52, height: 73,
+                    marginTop: i > 0 ? `-${overlap}px` : '0',
+                    transform: `rotate(-90deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                </div>
+              );
+            })}
           </div>
         )}
         <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
