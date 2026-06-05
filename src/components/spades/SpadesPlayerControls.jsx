@@ -76,12 +76,25 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const dealerSeat = allSeated[0]?.seatNumber || 1;
     const firstBidder = allSeated[1]?.seatNumber || allSeated[0]?.seatNumber;
     
+    // Check if CPU game - skip bidding on first hand
+    const hasCpu = allSeated.some(p => p.playerType === 'cpu');
+    
     // Update state with deck visible for deal animation
     await updateState({
-      players: updatedPlayers, phase: 'bidding', status: 'active',
+      players: updatedPlayers, 
+      phase: hasCpu ? 'playing' : 'bidding', 
+      status: 'active',
       deck: deck,
-      current_trick: [], current_bidder_seat: firstBidder, dealer_seat: dealerSeat,
-      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0,
+      current_trick: [], 
+      current_bidder_seat: hasCpu ? firstBidder : firstBidder,
+      current_turn_seat: hasCpu ? firstBidder : null,
+      dealer_seat: dealerSeat,
+      tricks_played: 0, 
+      bid1: hasCpu ? 0 : null, 
+      bid2: hasCpu ? 0 : null, 
+      books1: 0, 
+      books2: 0,
+      first_hand_no_bid: hasCpu,
     });
     
     // Start deal animation
@@ -112,7 +125,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     console.log('Cards per player:', cardsPerPlayer);
     const updatedPlayers = (gs.players || []).map(p => {
-      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      if (p.seatNumber == null) return p;
       const idx = seated.findIndex(s => s.playerId === p.playerId);
       const hand = workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer);
       console.log('Player', p.playerId.slice(0, 8), 'gets', hand.length, 'cards');
@@ -120,11 +133,27 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     });
     const dealerSeat = seated[0]?.seatNumber || 1;
     const firstBidder = seated[1]?.seatNumber || seated[0]?.seatNumber;
+    
+    // Check if CPU game - skip bidding on first hand
+    const hasCpu = seated.some(p => p.playerType === 'cpu');
+    
     console.log('Updating game state');
     await updateState({
-      players: updatedPlayers, phase: 'bidding', status: 'active',
-      deck: [], current_trick: [], current_bidder_seat: firstBidder, dealer_seat: dealerSeat,
-      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0, shuffle_count: 0,
+      players: updatedPlayers, 
+      phase: hasCpu ? 'playing' : 'bidding', 
+      status: 'active',
+      deck: [], 
+      current_trick: [], 
+      current_bidder_seat: hasCpu ? firstBidder : firstBidder,
+      current_turn_seat: hasCpu ? firstBidder : null,
+      dealer_seat: dealerSeat,
+      tricks_played: 0, 
+      bid1: hasCpu ? 0 : null, 
+      bid2: hasCpu ? 0 : null, 
+      books1: 0, 
+      books2: 0, 
+      shuffle_count: 0,
+      first_hand_no_bid: hasCpu,
     });
   };
 
