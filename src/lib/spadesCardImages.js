@@ -50,6 +50,22 @@ const DIAMONDS_IMAGES = {
   'A': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/e1ecc1e89_diamonds-A.png',
 };
 
+const CLUBS_IMAGES = {
+  '2': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6a0006e3f_Clubs-2.png',
+  '3': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/ec38e9f72_Clubs-3.png',
+  '4': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/026988259_Clubs-4.png',
+  '5': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/eab42cab6_Clubs-5.png',
+  '6': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/8efabb3d7_Clubs-6.png',
+  '7': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b514470ad_Clubs-7.png',
+  '8': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/cff0fcef2_Clubs-8.png',
+  '9': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c60d51092_Clubs-9.png',
+  '10': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b67e52883_Clubs-10.png',
+  'J': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/64f728cce_Clubs-J.png',
+  'Q': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6e4011eab_Clubs-Q.png',
+  'K': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c8264ce79_Clubs-K.png',
+  'A': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/a05e77b99_Clubs-A.png',
+};
+
 export function getCardImage(card) {
   if (!card) return null;
   if (card.suit === '♠') {
@@ -60,6 +76,9 @@ export function getCardImage(card) {
   }
   if (card.suit === '♦') {
     return DIAMONDS_IMAGES[card.value] || null;
+  }
+  if (card.suit === '♣') {
+    return CLUBS_IMAGES[card.value] || null;
   }
   return null;
 }
