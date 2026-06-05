@@ -1,6 +1,7 @@
 import React from 'react';
 import SpadesSeat from './SpadesSeat';
 import SpadesCardArea from './SpadesCardArea';
+import SpadesPlayerControls from './SpadesPlayerControls';
 import { getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -140,42 +141,56 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         </div>
       </div>
 
-      {/* My Hand */}
-      {isPlayer && myHand.length > 0 && (
-        <div className="w-full p-4 border border-[#4ade80]/30 rounded-xl bg-black/40">
-          <div className="text-[8px] tracking-widest text-[#4ade80]/60 uppercase mb-3" style={PS2}>
-            Your Hand — {myHand.length} cards
-            {gs.current_turn_seat === mySeatNumber && <span className="ml-3 text-[#FFD700]">▶ YOUR TURN</span>}
-          </div>
-          <div className="flex flex-wrap gap-2 justify-center">
-            {myHand.map((card, i) => {
-              const imgSrc = getCardImage(card);
-              const isRed = card.suit === '♥' || card.suit === '♦';
-              const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
-              return (
-                <button
-                  key={card.id || i}
-                  onClick={() => playCard(card)}
-                  disabled={!isMyTurn}
-                  className="relative rounded-lg overflow-hidden transition-all hover:scale-110 hover:-translate-y-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-xl"
-                  style={{
-                    width: 64, height: 90,
-                    border: isMyTurn ? '2px solid #4ade80' : '2px solid transparent',
-                    boxShadow: isMyTurn ? '0 0 14px rgba(74,222,128,0.5)' : '0 4px 12px rgba(0,0,0,0.5)',
-                  }}
-                >
-                  {imgSrc ? (
-                    <img src={imgSrc} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full bg-white flex flex-col items-center justify-center">
-                      <span className={`text-xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                      <span className={`text-sm leading-none font-bold mt-0.5 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.value}</span>
-                    </div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+      {/* My Hand and Controls */}
+      {isPlayer && myPlayer && (
+        <div className="w-full space-y-3">
+          {/* Player Controls */}
+          <SpadesPlayerControls
+            seatNumber={mySeatNumber}
+            player={myPlayer}
+            gs={gs}
+            updateState={updateState}
+            isMySeat={true}
+          />
+
+          {/* Hand */}
+          {myHand.length > 0 && (
+            <div className="w-full p-4 border border-[#4ade80]/30 rounded-xl bg-black/40">
+              <div className="text-[8px] tracking-widest text-[#4ade80]/60 uppercase mb-3" style={PS2}>
+                Your Hand — {myHand.length} cards
+                {gs.current_turn_seat === mySeatNumber && <span className="ml-3 text-[#FFD700]">▶ YOUR TURN</span>}
+              </div>
+              <div className="flex flex-wrap gap-2 justify-center">
+                {myHand.map((card, i) => {
+                  const imgSrc = getCardImage(card);
+                  const isRed = card.suit === '♥' || card.suit === '♦';
+                  const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
+                  return (
+                    <button
+                      key={card.id || i}
+                      onClick={() => playCard(card)}
+                      disabled={!isMyTurn}
+                      className="relative rounded-lg overflow-hidden transition-all hover:scale-110 hover:-translate-y-2 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed shadow-xl"
+                      style={{
+                        width: 64, height: 90,
+                        border: isMyTurn ? '2px solid #4ade80' : '2px solid transparent',
+                        boxShadow: isMyTurn ? '0 0 14px rgba(74,222,128,0.5)' : '0 4px 12px rgba(0,0,0,0.5)',
+                      }}
+                    >
+                      {imgSrc ? (
+                        <img src={imgSrc} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-white flex flex-col items-center justify-center">
+                          <span className={`text-xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
+                          <span className={`text-sm leading-none font-bold mt-0.5 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.value}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
