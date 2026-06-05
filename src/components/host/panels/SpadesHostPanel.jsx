@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
+import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -97,6 +98,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const [targetScore, setTargetScore] = useState(gs.targetScore || 500);
   const [cpuProcessing, setCpuProcessing] = useState(false);
   const [isShuffling, setIsShuffling] = useState(false);
+  const [shufflePhase, setShufflePhase] = useState('idle');
 
   const players = gs.players || [];
   const isSetup = !gs.phase || gs.phase === 'setup';
@@ -186,9 +188,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleShuffle = async () => {
     if (isShuffling) return;
     setIsShuffling(true);
+    setShufflePhase('shuffling');
     const deck = shuffleDeck(generateFullDeck());
     await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
-    setIsShuffling(false);
+    // isShuffling reset happens when animation completes via onComplete
   };
 
   const handleNewDeck = async () => {
@@ -337,7 +340,16 @@ export default function SpadesHostPanel({ gs, updateState }) {
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
           <HostSeatSlot seatNumber={4} player={getPlayerAtSeat(4)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
         </div>
-        <SpadesCardArea trick={gs.current_trick || []} players={players} />
+        {shufflePhase !== 'idle' ? (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 z-20">
+            <SpadesShuffleAnimation
+              phase={shufflePhase}
+              onComplete={() => { setShufflePhase('idle'); setIsShuffling(false); }}
+            />
+          </div>
+        ) : (
+          <SpadesCardArea trick={gs.current_trick || []} players={players} />
+        )}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
           <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} onSetBid={setPlayerBid} />
         </div>
