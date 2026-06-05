@@ -297,8 +297,8 @@ function BFFViewer({ roomCode }) {
     );
   }
 
-  // Participant: family selection (if no family yet and game is playing)
-  if (isParticipant && !myFamily && isPlaying) {
+  // Participant: family selection (if no family yet)
+  if (isParticipant && !myFamily) {
     return (
       <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
         <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
