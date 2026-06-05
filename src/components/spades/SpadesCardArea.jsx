@@ -12,9 +12,12 @@ const TRICK_POSITIONS = {
 };
 
 export default function SpadesCardArea({ trick, players }) {
+  // Hide deck after cards are dealt (when players have cards in hand)
+  const hasDealtCards = players?.some(p => p.hand && p.hand.length > 0);
+  
   return (
     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56">
-      {trick.length === 0 ? (
+      {trick.length === 0 && !hasDealtCards ? (
         <div className="w-full h-full flex items-center justify-center">
           {/* Deck of cards visual */}
           <div className="relative w-20 h-28">

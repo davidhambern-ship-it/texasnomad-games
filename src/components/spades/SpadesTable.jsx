@@ -39,7 +39,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   const myPlayer = players.find(p => p.playerId === playerId);
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
-  
+
   // Sort hand by suit (clubs, diamonds, hearts, spades) then by value
   const sortedHand = myHand.length > 0 ? [...myHand].sort((a, b) => {
     const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
@@ -182,11 +182,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                       className="relative rounded-xl overflow-hidden transition-all hover:scale-110 hover:-translate-y-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl"
                       style={{
                         width: 72, height: 100,
-                        border: isMyTurn ? '3px solid #4ade80' : '2px solid rgba(255,255,255,0.3)',
+                        border: isMyTurn ? '3px solid #4ade80' : '2px solid rgba(255,255,255,0.4)',
                         boxShadow: isMyTurn 
-                          ? '0 0 20px rgba(74,222,128,0.6), 0 8px 16px rgba(0,0,0,0.4)' 
-                          : '0 4px 16px rgba(0,0,0,0.5), inset 0 0 8px rgba(255,255,255,0.1)',
-                        filter: 'brightness(1.15) contrast(1.05)',
+                          ? '0 0 24px rgba(74,222,128,0.7), 0 8px 16px rgba(0,0,0,0.5)' 
+                          : '0 4px 16px rgba(0,0,0,0.6), inset 0 0 8px rgba(255,255,255,0.15)',
+                        filter: 'brightness(1.25) contrast(1.15) saturate(1.1)',
                       }}
                     >
                       {imgSrc ? (
@@ -194,7 +194,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                           src={imgSrc} 
                           alt={`${card.value}${card.suit}`} 
                           className="w-full h-full object-cover"
-                          style={{ filter: 'brightness(1.1) contrast(1.05)' }}
+                          style={{ filter: 'brightness(1.2) contrast(1.15) saturate(1.1)' }}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-white to-gray-100 flex flex-col items-center justify-center rounded-xl">

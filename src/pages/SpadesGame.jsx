@@ -72,14 +72,11 @@ function SpadesViewer({ roomCode }) {
     if (myRole) setOverlayState('done');
   }, []);
 
-  // Auto-deal when CPU becomes dealer
+  // Auto-deal when it's setup phase (CPU or human dealer)
   useEffect(() => {
-    if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
+    if (!room || !gs.dealer_seat) return;
     
-    const dealerPlayer = players.find(p => p.seatNumber === gs.dealer_seat);
-    if (!dealerPlayer || dealerPlayer.playerType !== 'cpu') return;
-    
-    // Only auto-deal if in setup phase and CPU is dealer
+    // Only auto-deal if in setup phase
     if (gs.phase === 'setup' || !gs.phase) {
       const timer = setTimeout(async () => {
         // Shuffle 3 times then deal
@@ -88,10 +85,12 @@ function SpadesViewer({ roomCode }) {
           await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
           await new Promise(resolve => setTimeout(resolve, 400));
         }
+        // After shuffling, deal the cards
+        await handleAutoDeal();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
+  }, [gs.dealer_seat, gs.phase, room]);
 
   const handleAutoDeal = async () => {
     const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
@@ -105,10 +104,26 @@ function SpadesViewer({ roomCode }) {
     });
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
+    
+    // "First hand bids itself" - auto-bid for all players
+    const autoBidPlayers = updatedPlayers.map(p => {
+      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      // Simple auto-bid logic: count spades and high cards
+      const spadesCount = (p.hand || []).filter(c => c.suit === '♠').length;
+      const aces = (p.hand || []).filter(c => c.value === 'A').length;
+      const kings = (p.hand || []).filter(c => c.value === 'K').length;
+      const autoBid = Math.min(13, spadesCount + Math.floor((aces + kings) / 2));
+      return { ...p, bid: autoBid };
+    });
+    
+    // Calculate team bids (players without team are team 2)
+    const team1Bid = autoBidPlayers.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
+    const team2Bid = autoBidPlayers.filter(p => p.team === 2 || !p.team).reduce((sum, p) => sum + (p.bid || 0), 0);
+    
     await updateState({
-      players: updatedPlayers, phase: 'bidding', status: 'active',
-      deck: [], current_trick: [], current_bidder_seat: firstBidder,
-      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0, shuffle_count: 0,
+      players: autoBidPlayers, phase: 'playing', status: 'active',
+      deck: [], current_trick: [], current_turn_seat: firstBidder,
+      tricks_played: 0, bid1: team1Bid, bid2: team2Bid, books1: 0, books2: 0, shuffle_count: 0,
     });
   };
 
