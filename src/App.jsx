@@ -15,6 +15,7 @@ import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import HostPanel from '@/pages/HostPanel';
+import Games from '@/pages/Games';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -50,7 +51,7 @@ const AuthenticatedApp = () => {
     <Routes>
       <Route path="/welcome" element={<Welcome />} />
       <Route path="/" element={<HomeGate />} />
-      <Route path="/games" element={<PlaceholderPage />} />
+      <Route path="/games" element={<Games />} />
       <Route path="/games/bff" element={<BFFGame />} />
       <Route path="/games/square-biz" element={<SquareBizGame />} />
       <Route path="/games/hangman" element={<HangmanGame />} />
