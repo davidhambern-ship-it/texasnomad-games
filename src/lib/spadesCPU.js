@@ -190,7 +190,7 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
   const partner = players.find(p => p.seatNumber === partnerSeat);
   const actualPartnerBid = partner?.bid || 0;
 
-  const context = buildContext(hand, trick, actualPartnerBid, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds);
+  const context = buildContext(hand, trick, actualPartnerBid, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds || new Set());
 
   if (trick.length === 0) {
     return selectLeadCard(context);
@@ -200,6 +200,10 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
 
 // Build a context object for strategic decisions
 function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds) {
+  // Ensure playedCardIds is a Set
+  if (!(playedCardIds instanceof Set)) {
+    playedCardIds = new Set();
+  }
   const players = gameState.players || [];
   const myTeam = getTeamFromSeat(mySeatNumber);
   const partnerSeat = mySeatNumber === 1 ? 3 : mySeatNumber === 3 ? 1 : mySeatNumber === 2 ? 4 : 2;
@@ -234,10 +238,10 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
 
   // Cards still alive (not yet played) by suit — for memory
   const remainingHigh = {
-    BJ: !playedCardIds.has('BigJoker'),
-    LJ: !playedCardIds.has('LittleJoker'),
-    AS: !playedCardIds.has('♠A'),
-    KS: !playedCardIds.has('♠K'),
+    BJ: !playedCardIds?.has('BigJoker'),
+    LJ: !playedCardIds?.has('LittleJoker'),
+    AS: !playedCardIds?.has('♠A'),
+    KS: !playedCardIds?.has('♠K'),
   };
 
   return {
@@ -253,13 +257,15 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
 function collectPlayedCards(gameState, currentTrick) {
   const ids = new Set();
   // Cards in the current trick
-  for (const play of (currentTrick || [])) {
-    if (play.card?.id) ids.add(play.card.id);
+  if (Array.isArray(currentTrick)) {
+    for (const play of currentTrick) {
+      if (play.card?.id) ids.add(play.card.id);
+    }
   }
   // Also check completed_books for historical plays
-  const completedBooks = gameState.completed_books || [];
+  const completedBooks = Array.isArray(gameState.completed_books) ? gameState.completed_books : [];
   for (const book of completedBooks) {
-    const cardsPlayed = book.cardsPlayed || [];
+    const cardsPlayed = Array.isArray(book.cardsPlayed) ? book.cardsPlayed : [];
     for (const play of cardsPlayed) {
       if (play.card?.id) ids.add(play.card.id);
     }
