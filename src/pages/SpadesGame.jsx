@@ -1,18 +1,18 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
-import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
-import RoleSelection from '@/components/game/RoleSelection.jsx';
+import SpadesTable from '@/components/spades/SpadesTable';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+const SPADES_SEATS = [1, 2, 3, 4];
 
 export default function SpadesGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   if (!roomCode) {
-    window.location.href = '/';
+    window.location.href = '/games';
     return null;
   }
   return <SpadesViewer roomCode={roomCode} />;
@@ -20,16 +20,29 @@ export default function SpadesGame() {
 
 function SpadesViewer({ roomCode }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'spades', 'viewer');
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'spades', updateState);
+
+  // Stable playerId per room
+  const [playerId] = useState(() => {
+    const key = `tn_pid_${roomCode}`;
+    let id = localStorage.getItem(key);
+    if (!id) {
+      id = 'p_' + Math.random().toString(36).slice(2, 10) + '_' + Date.now().toString(36);
+      localStorage.setItem(key, id);
+    }
+    return id;
+  });
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
+
+  // overlay: null = not shown, 'choosing' = show sit/spectate, 'done' = chosen
+  const [overlayState, setOverlayState] = useState('choosing');
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
-  const [roleLoading, setRoleLoading] = useState(false);
-  const [myTeam, setMyTeam] = useState(null);
+  const [mySeatNumber, setMySeatNumber] = useState(null);
 
   const containerRef = useRef(null);
   const gs = room?.game_state || {};
+  const players = gs.players || [];
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
@@ -37,87 +50,165 @@ function SpadesViewer({ roomCode }) {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // Sync my seat from room state on load / updates
   useEffect(() => {
-    if (!playerId || !gs.players) return;
-    const me = (gs.players || []).find(p => p.playerId === playerId);
-    if (me?.team && !myTeam) setMyTeam(me.team);
-  }, [gs.players, playerId]);
-
-  const handleChooseRole = async (role) => {
-    setRoleLoading(true);
-    try {
-      const updatedPlayers = (gs.players || []).map(p =>
-        p.playerId === playerId ? { ...p, role } : p
-      );
-      await updateState({ players: updatedPlayers });
-      localStorage.setItem(`spades_role_${roomCode}`, role);
-      setMyRole(role);
-    } finally {
-      setRoleLoading(false);
+    if (!room || !playerId) return;
+    const me = players.find(p => p.playerId === playerId);
+    if (me) {
+      setMySeatNumber(me.seatNumber);
+      setMyRole(me.role);
+      localStorage.setItem(`spades_role_${roomCode}`, me.role);
+      setOverlayState('done');
     }
-  };
+  }, [room, playerId]);
 
-  const handleChooseTeam = async (team) => {
-    const updatedPlayers = (gs.players || []).map(p =>
-      p.playerId === playerId ? { ...p, team, role: 'participant' } : p
-    );
+  // If we already have a saved role, skip overlay
+  useEffect(() => {
+    if (myRole) setOverlayState('done');
+  }, []);
+
+  const occupiedSeats = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').map(p => p.seatNumber);
+  const availableSeats = SPADES_SEATS.filter(s => !occupiedSeats.includes(s));
+
+  const handleChooseSpectate = async () => {
+    if (!room) return;
+    const newPlayer = {
+      playerId,
+      seatNumber: null,
+      role: 'spectator',
+      connected: true,
+      joinedAt: Date.now(),
+      lastActionAt: Date.now(),
+    };
+    const existing = players.find(p => p.playerId === playerId);
+    const updatedPlayers = existing
+      ? players.map(p => p.playerId === playerId ? { ...p, role: 'spectator', connected: true } : p)
+      : [...players, newPlayer];
     await updateState({ players: updatedPlayers });
-    setMyTeam(team);
+    localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
+    setMyRole('spectator');
+    setOverlayState('done');
   };
 
-  const players = gs.players || [];
-  const isParticipant = myRole === 'participant';
-  const isPlaying = gs.phase === 'playing';
+  const handleChooseSit = async () => {
+    if (!room) return;
+    if (availableSeats.length === 0) {
+      await handleChooseSpectate();
+      setNotification({ message: 'All seats full — you are spectating', type: 'info' });
+      return;
+    }
+    const seat = availableSeats[0];
+    await sitInSeat(seat);
+  };
 
-  if (isSeated && !myRole) {
-    return (
-      <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
-        <SpadesHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
-        <RoleSelection
-          roomCode={roomCode}
-          seatNumber={seatNumber}
-          onChooseRole={handleChooseRole}
-          loading={roleLoading}
-        />
-      </div>
-    );
-  }
+  const sitInSeat = async (seatNum) => {
+    if (!room) return;
+    const newPlayer = {
+      playerId,
+      seatNumber: seatNum,
+      role: 'player',
+      connected: true,
+      joinedAt: Date.now(),
+      lastActionAt: Date.now(),
+    };
+    const existing = players.find(p => p.playerId === playerId);
+    const updatedPlayers = existing
+      ? players.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', connected: true } : p)
+      : [...players, newPlayer];
+    await updateState({ players: updatedPlayers });
+    localStorage.setItem(`spades_role_${roomCode}`, 'player');
+    setMyRole('player');
+    setMySeatNumber(seatNum);
+    setOverlayState('done');
+  };
 
-  if (isParticipant && !myTeam) {
-    return (
-      <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
-        <SpadesHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
-        <TeamSelector gs={gs} onChoose={handleChooseTeam} />
-      </div>
-    );
-  }
+  const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
+  const isSpectator = myRole === 'spectator';
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
       <SeatNotification notification={notification} />
-      <SpadesHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
+      <SpadesHeader
+        roomCode={roomCode}
+        room={room}
+        isFullscreen={isFullscreen}
+        containerRef={containerRef}
+        seatNumber={mySeatNumber}
+        isSeated={isPlayer}
+        myRole={myRole}
+      />
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : !isPlaying ? (
-        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} role={myRole} gs={gs} />
       ) : (
-        <GameScreen
-          gs={gs}
-          playerId={playerId}
-          seatNumber={seatNumber}
-          players={players}
-          isParticipant={isParticipant}
-          myTeam={myTeam}
-        />
+        <div className="flex-1 relative">
+          {/* Game board always visible behind overlay */}
+          <div className={overlayState === 'choosing' ? 'filter blur-sm pointer-events-none select-none' : ''}>
+            <SpadesTable
+              gs={gs}
+              playerId={playerId}
+              mySeatNumber={mySeatNumber}
+              myRole={myRole}
+              isPlayer={isPlayer}
+              isSpectator={isSpectator}
+              updateState={updateState}
+              availableSeats={availableSeats}
+              onSitInSeat={sitInSeat}
+              roomCode={roomCode}
+            />
+          </div>
+
+          {/* Sit or Spectate Overlay */}
+          {overlayState === 'choosing' && (
+            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+              <div className="max-w-sm w-full mx-4 p-8 rounded-2xl border-2 border-[#BC13FE]/60 bg-[#070311]/95 text-center"
+                style={{ boxShadow: '0 0 60px rgba(188,19,254,0.3)' }}>
+                <div className="text-4xl mb-4">♠️</div>
+                <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2">SPADES</div>
+                <div className="text-[8px] tracking-widest text-white/40 uppercase mb-6" style={PS2}>
+                  ROOM {roomCode}
+                </div>
+                <div className="font-heading text-lg tracking-widest text-white uppercase mb-6">
+                  Would you like to sit or spectate?
+                </div>
+                {availableSeats.length > 0 ? (
+                  <div className="text-[7px] text-[#4ade80]/60 mb-6 uppercase" style={PS2}>
+                    {availableSeats.length} seat{availableSeats.length !== 1 ? 's' : ''} available
+                  </div>
+                ) : (
+                  <div className="text-[7px] text-[#FF5F1F]/60 mb-6 uppercase" style={PS2}>
+                    All 4 seats taken — spectate only
+                  </div>
+                )}
+                <div className="flex gap-4">
+                  <button
+                    onClick={handleChooseSit}
+                    disabled={availableSeats.length === 0}
+                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
+                    style={{ borderColor: '#4ade80', color: '#4ade80', background: 'rgba(74,222,128,0.08)' }}
+                  >
+                    Sit
+                  </button>
+                  <button
+                    onClick={handleChooseSpectate}
+                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
+                    style={{ borderColor: '#BC13FE', color: '#BC13FE', background: 'rgba(188,19,254,0.08)' }}
+                  >
+                    Spectate
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
 }
 
-function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, isSeated }) {
+function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, isSeated, myRole }) {
   return (
     <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#070311]/90 backdrop-blur-xl">
       <div className="px-4 h-12 flex items-center justify-between gap-2">
@@ -135,10 +226,19 @@ function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, 
               🔴 HOST LIVE
             </span>
           )}
+          {myRole === 'spectator' && (
+            <span className="px-2 py-0.5 bg-white/10 border border-white/20 rounded text-white/40 text-[7px] tracking-widest uppercase" style={PS2}>
+              👁 SPECTATING
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <SeatBadge seatNumber={seatNumber} isSeated={isSeated} />
-          <Link to="/" className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase hidden sm:block" style={PS2}>← LOBBY</Link>
+          {isSeated && seatNumber && (
+            <div className="px-2 py-1 rounded border border-[#BC13FE] bg-[#BC13FE]/10 text-[7px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>
+              SEAT {seatNumber}
+            </div>
+          )}
+          <Link to="/games" className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase hidden sm:block" style={PS2}>← LOBBY</Link>
           <button
             onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
             className="px-2 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[7px] tracking-widest uppercase" style={PS2}>
@@ -148,122 +248,4 @@ function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, 
       </div>
     </header>
   );
-}
-
-function TeamSelector({ gs, onChoose }) {
-  return (
-    <div className="flex-1 flex items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-6 text-center">
-        <div>
-          <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2">Choose Your Team</div>
-          <div className="text-[8px] tracking-widest text-white/40 uppercase" style={PS2}>Pick your partner</div>
-        </div>
-        <div className="grid grid-cols-2 gap-4">
-          {[
-            { team: 1, name: 'Team 1', color: '#BC13FE' },
-            { team: 2, name: 'Team 2', color: '#FF5F1F' },
-          ].map(({ team, name, color }) => (
-            <button key={team} onClick={() => onChoose(team)}
-              className="p-6 rounded-xl border-2 transition-all hover:scale-105 active:scale-95 text-center"
-              style={{ borderColor: `${color}60`, background: `${color}08` }}>
-              <div className="font-heading text-lg tracking-widest uppercase mb-2" style={{ color }}>{name}</div>
-              <div className="text-[8px] text-white/40 uppercase" style={PS2}>Partner across the table</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GameScreen({ gs, playerId, seatNumber, players, isParticipant, myTeam }) {
-  const isPlaying = gs.phase === 'playing';
-
-  return (
-    <div className="flex-1 flex flex-col p-4 gap-4 max-w-4xl mx-auto w-full">
-      {/* Table Layout */}
-      <div className="flex-1 relative bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817]" style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)', minHeight: '500px' }}>
-        {/* Center - Deck of Cards */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-44 rounded-lg bg-white border-2 border-gray-300 shadow-xl"
-          style={{ background: 'linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%)' }}>
-          {/* Card back pattern */}
-          <div className="absolute inset-2 rounded border border-gray-400"
-            style={{ background: 'repeating-linear-gradient(45deg, #1a4d8f 0px, #1a4d8f 8px, #154080 8px, #154080 16px)' }} />
-          {/* Waiting message overlay */}
-          {!isPlaying && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 rounded-lg">
-              <div className="text-center px-4">
-                <div className="text-lg tracking-widest text-white/80 uppercase mb-2" style={PS2}>Waiting for</div>
-                <div className="text-2xl tracking-widest text-[#FFD700] uppercase text-glow-gold" style={PS2}>Host/Players</div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Player Positions */}
-        {/* Top (Partner) */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 text-center">
-          <div className="px-4 py-2 rounded-lg border border-[#BC13FE]/40 bg-[#BC13FE]/10">
-            <div className="text-[7px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>Partner</div>
-            <div className="text-[8px] text-white/60" style={PS2}>Seat ?</div>
-          </div>
-        </div>
-
-        {/* Bottom (You) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-center">
-          <div className="px-4 py-2 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10">
-            <div className="text-[7px] tracking-widest text-[#4ade80] uppercase" style={PS2}>You</div>
-            <div className="text-[8px] text-white" style={PS2}>Seat {seatNumber}</div>
-          </div>
-          {/* Hand placeholder */}
-          <div className="mt-2 flex gap-1 justify-center">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="w-10 h-14 rounded bg-white border border-gray-300 shadow-lg"
-                style={{ background: 'linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%)' }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Left (Opponent 1) */}
-        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-center">
-          <div className="px-4 py-2 rounded-lg border border-[#FF5F1F]/40 bg-[#FF5F1F]/10">
-            <div className="text-[7px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>Opponent</div>
-            <div className="text-[8px] text-white/60" style={PS2}>Seat ?</div>
-          </div>
-        </div>
-
-        {/* Right (Opponent 2) */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 text-center">
-          <div className="px-4 py-2 rounded-lg border border-[#FF5F1F]/40 bg-[#FF5F1F]/10">
-            <div className="text-[7px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>Opponent</div>
-            <div className="text-[8px] text-white/60" style={PS2}>Seat ?</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Score Board */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="p-4 border-2 rounded-xl text-center" style={{ borderColor: '#BC13FE30', background: '#BC13FE08' }}>
-          <div className="font-heading text-sm tracking-widest text-white uppercase">Team 1</div>
-          <div className="font-heading text-2xl text-[#BC13FE] mt-1">{gs.score1 || 0}</div>
-          <div className="text-[7px] text-white/30 mt-1" style={PS2}>Bid: {gs.bid1 || '-'}</div>
-        </div>
-        <div className="p-4 border-2 rounded-xl text-center" style={{ borderColor: '#FF5F1F30', background: '#FF5F1F08' }}>
-          <div className="font-heading text-sm tracking-widest text-white uppercase">Team 2</div>
-          <div className="font-heading text-2xl text-[#FF5F1F] mt-1">{gs.score2 || 0}</div>
-          <div className="text-[7px] text-white/30 mt-1" style={PS2}>Bid: {gs.bid2 || '-'}</div>
-        </div>
-      </div>
-
-      {!isParticipant && (
-        <div className="text-center px-4 py-3 border border-white/10 rounded-xl bg-white/5">
-          <div className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>👁 Watching — no controls</div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function WaitingScreen({ isSeated, seatNumber, role, gs }) {
-  return null;
 }
