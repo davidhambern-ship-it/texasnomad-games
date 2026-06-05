@@ -46,7 +46,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const isSetup = !gs.phase || gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
   const wrongCount = (gs.wrong_letters || []).length;
-  const maxWrong = gs.max_wrong || 6;
+  const maxWrong = gs.max_wrong || 7;
   const guessed = gs.guessed_letters || [];
   const wrong = gs.wrong_letters || [];
   const secretWord = (gs.secret_word || '').toUpperCase();

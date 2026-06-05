@@ -51,7 +51,7 @@ function HangmanViewer({ roomCode }) {
   const word = gs.secret_word || '';
   const guessed = gs.guessed_letters || [];
   const wrong = gs.wrong_letters || [];
-  const maxWrong = gs.max_wrong || 6;
+  const maxWrong = gs.max_wrong || 7;
   const wrongCount = wrong.length;
   const maskedWord = word.split('').map(ch => ch === ' ' ? ' ' : (guessed.includes(ch) || gs.word_revealed ? ch : '_'));
 
