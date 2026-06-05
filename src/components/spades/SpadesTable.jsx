@@ -154,6 +154,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex flex-col items-center" style={{ width: 80, height: 440 }}>
             {getPlayerAtSeat(3).hand.map((card, i, arr) => {
               const overlap = getVerticalOverlap(arr.length);
+              const fanAngle = (i - (arr.length - 1) / 2) * 3;
               return (
                 <div
                   key={card.id || i}
@@ -161,7 +162,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                   style={{
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(${180 + (i - (arr.length - 1) / 2) * 2}deg)`,
+                    transform: `rotate(${180 + fanAngle}deg)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
