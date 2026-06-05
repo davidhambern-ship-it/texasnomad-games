@@ -98,7 +98,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
   const glowColor2 = game.color2 || game.color;
 
   const handleJoin = () => {
-    if (!roomCode || !roomCode.trim()) return;
+    if (!roomCode || !String(roomCode).trim()) return;
     setJoining(true);
     onJoinRoom(game.id, roomCode);
     setTimeout(() => setJoining(false), 2000);
@@ -209,7 +209,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
             />
             <button
               onClick={handleJoin}
-              disabled={!roomCode.trim() || joining}
+              disabled={!String(roomCode || '').trim() || joining}
               className="px-3 py-2 rounded-lg font-heading text-xs tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-30"
               style={{ background: `${glowColor2}20`, border: `1px solid ${glowColor2}60`, color: glowColor2 }}
             >
