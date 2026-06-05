@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
+import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -362,7 +363,6 @@ export default function SpadesHostPanel({ gs, updateState }) {
           </div>
           <div className="flex flex-wrap gap-2">
             {hostInSeat.hand.map((card, i) => {
-              const isRed = card.suit === '♥' || card.suit === '♦';
               const isMyTurn = gs.current_turn_seat === hostInSeat.seatNumber && isPlaying;
               return (
                 <button key={card.id || i} disabled={!isMyTurn}
@@ -376,11 +376,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
                       current_trick: [...trick, { playerId: HOST_PLAYER_ID, seatNumber: hostInSeat.seatNumber, card }],
                     });
                   }}
-                  className={`w-12 h-16 rounded-lg border-2 flex flex-col items-center justify-center font-heading text-sm transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-default shadow-md ${isRed ? 'text-red-600' : 'text-gray-900'}`}
-                  style={{ background: 'linear-gradient(180deg,#fff 0%,#f0f0f0 100%)', borderColor: isMyTurn ? '#4ade80' : '#d1d5db' }}
+                  className={`w-12 h-16 rounded-lg overflow-hidden border-2 transition-all hover:scale-110 active:scale-95 disabled:opacity-50 disabled:cursor-default shadow-md`}
+                  style={{ borderColor: isMyTurn ? '#4ade80' : 'transparent' }}
                 >
-                  <span className="text-base leading-none">{card.suit}</span>
-                  <span className="text-[10px] leading-none mt-0.5">{card.value}</span>
+                  <img src={getCardImage(card)} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" onError={(e) => { e.target.src = getCardBack(); }} />
                 </button>
               );
             })}
