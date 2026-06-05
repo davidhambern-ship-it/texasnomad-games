@@ -20,6 +20,28 @@ const Btn = ({ children, onClick, color = '#FFD700', size = 'md', className = ''
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+const PARTS = [
+  <line key="rope" x1="120" y1="20" x2="120" y2="60" stroke="#BC13FE" strokeWidth="3" />,
+  <circle key="head" cx="120" cy="75" r="15" stroke="#FFD700" strokeWidth="3" fill="none" />,
+  <line key="body" x1="120" y1="90" x2="120" y2="140" stroke="#FFD700" strokeWidth="3" />,
+  <line key="arm-l" x1="120" y1="100" x2="90" y2="125" stroke="#FFD700" strokeWidth="3" />,
+  <line key="arm-r" x1="120" y1="100" x2="150" y2="125" stroke="#FFD700" strokeWidth="3" />,
+  <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
+  <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
+];
+
+function HangmanSVG({ wrongCount }) {
+  return (
+    <svg width="160" height="190">
+      <line x1="20" y1="180" x2="140" y2="180" stroke="#ffffff15" strokeWidth="3" />
+      <line x1="55" y1="180" x2="55" y2="10" stroke="#ffffff15" strokeWidth="3" />
+      <line x1="55" y1="10" x2="120" y2="10" stroke="#ffffff15" strokeWidth="3" />
+      <line x1="120" y1="10" x2="120" y2="20" stroke="#ffffff15" strokeWidth="3" />
+      {PARTS.slice(0, wrongCount)}
+    </svg>
+  );
+}
+
 export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const isSetup = !gs.phase || gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
@@ -244,6 +266,38 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
           </div>
         </div>
       </div>
+
+      {/* ── GAME BOARD (while playing or finished) ── */}
+      {(isPlaying || gs.phase === 'finished') && secretWord && (
+        <div className="p-5 border border-[#FFD700]/30 rounded-xl bg-black/60 flex flex-col items-center gap-4">
+          {/* Hangman SVG + wrong count */}
+          <div className="flex items-center gap-8">
+            <HangmanSVG wrongCount={wrongCount} />
+            <div className="text-center">
+              <div className="text-4xl" style={{ ...PS2, color: wrongCount >= maxWrong ? '#ef4444' : '#FF5F1F' }}>{wrongCount}</div>
+              <div className="text-[7px] tracking-widest text-white/40 uppercase mt-1" style={PS2}>Wrong</div>
+              <div className="text-[9px] text-white/20 mt-1" style={PS2}>/ {maxWrong}</div>
+            </div>
+          </div>
+          {/* Masked Word */}
+          <div className="flex gap-2 flex-wrap justify-center">
+            {secretWord.split('').map((ch, i) => {
+              const revealed = ch === ' ' || guessed.includes(ch) || gs.word_revealed;
+              return ch === ' ' ? (
+                <div key={i} className="w-3" />
+              ) : (
+                <div key={i} className="flex flex-col items-center gap-1">
+                  <span className="text-2xl font-bold min-w-[1.5ch] text-center"
+                    style={{ ...PS2, color: revealed ? '#FFD700' : '#ffffff30', textShadow: revealed ? '0 0 12px rgba(255,215,0,0.5)' : 'none' }}>
+                    {revealed ? ch : '_'}
+                  </span>
+                  <div className="w-full h-0.5 bg-[#FFD700]/30 rounded" />
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── GAME STATUS (while playing) ── */}
       {isPlaying && (
