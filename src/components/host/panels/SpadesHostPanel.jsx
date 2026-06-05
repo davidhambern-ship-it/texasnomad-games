@@ -6,6 +6,24 @@ const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SUITS = ['♠', '♥', '♦', '♣'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
 
+// Standard 52-card deck (no jokers) - 2♥ and 2♦ removed for Joker Spades variant
+function generateFullDeck() {
+  const deck = [];
+  for (const suit of SUITS) {
+    for (const value of VALUES) {
+      // Remove 2 of Hearts and 2 of Diamonds when using Jokers
+      if ((suit === '♥' || suit === '♦') && value === '2') {
+        continue;
+      }
+      deck.push({ suit, value, id: `${suit}${value}` });
+    }
+  }
+  // Add Big Joker and Little Joker
+  deck.push({ suit: 'Joker', value: 'BJ', id: 'BigJoker' });
+  deck.push({ suit: 'Joker', value: 'LJ', id: 'LittleJoker' });
+  return deck;
+}
+
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
   return (
@@ -19,15 +37,7 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = ''
   );
 };
 
-function generateFullDeck() {
-  const deck = [];
-  for (const suit of SUITS) {
-    for (const value of VALUES) {
-      deck.push({ suit, value, id: `${suit}${value}` });
-    }
-  }
-  return deck;
-}
+
 
 function shuffleDeck(deck) {
   const d = [...deck];
@@ -111,7 +121,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleDeal = async () => {
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
     if (seated.length < 2) return;
-    const workingDeck = (gs.deck_shuffled && gs.deck?.length === 52) ? gs.deck : shuffleDeck(generateFullDeck());
+    const workingDeck = (gs.deck_shuffled && gs.deck?.length === 52) ? gs.deck : shuffleDeck(generateFullDeck()); // 52 cards: 48 standard + 2 jokers (2♥ and 2♦ removed)
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
