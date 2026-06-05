@@ -1,6 +1,8 @@
 // Maps card value + suit to custom TexasNomad Spades card image URLs
 // Only spades suit has custom images; other suits use a styled fallback
 
+const CARD_BACK = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/711c24400_BackDesign.png';
+
 const SPADES_IMAGES = {
   '2': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/53f30e114_2-spades.png',
   '3': 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/dd0d5f07d_3-spades.png',
@@ -23,4 +25,8 @@ export function getCardImage(card) {
     return SPADES_IMAGES[card.value] || null;
   }
   return null;
+}
+
+export function getCardBack() {
+  return CARD_BACK;
 }

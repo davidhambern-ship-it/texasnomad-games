@@ -1,5 +1,5 @@
 import React from 'react';
-import { getCardImage } from '@/lib/spadesCardImages';
+import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -20,16 +20,13 @@ export default function SpadesCardArea({ trick, players }) {
           <div className="relative w-20 h-28">
             {[3, 2, 1, 0].map(offset => (
               <div key={offset}
-                className="absolute rounded-lg border border-gray-300 bg-white"
+                className="absolute rounded-lg overflow-hidden shadow-lg"
                 style={{
                   width: 56, height: 80,
                   top: offset * 1.5,
                   left: offset * 1.5,
-                  background: 'linear-gradient(135deg, #fff 0%, #f0f0f0 100%)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
                 }}>
-                <div className="absolute inset-1.5 rounded"
-                  style={{ background: 'repeating-linear-gradient(45deg, #1a4d8f 0px, #1a4d8f 6px, #154080 6px, #154080 12px)' }} />
+                <img src={getCardBack()} alt="Card back" className="w-full h-full object-cover" />
               </div>
             ))}
           </div>
