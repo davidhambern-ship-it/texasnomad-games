@@ -29,6 +29,14 @@ export const ALL_GAMES = [
     emoji: '🔤',
     path: '/games/hangman',
   },
+  {
+    id: 'spades',
+    title: 'SPADES',
+    subtitle: 'CARD GAME',
+    color: '#4ade80',
+    emoji: '♠️',
+    path: '/games/spades',
+  },
 ];
 
 export default function HostGameSelect({ onSelect, currentGame }) {
