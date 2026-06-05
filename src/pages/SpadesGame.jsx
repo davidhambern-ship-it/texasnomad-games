@@ -197,10 +197,14 @@ function SpadesViewer({ roomCode }) {
           : p
       );
       
+      // Update state with card played (turn rotation happens in separate effect)
       await updateState({
         players: updatedPlayers,
         current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
       });
+      
+      // Small delay before turn rotation to avoid rate limit
+      await new Promise(resolve => setTimeout(resolve, 400));
     }, CPU_ACTION_DELAY);
     
     return () => clearTimeout(timer);
@@ -226,10 +230,14 @@ function SpadesViewer({ roomCode }) {
     
     if (!nextPlayer) return;
     
-    // Rotate turn to next player immediately (no delay for smooth gameplay)
-    updateState({
-      current_turn_seat: nextPlayer.seatNumber,
-    });
+    // Rotate turn to next player with small delay to avoid rate limit
+    const timer = setTimeout(async () => {
+      await updateState({
+        current_turn_seat: nextPlayer.seatNumber,
+      });
+    }, 300);
+    
+    return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
   // Handle trick completion and turn rotation
