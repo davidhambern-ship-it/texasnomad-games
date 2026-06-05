@@ -138,8 +138,8 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
           style={{ background: `linear-gradient(135deg, ${glowColor}30, ${glowColor2}30)`, borderBottom: `2px solid ${glowColor}50` }}>
           <div className="absolute inset-0 opacity-30"
             style={{ background: `repeating-linear-gradient(90deg, transparent, transparent 8px, ${glowColor}20 8px, ${glowColor}20 9px)` }} />
-          <div className="relative font-heading tracking-[0.2em] uppercase text-outlaw-gold"
-            style={{ fontSize: featured ? '1.6rem' : '1.3rem', textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
+          <div className="relative tracking-[0.1em] uppercase text-outlaw-gold"
+            style={{ fontSize: featured ? '1.6rem' : '1.3rem', fontFamily: "'Rye', serif", textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
             {game.title}
           </div>
           <div className="text-[7px] tracking-[0.3em] uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace", color: `${glowColor}cc` }}>
@@ -399,7 +399,7 @@ export default function Games() {
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-4 left-8 opacity-40"><NeonSign text="PLAY" color="#BC13FE" size="sm" /></div>
             <div className="absolute top-8 right-12 opacity-40"><NeonSign text="WIN" color="#FF5F1F" size="sm" /></div>
-            <div className="absolute bottom-4 left-1/4 opacity-30"><NeonSign text="NOMAD" color="#FFD700" size="sm" /></div>
+
 
           </div>
 
@@ -408,14 +408,14 @@ export default function Games() {
               style={{ fontFamily: "'Press Start 2P', monospace", textShadow: '0 0 15px #BC13FE' }}>
               ✦ TEXASNOMAD ARCADE ✦
             </div>
-            <h1 className="font-heading text-6xl sm:text-8xl md:text-9xl tracking-wider uppercase leading-none text-glow-gold"
-              style={{ color: '#FFD700' }}>
+            <h1 className="text-6xl sm:text-8xl md:text-9xl tracking-wider uppercase leading-none text-glow-gold"
+              style={{ color: '#FFD700', fontFamily: "'Monoton', cursive" }}>
               THE GAMES
             </h1>
-            <div className="font-heading text-xl sm:text-3xl tracking-[0.3em] uppercase mt-1 text-white/50">
+            <div className="font-heading text-xl sm:text-3xl tracking-[0.3em] uppercase mt-1 text-cyber-purple">
               Choose Your Battle
             </div>
-            <p className="mt-4 text-white/40 font-body text-sm max-w-xl mx-auto">
+            <p className="mt-4 font-body text-sm max-w-xl mx-auto text-cyber-purple/70">
               Step into the arcade. Every cabinet is a world. Every game is a showdown.
             </p>
           </div>
