@@ -66,11 +66,11 @@ function SpadesViewer({ roomCode }) {
 
 
 
-  // Auto-deal when it's setup phase (CPU or human dealer)
+  // Auto-deal when it's setup phase (CPU or human dealer) - ONLY for CPU games
   useEffect(() => {
-    if (!room || !gs.dealer_seat) return;
+    if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
     
-    // Only auto-deal if in setup phase
+    // Only auto-deal if in setup phase AND CPU is enabled
     if (gs.phase === 'setup' || !gs.phase) {
       const timer = setTimeout(async () => {
         // Shuffle 3 times then deal
@@ -84,7 +84,7 @@ function SpadesViewer({ roomCode }) {
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [gs.dealer_seat, gs.phase, room]);
+  }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
 
   const handleAutoDeal = async () => {
     const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
