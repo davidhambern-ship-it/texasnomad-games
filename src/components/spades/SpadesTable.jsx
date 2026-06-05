@@ -188,7 +188,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           )}
         </div>
 
-        {/* Bottom (Seat 1) */}
+        {/* Bottom (Seat 1) - Player's hand area on table */}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10">
           <SpadesSeat
             seatNumber={1}
@@ -200,13 +200,50 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
           />
+          {/* Hand display on table for Seat 1 */}
+          {mySeatNumber === 1 && sortedHand.length > 0 && (
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2">
+              <div className="flex gap-1 justify-center" style={{ transform: 'translateX(-50%)' }}>
+                {sortedHand.slice(0, 8).map((card, i) => {
+                  const imgSrc = getCardImage(card);
+                  const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
+                  return (
+                    <button
+                      key={card.id || i}
+                      onClick={() => playCard(card)}
+                      disabled={!isMyTurn}
+                      className="relative rounded-lg overflow-hidden transition-all hover:scale-110 hover:-translate-y-2 active:scale-95 disabled:opacity-50"
+                      style={{
+                        width: 48, height: 68,
+                        border: isMyTurn ? '2px solid #4ade80' : '1px solid rgba(255,255,255,0.3)',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                        marginLeft: i > 0 ? '-20px' : '0',
+                      }}
+                    >
+                      {imgSrc ? (
+                        <img src={imgSrc} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full bg-white rounded-lg flex items-center justify-center">
+                          <span className="text-lg">{card.suit}</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+                {sortedHand.length > 8 && (
+                  <div className="w-12 h-16 rounded-lg bg-white/20 border border-white/30 flex items-center justify-center text-xs text-white/60">
+                    +{sortedHand.length - 8}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* My Hand and Controls */}
+      {/* Player Controls (below table) */}
       {isPlayer && myPlayer && (
-        <div className="w-full space-y-3">
-          {/* Player Controls */}
+        <div className="w-full max-w-md mx-auto mt-4">
           <SpadesPlayerControls
             seatNumber={mySeatNumber}
             player={myPlayer}
@@ -216,53 +253,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             onShuffleStart={() => setShufflePhase('shuffling')}
             onDealStart={() => setDealPhase('dealing')}
           />
-
-          {/* Hand */}
-          {sortedHand.length > 0 && (
-            <div className="w-full p-4 border-2 border-[#4ade80]/50 rounded-xl bg-gradient-to-b from-white/10 to-black/40 backdrop-blur-sm">
-              <div className="text-[8px] tracking-widest text-[#4ade80] uppercase mb-3 font-bold" style={PS2}>
-                Your Hand — {sortedHand.length} cards
-                {gs.current_turn_seat === mySeatNumber && <span className="ml-3 text-[#FFD700] animate-pulse">▶ YOUR TURN</span>}
-              </div>
-              <div className="flex flex-wrap gap-3 justify-center">
-                {sortedHand.map((card, i) => {
-                  const imgSrc = getCardImage(card);
-                  const isRed = card.suit === '♥' || card.suit === '♦';
-                  const isMyTurn = gs.current_turn_seat === mySeatNumber && isPlaying;
-                  return (
-                    <button
-                      key={card.id || i}
-                      onClick={() => playCard(card)}
-                      disabled={!isMyTurn}
-                      className="relative rounded-xl overflow-hidden transition-all hover:scale-110 hover:-translate-y-3 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl"
-                      style={{
-                        width: 72, height: 100,
-                        border: isMyTurn ? '3px solid #4ade80' : '2px solid rgba(255,255,255,0.4)',
-                        boxShadow: isMyTurn 
-                          ? '0 0 24px rgba(74,222,128,0.7), 0 8px 16px rgba(0,0,0,0.5)' 
-                          : '0 4px 16px rgba(0,0,0,0.6), inset 0 0 8px rgba(255,255,255,0.15)',
-                        filter: 'brightness(1.25) contrast(1.15) saturate(1.1)',
-                      }}
-                    >
-                      {imgSrc ? (
-                        <img 
-                          src={imgSrc} 
-                          alt={`${card.value}${card.suit}`} 
-                          className="w-full h-full object-cover"
-                          style={{ filter: 'brightness(1.2) contrast(1.15) saturate(1.1)' }}
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-white to-gray-100 flex flex-col items-center justify-center rounded-xl">
-                          <span className={`text-2xl leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                          <span className={`text-base leading-none font-bold mt-1 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.value}</span>
-                        </div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
