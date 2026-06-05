@@ -96,6 +96,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const [team2Name, setTeam2Name] = useState(gs.team2Name || 'Team 2');
   const [targetScore, setTargetScore] = useState(gs.targetScore || 500);
   const [cpuProcessing, setCpuProcessing] = useState(false);
+  const [isShuffling, setIsShuffling] = useState(false);
 
   const players = gs.players || [];
   const isSetup = !gs.phase || gs.phase === 'setup';
@@ -183,7 +184,11 @@ export default function SpadesHostPanel({ gs, updateState }) {
   };
 
   const handleShuffle = async () => {
-    await updateState({ deck: shuffleDeck(generateFullDeck()), deck_shuffled: true });
+    if (isShuffling) return;
+    setIsShuffling(true);
+    const deck = shuffleDeck(generateFullDeck());
+    await updateState({ deck, deck_shuffled: true });
+    setIsShuffling(false);
   };
 
   const handleNewDeck = async () => {
@@ -196,7 +201,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleDeal = async () => {
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
     if (seated.length < 2) return;
-    const workingDeck = (gs.deck_shuffled && gs.deck?.length === 52) ? gs.deck : shuffleDeck(generateFullDeck());
+    const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
@@ -437,7 +442,9 @@ export default function SpadesHostPanel({ gs, updateState }) {
       <div className="p-4 border border-white/10 rounded-xl bg-black/60 space-y-3">
         <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Controls</h3>
         <div className="flex flex-wrap gap-2">
-          <Btn onClick={handleShuffle} color="#FFD700" size="sm">🔀 Shuffle</Btn>
+          <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={isShuffling}>
+            {isShuffling ? '⏳ Shuffling...' : gs.deck_shuffled ? '✓ Shuffled' : '🔀 Shuffle'}
+          </Btn>
           <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={seatedPlayers.length < 2}>🃏 Deal</Btn>
           <Btn onClick={handleNewDeck} color="#22d3ee" size="sm">🂠 New Deck</Btn>
           <Btn onClick={evaluateTrick} color="#BC13FE" size="sm" disabled={(gs.current_trick || []).length < seatedPlayers.length}>✓ Eval Trick</Btn>

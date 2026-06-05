@@ -36,16 +36,15 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     if (isShuffling) return;
     setIsShuffling(true);
 
-    // Start shuffle animation immediately
+    // Start shuffle animation
     onShuffleStart?.();
 
     // Generate shuffled deck
     const deck = shuffleDeck(generateFullDeck());
 
-    // Wait for animation to complete (~2s), then update state
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    // Wait for animation (~1.8s), then update state
+    await new Promise(resolve => setTimeout(resolve, 1800));
     await updateState({ deck, deck_shuffled: true });
-
     setIsShuffling(false);
   };
 
