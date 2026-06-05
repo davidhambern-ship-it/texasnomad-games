@@ -36,8 +36,6 @@ function SpadesViewer({ roomCode }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  // overlay: null = not shown, 'choosing' = show sit/spectate, 'done' = chosen
-  const [overlayState, setOverlayState] = useState('choosing');
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
   const [mySeatNumber, setMySeatNumber] = useState(null);
 
@@ -63,14 +61,10 @@ function SpadesViewer({ roomCode }) {
       setMySeatNumber(me.seatNumber);
       setMyRole(me.role);
       localStorage.setItem(`spades_role_${roomCode}`, me.role);
-      setOverlayState('done');
     }
   }, [room, playerId]);
 
-  // If we already have a saved role, skip overlay
-  useEffect(() => {
-    if (myRole) setOverlayState('done');
-  }, []);
+
 
   // Auto-deal when it's setup phase (CPU or human dealer)
   useEffect(() => {
@@ -172,7 +166,6 @@ function SpadesViewer({ roomCode }) {
     await updateState({ players: updatedPlayers });
     localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
     setMyRole('spectator');
-    setOverlayState('done');
   };
 
   const handleChooseSit = async () => {
@@ -184,9 +177,6 @@ function SpadesViewer({ roomCode }) {
     }
     const seat = availableSeats[0];
     await sitInSeat(seat);
-    // After sitting, show CPU choice
-    setShowCPUChoice(true);
-    setSelectedSeat(seat);
   };
 
   const sitInSeat = async (seatNum) => {
@@ -208,7 +198,6 @@ function SpadesViewer({ roomCode }) {
     localStorage.setItem(`spades_role_${roomCode}`, 'player');
     setMyRole('player');
     setMySeatNumber(seatNum);
-    setOverlayState('done');
   };
 
   const handlePlayAgainstCPU = async () => {
@@ -249,97 +238,19 @@ function SpadesViewer({ roomCode }) {
         </div>
       ) : (
         <div className="flex-1 relative">
-          {/* Game board always visible behind overlay */}
-          <div className={overlayState === 'choosing' ? 'filter blur-sm pointer-events-none select-none' : ''}>
-            <SpadesTable
-              gs={gs}
-              playerId={playerId}
-              mySeatNumber={mySeatNumber}
-              myRole={myRole}
-              isPlayer={isPlayer}
-              isSpectator={isSpectator}
-              updateState={updateState}
-              availableSeats={availableSeats}
-              onSitInSeat={sitInSeat}
-              roomCode={roomCode}
-            />
-          </div>
+          <SpadesTable
+            gs={gs}
+            playerId={playerId}
+            mySeatNumber={mySeatNumber}
+            myRole={myRole}
+            isPlayer={isPlayer}
+            isSpectator={isSpectator}
+            updateState={updateState}
+            availableSeats={availableSeats}
+            onSitInSeat={sitInSeat}
+            roomCode={roomCode}
+          />
 
-          {/* Sit or Spectate Overlay */}
-          {overlayState === 'choosing' && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="max-w-sm w-full mx-4 p-8 rounded-2xl border-2 border-[#BC13FE]/60 bg-[#070311]/95 text-center"
-                style={{ boxShadow: '0 0 60px rgba(188,19,254,0.3)' }}>
-                <div className="text-4xl mb-4">♠️</div>
-                <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2">SPADES</div>
-                <div className="text-[8px] tracking-widest text-white/40 uppercase mb-6" style={PS2}>
-                  ROOM {roomCode}
-                </div>
-                <div className="font-heading text-lg tracking-widest text-white uppercase mb-6">
-                  Would you like to sit or spectate?
-                </div>
-                {availableSeats.length > 0 ? (
-                  <div className="text-[7px] text-[#4ade80]/60 mb-6 uppercase" style={PS2}>
-                    {availableSeats.length} seat{availableSeats.length !== 1 ? 's' : ''} available
-                  </div>
-                ) : (
-                  <div className="text-[7px] text-[#FF5F1F]/60 mb-6 uppercase" style={PS2}>
-                    All 4 seats taken — spectate only
-                  </div>
-                )}
-                <div className="flex gap-4">
-                  <button
-                    onClick={handleChooseSit}
-                    disabled={availableSeats.length === 0}
-                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed"
-                    style={{ borderColor: '#4ade80', color: '#4ade80', background: 'rgba(74,222,128,0.08)' }}
-                  >
-                    Sit
-                  </button>
-                  <button
-                    onClick={handleChooseSpectate}
-                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
-                    style={{ borderColor: '#BC13FE', color: '#BC13FE', background: 'rgba(188,19,254,0.08)' }}
-                  >
-                    Spectate
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* CPU Choice Overlay */}
-          {showCPUChoice && (
-            <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-              <div className="max-w-md w-full mx-4 p-8 rounded-2xl border-2 border-[#FFD700]/60 bg-[#070311]/95 text-center"
-                style={{ boxShadow: '0 0 60px rgba(255,215,0,0.3)' }}>
-                <div className="text-4xl mb-4">🤠</div>
-                <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2">PLAY MODE</div>
-                <div className="text-[8px] tracking-widest text-white/40 uppercase mb-6" style={PS2}>
-                  ROOM {roomCode} — SEAT {selectedSeat}
-                </div>
-                <div className="font-heading text-lg tracking-widest text-white uppercase mb-6">
-                  Would you like to play against the computer while waiting for more players?
-                </div>
-                <div className="flex gap-4">
-                  <button
-                    onClick={handlePlayAgainstCPU}
-                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
-                    style={{ borderColor: '#4ade80', color: '#4ade80', background: 'rgba(74,222,128,0.08)' }}
-                  >
-                    Play Against CPU
-                  </button>
-                  <button
-                    onClick={handleWaitForRealPlayers}
-                    className="flex-1 py-4 rounded-xl border-2 font-heading text-lg tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
-                    style={{ borderColor: '#BC13FE', color: '#BC13FE', background: 'rgba(188,19,254,0.08)' }}
-                  >
-                    Wait For Real Players
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
     </div>
