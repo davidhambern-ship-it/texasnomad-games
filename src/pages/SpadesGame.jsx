@@ -197,20 +197,23 @@ function SpadesViewer({ roomCode }) {
           : p
       );
       
-      // Update state with card played (turn rotation happens in separate effect)
+      // Find next player for turn rotation
+      const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+      const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === currentTurnSeat);
+      const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
+      
+      // Update state with card played and rotate turn in one call to avoid rate limit
       await updateState({
         players: updatedPlayers,
         current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
+        current_turn_seat: nextPlayer?.seatNumber || currentTurnSeat,
       });
-      
-      // Small delay before turn rotation to avoid rate limit
-      await new Promise(resolve => setTimeout(resolve, 400));
     }, CPU_ACTION_DELAY);
     
     return () => clearTimeout(timer);
   }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
-  // Handle turn rotation after each card is played
+  // Handle turn rotation after each card is played (only for human players)
   useEffect(() => {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     
@@ -229,13 +232,14 @@ function SpadesViewer({ roomCode }) {
     const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
     
     if (!nextPlayer) return;
+    if (nextPlayer.playerType === 'cpu') return; // CPU turn handler will set this
     
-    // Rotate turn to next player with small delay to avoid rate limit
+    // Rotate turn to next human player with delay to avoid rate limit
     const timer = setTimeout(async () => {
       await updateState({
         current_turn_seat: nextPlayer.seatNumber,
       });
-    }, 300);
+    }, 600);
     
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
