@@ -193,10 +193,14 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
 
 // Select card when leading a trick
 function selectLeadingCard(hand, myBid, booksWon) {
-  const suitCounts = { '♠': 0, '♥': 0, '♦': 0, '♣': 0 };
-  const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [] };
+  const suitCounts = { '♠': 0, '♥': 0, '♦': 0, '♣': 0, 'Joker': 0 };
+  const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [], 'Joker': [] };
   
   for (const card of hand) {
+    if (!suitCounts[card.suit]) {
+      suitCounts[card.suit] = 0;
+      suitCards[card.suit] = [];
+    }
     suitCounts[card.suit]++;
     suitCards[card.suit].push(card);
   }
@@ -243,10 +247,14 @@ function selectFollowingCard(hand, trick, myBid, booksWon) {
   const leadSuit = trick[0]?.card?.suit;
   const currentWinner = getCurrentTrickWinner(trick);
   
-  const suitCounts = { '♠': 0, '♥': 0, '♦': 0, '♣': 0 };
-  const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [] };
+  const suitCounts = { '♠': 0, '♥': 0, '♦': 0, '♣': 0, 'Joker': 0 };
+  const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [], 'Joker': [] };
   
   for (const card of hand) {
+    if (!suitCounts[card.suit]) {
+      suitCounts[card.suit] = 0;
+      suitCards[card.suit] = [];
+    }
     suitCounts[card.suit]++;
     suitCards[card.suit].push(card);
   }
