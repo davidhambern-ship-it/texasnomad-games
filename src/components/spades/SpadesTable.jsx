@@ -4,7 +4,7 @@ import SpadesCardArea from './SpadesCardArea';
 import SpadesPlayerControls from './SpadesPlayerControls';
 import SpadesShuffleAnimation from './SpadesShuffleAnimation';
 import SpadesDealAnimation from './SpadesDealAnimation';
-import { getCardImage } from '@/lib/spadesCardImages';
+import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -159,29 +159,19 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1.15)' }}>
-              {getPlayerAtSeat(3).hand.map((card, i) => {
-                const imgSrc = getCardImage(card);
-                const isRed = card.suit === '♥' || card.suit === '♦';
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 60, height: 84,
-                      marginLeft: i > 0 ? '-66px' : '0',
-                      transform: `rotate(${(i - 6) * 2}deg)`,
-                    }}
-                  >
-                    {imgSrc ? (
-                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white flex items-center justify-center">
-                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {getPlayerAtSeat(3).hand.map((card, i) => (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 60, height: 84,
+                    marginLeft: i > 0 ? '-66px' : '0',
+                    transform: `rotate(${(i - 6) * 2}deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -202,29 +192,19 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
           <div className="absolute left-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(90deg)' }}>
-              {getPlayerAtSeat(2).hand.map((card, i) => {
-                const imgSrc = getCardImage(card);
-                const isRed = card.suit === '♥' || card.suit === '♦';
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 60, height: 84,
-                      marginTop: i > 0 ? '-66px' : '0',
-                      transform: `rotate(${(i - 6) * 2}deg)`,
-                    }}
-                  >
-                    {imgSrc ? (
-                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white flex items-center justify-center">
-                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {getPlayerAtSeat(2).hand.map((card, i) => (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 60, height: 84,
+                    marginTop: i > 0 ? '-66px' : '0',
+                    transform: `rotate(${(i - 6) * 2}deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -245,29 +225,19 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(4)?.hand?.length > 0 && (
           <div className="absolute right-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(-90deg)' }}>
-              {getPlayerAtSeat(4).hand.map((card, i) => {
-                const imgSrc = getCardImage(card);
-                const isRed = card.suit === '♥' || card.suit === '♦';
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 60, height: 84,
-                      marginTop: i > 0 ? '-66px' : '0',
-                      transform: `rotate(${(i - 6) * 2}deg)`,
-                    }}
-                  >
-                    {imgSrc ? (
-                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white flex items-center justify-center">
-                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {getPlayerAtSeat(4).hand.map((card, i) => (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 60, height: 84,
+                    marginTop: i > 0 ? '-66px' : '0',
+                    transform: `rotate(${(i - 6) * 2}deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -288,29 +258,19 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
           <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1.15)' }}>
-              {getPlayerAtSeat(1).hand.map((card, i) => {
-                const imgSrc = getCardImage(card);
-                const isRed = card.suit === '♥' || card.suit === '♦';
-                return (
-                  <div
-                    key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
-                    style={{
-                      width: 60, height: 84,
-                      marginLeft: i > 0 ? '-66px' : '0',
-                      transform: `rotate(${(i - 6) * 2}deg)`,
-                    }}
-                  >
-                    {imgSrc ? (
-                      <img src={imgSrc} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-white flex items-center justify-center">
-                        <span className={`text-lg ${isRed ? 'text-red-600' : 'text-gray-900'}`}>{card.suit}</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {getPlayerAtSeat(1).hand.map((card, i) => (
+                <div
+                  key={card.id || i}
+                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  style={{
+                    width: 60, height: 84,
+                    marginLeft: i > 0 ? '-66px' : '0',
+                    transform: `rotate(${(i - 6) * 2}deg)`,
+                  }}
+                >
+                  <img src={getCardBack()} alt="" className="w-full h-full object-cover" />
+                </div>
+              ))}
             </div>
           </div>
         )}

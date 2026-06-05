@@ -31,19 +31,15 @@ export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSp
             style={PS2}>▶ TURN</div>
         )}
 
-        <div className="text-[7px] tracking-widest uppercase mb-0.5" style={{ ...PS2, color: isMe ? '#4ade80' : '#ffffff50' }}>
-          {isMe ? 'YOU' : `SEAT ${seatNumber}`}
-        </div>
-
         {occupied ? (
           <>
             <div className="font-heading text-sm tracking-widest text-white">
-              SEAT {seatNumber}
+              {isMe ? 'YOU' : `SEAT ${seatNumber}`}
             </div>
             <div className="flex items-center gap-1 justify-center mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
               <span className="text-[6px] text-[#4ade80]/70 uppercase" style={PS2}>
-                {player.role === 'hostPlayer' ? 'HOST' : 'PLAYER'}
+                {player.role === 'hostPlayer' ? 'HOST' : isMe ? 'PLAYER' : 'PLAYER'}
               </span>
             </div>
             {player.bid != null && (
