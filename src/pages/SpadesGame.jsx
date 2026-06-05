@@ -72,6 +72,71 @@ function SpadesViewer({ roomCode }) {
     if (myRole) setOverlayState('done');
   }, []);
 
+  // Auto-deal when CPU becomes dealer
+  useEffect(() => {
+    if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
+    
+    const dealerPlayer = players.find(p => p.seatNumber === gs.dealer_seat);
+    if (!dealerPlayer || dealerPlayer.playerType !== 'cpu') return;
+    
+    // Only auto-deal if in setup phase and CPU is dealer
+    if (gs.phase === 'setup' || !gs.phase) {
+      const timer = setTimeout(async () => {
+        // Shuffle 3 times then deal
+        for (let i = 0; i < 3; i++) {
+          const deck = generateFullDeck();
+          await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
+          await new Promise(resolve => setTimeout(resolve, 400));
+        }
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
+
+  const handleAutoDeal = async () => {
+    const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    if (seated.length < 2) return;
+    const workingDeck = shuffleDeck(generateFullDeck());
+    const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
+    const updatedPlayers = (gs.players || []).map(p => {
+      if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+      const idx = seated.findIndex(s => s.playerId === p.playerId);
+      return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+    });
+    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
+    const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
+    await updateState({
+      players: updatedPlayers, phase: 'bidding', status: 'active',
+      deck: [], current_trick: [], current_bidder_seat: firstBidder,
+      tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0, shuffle_count: 0,
+    });
+  };
+
+  // Detect when round ends and rotate dealer
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled) return;
+    
+    // Check if all tricks are played (13 tricks per round)
+    if (gs.tricks_played >= 13 && gs.phase === 'playing') {
+      const timer = setTimeout(async () => {
+        // Rotate dealer to the left (next seat number)
+        const currentDealer = gs.dealer_seat || 1;
+        const nextDealer = currentDealer >= 4 ? 1 : currentDealer + 1;
+        
+        // Check if next dealer is CPU
+        const nextDealerPlayer = players.find(p => p.seatNumber === nextDealer);
+        if (nextDealerPlayer?.playerType === 'cpu') {
+          // Update dealer and trigger auto-shuffle/deal
+          await updateState({ dealer_seat: nextDealer, phase: 'setup', tricks_played: 0 });
+        } else {
+          // Human dealer - just update dealer seat and wait for manual shuffle
+          await updateState({ dealer_seat: nextDealer, phase: 'setup', tricks_played: 0 });
+        }
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [gs.tricks_played, gs.phase, gs.dealer_seat, gs.cpu_enabled, room]);
+
   const occupiedSeats = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').map(p => p.seatNumber);
   const availableSeats = SPADES_SEATS.filter(s => !occupiedSeats.includes(s));
 
@@ -306,4 +371,28 @@ function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, 
       </div>
     </header>
   );
+}
+
+function generateFullDeck() {
+  const SUITS = ['♠', '♥', '♦', '♣'];
+  const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+  const deck = [];
+  for (const suit of SUITS) {
+    for (const value of VALUES) {
+      if ((suit === '♥' || suit === '♦') && value === '2') continue;
+      deck.push({ suit, value, id: `${suit}${value}` });
+    }
+  }
+  deck.push({ suit: 'Joker', value: 'BJ', id: 'BigJoker' });
+  deck.push({ suit: 'Joker', value: 'LJ', id: 'LittleJoker' });
+  return deck;
+}
+
+function shuffleDeck(deck) {
+  const d = [...deck];
+  for (let i = d.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [d[i], d[j]] = [d[j], d[i]];
+  }
+  return d;
 }
