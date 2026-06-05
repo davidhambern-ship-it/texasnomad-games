@@ -62,12 +62,16 @@ function HangmanViewer({ roomCode }) {
   const connectedSeats = players.map(p => p.seatNumber);
   const alreadyChosen = seatNumber ? seatsThatChose.includes(seatNumber) : false;
 
+  // Small room: host counts as 1, plus players
+  const totalPeople = players.length + 1;
+  const isGoRoundMode = totalPeople >= 4;
+
   const canGuess =
     isSeated &&
     seatNumber !== null &&
     gs.phase === 'playing' &&
     !gs.word_revealed &&
-    !alreadyChosen;
+    (isGoRoundMode ? !alreadyChosen : true);
 
   const handleGuessLetter = async (letter) => {
     if (!canGuess) return;
@@ -82,11 +86,15 @@ function HangmanViewer({ roomCode }) {
     const allRevealed = secretWord.split('').every(ch => ch === ' ' || newGuessed.includes(ch));
     const newPhase = allRevealed ? 'finished' : (newWrong.length >= maxWrong ? 'finished' : 'playing');
 
-    // Go-round management
-    const newSeatsThatChose = [...seatsThatChose, seatNumber];
-    const allChosen = connectedSeats.length > 0 && connectedSeats.every(s => newSeatsThatChose.includes(s));
-    const nextGoRound = allChosen ? currentGoRound + 1 : currentGoRound;
-    const nextSeatsThatChose = allChosen ? [] : newSeatsThatChose;
+    // Go-round management — only in go-round mode (4+ people)
+    let nextGoRound = currentGoRound;
+    let nextSeatsThatChose = seatsThatChose;
+    if (isGoRoundMode) {
+      const newSeatsThatChose = [...seatsThatChose, seatNumber];
+      const allChosen = connectedSeats.length > 0 && connectedSeats.every(s => newSeatsThatChose.includes(s));
+      nextGoRound = allChosen ? currentGoRound + 1 : currentGoRound;
+      nextSeatsThatChose = allChosen ? [] : newSeatsThatChose;
+    }
 
     const last_action = {
       playerId,
@@ -149,7 +157,7 @@ function HangmanViewer({ roomCode }) {
             )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <SeatBadge seatNumber={seatNumber} isSeated={isSeated} alreadyChosen={alreadyChosen} />
+            <SeatBadge seatNumber={seatNumber} isSeated={isSeated} alreadyChosen={isGoRoundMode && alreadyChosen} />
             <Link to="/" className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase hidden sm:block" style={{ fontFamily: "'Press Start 2P', monospace" }}>← LOBBY</Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
@@ -168,27 +176,40 @@ function HangmanViewer({ roomCode }) {
         <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
-          {/* Go-Round indicator */}
+          {/* Mode indicator */}
           {gs.phase === 'playing' && (
             <div className="flex items-center gap-4">
-              <div className="px-4 py-1.5 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
-                <div className="text-[7px] tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>Go-Round</div>
-                <div className="text-lg text-[#FFD700]" style={{ fontFamily: "'Press Start 2P', monospace" }}>{currentGoRound}</div>
+              {/* Mode badge */}
+              <div className="px-4 py-1.5 rounded-lg border text-center"
+                style={{ borderColor: isGoRoundMode ? '#FFD700' : '#4ade80', background: isGoRoundMode ? 'rgba(255,215,0,0.05)' : 'rgba(74,222,128,0.05)' }}>
+                <div className="text-[7px] tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>Mode</div>
+                <div className="text-[9px] mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace", color: isGoRoundMode ? '#FFD700' : '#4ade80' }}>
+                  {isGoRoundMode ? 'Go-Round' : 'Free Play'}
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                {connectedSeats.map(seat => (
-                  <div key={seat}
-                    className="w-7 h-7 rounded flex items-center justify-center border text-[7px]"
-                    style={{
-                      fontFamily: "'Press Start 2P', monospace",
-                      borderColor: seatsThatChose.includes(seat) ? '#4ade80' : '#ffffff20',
-                      color: seatsThatChose.includes(seat) ? '#4ade80' : '#ffffff30',
-                      background: seatsThatChose.includes(seat) ? '#4ade8015' : 'transparent',
-                    }}>
-                    {seat}
+              {/* Go-round counter + seats (only in go-round mode) */}
+              {isGoRoundMode && (
+                <>
+                  <div className="px-4 py-1.5 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
+                    <div className="text-[7px] tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>Go-Round</div>
+                    <div className="text-lg text-[#FFD700]" style={{ fontFamily: "'Press Start 2P', monospace" }}>{currentGoRound}</div>
                   </div>
-                ))}
-              </div>
+                  <div className="flex gap-1.5">
+                    {connectedSeats.map(seat => (
+                      <div key={seat}
+                        className="w-7 h-7 rounded flex items-center justify-center border text-[7px]"
+                        style={{
+                          fontFamily: "'Press Start 2P', monospace",
+                          borderColor: seatsThatChose.includes(seat) ? '#4ade80' : '#ffffff20',
+                          color: seatsThatChose.includes(seat) ? '#4ade80' : '#ffffff30',
+                          background: seatsThatChose.includes(seat) ? '#4ade8015' : 'transparent',
+                        }}>
+                        {seat}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
 
@@ -255,7 +276,7 @@ function HangmanViewer({ roomCode }) {
 
           {/* Alphabet — interactive for players */}
           <div className="w-full max-w-lg">
-            {alreadyChosen && gs.phase === 'playing' && (
+            {isGoRoundMode && alreadyChosen && gs.phase === 'playing' && (
               <div className="text-center mb-3 px-4 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/10">
                 <span className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                   You already chose a letter this round. Waiting for next go-round…

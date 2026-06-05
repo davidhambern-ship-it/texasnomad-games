@@ -121,6 +121,10 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const connectedSeats = players.map(p => p.seatNumber);
   const seatsWaiting = connectedSeats.filter(s => !seatsThatChose.includes(s));
 
+  // Small room logic: host counts as 1 person
+  const totalPeople = players.length + 1;
+  const isGoRoundMode = totalPeople >= 4;
+
   return (
     <div className="max-w-2xl mx-auto space-y-4">
 
@@ -129,11 +133,23 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
         <div className="p-4 border border-[#BC13FE]/30 rounded-xl bg-black/60 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-[9px] tracking-[0.15em] text-[#BC13FE] uppercase" style={PS2}>Player Seats</h2>
-            <span className="text-[8px] text-white/30" style={PS2}>{players.length} connected</span>
+            <div className="flex items-center gap-3">
+              <span className="text-[8px] text-white/30" style={PS2}>{players.length} connected</span>
+              {/* Mode badge */}
+              <span className="px-2 py-1 rounded border text-[7px] tracking-widest uppercase"
+                style={{
+                  ...PS2,
+                  borderColor: isGoRoundMode ? '#FFD700' : '#4ade80',
+                  color: isGoRoundMode ? '#FFD700' : '#4ade80',
+                  background: isGoRoundMode ? 'rgba(255,215,0,0.08)' : 'rgba(74,222,128,0.08)',
+                }}>
+                {isGoRoundMode ? 'Go-Round' : 'Free Play'}
+              </span>
+            </div>
           </div>
 
-          {/* Go-Round */}
-          {isPlaying && (
+          {/* Go-Round stats — only in go-round mode */}
+          {isPlaying && isGoRoundMode && (
             <div className="grid grid-cols-3 gap-3 text-center py-2 border-t border-white/10">
               <div>
                 <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Go-Round</div>
@@ -147,6 +163,11 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
                 <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Waiting</div>
                 <div className="text-xl text-[#FF5F1F]" style={PS2}>{seatsWaiting.length}</div>
               </div>
+            </div>
+          )}
+          {isPlaying && !isGoRoundMode && (
+            <div className="py-2 border-t border-white/10 text-center">
+              <span className="text-[7px] tracking-widest text-[#4ade80]/60 uppercase" style={PS2}>Players may freely choose letters</span>
             </div>
           )}
 
