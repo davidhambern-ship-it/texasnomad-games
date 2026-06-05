@@ -86,25 +86,46 @@ function SpadesViewer({ roomCode }) {
     if (seated.length < 2) return;
     const workingDeck = shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
-    const updatedPlayers = (gs.players || []).map(p => {
+    
+    // Initialize empty hands
+    const initializedPlayers = (gs.players || []).map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-      const idx = seated.findIndex(s => s.playerId === p.playerId);
-      return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+      return { ...p, hand: [], bid: null, tricksWon: 0 };
     });
+    await updateState({ players: initializedPlayers });
+    
+    // Deal cards one by one
+    const playerHands = seated.map(() => []);
+    for (let i = 0; i < cardsPerPlayer; i++) {
+      for (let j = 0; j < seated.length; j++) {
+        const cardIndex = i * seated.length + j;
+        if (cardIndex < workingDeck.length) {
+          playerHands[j].push(workingDeck[cardIndex]);
+          const updatedPlayers = (gs.players || []).map(p => {
+            if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
+            const idx = seated.findIndex(s => s.playerId === p.playerId);
+            return { ...p, hand: [...playerHands[idx]] };
+          });
+          await updateState({ players: updatedPlayers });
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      }
+    }
+    
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
     
     // First hand - no bidding, player to left of dealer starts playing
-    const noBidPlayers = updatedPlayers.map(p => {
+    const noBidPlayers = (gs.players || []).map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-      return { ...p, bid: 0 }; // Set bid to 0 for first hand
+      return { ...p, bid: 0 };
     });
     
     await updateState({
       players: noBidPlayers, phase: 'playing', status: 'active',
       deck: [], current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
-      first_hand_no_bid: true, // Flag to track first hand
+      first_hand_no_bid: true,
     });
   };
 
