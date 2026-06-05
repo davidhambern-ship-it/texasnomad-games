@@ -40,6 +40,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     return (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
   }) : [];
 
+
+
   // Calculate card overlap for horizontal spread (seats 1 & 3)
   const getHorizontalOverlap = (cardCount) => {
     if (cardCount <= 1) return 0;
@@ -253,23 +255,23 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Bottom (Seat 1) - Hand on table (card backs only) - wider spread */}
-        {getPlayerAtSeat(1)?.hand?.length > 0 && (
-          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 700, height: 120 }}>
+        {/* Bottom (Seat 1) - Player's hand (face-up cards) - wider spread */}
+        {mySeatNumber === 1 && sortedHand.length > 0 && (
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-20 flex justify-center" style={{ width: 700, height: 140 }}>
             <div className="flex" style={{ transform: 'scale(1)' }}>
-              {getPlayerAtSeat(1).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length) * 0.6;
+              {sortedHand.map((card, i, arr) => {
+                const overlap = getHorizontalOverlap(arr.length) * 0.5;
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:scale-110 hover:z-30 hover:shadow-xl cursor-pointer"
                     style={{
-                      width: 52, height: 73,
+                      width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
                       transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
                     }}
                   >
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                    <img src={getCardImage(card)} alt={`${card.suit} ${card.value}`} className="w-full h-full object-cover" />
                   </div>
                 );
               })}
