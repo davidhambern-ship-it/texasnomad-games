@@ -4,7 +4,7 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SpadesTable from '@/components/spades/SpadesTable';
-import { fillEmptySeatsWithCPU } from '@/lib/spadesCPU';
+import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -112,6 +112,89 @@ function SpadesViewer({ roomCode }) {
       first_hand_no_bid: true, // Flag to track first hand
     });
   };
+
+  // CPU turn handler - play card when it's CPU's turn
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
+    
+    const currentTurnSeat = gs.current_turn_seat;
+    if (!currentTurnSeat) return;
+    
+    // Find player whose turn it is
+    const currentPlayer = players.find(p => p.seatNumber === currentTurnSeat);
+    if (!currentPlayer || currentPlayer.playerType !== 'cpu') return;
+    
+    // Don't act if already played this trick
+    const hasPlayed = (gs.current_trick || []).some(p => p.seatNumber === currentTurnSeat);
+    if (hasPlayed) return;
+    
+    const timer = setTimeout(async () => {
+      const hand = currentPlayer.hand || [];
+      if (hand.length === 0) return;
+      
+      // Select card using CPU logic
+      const cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0);
+      if (!cardToPlay) return;
+      
+      // Play the card
+      const updatedPlayers = players.map(p =>
+        p.playerId === currentPlayer.playerId
+          ? { ...p, hand: (p.hand || []).filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
+          : p
+      );
+      
+      await updateState({
+        players: updatedPlayers,
+        current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
+      });
+    }, CPU_ACTION_DELAY);
+    
+    return () => clearTimeout(timer);
+  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, players, room]);
+
+  // Handle trick completion and turn rotation
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
+    
+    const trick = gs.current_trick || [];
+    if (trick.length !== 4 || trick.length < (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer').length) return;
+    
+    // All players have played - determine winner
+    const spades = trick.filter(t => t.card?.suit === '♠');
+    const relevant = spades.length > 0 ? spades : trick;
+    
+    const cardOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'BJ': 15, 'LJ': 14.5 };
+    const winner = relevant.reduce((a, b) => (cardOrder[a.card?.value] || 0) > (cardOrder[b.card?.value] || 0) ? a : b);
+    
+    if (!winner) return;
+    
+    const timer = setTimeout(async () => {
+      const winningSeat = winner.seatNumber;
+      const winningTeam = winningSeat === 1 || winningSeat === 3 ? 1 : 2;
+      
+      // Update books and tricks
+      const updatedPlayers = players.map(p => 
+        p.seatNumber === winningSeat 
+          ? { ...p, tricksWon: (p.tricksWon || 0) + 1 }
+          : p
+      );
+      
+      const newTricksPlayed = (gs.tricks_played || 0) + 1;
+      const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
+      const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
+      
+      await updateState({
+        players: updatedPlayers,
+        current_trick: [],
+        current_turn_seat: winningSeat, // Winner leads next trick
+        tricks_played: newTricksPlayed,
+        books1: newBooks1,
+        books2: newBooks2,
+      });
+    }, 1500);
+    
+    return () => clearTimeout(timer);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled, players, room]);
 
   // Detect when round ends and rotate dealer
   useEffect(() => {
