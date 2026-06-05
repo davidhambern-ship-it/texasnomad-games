@@ -31,7 +31,7 @@ export default function Hero({ heroBg, crownLogo }) {
           {/* Card back */}
           <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/711c24400_BackDesign.png" alt="Card Back" className="h-12 w-auto rounded shadow-lg" />
           {/* Purple O */}
-          <span className="text-4xl font-bold leading-none" style={{ color: '#BC13FE', textShadow: '0 0 10px rgba(188,19,254,0.6)', fontFamily: 'serif' }}>○</span>
+          <span className="font-bold leading-none" style={{ fontSize: '2rem', color: '#BC13FE', textShadow: '0 0 10px rgba(188,19,254,0.6)', fontFamily: 'serif' }}>○</span>
           {/* Big Joker */}
           <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/857028cf9_BigJoker.png" alt="Big Joker" className="h-12 w-auto rounded shadow-lg" />
         </div>
