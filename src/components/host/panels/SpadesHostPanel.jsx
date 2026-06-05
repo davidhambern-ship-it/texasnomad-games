@@ -264,38 +264,19 @@ export default function SpadesHostPanel({ gs, updateState }) {
     });
   };
 
-  const setPlayerBid = async (playerId, bid) => {
-    const updated = players.map(p => p.playerId === playerId ? { ...p, bid } : p);
-    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
-    const bidderIdx = seated.findIndex(p => p.playerId === playerId);
-    const nextBidder = seated[(bidderIdx + 1) % seated.length];
-    const allBid = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').every(p => p.bid != null);
-    if (allBid) {
-      const team1Bid = updated.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
-      const team2Bid = updated.filter(p => p.team === 2).reduce((sum, p) => sum + (p.bid || 0), 0);
-      await updateState({ players: updated, phase: 'playing', bid1: team1Bid, bid2: team2Bid, current_turn_seat: seated[0]?.seatNumber, current_bidder_seat: null });
-    } else {
-      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
-    }
-  };
-
-  const scoreRound = async () => {
-    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
-    const team1Books = gs.books1 || 0;
-    const team2Books = gs.books2 || 0;
-    const bid1 = gs.bid1 || 0;
-    const bid2 = gs.bid2 || 0;
-    const s1 = team1Books >= bid1 ? bid1 * 10 + (team1Books - bid1) : -bid1 * 10;
-    const s2 = team2Books >= bid2 ? bid2 * 10 + (team2Books - bid2) : -bid2 * 10;
-    await updateState({ score1: (gs.score1 || 0) + s1, score2: (gs.score2 || 0) + s2, phase: 'setup', current_trick: [], players: seated.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })) });
-  };
-
   const resetScore = async () => { await updateState({ score1: 0, score2: 0 }); };
   const resetRound = async () => {
-    await updateState({ phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null, players: players.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })) });
+    await updateState({
+      phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null,
+      players: players.map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
+    });
   };
   const newGame = async () => {
-    await updateState({ phase: 'setup', score1: 0, score2: 0, current_trick: [], tricks_played: 0, bid1: null, bid2: null, books1: 0, books2: 0, players: players.map(p => (p.role === 'player' || p.role === 'hostPlayer') ? { ...p, hand: [], bid: null, tricksWon: 0 } : p) });
+    await updateState({
+      phase: 'setup', score1: 0, score2: 0, current_trick: [], tricks_played: 0,
+      bid1: null, bid2: null, books1: 0, books2: 0,
+      players: players.map(p => (p.role === 'player' || p.role === 'hostPlayer') ? { ...p, hand: [], bid: null, tricksWon: 0 } : p),
+    });
   };
 
   return (
