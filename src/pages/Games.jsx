@@ -98,7 +98,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
   const glowColor2 = game.color2 || game.color;
 
   const handleJoin = () => {
-    if (!roomCode.trim()) return;
+    if (!roomCode || !roomCode.trim()) return;
     setJoining(true);
     onJoinRoom(game.id, roomCode);
     setTimeout(() => setJoining(false), 2000);
@@ -330,7 +330,7 @@ const COMING_SOON = [
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
 
