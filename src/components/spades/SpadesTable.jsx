@@ -114,7 +114,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       )}
 
       {/* Bidding Banner */}
-      {isBidding && (
+      {isBidding && !gs.first_hand_no_bid && (
         <div className="w-full px-4 py-3 rounded-xl border-2 border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-center"
           style={{ boxShadow: '0 0 20px rgba(255,95,31,0.2)' }}>
           <div className="font-heading text-lg tracking-widest text-[#FF5F1F] uppercase">📋 Bidding Round</div>

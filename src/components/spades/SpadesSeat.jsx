@@ -39,7 +39,7 @@ export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSp
             <div className="flex items-center gap-1 justify-center mt-0.5">
               <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
               <span className="text-[6px] text-[#4ade80]/70 uppercase" style={PS2}>
-                {player.role === 'hostPlayer' ? 'HOST' : isMe ? 'PLAYER' : 'PLAYER'}
+                {player.role === 'hostPlayer' ? 'HOST' : isMe ? 'PLAYER' : player.playerType === 'cpu' ? 'CPU' : 'PLAYER'}
               </span>
             </div>
             {player.bid != null && (
