@@ -114,6 +114,11 @@ export function calculateCPUBid(hand, teamBid = 0) {
   const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [] };
   
   for (const card of hand) {
+    if (card.suit === 'Joker') {
+      // Count jokers as sure tricks directly
+      sureTricks += 1;
+      continue;
+    }
     suitCounts[card.suit]++;
     suitCards[card.suit].push(card.value);
   }
