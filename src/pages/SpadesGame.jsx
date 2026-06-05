@@ -275,7 +275,7 @@ function SpadesViewer({ roomCode }) {
     // Fill empty seats with CPU players
     const currentPlayers = gs.players || [];
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
-    // Set dealer to seat 1 (host) if not set, then trigger auto-deal
+    // Set dealer to seat 1 (host) if not set
     await updateState({ 
       players: filledPlayers, 
       cpu_enabled: true,
@@ -283,6 +283,13 @@ function SpadesViewer({ roomCode }) {
       phase: 'setup'
     });
     setCpuChoiceShown(false);
+    // Trigger shuffle and deal immediately
+    for (let i = 0; i < 3; i++) {
+      const deck = generateFullDeck();
+      await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
+      await new Promise(resolve => setTimeout(resolve, 400));
+    }
+    await handleAutoDeal();
   };
 
   const handleWaitForRealPlayers = async () => {
