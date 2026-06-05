@@ -15,15 +15,11 @@ export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSp
             : isMe
             ? 'border-[#4ade80] bg-[#4ade80]/10'
             : occupied
-            ? 'border-[#BC13FE]/50 bg-[#BC13FE]/08'
+            ? 'border-white/20 bg-white/5'
             : 'border-white/10 bg-white/5'
         }`}
         style={{
-          boxShadow: isMyTurn
-            ? '0 0 20px rgba(255,215,0,0.4)'
-            : isMe
-            ? '0 0 10px rgba(74,222,128,0.2)'
-            : 'none',
+          boxShadow: 'none',
         }}
       >
         {isMyTurn && (
