@@ -27,35 +27,68 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const hasCards = player.hand?.length > 0;
   const isMyTurn = gs.current_turn_seat === seatNumber && gs.phase === 'playing';
   const hasBid = player.bid != null;
+  const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
+
+  console.log('SpadesPlayerControls render:', { 
+    seatNumber, 
+    isMySeat, 
+    playerRole: player?.role, 
+    isSetup, 
+    isShuffling,
+    disabled: !isSetup || isShuffling,
+    seatedPlayersCount: seatedPlayers.length
+  });
 
   const handleShuffleAndDeal = async () => {
-    if (isShuffling) return;
+    console.log('Shuffle & Deal clicked!', { isShuffling, isSetup, seatedPlayers: seatedPlayers.length });
+    if (isShuffling) {
+      console.log('Already shuffling, returning');
+      return;
+    }
+    if (seatedPlayers.length < 2) {
+      console.log('Not enough players:', seatedPlayers.length);
+      alert('Need at least 2 players to deal');
+      return;
+    }
+    
     setIsShuffling(true);
     
     // Shuffle 3 times with animation
     for (let i = 0; i < 3; i++) {
+      console.log('Shuffle iteration', i + 1);
       const deck = generateFullDeck();
       await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
       await new Promise(resolve => setTimeout(resolve, 400));
     }
     
     // Auto-deal after shuffling
+    console.log('Shuffling done, dealing cards...');
     await handleDeal();
     setIsShuffling(false);
+    console.log('Deal complete');
   };
 
   const handleDeal = async () => {
+    console.log('handleDeal called');
     const seated = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
-    if (seated.length < 2) return;
+    console.log('Seated players:', seated);
+    if (seated.length < 2) {
+      console.log('Not enough players to deal');
+      return;
+    }
     const workingDeck = (gs.deck_shuffled && gs.deck?.length === 52) ? gs.deck : shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
+    console.log('Cards per player:', cardsPerPlayer);
     const updatedPlayers = (gs.players || []).map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
       const idx = seated.findIndex(s => s.playerId === p.playerId);
-      return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+      const hand = workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer);
+      console.log('Player', p.playerId.slice(0, 8), 'gets', hand.length, 'cards');
+      return { ...p, hand, bid: null, tricksWon: 0 };
     });
     const dealerSeat = seated[0]?.seatNumber || 1;
     const firstBidder = seated[1]?.seatNumber || seated[0]?.seatNumber;
+    console.log('Updating game state');
     await updateState({
       players: updatedPlayers, phase: 'bidding', status: 'active',
       deck: [], current_trick: [], current_bidder_seat: firstBidder, dealer_seat: dealerSeat,
