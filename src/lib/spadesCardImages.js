@@ -73,23 +73,23 @@ const JOKER_IMAGES = {
 };
 
 export function getCardImage(card) {
-  if (!card) return null;
+  if (!card) return CARD_BACK;
   if (card.value === 'BJ' || card.value === 'LJ') {
-    return JOKER_IMAGES[card.value] || null;
+    return JOKER_IMAGES[card.value] || CARD_BACK;
   }
   if (card.suit === '♠') {
-    return SPADES_IMAGES[card.value] || null;
+    return SPADES_IMAGES[card.value] || CARD_BACK;
   }
   if (card.suit === '♥') {
-    return HEARTS_IMAGES[card.value] || null;
+    return HEARTS_IMAGES[card.value] || CARD_BACK;
   }
   if (card.suit === '♦') {
-    return DIAMONDS_IMAGES[card.value] || null;
+    return DIAMONDS_IMAGES[card.value] || CARD_BACK;
   }
   if (card.suit === '♣') {
-    return CLUBS_IMAGES[card.value] || null;
+    return CLUBS_IMAGES[card.value] || CARD_BACK;
   }
-  return null;
+  return CARD_BACK;
 }
 
 export function getCardBack() {
