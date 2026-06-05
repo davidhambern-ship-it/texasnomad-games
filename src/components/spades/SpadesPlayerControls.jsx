@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { generateFullDeck, shuffleDeck as shuffleDeckSecure } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -39,8 +40,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     // Start shuffle animation
     onShuffleStart?.();
 
-    // Generate shuffled deck
-    const deck = shuffleDeck(generateFullDeck());
+    // Generate shuffled deck (crypto-secure)
+    const deck = shuffleDeckSecure(generateFullDeck());
 
     // Wait for animation (~1.8s), then update state
     await new Promise(resolve => setTimeout(resolve, 1800));
@@ -59,7 +60,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
     const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0)
       ? gs.deck
-      : shuffleDeck(generateFullDeck());
+      : shuffleDeckSecure(generateFullDeck());
 
     setIsDealing(true);
 
@@ -249,28 +250,4 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       )}
     </div>
   );
-}
-
-function generateFullDeck() {
-  const SUITS = ['♠', '♥', '♦', '♣'];
-  const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-  const deck = [];
-  for (const suit of SUITS) {
-    for (const value of VALUES) {
-      if ((suit === '♥' || suit === '♦') && value === '2') continue;
-      deck.push({ suit, value, id: `${suit}${value}` });
-    }
-  }
-  deck.push({ suit: 'Joker', value: 'BJ', id: 'BigJoker' });
-  deck.push({ suit: 'Joker', value: 'LJ', id: 'LittleJoker' });
-  return deck;
-}
-
-function shuffleDeck(deck) {
-  const d = [...deck];
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-  return d;
 }
