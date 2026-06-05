@@ -114,12 +114,6 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {featured && (
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-20 px-4 py-1 rounded-full text-[7px] tracking-widest uppercase font-bold"
-          style={{ fontFamily: "'Press Start 2P', monospace", background: '#FFD700', color: '#000', boxShadow: '0 0 15px #FFD700' }}>
-          ⭐ FEATURED
-        </div>
-      )}
 
       {/* Cabinet Body */}
       <div className="relative rounded-t-3xl rounded-b-xl overflow-hidden border-2 scanline-overlay"
