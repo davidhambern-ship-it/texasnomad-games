@@ -255,7 +255,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Bottom (Seat 1) - Hand on table (card backs only) - wider spread */}
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
-          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 700, height: 120 }}>
+          <div className="absolute bottom-0 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 700, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1)' }}>
               {getPlayerAtSeat(1).hand.map((card, i, arr) => {
                 const overlap = getHorizontalOverlap(arr.length) * 0.6;
