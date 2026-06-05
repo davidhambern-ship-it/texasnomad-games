@@ -117,12 +117,20 @@ export default function SpadesDealAnimation({ deck, players, onComplete }) {
               transform: `translate(${finalX}px, ${finalY}px) rotate(${pos.rotation + fanAngle}deg)`,
               opacity: 1,
               zIndex: 20 + deal.indexInHand,
-              animation: `card-fly-deal 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards`,
-              animationDelay: `${(i * DEAL_SPEED) / 1000}s`,
+              animation: `card-fly-deal 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards, card-reveal 0.5s ease-out forwards`,
+              animationDelay: `${(i * DEAL_SPEED) / 1000}s, ${(i * DEAL_SPEED) / 1000 + 0.35}s`,
               filter: 'brightness(1.08) contrast(1.02)',
+              backfaceVisibility: 'hidden',
             }}
           >
-            <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+            <div className="w-full h-full relative" style={{ transformStyle: 'preserve-3d', transform: 'rotateY(0deg)', animation: `card-flip 0.5s ease-out forwards`, animationDelay: `${(i * DEAL_SPEED) / 1000 + 0.35}s` }}>
+              <div className="absolute inset-0 w-full h-full" style={{ backfaceVisibility: 'hidden' }}>
+                <img src={getCardBack()} alt="Card back" className="w-full h-full object-cover" />
+              </div>
+              <div className="absolute inset-0 w-full h-full" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
+                <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+              </div>
+            </div>
           </div>
         );
       })}

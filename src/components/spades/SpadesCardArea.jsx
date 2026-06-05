@@ -16,7 +16,7 @@ export default function SpadesCardArea({ trick, players }) {
   const hasDealtCards = players?.some(p => p.hand && p.hand.length > 0);
   
   return (
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56">
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72">
       {trick.length === 0 && !hasDealtCards ? (
         <div className="w-full h-full flex items-center justify-center">
           {/* Deck of cards visual */}
@@ -49,7 +49,8 @@ export default function SpadesCardArea({ trick, players }) {
                   position: 'absolute', 
                   width: 104, 
                   height: 144,
-                  filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.5))'
+                  filter: 'drop-shadow(0 8px 20px rgba(0,0,0,0.6))',
+                  zIndex: 50
                 }}>
                 {getCardImage(play.card) ? (
                   <img src={getCardImage(play.card)} alt={`${play.card?.value}${play.card?.suit}`} className="w-full h-full object-cover rounded-lg" />
