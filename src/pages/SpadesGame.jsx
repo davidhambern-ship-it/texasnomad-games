@@ -3,6 +3,14 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
+import { 
+  generateFullDeck, 
+  shuffleDeck, 
+  isValidPlay, 
+  determineTrickWinner, 
+  getActiveSuit,
+  getTeamFromSeat,
+} from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -138,6 +146,8 @@ function SpadesViewer({ roomCode }) {
       deck: [], current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
       first_hand_no_bid: true,
+      spades_broken: false,
+      completed_books: [],
     });
   };
 
@@ -181,11 +191,28 @@ function SpadesViewer({ roomCode }) {
         return;
       }
       
-      // Select card using CPU logic
-      const cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0);
+      // Validate play using rule engine
+      const isLead = (gs.current_trick || []).length === 0;
+      const activeSuit = getActiveSuit(gs.current_trick || []);
+      
+      // Select card using CPU logic (already validates rules)
+      const cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false);
       if (!cardToPlay) {
         console.log('CPU turn: selectCPUCard returned null');
         return;
+      }
+      
+      // Double-check with rule engine
+      const validation = isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead);
+      if (!validation.valid) {
+        console.log('CPU turn: invalid play -', validation.errors);
+        // Fallback: find any valid card
+        const validCard = hand.find(c => {
+          const v = isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead);
+          return v.valid;
+        });
+        if (!validCard) return;
+        cardToPlay = validCard;
       }
       
       console.log('CPU turn: Playing card', cardToPlay);
@@ -202,11 +229,15 @@ function SpadesViewer({ roomCode }) {
       const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === currentTurnSeat);
       const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
       
+      // Check if spades are broken
+      const spadesBroken = gs.spades_broken || cardToPlay.suit === '♠';
+      
       // Update state with card played and rotate turn in one call to avoid rate limit
       await updateState({
         players: updatedPlayers,
         current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
         current_turn_seat: nextPlayer?.seatNumber || currentTurnSeat,
+        spades_broken: spadesBroken,
       });
     }, CPU_ACTION_DELAY);
     
@@ -252,18 +283,15 @@ function SpadesViewer({ roomCode }) {
     const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null);
     if (trick.length !== seatedPlayers.length) return;
     
-    // All players have played - determine winner
-    const spades = trick.filter(t => t.card?.suit === '♠');
-    const relevant = spades.length > 0 ? spades : trick;
-    
-    const cardOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'BJ': 15, 'LJ': 14.5 };
-    const winner = relevant.reduce((a, b) => (cardOrder[a.card?.value] || 0) > (cardOrder[b.card?.value] || 0) ? a : b);
+    // Determine winner using rule engine
+    const activeSuit = getActiveSuit(trick);
+    const winner = determineTrickWinner(trick, activeSuit);
     
     if (!winner) return;
     
     const timer = setTimeout(async () => {
       const winningSeat = winner.seatNumber;
-      const winningTeam = winningSeat === 1 || winningSeat === 3 ? 1 : 2;
+      const winningTeam = getTeamFromSeat(winningSeat);
       
       // Update books and tricks
       const updatedPlayers = (gs.players || []).map(p => 
@@ -276,13 +304,29 @@ function SpadesViewer({ roomCode }) {
       const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
       const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
       
+      // Track completed book
+      const completedBook = {
+        bookNumber: newTricksPlayed,
+        leadSeat: trick[0]?.seatNumber,
+        activeSuit,
+        cardsPlayed: trick,
+        winningSeat,
+        winningTeam,
+        winningCard: winner.card,
+        timestamp: Date.now(),
+      };
+      
+      const previousBooks = gs.completed_books || [];
+      
       await updateState({
         players: updatedPlayers,
         current_trick: [],
-        current_turn_seat: winningSeat,
+        current_turn_seat: winningSeat, // Winner leads next trick
         tricks_played: newTricksPlayed,
         books1: newBooks1,
         books2: newBooks2,
+        completed_books: [...previousBooks, completedBook],
+        spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
       });
     }, 1500);
     
@@ -397,12 +441,29 @@ function SpadesViewer({ roomCode }) {
   const handlePlayCard = async (card) => {
     if (!room || !isPlayer || gs.phase !== 'playing') return;
     if (gs.current_turn_seat !== mySeatNumber) {
-      console.log('Not your turn!');
+      alert('Not your turn!');
       return;
     }
     
     const myPlayer = players.find(p => p.playerId === playerId);
     if (!myPlayer || !myPlayer.hand) return;
+    
+    // Validate play using rule engine
+    const isLead = (gs.current_trick || []).length === 0;
+    const activeSuit = getActiveSuit(gs.current_trick || []);
+    const validation = isValidPlay(
+      card, 
+      myPlayer.hand, 
+      gs.current_trick || [], 
+      activeSuit, 
+      gs.spades_broken || false, 
+      isLead
+    );
+    
+    if (!validation.valid) {
+      alert(validation.errors[0] || 'Invalid play');
+      return;
+    }
     
     // Remove card from hand
     const updatedPlayers = players.map(p =>
@@ -419,10 +480,14 @@ function SpadesViewer({ roomCode }) {
     const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === mySeatNumber);
     const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
     
+    // Check if spades are broken
+    const spadesBroken = gs.spades_broken || card.suit === '♠';
+    
     await updateState({
       players: updatedPlayers,
       current_trick: newTrick,
       current_turn_seat: nextPlayer?.seatNumber || mySeatNumber,
+      spades_broken: spadesBroken,
     });
   };
 
@@ -581,28 +646,4 @@ function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, 
       </div>
     </header>
   );
-}
-
-function generateFullDeck() {
-  const SUITS = ['♠', '♥', '♦', '♣'];
-  const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
-  const deck = [];
-  for (const suit of SUITS) {
-    for (const value of VALUES) {
-      if ((suit === '♥' || suit === '♦') && value === '2') continue;
-      deck.push({ suit, value, id: `${suit}${value}` });
-    }
-  }
-  deck.push({ suit: 'Joker', value: 'BJ', id: 'BigJoker' });
-  deck.push({ suit: 'Joker', value: 'LJ', id: 'LittleJoker' });
-  return deck;
-}
-
-function shuffleDeck(deck) {
-  const d = [...deck];
-  for (let i = d.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-  return d;
 }

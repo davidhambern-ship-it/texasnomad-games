@@ -124,19 +124,60 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         </div>
       )}
 
-      {/* Score Row */}
+      {/* Score Row with Book Boxes */}
       <div className="w-full grid grid-cols-2 gap-3">
-        <div className="p-3 border-2 rounded-xl text-center" style={{ borderColor: '#BC13FE30', background: '#BC13FE08' }}>
+        <div className="p-3 border-2 rounded-xl text-center relative" style={{ borderColor: '#BC13FE30', background: '#BC13FE08' }}>
           <div className="font-heading text-sm tracking-widest text-white uppercase truncate">{gs.team1Name || 'Team 1'}</div>
           <div className="font-heading text-2xl text-[#BC13FE]">{gs.score1 || 0}</div>
           <div className="text-[7px] text-white/30 mt-0.5" style={PS2}>Bid: {gs.bid1 ?? '-'} | Books: {gs.books1 ?? '-'}</div>
+          
+          {/* Book Box - Team 1 */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1 min-h-[20px]">
+            {Array.from({ length: gs.books1 || 0 }).map((_, i) => (
+              <div key={i} className="w-4 h-3 bg-gradient-to-br from-[#BC13FE] to-[#6b21a8] rounded-sm border border-[#BC13FE]/50"
+                style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} 
+                title={`Book ${i + 1}`} />
+            ))}
+          </div>
         </div>
-        <div className="p-3 border-2 rounded-xl text-center" style={{ borderColor: '#FF5F1F30', background: '#FF5F1F08' }}>
+        
+        <div className="p-3 border-2 rounded-xl text-center relative" style={{ borderColor: '#FF5F1F30', background: '#FF5F1F08' }}>
           <div className="font-heading text-sm tracking-widest text-white uppercase truncate">{gs.team2Name || 'Team 2'}</div>
           <div className="font-heading text-2xl text-[#FF5F1F]">{gs.score2 || 0}</div>
           <div className="text-[7px] text-white/30 mt-0.5" style={PS2}>Bid: {gs.bid2 ?? '-'} | Books: {gs.books2 ?? '-'}</div>
+          
+          {/* Book Box - Team 2 */}
+          <div className="mt-2 flex flex-wrap justify-center gap-1 min-h-[20px]">
+            {Array.from({ length: gs.books2 || 0 }).map((_, i) => (
+              <div key={i} className="w-4 h-3 bg-gradient-to-br from-[#FF5F1F] to-[#c2410c] rounded-sm border border-[#FF5F1F]/50"
+                style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} 
+                title={`Book ${i + 1}`} />
+            ))}
+          </div>
         </div>
       </div>
+
+      {/* Game Info Bar */}
+      {(gs.phase === 'playing' || gs.phase === 'bidding') && (
+        <div className="w-full px-4 py-2 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 grid grid-cols-3 gap-2 text-[7px]" style={PS2}>
+          <div className="text-center">
+            <div className="text-white/40 uppercase">Book</div>
+            <div className="text-[#FFD700]">{(gs.tricks_played || 0) + 1}/13</div>
+          </div>
+          <div className="text-center">
+            <div className="text-white/40 uppercase">Active Suit</div>
+            <div className="text-[#FFD700] text-lg">
+              {(gs.current_trick?.[0]?.card?.suit) || '-'}
+            </div>
+          </div>
+          <div className="text-center">
+            <div className="text-white/40 uppercase">Spades</div>
+            <div className={gs.spades_broken ? 'text-[#4ade80]' : 'text-[#ef4444]'}>
+              {gs.spades_broken ? 'BROKEN' : 'INTACT'}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="relative w-full bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817] overflow-visible"

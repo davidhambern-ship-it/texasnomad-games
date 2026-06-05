@@ -177,14 +177,14 @@ export function calculateCPUBid(hand, teamBid = 0) {
 }
 
 // CPU Card Selection Logic
-export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, booksWon = 0) {
+export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, booksWon = 0, spadesBroken = false) {
   if (!hand || hand.length === 0) return null;
   
   const trick = currentTrick || [];
   
   // If leading (no cards in trick)
   if (trick.length === 0) {
-    return selectLeadingCard(hand, myBid, booksWon);
+    return selectLeadingCard(hand, myBid, booksWon, spadesBroken);
   }
   
   // If following to a trick
@@ -192,7 +192,7 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
 }
 
 // Select card when leading a trick
-function selectLeadingCard(hand, myBid, booksWon) {
+function selectLeadingCard(hand, myBid, booksWon, spadesBroken) {
   const suitCounts = { '♠': 0, '♥': 0, '♦': 0, '♣': 0, 'Joker': 0 };
   const suitCards = { '♠': [], '♥': [], '♦': [], '♣': [], 'Joker': [] };
   
@@ -210,6 +210,25 @@ function selectLeadingCard(hand, myBid, booksWon) {
   
   for (const suit of ['♠', '♥', '♦', '♣']) {
     suitCards[suit].sort((a, b) => cardOrder[b.value] - cardOrder[a.value]);
+  }
+  
+  // Cannot lead spades unless spades are broken or only have spades
+  const hasNonSpade = hand.some(c => c.suit !== '♠');
+  if (!spadesBroken && hasNonSpade) {
+    // Lead highest non-spade if we need tricks
+    if (booksWon < myBid) {
+      for (const suit of ['♥', '♦', '♣']) {
+        if (suitCards[suit].length > 0 && suitCards[suit][0].value !== 'BJ' && suitCards[suit][0].value !== 'LJ') {
+          return suitCards[suit][0];
+        }
+      }
+    }
+    // Lead low non-spade to avoid bags
+    for (const suit of ['♥', '♦', '♣']) {
+      if (suitCards[suit].length > 0) {
+        return suitCards[suit][suitCards[suit].length - 1];
+      }
+    }
   }
   
   // If we need tricks to make our bid, lead high
