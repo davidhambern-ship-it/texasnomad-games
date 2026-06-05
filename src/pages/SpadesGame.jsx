@@ -394,6 +394,38 @@ function SpadesViewer({ roomCode }) {
     setCpuChoiceShown(false);
   };
 
+  const handlePlayCard = async (card) => {
+    if (!room || !isPlayer || gs.phase !== 'playing') return;
+    if (gs.current_turn_seat !== mySeatNumber) {
+      console.log('Not your turn!');
+      return;
+    }
+    
+    const myPlayer = players.find(p => p.playerId === playerId);
+    if (!myPlayer || !myPlayer.hand) return;
+    
+    // Remove card from hand
+    const updatedPlayers = players.map(p =>
+      p.playerId === playerId
+        ? { ...p, hand: p.hand.filter(c => c.id !== card.id), lastActionAt: Date.now() }
+        : p
+    );
+    
+    // Add card to trick
+    const newTrick = [...(gs.current_trick || []), { playerId, seatNumber: mySeatNumber, card }];
+    
+    // Find next player
+    const seatedPlayers = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+    const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === mySeatNumber);
+    const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
+    
+    await updateState({
+      players: updatedPlayers,
+      current_trick: newTrick,
+      current_turn_seat: nextPlayer?.seatNumber || mySeatNumber,
+    });
+  };
+
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
   const isSpectator = myRole === 'spectator';
 
@@ -500,6 +532,7 @@ function SpadesViewer({ roomCode }) {
             onWaitForRealPlayers={handleWaitForRealPlayers}
             onChooseSpectate={handleChooseSpectate}
             onChooseSit={handleChooseSit}
+            onPlayCard={handlePlayCard}
           />
 
         </div>

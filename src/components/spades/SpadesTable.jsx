@@ -15,7 +15,7 @@ const SEAT_POSITIONS = {
   4: 'right',
 };
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -261,10 +261,16 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             <div className="flex" style={{ transform: 'scale(1)' }}>
               {sortedHand.map((card, i, arr) => {
                 const overlap = getHorizontalOverlap(arr.length) * 0.5;
+                const isMyTurn = gs.current_turn_seat === 1 && gs.phase === 'playing';
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)] cursor-pointer"
+                    onClick={() => isMyTurn && onPlayCard?.(card)}
+                    className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
+                      isMyTurn 
+                        ? 'hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
+                        : 'opacity-60 cursor-not-allowed'
+                    }`}
                     style={{
                       width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
@@ -272,6 +278,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     }}
                   >
                     <img src={getCardImage(card)} alt={`${card.suit} ${card.value}`} className="w-full h-full object-cover" />
+                    {isMyTurn && (
+                      <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
