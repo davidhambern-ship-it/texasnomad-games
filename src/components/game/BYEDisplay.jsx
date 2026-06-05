@@ -2,7 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const sty = { fontFamily: "'Press Start 2P', monospace" };
 const LETTERS = ['B', 'Y', 'E'];
-const COLORS = ['#FF5F1F', '#BC13FE', '#FFD700'];
+// Dimmed colors for inline display — readable but not overpowering
+const COLORS_INLINE = ['#cc4400', '#8a0eb5', '#cc9900'];
+// Slightly brighter for the flash popups but still reduced
+const COLORS_FLASH = ['#FF5F1F', '#BC13FE', '#FFD700'];
 
 export default function BYEDisplay({ byeCount = 0, byeFlash = 0 }) {
   const [flashLetter, setFlashLetter] = useState(null);
@@ -34,13 +37,13 @@ export default function BYEDisplay({ byeCount = 0, byeFlash = 0 }) {
 
   return (
     <>
-      {/* Full BYE popup */}
+      {/* Full BYE popup — reduced bloom */}
       {showFullBye && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none">
-          <div className="flex gap-2 animate-pulse" style={{ filter: 'drop-shadow(0 0 40px #FF5F1F) drop-shadow(0 0 80px rgba(255,95,31,0.5))' }}>
+          <div className="flex gap-2" style={{ filter: 'drop-shadow(0 0 15px rgba(255,95,31,0.6))' }}>
             {LETTERS.map((l, i) => (
-              <div key={l} className="font-heading text-[20vw] leading-none"
-                style={{ ...sty, color: COLORS[i], textShadow: `0 0 40px ${COLORS[i]}, 0 0 80px ${COLORS[i]}` }}>
+              <div key={l} className="font-heading text-[18vw] leading-none"
+                style={{ ...sty, color: COLORS_FLASH[i], textShadow: `0 0 20px ${COLORS_FLASH[i]}, 0 0 40px ${COLORS_FLASH[i]}60` }}>
                 {l}
               </div>
             ))}
@@ -48,14 +51,14 @@ export default function BYEDisplay({ byeCount = 0, byeFlash = 0 }) {
         </div>
       )}
 
-      {/* Flash single letter popup */}
+      {/* Flash single letter popup — reduced bloom */}
       {flashLetter !== null && !showFullBye && (
         <div className="fixed inset-0 z-[90] flex items-center justify-center pointer-events-none">
           <div className="font-heading" style={{
             ...sty,
-            fontSize: '30vw',
-            color: COLORS[flashLetter],
-            textShadow: `0 0 60px ${COLORS[flashLetter]}, 0 0 120px ${COLORS[flashLetter]}`,
+            fontSize: '25vw',
+            color: COLORS_FLASH[flashLetter],
+            textShadow: `0 0 30px ${COLORS_FLASH[flashLetter]}80, 0 0 60px ${COLORS_FLASH[flashLetter]}40`,
             animation: 'byeFlashIn 1.5s ease-out forwards',
           }}>
             {LETTERS[flashLetter]}
@@ -71,7 +74,7 @@ export default function BYEDisplay({ byeCount = 0, byeFlash = 0 }) {
         </div>
       )}
 
-      {/* Inline BYE letters display */}
+      {/* Inline BYE letters display — dimmer, still readable */}
       <div className="flex items-center justify-center gap-3">
         {LETTERS.map((letter, i) => {
           const active = i < byeCount;
@@ -82,10 +85,9 @@ export default function BYEDisplay({ byeCount = 0, byeFlash = 0 }) {
               style={{
                 ...sty,
                 fontSize: '2.5rem',
-                color: active ? COLORS[i] : '#ffffff10',
-                textShadow: active ? `0 0 20px ${COLORS[i]}, 0 0 40px ${COLORS[i]}` : 'none',
+                color: active ? COLORS_INLINE[i] : '#ffffff10',
+                textShadow: active ? `0 0 8px ${COLORS_INLINE[i]}` : 'none',
                 transform: isLatest ? 'scale(1.4)' : 'scale(1)',
-                filter: active ? `drop-shadow(0 0 8px ${COLORS[i]})` : 'none',
               }}>
               {letter}
             </div>

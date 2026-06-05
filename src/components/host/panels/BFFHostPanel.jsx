@@ -60,6 +60,11 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
   const stealMode = gs.steal_mode || false;
   const hostPlayerMode = gs.host_player_id ? true : false;
 
+  // 2P mode: auto-detect 2 active participants
+  const participantPlayers = players.filter(p => p.role === 'participant' || p.role === 'hostPlayer');
+  const is2PMode = participantPlayers.length === 2;
+  const byeCounts2P = gs.bye_counts_2p || {};
+
   const family1Players = getActivePlayers(players, 1);
   const family2Players = getActivePlayers(players, 2);
   const unassignedPlayers = players.filter(p => !p.familyTeam);
@@ -124,6 +129,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     const totalActive = players.filter(p => p.active !== false).length;
     const use1P = forceOnPlayerMode || totalActive <= 1;
 
+    const use2P = !use1P && participantPlayers.length === 2;
+    const initBye2P = {};
+    if (use2P) participantPlayers.forEach(p => { initBye2P[p.playerId] = 0; });
+
     await updateState({
       phase: 'playing', status: 'active',
       family1: family1Input.trim(), family2: family2Input.trim(),
@@ -133,7 +142,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
       current_question: firstSurvey?.question || '',
       answers: firstSurvey ? firstSurvey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })) : [],
       last_submission: null,
-      faceoff_mode: !use1P,
+      faceoff_mode: !use1P && !use2P,
       faceoff_player1_id: player1?.playerId || null,
       faceoff_player2_id: player2?.playerId || null,
       faceoff_round_idx1: nextIdx1,
@@ -141,8 +150,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
       buzz_winner: null,
       bye_count: 0, bye_flash: 0,
       one_player_mode: use1P,
-      answering_player_id: use1P ? (players[0]?.playerId || null) : null,
-      steal_mode: false, steal_player_id: null,
+      two_player_mode: use2P,
+      bye_counts_2p: use2P ? initBye2P : {},
+      answering_player_id: use1P ? (players[0]?.playerId || null) : (use2P ? (participantPlayers[0]?.playerId || null) : null),
+      steal_mode: false, steal_player_id: null, steal_result: null,
     });
   };
 
@@ -189,12 +200,47 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
   const clearBye = async () => { await updateState({ bye_count: 0 }); };
   const triggerByeAnimation = async () => { await updateState({ bye_flash: Date.now() }); };
 
-  // Mark wrong — auto BYE + auto advance rotation
+  // Mark wrong — auto BYE + auto advance rotation (supports 2P per-player BYE)
   const markWrong = async () => {
-    const newCount = Math.min(3, byeCount + 1);
     const currentAnsweringId = gs.answering_player_id || gs.buzz_winner?.playerId;
     const currentFamilyTeam = gs.active_turn || 1;
 
+    if (is2PMode && currentAnsweringId) {
+      // 2P mode: increment this specific player's BYE count
+      const playerByes = byeCounts2P[currentAnsweringId] || 0;
+      const newPlayerByes = Math.min(3, playerByes + 1);
+      const newBye2P = { ...byeCounts2P, [currentAnsweringId]: newPlayerByes };
+
+      if (newPlayerByes >= 3) {
+        // BYE complete for this player — auto-trigger steal by opponent
+        const oppFam = currentFamilyTeam === 1 ? 2 : 1;
+        const { player: stealPlayer, nextIdx, stealFamily } = getStealPlayer(players, currentFamilyTeam, gs) || {};
+        await updateState({
+          bye_counts_2p: newBye2P,
+          bye_count: newPlayerByes,
+          answering_player_id: stealPlayer?.playerId || null,
+          buzz_winner: null,
+          last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
+          steal_mode: !!stealPlayer,
+          steal_player_id: stealPlayer?.playerId || null,
+          steal_family: stealFamily || oppFam,
+          steal_round_idx: nextIdx,
+          steal_result: null,
+          active_turn: stealFamily || oppFam,
+        });
+      } else {
+        await updateState({
+          bye_counts_2p: newBye2P,
+          bye_count: newPlayerByes,
+          buzz_winner: null,
+          last_submission: gs.last_submission ? { ...gs.last_submission, result: 'wrong' } : null,
+        });
+      }
+      return;
+    }
+
+    // Standard mode
+    const newCount = Math.min(3, byeCount + 1);
     let nextPlayer = null;
     let nextNextPlayer = null;
     if (newCount < 3 && currentAnsweringId) {
@@ -237,22 +283,26 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     if (!survey) return;
     const { player1, player2, nextIdx1, nextIdx2 } = autoPickFaceoff();
     const use1P = onPlayerMode;
+    const use2P = is2PMode;
+    const resetBye2P = {};
+    if (use2P) participantPlayers.forEach(p => { resetBye2P[p.playerId] = 0; });
 
     await updateState({
       current_survey_idx: idx,
       current_question: survey.question,
       answers: survey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })),
       round_bank: 0,
-      faceoff_mode: !use1P,
+      faceoff_mode: !use1P && !use2P,
       faceoff_player1_id: player1?.playerId || null,
       faceoff_player2_id: player2?.playerId || null,
       faceoff_round_idx1: nextIdx1 ?? gs.faceoff_round_idx1,
       faceoff_round_idx2: nextIdx2 ?? gs.faceoff_round_idx2,
       buzz_winner: null, last_submission: null,
       bye_count: 0, bye_flash: 0,
-      answering_player_id: use1P ? (players[0]?.playerId || null) : null,
+      bye_counts_2p: use2P ? resetBye2P : {},
+      answering_player_id: use1P ? (players[0]?.playerId || null) : (use2P ? (participantPlayers[0]?.playerId || null) : null),
       pending_decision: null,
-      steal_mode: false, steal_player_id: null,
+      steal_mode: false, steal_player_id: null, steal_result: null,
       next_answering_player_id: null,
     });
   };
@@ -277,8 +327,9 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
       phase: 'setup', score1: 0, score2: 0, active_turn: 1, round_bank: 0,
       current_question: '', answers: [], round: 1, current_survey_idx: 0,
       last_submission: null, faceoff_mode: false, buzz_winner: null,
-      bye_count: 0, bye_flash: 0, one_player_mode: false,
-      steal_mode: false, steal_player_id: null, host_player_id: null,
+      bye_count: 0, bye_flash: 0, one_player_mode: false, two_player_mode: false,
+      bye_counts_2p: {},
+      steal_mode: false, steal_player_id: null, steal_result: null, host_player_id: null,
       faceoff_round_idx1: -1, faceoff_round_idx2: -1, next_answering_player_id: null,
     });
   };
@@ -402,11 +453,16 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
             <div className="w-px h-8 bg-white/10" />
             <div className={`px-3 py-1 rounded border text-[9px] tracking-widest uppercase`} style={{
               ...sty,
-              borderColor: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : '#ffffff30',
-              color: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : '#ffffff40',
+              borderColor: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : is2PMode ? '#4ade80' : '#ffffff30',
+              color: faceoffMode ? '#FF5F1F' : onPlayerMode ? '#FFD700' : is2PMode ? '#4ade80' : '#ffffff40',
             }}>
-              {faceoffMode ? '⚡ FACEOFF' : onPlayerMode ? '⭐ 1P MODE' : stealMode ? '🎯 STEAL' : 'PLAYING'}
+              {faceoffMode ? '⚡ FACEOFF' : onPlayerMode ? '⭐ 1P MODE' : stealMode ? '🎯 STEAL' : is2PMode ? '⚔ 2P MODE' : 'PLAYING'}
             </div>
+            {is2PMode && gs.answering_player_id && (
+              <div className="px-2 py-1 rounded border border-[#4ade80]/40 bg-[#4ade80]/5 text-[8px] text-[#4ade80] tracking-widest uppercase" style={sty}>
+                SEAT {players.find(p => p.playerId === gs.answering_player_id)?.seatNumber || '?'} answering
+              </div>
+            )}
             {isHostSittingIn && (
               <div className="px-2 py-1 rounded border border-[#BC13FE]/50 bg-[#BC13FE]/10 text-[8px] text-[#BC13FE] tracking-widest uppercase" style={sty}>
                 HOST IN GAME
@@ -460,14 +516,45 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
         <div className="p-4 border-2 rounded-xl bg-black/60 space-y-3"
           style={{ borderColor: byeCount >= 3 ? '#FF5F1F' : byeCount > 0 ? '#FF5F1F60' : '#BC13FE30', boxShadow: byeCount >= 3 ? '0 0 20px rgba(255,95,31,0.3)' : 'none' }}>
           <div className="flex items-center justify-between">
-            <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">BYE Strikes</h3>
+            <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">
+              BYE Strikes {is2PMode && <span className="text-[#4ade80]">— 2P Mode</span>}
+            </h3>
             {byeCount >= 3 && (
               <div className="px-2 py-1 rounded border border-[#FF5F1F] bg-[#FF5F1F]/10 text-[#FF5F1F] text-[8px] tracking-widest uppercase animate-pulse" style={sty}>BYE COMPLETE</div>
             )}
           </div>
+
+          {/* 2P per-player BYE display */}
+          {is2PMode ? (
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { fam: 1, name: gs.family1 || 'Family 1', color: '#BC13FE' },
+                { fam: 2, name: gs.family2 || 'Family 2', color: '#FF5F1F' },
+              ].map(({ fam, name, color }) => {
+                const fp = participantPlayers.find(p => Number(p.familyTeam) === fam);
+                const pid = fp?.playerId;
+                const byes = pid ? (byeCounts2P[pid] || 0) : 0;
+                const isActive = gs.answering_player_id === pid;
+                return (
+                  <div key={fam} className="px-3 py-2 rounded-lg border text-center"
+                    style={{ borderColor: byes >= 3 ? color : `${color}30`, background: isActive ? `${color}10` : 'transparent' }}>
+                    <div className="text-[7px] tracking-widest uppercase mb-1" style={{ ...sty, color }}>{name}</div>
+                    <div className="flex gap-1 justify-center mb-1">
+                      {['B','Y','E'].map((l, i) => (
+                        <span key={l} className="font-heading text-lg" style={{ ...sty, color: i < byes ? color : '#ffffff15' }}>{l}</span>
+                      ))}
+                    </div>
+                    {isActive && <div className="text-[6px] text-[#4ade80] tracking-widest uppercase" style={sty}>▶ Answering</div>}
+                    {byes >= 3 && <div className="text-[6px] animate-pulse tracking-widest uppercase" style={{ ...sty, color }}>BYE!</div>}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
           <div className="flex justify-center py-2">
             <HostBYEIndicator byeCount={byeCount} />
           </div>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <Btn onClick={markWrong} color="#ef4444" size="sm" disabled={byeCount >= 3}>✗ Mark Wrong + BYE</Btn>
             <Btn onClick={addByeStrike} color="#ef4444" size="sm" disabled={byeCount >= 3}>+ BYE Strike</Btn>
@@ -475,7 +562,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
             <Btn onClick={clearBye} color="#ffffff40" size="sm" disabled={byeCount === 0}>Clear BYE</Btn>
           </div>
           <Btn onClick={triggerByeAnimation} color="#FF5F1F" size="sm" className="w-full">🎬 Trigger BYE Animation</Btn>
-          {byeCount >= 3 && (
+          {byeCount >= 3 && !is2PMode && (
             <div className="space-y-2">
               <div className="px-3 py-2 rounded-lg border border-[#FF5F1F]/40 bg-[#FF5F1F]/10 text-center">
                 <div className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={sty}>BYE complete — prepare steal or award round</div>
@@ -483,6 +570,16 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
               <Btn onClick={triggerSteal} color="#FF5F1F" size="sm" className="w-full">🎯 Trigger Steal</Btn>
             </div>
           )}
+
+          {/* 2P steal result */}
+          {is2PMode && gs.steal_result && (
+            <div className={`p-3 rounded-xl border text-center ${gs.steal_result === 'correct' ? 'border-green-400/50 bg-green-400/10' : 'border-red-500/50 bg-red-500/10'}`}>
+              <div className="text-[8px] tracking-widest uppercase" style={{ ...sty, color: gs.steal_result === 'correct' ? '#4ade80' : '#ef4444' }}>
+                {gs.steal_result === 'correct' ? '✓ Steal Correct — Award Bank!' : '✗ Steal Missed — Bank Lost'}
+              </div>
+            </div>
+          )}
+
           {stealMode && stealPlayer && (
             <div className="p-3 border border-[#FF5F1F] rounded-xl bg-[#FF5F1F]/10 flex items-center justify-between">
               <div>

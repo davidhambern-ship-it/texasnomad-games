@@ -8,7 +8,7 @@ import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import Home from '@/pages/Home';
 import Welcome from '@/pages/Welcome';
-import BFFGame from '@/pages/BFFGame';
+import BFFGame from '@/pages/BFFGame.jsx';
 import SquareBizGame from '@/pages/SquareBizGame';
 import HangmanGame from '@/pages/HangmanGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
