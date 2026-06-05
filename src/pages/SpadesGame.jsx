@@ -206,6 +206,36 @@ function SpadesViewer({ roomCode }) {
     return () => clearTimeout(timer);
   }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
+  // Handle turn rotation after each card is played
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
+    
+    const trick = gs.current_trick || [];
+    if (trick.length === 0) return;
+    
+    const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+    if (trick.length >= seatedPlayers.length) return; // Wait for trick completion handler
+    
+    // Get the last player who played
+    const lastPlayed = trick[trick.length - 1];
+    if (!lastPlayed) return;
+    
+    // Find next player in seat order
+    const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === lastPlayed.seatNumber);
+    const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
+    
+    if (!nextPlayer) return;
+    
+    // Rotate turn to next player
+    const timer = setTimeout(async () => {
+      await updateState({
+        current_turn_seat: nextPlayer.seatNumber,
+      });
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
+
   // Handle trick completion and turn rotation
   useEffect(() => {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
