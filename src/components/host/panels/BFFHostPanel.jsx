@@ -46,7 +46,10 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
   const [answerInput, setAnswerInput] = useState('');
   const [checkResult, setCheckResult] = useState(null);
   const [isListening, setIsListening] = useState(false);
+  const [autoRoundCountdown, setAutoRoundCountdown] = useState(null);
   const recognitionRef = useRef(null);
+  const autoRoundTimerRef = useRef(null);
+  const prevStealResultRef = useRef(gs.steal_result);
 
   const isSetup = !gs.phase || gs.phase === 'setup';
   const isPlaying = gs.phase === 'playing';
@@ -71,6 +74,73 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     setLoadingSurveys(true);
     base44.entities.BFFSurvey.list().then(setSurveys).finally(() => setLoadingSurveys(false));
   }, []);
+
+  // ── AUTO ROUND TRANSITION ──
+  // After steal resolves (wrong or correct), dead-reveal all answers then auto-advance round after 5s
+  useEffect(() => {
+    const stealResult = gs.steal_result;
+    if (!stealResult || stealResult === prevStealResultRef.current) return;
+    prevStealResultRef.current = stealResult;
+
+    // Clear any existing timer
+    clearTimeout(autoRoundTimerRef.current);
+
+    // Step 1: Dead-reveal all unrevealed answers immediately
+    const answers = gs.answers || [];
+    const hasUnrevealed = answers.some(a => !a.revealed);
+    const revealPromise = hasUnrevealed
+      ? updateState({ answers: answers.map(a => ({ ...a, revealed: true })) })
+      : Promise.resolve();
+
+    // Step 2: Count down 5s then load next round
+    let count = 5;
+    setAutoRoundCountdown(count);
+    const tick = setInterval(() => {
+      count -= 1;
+      setAutoRoundCountdown(count);
+      if (count <= 0) clearInterval(tick);
+    }, 1000);
+
+    revealPromise.then(() => {
+      autoRoundTimerRef.current = setTimeout(() => {
+        clearInterval(tick);
+        setAutoRoundCountdown(null);
+        // loadNextRound logic inlined (surveys may have updated)
+        setSurveys(prev => {
+          const usedIds = gs.used_survey_ids || [];
+          const unused = prev.filter(s => !usedIds.includes(s.id));
+          const pool = unused.length > 0 ? unused : prev;
+          if (pool.length === 0) return prev;
+          const survey = pool[Math.floor(Math.random() * pool.length)];
+          const participants = (gs.players || []).filter(p => p.role === 'participant' || p.role === 'hostPlayer');
+          const use2P = participants.length === 2;
+          const resetBye2P = {};
+          if (use2P) participants.forEach(p => { resetBye2P[p.playerId] = 0; });
+          const newUsedIds = [...usedIds, survey.id];
+          updateState({
+            current_question: survey.question,
+            answers: survey.answers.map(a => ({ text: a.answer || a.text, points: a.points, revealed: false })),
+            used_survey_ids: newUsedIds,
+            round_bank: 0,
+            faceoff_mode: !use2P,
+            buzz_winner: null, last_submission: null,
+            bye_count: 0, bye_flash: 0,
+            bye_counts_2p: use2P ? resetBye2P : {},
+            answering_player_id: use2P ? (participants[0]?.playerId || null) : null,
+            steal_mode: false, steal_player_id: null, steal_result: null,
+            next_answering_player_id: null, current_typing: '',
+            round: (gs.round || 1) + 1,
+          });
+          return prev;
+        });
+      }, 5000);
+    });
+
+    return () => {
+      clearTimeout(autoRoundTimerRef.current);
+      clearInterval(tick);
+    };
+  }, [gs.steal_result]);
 
   const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -720,9 +790,17 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
         {/* Player Roster */}
         <PlayerRoster players={players} gs={gs} />
 
+        {/* Auto Round Countdown */}
+        {autoRoundCountdown !== null && (
+          <div className="p-4 border-2 border-[#FFD700] rounded-xl bg-[#FFD700]/10 text-center animate-pulse">
+            <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase mb-1" style={sty}>Next round starting in</div>
+            <div className="font-heading text-4xl text-[#FFD700]">{autoRoundCountdown}</div>
+          </div>
+        )}
+
         {/* Actions */}
         <div className="grid grid-cols-2 gap-3">
-          <Btn onClick={loadNextRound} color="#FF5F1F" size="lg" disabled={surveys.length === 0}>▶ Next Round</Btn>
+          <Btn onClick={loadNextRound} color="#FF5F1F" size="lg" disabled={surveys.length === 0 || autoRoundCountdown !== null}>▶ Next Round</Btn>
           <Btn onClick={newGame} color="#ffffff" size="lg">↺ New Game</Btn>
         </div>
       </div>
