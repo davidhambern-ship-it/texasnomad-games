@@ -154,16 +154,16 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Top (Seat 3) - Hand on table (card backs only) */}
         {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 440, height: 120 }}>
             <div className="flex" style={{ transform: 'scale(1.15)' }}>
-              {getPlayerAtSeat(3).hand.map((card, i) => (
+              {getPlayerAtSeat(3).hand.map((card, i, arr) => (
                 <div
                   key={card.id || i}
                   className="relative rounded-lg overflow-hidden shadow-lg"
                   style={{
                     width: 60, height: 84,
-                    marginLeft: i > 0 ? '-66px' : '0',
-                    transform: `rotate(${(i - 6) * 2}deg)`,
+                    marginLeft: i > 0 ? '-52px' : '0',
+                    transform: `rotate(${(i - (arr.length - 1) / 2) * 3}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -2}px)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -189,14 +189,14 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(2)?.hand?.length > 0 && (
           <div className="absolute left-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(90deg)' }}>
-              {getPlayerAtSeat(2).hand.map((card, i) => (
+              {getPlayerAtSeat(2).hand.map((card, i, arr) => (
                 <div
                   key={card.id || i}
                   className="relative rounded-lg overflow-hidden shadow-lg"
                   style={{
                     width: 60, height: 84,
-                    marginTop: i > 0 ? '-66px' : '0',
-                    transform: `rotate(${(i - 6) * 2}deg)`,
+                    marginTop: i > 0 ? '-56px' : '0',
+                    transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -222,14 +222,14 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {getPlayerAtSeat(4)?.hand?.length > 0 && (
           <div className="absolute right-16 top-1/2 -translate-y-1/2 z-5 flex items-center" style={{ width: 120, height: 400 }}>
             <div className="flex flex-col" style={{ transform: 'scale(1.15) rotate(-90deg)' }}>
-              {getPlayerAtSeat(4).hand.map((card, i) => (
+              {getPlayerAtSeat(4).hand.map((card, i, arr) => (
                 <div
                   key={card.id || i}
                   className="relative rounded-lg overflow-hidden shadow-lg"
                   style={{
                     width: 60, height: 84,
-                    marginTop: i > 0 ? '-66px' : '0',
-                    transform: `rotate(${(i - 6) * 2}deg)`,
+                    marginTop: i > 0 ? '-56px' : '0',
+                    transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -253,16 +253,16 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
         {/* Bottom (Seat 1) - Hand on table (card backs only) */}
         {getPlayerAtSeat(1)?.hand?.length > 0 && (
-          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 400, height: 120 }}>
-            <div className="flex" style={{ transform: 'scale(1.15)' }}>
-              {getPlayerAtSeat(1).hand.map((card, i) => (
+          <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 480, height: 140 }}>
+            <div className="flex" style={{ transform: 'scale(1.2)' }}>
+              {getPlayerAtSeat(1).hand.map((card, i, arr) => (
                 <div
                   key={card.id || i}
                   className="relative rounded-lg overflow-hidden shadow-lg"
                   style={{
                     width: 60, height: 84,
-                    marginLeft: i > 0 ? '-66px' : '0',
-                    transform: `rotate(${(i - 6) * 2}deg)`,
+                    marginLeft: i > 0 ? '-48px' : '0',
+                    transform: `rotate(${(i - (arr.length - 1) / 2) * 4}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -3}px)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
