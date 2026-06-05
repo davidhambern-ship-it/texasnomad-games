@@ -306,10 +306,23 @@ const GAMES = [
     path: '/games/hangman',
     featured: false,
   },
+  {
+    id: 'spades',
+    title: 'Spades',
+    tagline: 'Classic Card Trick-Taking',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/2b111c7de_BFFCover-2.png',
+    color: '#4a4a8a',
+    color2: '#6a6aaa',
+    marqueeText: 'BID SMART • PLAY TOGETHER • WIN TRICKS • DOMINATE THE TABLE',
+    screenText: 'PARTNER CARD GAME',
+    description: 'The classic trick-taking card game. Partner up, bid your tricks, and outplay the competition. Teamwork wins championships.',
+    tags: ['4 Players', 'Partner', 'Strategy'],
+    path: '/games/spades',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [
-  { title: 'Spades', emoji: '♠️', color: '#4a4a8a' },
   { title: 'TN Originals', emoji: '🤠', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];

@@ -11,6 +11,7 @@ import Welcome from '@/pages/Welcome';
 import BFFGame from '@/pages/BFFGame';
 import SquareBizGame from '@/pages/SquareBizGame';
 import HangmanGame from '@/pages/HangmanGame';
+import SpadesGame from '@/pages/SpadesGame';
 import GamePlaceholder from '@/pages/GamePlaceholder';
 import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
@@ -55,6 +56,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/bff" element={<BFFGame />} />
       <Route path="/games/square-biz" element={<SquareBizGame />} />
       <Route path="/games/hangman" element={<HangmanGame />} />
+      <Route path="/games/spades" element={<SpadesGame />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
       <Route path="/live-status" element={<PlaceholderPage />} />
       <Route path="/about" element={<PlaceholderPage />} />
