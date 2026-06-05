@@ -199,7 +199,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                   style={{
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(-90deg)`,
+                    transform: `rotate(-90deg) scaleY(-1)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
@@ -233,7 +233,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                   style={{
                     width: 52, height: 73,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(90deg)`,
+                    transform: `rotate(90deg) scaleY(-1)`,
                   }}
                 >
                   <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
