@@ -18,11 +18,11 @@ const BACK_CARDS = [
 export default function SpadesCabinetImage() {
   return (
     <div className="w-full h-full flex items-center justify-center"
-      style={{ minHeight: 130, position: 'relative', background: '#0a1a0a', boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)', border: '3px solid #3d2817' }}>
+      style={{ minHeight: 130, position: 'relative', background: 'rgba(180,70,10,0.35)', boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)', border: '3px solid rgba(255,120,30,0.6)', backdropFilter: 'blur(2px)' }}>
       
       {/* Felt texture overlay */}
       <div className="absolute inset-0 pointer-events-none"
-        style={{ background: 'radial-gradient(ellipse at 50% 50%, rgba(20,50,20,0.3) 0%, rgba(0,0,0,0.4) 100%)' }} />
+        style={{ background: 'radial-gradient(ellipse at 50% 30%, rgba(255,140,40,0.18) 0%, rgba(180,50,0,0.15) 60%, rgba(0,0,0,0.35) 100%)' }} />
 
       {/* Curved text along top edge */}
       <svg viewBox="0 0 300 55" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: 55, pointerEvents: 'none', zIndex: 30 }}>
