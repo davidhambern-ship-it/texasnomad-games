@@ -180,8 +180,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       )}
 
       {/* Table */}
-      <div className="relative w-full bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817] overflow-visible"
-        style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)', minHeight: 520 }}>
+      <div className="relative w-full rounded-3xl border-4 overflow-visible"
+        style={{ background: 'rgba(180,70,10,0.35)', border: '4px solid rgba(255,120,30,0.6)', boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', minHeight: 520 }}>
 
         {/* Table center logo */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-20">
