@@ -149,6 +149,13 @@ export default function SpadesHostPanel({ gs, updateState }) {
 
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
 
+  // Sync occupied seats on mount - ensure host panel sees live players
+  useEffect(() => {
+    if (seatedPlayers.length > 0) {
+      console.log('🎮 Host Panel - Occupied seats:', seatedPlayers.map(p => ({ seat: p.seatNumber, role: p.role, type: p.playerType })));
+    }
+  }, [seatedPlayers.length, seatedPlayers.map(p => p.seatNumber).join(',')]);
+
 
 
   // Detect new human players joining (to notify host)
