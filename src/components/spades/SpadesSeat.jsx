@@ -2,9 +2,21 @@ import React from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSpectator, onSit, currentTurnSeat, isPlaying }) {
+export default function SpadesSeat({ 
+  seatNumber, 
+  player, 
+  isMe, 
+  isAvailable, 
+  isSpectator, 
+  onSit, 
+  onStand,
+  onTakeOver,
+  currentTurnSeat, 
+  isPlaying 
+}) {
   const isMyTurn = currentTurnSeat === seatNumber && isPlaying;
   const occupied = !!player;
+  const isCPU = player?.playerType === 'cpu';
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -47,6 +59,28 @@ export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSp
                 Bid: {player.bid}
               </div>
             )}
+            
+            {/* STAND button for seated players */}
+            {isMe && (
+              <button
+                onClick={onStand}
+                className="mt-1.5 px-2 py-1 rounded border border-red-500/60 text-red-400 text-[6px] tracking-widest uppercase hover:bg-red-500/20 transition-all active:scale-95 w-full"
+                style={PS2}
+              >
+                Stand
+              </button>
+            )}
+            
+            {/* TAKE OVER button for CPU seats */}
+            {isCPU && isSpectator && (
+              <button
+                onClick={onTakeOver}
+                className="mt-1.5 px-2 py-1 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95 w-full"
+                style={PS2}
+              >
+                Take Over
+              </button>
+            )}
           </>
         ) : isAvailable && isSpectator ? (
           <>
@@ -56,7 +90,7 @@ export default function SpadesSeat({ seatNumber, player, isMe, isAvailable, isSp
               className="px-2 py-1 rounded border border-[#4ade80]/60 text-[#4ade80] text-[7px] tracking-widest uppercase hover:bg-[#4ade80]/20 transition-all active:scale-95"
               style={PS2}
             >
-              Sit
+              SIT
             </button>
           </>
         ) : (

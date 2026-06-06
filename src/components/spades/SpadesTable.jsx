@@ -15,7 +15,7 @@ const SEAT_POSITIONS = {
   4: 'right',
 };
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -233,6 +233,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             isAvailable={availableSeats.includes(3)}
             isSpectator={isSpectator}
             onSit={() => onSitInSeat(3)}
+            onStand={onStandUp}
+            onTakeOver={() => onTakeOverCPU?.(3)}
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
           />
@@ -268,6 +270,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             isAvailable={availableSeats.includes(2)}
             isSpectator={isSpectator}
             onSit={() => onSitInSeat(2)}
+            onStand={onStandUp}
+            onTakeOver={() => onTakeOverCPU?.(2)}
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
           />
@@ -303,6 +307,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             isAvailable={availableSeats.includes(4)}
             isSpectator={isSpectator}
             onSit={() => onSitInSeat(4)}
+            onStand={onStandUp}
+            onTakeOver={() => onTakeOverCPU?.(4)}
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
           />

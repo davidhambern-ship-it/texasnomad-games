@@ -471,6 +471,11 @@ function SpadesViewer({ roomCode }) {
 
   const handleStandUp = async () => {
     if (!room || !isPlayer) return;
+    // Confirm if game is active
+    if (gs.phase === 'playing' || gs.phase === 'bidding') {
+      const confirmed = window.confirm('Standing during an active hand may affect gameplay. Are you sure?');
+      if (!confirmed) return;
+    }
     // Change role to spectator and clear seat
     const updatedPlayers = players.map(p =>
       p.playerId === playerId
@@ -483,6 +488,23 @@ function SpadesViewer({ roomCode }) {
     setMySeatNumber(null);
     setIsWaitingForPlayers(false);
     // Keep music playing - don't stop when standing up
+  };
+
+  const handleTakeOverCPU = async (seatNum) => {
+    if (!room || !isSpectator) return;
+    const cpuPlayer = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
+    if (!cpuPlayer) return;
+    
+    // Replace CPU with human player, keeping seat's current state
+    const updatedPlayers = players.map(p =>
+      p.playerId === cpuPlayer.playerId
+        ? { ...p, playerId, playerType: 'human', role: 'player' }
+        : p
+    );
+    await updateState({ players: updatedPlayers });
+    localStorage.setItem(`spades_role_${roomCode}`, 'player');
+    setMyRole('player');
+    setMySeatNumber(seatNum);
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
@@ -710,6 +732,7 @@ function SpadesViewer({ roomCode }) {
             onChooseSit={handleChooseSit}
             onPlayCard={handlePlayCard}
             onStandUp={handleStandUp}
+            onTakeOverCPU={handleTakeOverCPU}
           />
 
         </div>
