@@ -16,7 +16,7 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'sm', disabled = fal
   );
 };
 
-export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onDealStart }) {
+export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onDealStart, onStandUp }) {
   const [bidInput, setBidInput] = useState('');
   const [blindAmount, setBlindAmount] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
@@ -31,6 +31,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const hasBid = player.bid != null;
   const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
   const hasDeck = gs.deck?.length > 0;
+  const canStandUp = gs.phase === 'setup' || !hasCards;
 
   // SHUFFLE: Trigger animation then update deck in state
   const handleShuffle = async () => {
@@ -47,6 +48,12 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     await new Promise(resolve => setTimeout(resolve, 1800));
     await updateState({ deck, deck_shuffled: true });
     setIsShuffling(false);
+  };
+
+  // STAND UP: Leave seat and become spectator
+  const handleStandUp = () => {
+    if (!canStandUp) return;
+    onStandUp?.();
   };
 
   // DEAL: Trigger deal animation and progressively add cards to hands
@@ -199,6 +206,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         </Btn>
         <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={isSetup && !hasCards && !hasBid}>
           ↺ Reset
+        </Btn>
+        <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
+          🚶 Stand Up
         </Btn>
       </div>
 

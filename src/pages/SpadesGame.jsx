@@ -475,10 +475,7 @@ function SpadesViewer({ roomCode }) {
     setMyRole('spectator');
     setMySeatNumber(null);
     setIsWaitingForPlayers(false);
-    // Stop jazz if playing
-    if (audioRef.current) {
-      audioRef.current.pause();
-    }
+    // Keep music playing - don't stop when standing up
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
@@ -498,13 +495,52 @@ function SpadesViewer({ roomCode }) {
     }
   }, [isPlayer]);
 
-  // Stop jazz when table is full (4 players)
+  // Start music when waiting for players or room is active
   useEffect(() => {
-    if (occupiedSeats.length >= 4 && audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    if (!room || !audioRef.current) return;
+    // Play music when room exists and has players waiting
+    if ((isWaitingForPlayers || occupiedSeats.length > 0) && occupiedSeats.length < 4) {
+      audioRef.current.volume = 0.3;
+      audioRef.current.play().catch(() => {});
     }
-  }, [occupiedSeats.length]);
+  }, [room, isWaitingForPlayers, occupiedSeats.length]);
+
+  // Host arrival announcement
+  const [hostAnnounced, setHostAnnounced] = useState(false);
+  useEffect(() => {
+    if (!room?.host_connected || hostAnnounced || !audioRef.current) return;
+    
+    // Host just connected - announce it
+    setHostAnnounced(true);
+    
+    // Duck music volume
+    const originalVolume = audioRef.current.volume;
+    audioRef.current.volume = 0.1;
+    
+    // Play announcement sound (simple beep/chime using Web Audio API)
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 880; // A5
+    oscillator.type = 'sine';
+    
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+    
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.5);
+    
+    // Restore volume after announcement
+    setTimeout(() => {
+      if (audioRef.current) {
+        audioRef.current.volume = 0.3;
+      }
+    }, 600);
+  }, [room?.host_connected, hostAnnounced]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -534,6 +570,18 @@ function SpadesViewer({ roomCode }) {
             <span className="text-lg">🎷</span>
             Waiting for Players... {occupiedSeats.length}/4 Seats Filled
             <span className="text-lg">🎷</span>
+          </div>
+        </div>
+      )}
+
+      {/* Host Arrived Banner */}
+      {room?.host_connected && !hostAnnounced && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 px-6 py-3 rounded-xl border-2 border-[#4ade80]/60 bg-[#4ade80]/10 backdrop-blur-sm animate-pulse"
+          style={{ boxShadow: '0 0 30px rgba(74,222,128,0.3)' }}>
+          <div className="text-[8px] tracking-widest text-[#4ade80] uppercase flex items-center gap-2" style={PS2}>
+            <span className="text-lg">🎛</span>
+            The Host Has Arrived!
+            <span className="text-lg">🎛</span>
           </div>
         </div>
       )}

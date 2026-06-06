@@ -392,6 +392,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             isMySeat={true}
             onShuffleStart={() => setShufflePhase('shuffling')}
             onDealStart={() => setDealPhase('dealing')}
+            onStandUp={onStandUp}
           />
           
           {/* Stand Up Button */}
