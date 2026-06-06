@@ -131,75 +131,52 @@ function SpadesViewer({ roomCode }) {
 
   // CPU turn handler - play card when it's CPU's turn
   useEffect(() => {
-    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') {
-      console.log('CPU turn: skipping - room:', !!room, 'cpu_enabled:', gs.cpu_enabled, 'phase:', gs.phase);
-      return;
-    }
+    if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     
     const currentTurnSeat = gs.current_turn_seat;
-    if (!currentTurnSeat) {
-      console.log('CPU turn: no current_turn_seat');
-      return;
-    }
+    if (!currentTurnSeat) return;
     
-    // Find player whose turn it is from gs.players
-    const currentPlayer = (gs.players || []).find(p => p.seatNumber === currentTurnSeat);
-    if (!currentPlayer) {
-      console.log('CPU turn: no player found for seat', currentTurnSeat);
-      return;
-    }
-    if (currentPlayer.playerType !== 'cpu') {
-      console.log('CPU turn: player is not CPU -', currentPlayer.playerType);
-      return;
-    }
+    // Find player whose turn it is from players (local state)
+    const currentPlayer = players.find(p => p.seatNumber === currentTurnSeat);
+    if (!currentPlayer || currentPlayer.playerType !== 'cpu') return;
     
     // Don't act if already played this trick
     const hasPlayed = (gs.current_trick || []).some(p => p.seatNumber === currentTurnSeat);
-    if (hasPlayed) {
-      console.log('CPU turn: already played this trick');
-      return;
-    }
+    if (hasPlayed) return;
     
-    console.log('CPU turn: Seat', currentTurnSeat, 'is thinking... hand size:', currentPlayer.hand?.length || 0);
+    const hand = currentPlayer.hand || [];
+    if (hand.length === 0) return;
+    
+    // Validate play using rule engine
+    const isLead = (gs.current_trick || []).length === 0;
+    const activeSuit = getActiveSuit(gs.current_trick || []);
     
     const timer = setTimeout(async () => {
-      const hand = currentPlayer.hand || [];
-      if (hand.length === 0) {
-        console.log('CPU turn: empty hand');
-        return;
-      }
-      
-      // Validate play using rule engine
-      const isLead = (gs.current_trick || []).length === 0;
-      const activeSuit = getActiveSuit(gs.current_trick || []);
-      
-      // Select card using CPU logic (already validates rules)
+      // Select card using CPU logic
       let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
       
-      // Double-check with rule engine; fallback to any valid card
+      // Fallback to any valid card if CPU logic fails
       if (!cardToPlay || !isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid) {
         cardToPlay = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
         if (!cardToPlay) return;
       }
       
-      console.log('CPU turn: Playing card', cardToPlay);
-      
       // Play the card
-      const updatedPlayers = (gs.players || []).map(p =>
+      const updatedPlayers = players.map(p =>
         p.playerId === currentPlayer.playerId
-          ? { ...p, hand: (p.hand || []).filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
+          ? { ...p, hand: p.hand.filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
           : p
       );
       
       // Find next player for turn rotation
-      const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+      const seatedPlayers = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
       const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === currentTurnSeat);
       const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
       
       // Check if spades are broken
       const spadesBroken = gs.spades_broken || cardToPlay.suit === '♠';
       
-      // Update state with card played and rotate turn in one call to avoid rate limit
+      // Update state
       await updateState({
         players: updatedPlayers,
         current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
@@ -209,7 +186,7 @@ function SpadesViewer({ roomCode }) {
     }, CPU_ACTION_DELAY);
     
     return () => clearTimeout(timer);
-  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
+  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players, room]);
 
   // Handle turn rotation after each card is played (only for human players)
   useEffect(() => {
