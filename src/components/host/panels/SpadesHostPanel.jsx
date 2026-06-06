@@ -3,7 +3,7 @@ import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
-import { generateFullDeck, shuffleDeck as shuffleDeckRules, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck as shuffleDeckRules, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat, getShuffleDebugStats, validateDealtHands, validateDeck } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -354,16 +354,43 @@ export default function SpadesHostPanel({ gs, updateState }) {
     setIsShuffling(true);
     setShufflePhase('shuffling');
     
-    // Shuffle 3 times for better randomization
+    // Build a fresh deck every time - never reuse previous deck
     let deck = generateFullDeck();
+    
+    // Shuffle 3 times with cryptographically secure Fisher-Yates
     for (let i = 0; i < 3; i++) {
       deck = shuffleDeckRules(deck);
       await new Promise(resolve => setTimeout(resolve, 100));
     }
     
-    // Debug: Log first 5 cards to verify shuffle is random
-    console.log('🔀 SHUFFLED DECK - First 5 cards:', deck.slice(0, 5).map(c => `${c.value}${c.suit}`));
-    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: (gs.shuffle_count || 0) + 1 });
+    // Validate deck integrity
+    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const shuffleStats = getShuffleDebugStats(deck, seated, gs.previousHandHashes ? new Set(gs.previousHandHashes) : null);
+    
+    // Debug logging for host testing
+    console.log('🔀 SHUFFLE DEBUG:', {
+      sessionId: shuffleStats.sessionId,
+      deckSize: shuffleStats.deckSize,
+      deckValid: shuffleStats.deckValid,
+      validationErrors: shuffleStats.validationErrors,
+      hasDuplicateCards: shuffleStats.hasDuplicateCards,
+      first5CardIds: shuffleStats.first5CardIds,
+      handDistribution: shuffleStats.handDistribution,
+      duplicateHands: shuffleStats.duplicateHands,
+      duplicateHandSeats: shuffleStats.duplicateHandSeats,
+    });
+    
+    if (shuffleStats.duplicateHands) {
+      console.warn('⚠️ DUPLICATE HAND DETECTED - forcing reshuffle');
+    }
+    
+    await updateState({ 
+      deck, 
+      deck_shuffled: true, 
+      shuffle_ts: Date.now(), 
+      shuffle_count: (gs.shuffle_count || 0) + 1,
+      previousHandHashes: shuffleStats.allHandHashes ? Array.from(shuffleStats.allHandHashes) : [],
+    });
     // isShuffling reset happens when animation completes via onComplete
   };
 
@@ -377,14 +404,36 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleDeal = async () => {
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
     if (seated.length < 2) return;
+    
+    // Always use shuffled deck from state - never reshuffle during deal
     const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeckRules(generateFullDeck());
-    // Debug: Log deck order being dealt
+    
+    // Validate deck integrity before dealing
+    const deckValidation = validateDeck(workingDeck);
+    console.log('🃏 DECK VALIDATION:', {
+      valid: deckValidation.valid,
+      errors: deckValidation.errors,
+      deckSize: workingDeck.length,
+    });
+    
+    // Debug: Log first 5 cards being dealt
     console.log('🃏 DEALING - First 5 cards:', workingDeck.slice(0, 5).map(c => `${c.value}${c.suit}`));
+    console.log('🃏 DEALING - First 5 card IDs:', workingDeck.slice(0, 5).map(c => c.id));
+    
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
       const idx = seated.findIndex(s => s.playerId === p.playerId);
       return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+    });
+    
+    // Validate dealt hands - ensure no card appears in multiple hands
+    const dealtValidation = validateDealtHands(updatedPlayers.filter(p => p.hand?.length > 0));
+    console.log('✋ DEAL VALIDATION:', {
+      valid: dealtValidation.valid,
+      errors: dealtValidation.errors,
+      totalCardsDealt: updatedPlayers.reduce((sum, p) => sum + (p.hand?.length || 0), 0),
+      cardsRemaining: workingDeck.length - (seated.length * cardsPerPlayer),
     });
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     // First round: no bidding — play first, then bid from round 2 onwards

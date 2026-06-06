@@ -10,6 +10,34 @@ export const CARD_ORDER = {
   'LJ': 15, 'BJ': 16
 };
 
+// Cryptographically secure random integer generator
+// Uses crypto.getRandomValues() for true randomness
+export function secureRandomInt(maxExclusive) {
+  const array = new Uint32Array(1);
+  let value;
+  const limit = Math.floor(0x100000000 / maxExclusive) * maxExclusive;
+
+  do {
+    crypto.getRandomValues(array);
+    value = array[0];
+  } while (value >= limit);
+
+  return value % maxExclusive;
+}
+
+// Fisher-Yates shuffle with cryptographically secure randomness
+// This is the gold standard for shuffling - unbiased and truly random
+export function fisherYatesShuffle(deck) {
+  const shuffled = [...deck];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = secureRandomInt(i + 1);
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  return shuffled;
+}
+
 // Generate a fresh full Spades deck (54 cards: 52 standard - 2♥ - 2♦ + 2 jokers = 54)
 // Each card gets a unique ID based on suit+value for deduplication checks
 export function generateFullDeck() {
@@ -26,58 +54,62 @@ export function generateFullDeck() {
   return deck;
 }
 
-// Cryptographically strong Fisher-Yates shuffle
-// Uses crypto.getRandomValues() for strong randomness instead of Math.random()
-export function shuffleDeck(deck) {
-  const d = [...deck]; // Always work on a fresh copy
-  const len = d.length;
-
-  // Generate all random values in one call for efficiency
-  const randomBuffer = new Uint32Array(len);
-  crypto.getRandomValues(randomBuffer);
-
-  for (let i = len - 1; i > 0; i--) {
-    // Map the random uint32 to range [0, i] without modulo bias
-    // Use high-quality reduction: (randomBuffer[i] / (2^32)) * (i+1)
-    const j = Math.floor((randomBuffer[i] / 4294967296) * (i + 1));
-    [d[i], d[j]] = [d[j], d[i]];
-  }
-
-  return d;
-}
-
-// Validate deck integrity before dealing
-// Returns { valid: boolean, errors: string[] }
+// Validate deck integrity - checks for duplicates, correct size, and card existence
 export function validateDeck(deck) {
   const errors = [];
-
-  // Check total card count
-  const expected = 54; // 52 - 2♥2 - 2♦2 + LJ + BJ
-  if (deck.length !== expected) {
-    errors.push(`Expected ${expected} cards, got ${deck.length}`);
+  
+  // Check deck size (should be 54 for TexasNomad Spades)
+  if (deck.length !== 54) {
+    errors.push(`Invalid deck size: ${deck.length} (expected 54)`);
   }
 
-  // Check for duplicate IDs
+  // Check for duplicate card IDs
   const ids = deck.map(c => c.id);
   const uniqueIds = new Set(ids);
   if (uniqueIds.size !== ids.length) {
-    const dupes = ids.filter((id, i) => ids.indexOf(id) !== i);
-    errors.push(`Duplicate card IDs: ${dupes.join(', ')}`);
+    const duplicateIds = ids.filter((id, i) => ids.indexOf(id) !== i);
+    errors.push(`Duplicate card IDs found: ${[...new Set(duplicateIds)].join(', ')}`);
   }
 
-  // Check required cards exist
-  const mustExist = ['BigJoker', 'LittleJoker', '♠A', '♠K', '♠Q'];
-  for (const id of mustExist) {
-    if (!uniqueIds.has(id)) errors.push(`Missing required card: ${id}`);
+  // Verify all expected cards exist
+  const expectedCards = new Set();
+  for (const suit of SUITS) {
+    for (const value of ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A']) {
+      if ((suit === '♥' || suit === '♦') && value === '2') continue;
+      expectedCards.add(`${suit}${value}`);
+    }
+  }
+  expectedCards.add('LittleJoker');
+  expectedCards.add('BigJoker');
+
+  const missingCards = [...expectedCards].filter(id => !ids.includes(id));
+  if (missingCards.length > 0) {
+    errors.push(`Missing cards: ${missingCards.join(', ')}`);
   }
 
-  return { valid: errors.length === 0, errors };
+  return {
+    valid: errors.length === 0,
+    errors,
+  };
+}
+
+// Generate a hash for a hand to detect duplicate hands across rounds
+export function getHandHash(hand) {
+  if (!hand || hand.length === 0) return '';
+  const sorted = [...hand].sort((a, b) => a.id.localeCompare(b.id));
+  return sorted.map(c => c.id).join('|');
+}
+
+// Cryptographically strong Fisher-Yates shuffle
+// Uses crypto.getRandomValues() for true randomness - NEVER use Math.random()
+export function shuffleDeck(deck) {
+  return fisherYatesShuffle(deck);
 }
 
 // Validate dealt hands — no card in more than one hand
 export function validateDealtHands(players) {
   const errors = [];
-  const seenIds = new Map(); // id -> playerId
+  const seenIds = new Map();
 
   for (const player of players) {
     if (!player.hand) continue;
@@ -94,26 +126,55 @@ export function validateDealtHands(players) {
 }
 
 // Debug shuffle stats (host-only, not shown to players)
-export function getShuffleDebugStats(deck, players) {
+export function getShuffleDebugStats(deck, players, previousHandHashes = null) {
   const sessionId = Array.from(crypto.getRandomValues(new Uint8Array(4)))
     .map(b => b.toString(16).padStart(2, '0')).join('');
 
   const first5 = deck.slice(0, 5).map(c => `${c.value}${c.suit}`).join(', ');
+  const first5Ids = deck.slice(0, 5).map(c => c.id).join(', ');
+
+  // Validate deck integrity
+  const validation = validateDeck(deck);
+  const ids = deck.map(c => c.id);
+  const uniqueIds = new Set(ids);
+  const hasDuplicates = uniqueIds.size !== ids.length;
 
   const handStats = players
     .filter(p => p.hand?.length > 0)
     .map(p => {
       const spadesCount = p.hand.filter(c => c.suit === '♠').length;
       const jokers = p.hand.filter(c => c.suit === 'Joker').length;
-      return `Seat ${p.seatNumber}: ${p.hand.length} cards, ${spadesCount}♠, ${jokers} jokers`;
+      const handHash = getHandHash(p.hand);
+      const isDuplicateHand = previousHandHashes?.has(handHash) || false;
+      return {
+        seat: p.seatNumber,
+        cardCount: p.hand.length,
+        spadesCount,
+        jokersCount: jokers,
+        handHash,
+        isDuplicate: isDuplicateHand,
+        label: `Seat ${p.seatNumber}: ${p.hand.length} cards, ${spadesCount}♠, ${jokers} jokers${isDuplicateHand ? ' ⚠️ DUPLICATE' : ''}`,
+      };
     });
+
+  // Check for duplicate hands
+  const duplicateHands = handStats.filter(h => h.isDuplicate);
+  const allHandHashes = new Set(handStats.map(h => h.handHash));
 
   return {
     sessionId,
     first5Cards: first5,
+    first5CardIds: first5Ids,
     deckSize: deck.length,
-    handDistribution: handStats,
-    deckValid: validateDeck(deck).valid,
+    deckValid: validation.valid,
+    validationErrors: validation.errors,
+    hasDuplicateCards: hasDuplicates,
+    duplicateCardIds: hasDuplicates ? ids.filter((id, i) => ids.indexOf(id) !== i) : [],
+    handDistribution: handStats.map(h => h.label),
+    handDetails: handStats,
+    duplicateHands: duplicateHands.length > 0,
+    duplicateHandSeats: duplicateHands.map(h => h.seat),
+    allHandHashes,
   };
 }
 
