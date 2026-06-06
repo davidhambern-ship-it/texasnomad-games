@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -64,6 +65,28 @@ export default function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, 
           )}
           {isPlaying && player.bid != null && (
             <div className="text-[6px] text-[#FFD700]/60 mt-0.5" style={PS2}>Bid: {player.bid} | Books: {player.tricksWon || 0}</div>
+          )}
+          {player.hand && player.hand.length > 0 && (
+            <div className="mt-1 flex flex-wrap justify-center gap-0.5" style={{ maxWidth: 180 }}>
+              {[...player.hand].slice(0, 7).map((card, i) => (
+                <div
+                  key={card.id || i}
+                  className="w-5 h-7 rounded border border-white/20 overflow-hidden shadow-sm"
+                  style={{ transform: `rotate(${(i - 3) * 3}deg)`, marginLeft: i > 0 ? '-6px' : '0' }}
+                >
+                  <img
+                    src={getCardImage(card)}
+                    alt={`${card.value}${card.suit}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ))}
+              {player.hand.length > 7 && (
+                <div className="w-5 h-7 rounded border border-white/20 bg-black/60 flex items-center justify-center text-[5px] text-white/60" style={{ marginLeft: '-6px' }}>
+                  +{player.hand.length - 7}
+                </div>
+              )}
+            </div>
           )}
           <div className="flex gap-1 mt-1 justify-center flex-wrap">
             <button onClick={() => onForceTurn(seatNumber)}
