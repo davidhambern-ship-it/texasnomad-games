@@ -83,21 +83,20 @@ export default function SpadesSeat({
               </button>
             )}
             
-            {/* Player's hand - show cards for seated player */}
+            {/* Player's hand - show face-down for other players, face-up only for current viewer */}
             {player?.hand?.length > 0 && (
               <div className="mt-2 flex flex-wrap justify-center gap-0.5" style={{ maxWidth: 200 }}>
-                {[...player.hand].sort((a, b) => {
-                  const suitOrder = { '♠': 0, '♦': 1, '♣': 2, '♥': 3, 'Joker': 4 };
-                  const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
-                  const suitDiff = (suitOrder[a.suit] ?? 5) - (suitOrder[b.suit] ?? 5);
-                  return suitDiff !== 0 ? suitDiff : (valueOrder[a.value] ?? 0) - (valueOrder[b.value] ?? 0);
-                }).slice(0, 7).map((card, i) => (
+                {[...player.hand].slice(0, 7).map((card, i) => (
                   <div
                     key={card.id || i}
                     className="w-6 h-8 rounded border border-white/20 overflow-hidden shadow-sm"
                     style={{ transform: `rotate(${(i - 3) * 3}deg)`, marginLeft: i > 0 ? '-8px' : '0' }}
                   >
-                    <img src={getCardImage(card)} alt={`${card.value}${card.suit}`} className="w-full h-full object-cover" onError={(e) => { e.target.src = getCardBack(); }} />
+                    <img 
+                      src={isMe ? getCardImage(card) : getCardBack()} 
+                      alt={isMe ? `${card.value}${card.suit}` : 'Card'} 
+                      className="w-full h-full object-cover" 
+                    />
                   </div>
                 ))}
                 {player.hand.length > 7 && (
