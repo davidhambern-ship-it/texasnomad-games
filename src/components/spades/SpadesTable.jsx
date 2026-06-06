@@ -201,24 +201,44 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Top (Seat 3) - Hand on table (card backs only) - horizontal fan (mirrors seat 1) */}
-        {getPlayerAtSeat(3)?.hand?.length > 0 && (
-          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-5 flex justify-center" style={{ width: 600, height: 120 }}>
+        {/* Top (Seat 3) - Player's hand (face-up for player in seat 3) */}
+        {mySeatNumber === 3 && sortedHand.length > 0 && (
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 z-20 flex justify-center" style={{ width: 700, height: 140 }}>
             <div className="flex" style={{ transform: 'scale(1) rotate(180deg)' }}>
-              {getPlayerAtSeat(3).hand.map((card, i, arr) => {
-                const overlap = getHorizontalOverlap(arr.length);
+              {sortedHand.map((card, i, arr) => {
+                const overlap = getHorizontalOverlap(arr.length) * 0.5;
+                const isMyTurn = gs.current_turn_seat === 3 && gs.phase === 'playing';
+                const isBidding = gs.phase === 'bidding';
+                const hasBid = myPlayer?.bid != null;
                 return (
                   <div
                     key={card.id || i}
-                    className="relative rounded-lg overflow-hidden shadow-lg"
+                    onClick={() => isMyTurn && onPlayCard?.(card)}
+                    className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
+                      isMyTurn 
+                        ? 'hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
+                        : isBidding && !hasBid
+                        ? 'hover:-translate-y-2'
+                        : 'opacity-90 cursor-not-allowed'
+                    }`}
                     style={{
-                      width: 52, height: 73,
+                      width: 64, height: 90,
                       marginLeft: i > 0 ? `-${overlap}px` : '0',
-                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2.5}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1.5}px)`,
-                      filter: 'brightness(1.25)',
+                      transform: `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`,
+                      filter: isBidding && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.25)',
                     }}
                   >
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                    <img 
+                      src={getCardImage(card)} 
+                      alt={`${card.suit} ${card.value}`} 
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.src = getCardBack(); }}
+                    />
+                    {isMyTurn && (
+                      <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
+                      </div>
+                    )}
                   </div>
                 );
               })}
@@ -240,23 +260,43 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Left (Seat 2) - Hand on table (card backs only) - vertical fan */}
-        {getPlayerAtSeat(2)?.hand?.length > 0 && (
-          <div className="absolute left-20 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 520 }}>
-            {getPlayerAtSeat(2).hand.map((card, i, arr) => {
-              const overlap = getVerticalOverlap(arr.length);
+        {/* Left (Seat 2) - Player's hand (face-up for player in seat 2) */}
+        {mySeatNumber === 2 && sortedHand.length > 0 && (
+          <div className="absolute left-1 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ width: 140, height: 600 }}>
+            {sortedHand.map((card, i, arr) => {
+              const overlap = getVerticalOverlap(arr.length) * 0.5;
+              const isMyTurn = gs.current_turn_seat === 2 && gs.phase === 'playing';
+              const isBidding = gs.phase === 'bidding';
+              const hasBid = myPlayer?.bid != null;
               return (
                 <div
                   key={card.id || i}
-                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  onClick={() => isMyTurn && onPlayCard?.(card)}
+                  className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
+                    isMyTurn 
+                      ? 'hover:-translate-x-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
+                      : isBidding && !hasBid
+                      ? 'hover:-translate-x-2'
+                      : 'opacity-90 cursor-not-allowed'
+                  }`}
                   style={{
-                    width: 52, height: 73,
+                    width: 64, height: 90,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(-90deg) scaleX(-1) scaleY(-1)`,
-                    filter: 'brightness(1.25)',
+                    transform: `rotate(-90deg)`,
+                    filter: isBidding && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.25)',
                   }}
                 >
-                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                  <img 
+                    src={getCardImage(card)} 
+                    alt={`${card.suit} ${card.value}`} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.src = getCardBack(); }}
+                  />
+                  {isMyTurn && (
+                    <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -277,23 +317,43 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           />
         </div>
 
-        {/* Right (Seat 4) - Hand on table (card backs only) - vertical fan */}
-        {getPlayerAtSeat(4)?.hand?.length > 0 && (
-          <div className="absolute right-20 top-1/2 -translate-y-1/2 z-5 flex flex-col items-center" style={{ width: 100, height: 520 }}>
-            {getPlayerAtSeat(4).hand.map((card, i, arr) => {
-              const overlap = getVerticalOverlap(arr.length);
+        {/* Right (Seat 4) - Player's hand (face-up for player in seat 4) */}
+        {mySeatNumber === 4 && sortedHand.length > 0 && (
+          <div className="absolute right-1 top-1/2 -translate-y-1/2 z-20 flex flex-col items-center" style={{ width: 140, height: 600 }}>
+            {sortedHand.map((card, i, arr) => {
+              const overlap = getVerticalOverlap(arr.length) * 0.5;
+              const isMyTurn = gs.current_turn_seat === 4 && gs.phase === 'playing';
+              const isBidding = gs.phase === 'bidding';
+              const hasBid = myPlayer?.bid != null;
               return (
                 <div
                   key={card.id || i}
-                  className="relative rounded-lg overflow-hidden shadow-lg"
+                  onClick={() => isMyTurn && onPlayCard?.(card)}
+                  className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
+                    isMyTurn 
+                      ? 'hover:translate-x-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
+                      : isBidding && !hasBid
+                      ? 'hover:translate-x-2'
+                      : 'opacity-90 cursor-not-allowed'
+                  }`}
                   style={{
-                    width: 52, height: 73,
+                    width: 64, height: 90,
                     marginTop: i > 0 ? `-${overlap}px` : '0',
-                    transform: `rotate(90deg) scaleX(-1) scaleY(-1)`,
-                    filter: 'brightness(1.25)',
+                    transform: `rotate(90deg)`,
+                    filter: isBidding && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.25)',
                   }}
                 >
-                  <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                  <img 
+                    src={getCardImage(card)} 
+                    alt={`${card.suit} ${card.value}`} 
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.src = getCardBack(); }}
+                  />
+                  {isMyTurn && (
+                    <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
+                    </div>
+                  )}
                 </div>
               );
             })}
