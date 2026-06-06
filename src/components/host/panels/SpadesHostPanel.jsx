@@ -346,10 +346,17 @@ export default function SpadesHostPanel({ gs, updateState }) {
     if (isShuffling) return;
     setIsShuffling(true);
     setShufflePhase('shuffling');
-    const deck = shuffleDeckRules(generateFullDeck());
+    
+    // Shuffle 3 times for better randomization
+    let deck = generateFullDeck();
+    for (let i = 0; i < 3; i++) {
+      deck = shuffleDeckRules(deck);
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
     // Debug: Log first 5 cards to verify shuffle is random
     console.log('🔀 SHUFFLED DECK - First 5 cards:', deck.slice(0, 5).map(c => `${c.value}${c.suit}`));
-    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
+    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: (gs.shuffle_count || 0) + 1 });
     // isShuffling reset happens when animation completes via onComplete
   };
 
