@@ -15,7 +15,7 @@ const SEAT_POSITIONS = {
   4: 'right',
 };
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -383,7 +383,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
       {/* Player Controls (below table) */}
       {isPlayer && myPlayer && (
-        <div className="w-full max-w-md mx-auto mt-4">
+        <div className="w-full max-w-md mx-auto mt-4 space-y-3">
           <SpadesPlayerControls
             seatNumber={mySeatNumber}
             player={myPlayer}
@@ -393,6 +393,15 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             onShuffleStart={() => setShufflePhase('shuffling')}
             onDealStart={() => setDealPhase('dealing')}
           />
+          
+          {/* Stand Up Button */}
+          <button
+            onClick={onStandUp}
+            className="w-full py-3 px-4 rounded-lg border-2 border-white/30 text-white/60 font-heading text-sm tracking-widest uppercase hover:border-red-500/60 hover:text-red-400 hover:bg-red-500/10 transition-all"
+            style={PS2}
+          >
+            🚶 Stand Up (Spectate)
+          </button>
         </div>
       )}
     </div>

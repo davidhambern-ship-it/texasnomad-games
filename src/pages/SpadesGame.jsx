@@ -462,6 +462,25 @@ function SpadesViewer({ roomCode }) {
     });
   };
 
+  const handleStandUp = async () => {
+    if (!room || !isPlayer) return;
+    // Change role to spectator and clear seat
+    const updatedPlayers = players.map(p =>
+      p.playerId === playerId
+        ? { ...p, role: 'spectator', seatNumber: null, hand: [], tricksWon: 0, bid: null }
+        : p
+    );
+    await updateState({ players: updatedPlayers });
+    localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
+    setMyRole('spectator');
+    setMySeatNumber(null);
+    setIsWaitingForPlayers(false);
+    // Stop jazz if playing
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+  };
+
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
   const isSpectator = myRole === 'spectator';
 
@@ -604,6 +623,7 @@ function SpadesViewer({ roomCode }) {
             onChooseSpectate={handleChooseSpectate}
             onChooseSit={handleChooseSit}
             onPlayCard={handlePlayCard}
+            onStandUp={handleStandUp}
           />
 
         </div>
