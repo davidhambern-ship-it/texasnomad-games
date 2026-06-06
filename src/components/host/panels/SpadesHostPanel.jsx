@@ -657,6 +657,72 @@ export default function SpadesHostPanel({ gs, updateState }) {
         ))}
       </div>
 
+      {/* SET STATUS DISPLAY */}
+      {isPlaying && (
+        <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-[#FFD700]/5 space-y-3">
+          <h3 className="font-heading text-xs tracking-[0.2em] text-[#FFD700]/80 uppercase">🎯 Set Status — CPU Strategy</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {/* Team 1 (Purple) */}
+            <div className="p-3 rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/05">
+              <div className="font-heading text-xs text-[#BC13FE] uppercase mb-2">{gs.team1Name || team1Name}</div>
+              <div className="text-[6px] space-y-1" style={PS2}>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Bid:</span>
+                  <span className="text-white">{gs.bid1 || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Books:</span>
+                  <span className="text-white">{gs.books1 || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Needs:</span>
+                  <span className="text-[#FFD700]">{Math.max(0, (gs.bid1 || 0) - (gs.books1 || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Remaining:</span>
+                  <span className="text-white">{Math.max(0, 13 - (gs.tricks_played || 0))}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-white/10">
+                  <span className="text-white/40">Can Be Set:</span>
+                  <span className={(gs.books1 || 0) + Math.max(0, 13 - (gs.tricks_played || 0)) < (gs.bid1 || 0) ? 'text-[#4ade80]' : 'text-red-400'}>
+                    {(gs.books1 || 0) + Math.max(0, 13 - (gs.tricks_played || 0)) < (gs.bid1 || 0) ? 'YES ✓' : 'NO'}
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Team 2 (Orange) */}
+            <div className="p-3 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/05">
+              <div className="font-heading text-xs text-[#FF5F1F] uppercase mb-2">{gs.team2Name || team2Name}</div>
+              <div className="text-[6px] space-y-1" style={PS2}>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Bid:</span>
+                  <span className="text-white">{gs.bid2 || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Books:</span>
+                  <span className="text-white">{gs.books2 || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Needs:</span>
+                  <span className="text-[#FFD700]">{Math.max(0, (gs.bid2 || 0) - (gs.books2 || 0))}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/40">Remaining:</span>
+                  <span className="text-white">{Math.max(0, 13 - (gs.tricks_played || 0))}</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-white/10">
+                  <span className="text-white/40">Can Be Set:</span>
+                  <span className={(gs.books2 || 0) + Math.max(0, 13 - (gs.tricks_played || 0)) < (gs.bid2 || 0) ? 'text-[#4ade80]' : 'text-red-400'}>
+                    {(gs.books2 || 0) + Math.max(0, 13 - (gs.tricks_played || 0)) < (gs.bid2 || 0) ? 'YES ✓' : 'NO'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 space-y-3">
         <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">🤖 CPU Players</h3>
         <div className="text-[7px] tracking-widest text-white/30 uppercase mb-2" style={PS2}>

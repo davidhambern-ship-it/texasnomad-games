@@ -232,8 +232,29 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
     .reduce((sum, p) => sum + (p.bid || 0), 0);
 
   const tricksLeft = Math.max(0, 13 - (gameState.tricks_played || 0));
-  const teamNeedsBooksMore = teamBid - teamBooksWon; // how many more we need
+  const teamNeedsBooksMore = Math.max(0, teamBid - teamBooksWon); // how many more we need
   const teamHasMadeBid = teamBooksWon >= teamBid;
+
+  // ─── SET TRACKING: Opponent team status ────────────────────────────────────
+  const oppTeamBooksWon = players
+    .filter(p => oppSeats.includes(p.seatNumber))
+    .reduce((sum, p) => sum + (p.tricksWon || 0), 0);
+
+  const oppTeamBid = players
+    .filter(p => oppSeats.includes(p.seatNumber))
+    .reduce((sum, p) => sum + (p.bid || 0), 0);
+
+  const oppTeamNeedsBooks = Math.max(0, oppTeamBid - oppTeamBooksWon);
+  const oppTeamHasMadeBid = oppTeamBooksWon >= oppTeamBid;
+  const oppTeamCanBeSet = oppTeamBooksWon + tricksLeft < oppTeamBid; // mathematically can't reach bid
+  const oppTeamCanStillMakeBid = !oppTeamCanBeSet && !oppTeamHasMadeBid;
+
+  // Set pressure: how aggressively should we try to set them?
+  // Higher when: their bid is high, they're close but vulnerable, we've made our bid
+  let setPressure = 0;
+  if (teamHasMadeBid && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0) {
+    setPressure = oppTeamNeedsBooks <= tricksLeft ? 2 : 1; // 2 = critical, 1 = moderate
+  }
 
   // Classify hand by suit
   const bySuit = { '♠': [], '♥': [], '♦': [], '♣': [], 'Joker': [] };
@@ -281,6 +302,8 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
     partnerPlayed, partnerPlayCard, partnerPlayedLow, partnerPlayedHigh, partnerPlayedMid, partnerMayBeFishing,
     // Memory
     voids, winnerStrength,
+    // Set tracking
+    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamHasMadeBid, oppTeamCanBeSet, oppTeamCanStillMakeBid, setPressure,
   };
 }
 
@@ -333,12 +356,24 @@ function collectPlayedCards(gameState, currentTrick) {
 // ─── LEADING ────────────────────────────────────────────────────────────────
 
 function selectLeadCard(ctx) {
-  const { hand, bySuit, myBid, booksWon, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, remainingHigh, tricksLeft, playedCardIds } = ctx;
+  const { hand, bySuit, myBid, booksWon, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, remainingHigh, tricksLeft, playedCardIds,
+    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure } = ctx;
 
   const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
 
   // ── TEAM HAS MADE BID: Lead low to avoid bags ───────────────────────────────
   if (teamHasMadeBid) {
+    // SET STRATEGY: If opponents can still make bid, lead aggressively to block them
+    if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0) {
+      // Lead from suit where opponents are weak or need to burn high cards
+      // Prefer leading Aces or Kings to force out opponent high cards
+      for (const suit of ['♥', '♦', '♣']) {
+        const cards = bySuit[suit];
+        if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
+          return cards[0]; // Lead Ace to force opponents
+        }
+      }
+    }
     return leadLowest(bySuit, spadesBroken, hasNonSpade);
   }
 
@@ -440,10 +475,14 @@ function followWithSuit(ctx, suitCards) {
   const { 
     activeSuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
     trick, myBid, booksWon, tricksLeft, partnerPlayedLow, partnerPlayedHigh, 
-    partnerPlayedMid, partnerMayBeFishing, partnerSeat, winnerStrength
+    partnerPlayedMid, partnerMayBeFishing, partnerSeat, winnerStrength,
+    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
   } = ctx;
   
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
+  
+  // Find lowest card that can beat current winner
+  const winningCards = suitCards.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
 
   // ─── PARTNER IS WINNING ─────────────────────────────────────────────────────
   // Partner is currently winning the trick
@@ -456,8 +495,16 @@ function followWithSuit(ctx, suitCards) {
   // ─── OPPONENT IS WINNING ────────────────────────────────────────────────────
   // Opponent is currently winning
   
-  // Find lowest card that can beat current winner
-  const winningCards = suitCards.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
+  // SET STRATEGY: Opponent winning a critical book that helps them make bid
+  if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0 && winningCards.length > 0) {
+    // Try to win this book away from opponents if we can do it cheaply
+    // Don't waste high cards unless it's a critical book (last few they need)
+    const isCriticalBook = oppTeamNeedsBooks <= tricksLeft && tricksLeft <= 3;
+    if (isCriticalBook || setPressure >= 2) {
+      // Critical: use lowest winning card to steal the book
+      return winningCards[winningCards.length - 1];
+    }
+  }
   
   // TEAM NEEDS BOOKS: Win with lowest possible card
   if (iNeedBook && winningCards.length > 0) {
@@ -512,7 +559,8 @@ function voidPlay(ctx) {
   const { 
     bySuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
     activeSuit, tricksLeft, myBid, booksWon, partnerPlayedLow, partnerPlayed,
-    winnerStrength, partnerSeat, voids
+    winnerStrength, partnerSeat, voids,
+    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
   } = ctx;
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
 
@@ -539,6 +587,16 @@ function voidPlay(ctx) {
   // Opponent is winning - decide whether to cut
   
   const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
+  
+  // SET STRATEGY: Opponent winning a book that helps them make their bid
+  // Cut them off if we can do it without wasting critical trump
+  if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0 && winningTrump.length > 0) {
+    const isCriticalBook = oppTeamNeedsBooks <= tricksLeft && tricksLeft <= 3;
+    if (isCriticalBook || setPressure >= 2) {
+      // Cut with lowest winning trump to steal the book
+      return winningTrump[winningTrump.length - 1];
+    }
+  }
   
   // TEAM NEEDS BOOKS: Cut with lowest winning trump
   if (iNeedBook && winningTrump.length > 0) {
