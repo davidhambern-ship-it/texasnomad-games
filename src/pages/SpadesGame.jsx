@@ -45,9 +45,11 @@ function SpadesViewer({ roomCode }) {
   const [mySeatNumber, setMySeatNumber] = useState(null);
 
   const [cpuChoiceShown, setCpuChoiceShown] = useState(false);
+  const [isWaitingForPlayers, setIsWaitingForPlayers] = useState(false);
 
   const containerRef = useRef(null);
   const isUpdatingRef = useRef(false);
+  const audioRef = useRef(null);
   const gs = room?.game_state || {};
   const players = gs.players || [];
 
@@ -399,6 +401,12 @@ function SpadesViewer({ roomCode }) {
   const handleWaitForRealPlayers = async () => {
     if (!room) return;
     setCpuChoiceShown(false);
+    setIsWaitingForPlayers(true);
+    // Start playing smooth jazz while waiting
+    if (audioRef.current) {
+      audioRef.current.volume = 0.3;
+      audioRef.current.play().catch(() => {});
+    }
   };
 
   const handlePlayCard = async (card) => {
@@ -471,11 +479,46 @@ function SpadesViewer({ roomCode }) {
     }
   }, [isPlayer]);
 
+  // Stop jazz when table is full (4 players)
+  useEffect(() => {
+    if (occupiedSeats.length >= 4 && audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+  }, [occupiedSeats.length]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
   // Show role selection when user hasn't chosen yet
   const showRoleSelection = myRole === null && !loading && room;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
+      {/* Smooth Jazz Audio - plays while waiting for players */}
+      <audio ref={audioRef} loop preload="auto">
+        <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" type="audio/mpeg" />
+      </audio>
+
+      {/* Waiting for Players Banner */}
+      {isWaitingForPlayers && occupiedSeats.length < 4 && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-40 px-6 py-3 rounded-xl border-2 border-[#FFD700]/60 bg-[#FFD700]/10 backdrop-blur-sm animate-pulse"
+          style={{ boxShadow: '0 0 30px rgba(255,215,0,0.3)' }}>
+          <div className="text-[8px] tracking-widest text-[#FFD700] uppercase flex items-center gap-2" style={PS2}>
+            <span className="text-lg">🎷</span>
+            Waiting for Players... {occupiedSeats.length}/4 Seats Filled
+            <span className="text-lg">🎷</span>
+          </div>
+        </div>
+      )}
+
       {/* Role Selection Modal */}
       {showRoleSelection && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -555,7 +598,7 @@ function SpadesViewer({ roomCode }) {
             availableSeats={availableSeats}
             onSitInSeat={sitInSeat}
             roomCode={roomCode}
-            cpuChoiceShown={cpuChoiceShown}
+            cpuChoiceShown={cpuChoiceShown && !isWaitingForPlayers}
             onPlayAgainstCPU={handlePlayAgainstCPU}
             onWaitForRealPlayers={handleWaitForRealPlayers}
             onChooseSpectate={handleChooseSpectate}

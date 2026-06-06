@@ -6,6 +6,7 @@ const GAME_PATHS = {
   bff: '/games/bff',
   'square-biz': '/games/square-biz',
   hangman: '/games/hangman',
+  spades: '/games/spades',
 };
 
 export default function JoinRoom() {
