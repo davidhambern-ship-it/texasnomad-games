@@ -47,6 +47,7 @@ function SpadesViewer({ roomCode }) {
   const [cpuChoiceShown, setCpuChoiceShown] = useState(false);
 
   const containerRef = useRef(null);
+  const isUpdatingRef = useRef(false);
   const gs = room?.game_state || {};
   const players = gs.players || [];
 
@@ -152,38 +153,45 @@ function SpadesViewer({ roomCode }) {
     const activeSuit = getActiveSuit(gs.current_trick || []);
     
     const timer = setTimeout(async () => {
-      // Select card using CPU logic
-      let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
       
-      // Fallback to any valid card if CPU logic fails
-      if (!cardToPlay || !isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid) {
-        cardToPlay = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
-        if (!cardToPlay) return;
+      try {
+        // Select card using CPU logic
+        let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
+        
+        // Fallback to any valid card if CPU logic fails
+        if (!cardToPlay || !isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid) {
+          cardToPlay = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
+          if (!cardToPlay) return;
+        }
+        
+        // Play the card
+        const updatedPlayers = players.map(p =>
+          p.playerId === currentPlayer.playerId
+            ? { ...p, hand: p.hand.filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
+            : p
+        );
+        
+        // Find next player for turn rotation
+        const seatedPlayers = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
+        const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === currentTurnSeat);
+        const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
+        
+        // Check if spades are broken
+        const spadesBroken = gs.spades_broken || cardToPlay.suit === '♠';
+        
+        // Update state
+        await updateState({
+          players: updatedPlayers,
+          current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
+          current_turn_seat: nextPlayer?.seatNumber || currentTurnSeat,
+          spades_broken: spadesBroken,
+        });
+      } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 800);
       }
-      
-      // Play the card
-      const updatedPlayers = players.map(p =>
-        p.playerId === currentPlayer.playerId
-          ? { ...p, hand: p.hand.filter(c => c.id !== cardToPlay.id), lastActionAt: Date.now() }
-          : p
-      );
-      
-      // Find next player for turn rotation
-      const seatedPlayers = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
-      const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === currentTurnSeat);
-      const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
-      
-      // Check if spades are broken
-      const spadesBroken = gs.spades_broken || cardToPlay.suit === '♠';
-      
-      // Update state
-      await updateState({
-        players: updatedPlayers,
-        current_trick: [...(gs.current_trick || []), { playerId: currentPlayer.playerId, seatNumber: currentTurnSeat, card: cardToPlay }],
-        current_turn_seat: nextPlayer?.seatNumber || currentTurnSeat,
-        spades_broken: spadesBroken,
-      });
-    }, CPU_ACTION_DELAY);
+    }, CPU_ACTION_DELAY + 500);
     
     return () => clearTimeout(timer);
   }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players, room]);
@@ -211,10 +219,14 @@ function SpadesViewer({ roomCode }) {
     
     // Rotate turn to next human player with delay to avoid rate limit
     const timer = setTimeout(async () => {
-      await updateState({
-        current_turn_seat: nextPlayer.seatNumber,
-      });
-    }, 600);
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
+      try {
+        await updateState({ current_turn_seat: nextPlayer.seatNumber });
+      } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 500);
+      }
+    }, 1000);
     
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
@@ -234,45 +246,52 @@ function SpadesViewer({ roomCode }) {
     if (!winner) return;
     
     const timer = setTimeout(async () => {
-      const winningSeat = winner.seatNumber;
-      const winningTeam = getTeamFromSeat(winningSeat);
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
       
-      // Update books and tricks
-      const updatedPlayers = (gs.players || []).map(p => 
-        p.seatNumber === winningSeat 
-          ? { ...p, tricksWon: (p.tricksWon || 0) + 1 }
-          : p
-      );
-      
-      const newTricksPlayed = (gs.tricks_played || 0) + 1;
-      const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
-      const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
-      
-      // Track completed book
-      const completedBook = {
-        bookNumber: newTricksPlayed,
-        leadSeat: trick[0]?.seatNumber,
-        activeSuit,
-        cardsPlayed: trick,
-        winningSeat,
-        winningTeam,
-        winningCard: winner.card,
-        timestamp: Date.now(),
-      };
-      
-      const previousBooks = gs.completed_books || [];
-      
-      await updateState({
-        players: updatedPlayers,
-        current_trick: [],
-        current_turn_seat: winningSeat, // Winner leads next trick
-        tricks_played: newTricksPlayed,
-        books1: newBooks1,
-        books2: newBooks2,
-        completed_books: [...previousBooks, completedBook],
-        spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
-      });
-    }, 1500);
+      try {
+        const winningSeat = winner.seatNumber;
+        const winningTeam = getTeamFromSeat(winningSeat);
+        
+        // Update books and tricks
+        const updatedPlayers = players.map(p => 
+          p.seatNumber === winningSeat 
+            ? { ...p, tricksWon: (p.tricksWon || 0) + 1 }
+            : p
+        );
+        
+        const newTricksPlayed = (gs.tricks_played || 0) + 1;
+        const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
+        const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
+        
+        // Track completed book
+        const completedBook = {
+          bookNumber: newTricksPlayed,
+          leadSeat: trick[0]?.seatNumber,
+          activeSuit,
+          cardsPlayed: trick,
+          winningSeat,
+          winningTeam,
+          winningCard: winner.card,
+          timestamp: Date.now(),
+        };
+        
+        const previousBooks = gs.completed_books || [];
+        
+        await updateState({
+          players: updatedPlayers,
+          current_trick: [],
+          current_turn_seat: winningSeat,
+          tricks_played: newTricksPlayed,
+          books1: newBooks1,
+          books2: newBooks2,
+          completed_books: [...previousBooks, completedBook],
+          spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
+        });
+      } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 1000);
+      }
+    }, 2000);
     
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
