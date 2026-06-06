@@ -98,51 +98,29 @@ function SpadesViewer({ roomCode }) {
     const workingDeck = shuffleDeck(generateFullDeck());
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     
-    // Initialize empty hands for all seated players (including CPU)
-    const initializedPlayers = (gs.players || []).map(p => {
-      if (p.seatNumber == null) return p;
-      return { ...p, hand: [], bid: null, tricksWon: 0 };
-    });
-    await updateState({ players: initializedPlayers, deck: workingDeck });
-    
-    // Deal cards in batches (every 4 cards to avoid rate limit)
-    const playerHands = seated.map(() => []);
-    let cardCount = 0;
-    for (let round = 0; round < cardsPerPlayer; round++) {
-      for (let j = 0; j < seated.length; j++) {
-        const cardIndex = round * seated.length + j;
-        if (cardIndex < workingDeck.length) {
-          playerHands[j].push(workingDeck[cardIndex]);
-          cardCount++;
-          
-          // Update state every 4 cards to avoid rate limit
-          if (cardCount % 4 === 0 || cardCount === workingDeck.length) {
-            const updatedPlayers = seated.map((p, idx) => ({
-              ...p,
-              hand: [...playerHands[idx]]
-            }));
-            const allPlayers = (gs.players || []).map(p => {
-              const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
-              return seatedIdx >= 0 ? updatedPlayers[seatedIdx] : p;
-            });
-            await updateState({ players: allPlayers });
-            await new Promise(resolve => setTimeout(resolve, 80));
-          }
-        }
-      }
+    // Build complete hands for all players in memory first
+    const playerHands = [];
+    for (let i = 0; i < seated.length; i++) {
+      const startIdx = i * cardsPerPlayer;
+      playerHands.push(workingDeck.slice(startIdx, startIdx + cardsPerPlayer));
     }
+    
+    // Update all players with full hands in a single state update
+    const updatedPlayers = (gs.players || []).map(p => {
+      const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
+      if (seatedIdx >= 0) {
+        return { ...p, hand: playerHands[seatedIdx], bid: 0, tricksWon: 0 };
+      }
+      return p;
+    });
     
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
     
-    // First hand - no bidding - set bid to 0 for all seated players
-    const finalPlayers = (gs.players || []).map(p => {
-      if (p.seatNumber == null) return p;
-      return { ...p, bid: 0 };
-    });
-    
+    // Single state update with all changes - no rate limit issue
     await updateState({
-      players: finalPlayers, phase: 'playing', status: 'active',
+      players: updatedPlayers,
+      phase: 'playing', status: 'active',
       deck: [], current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
       first_hand_no_bid: true,
