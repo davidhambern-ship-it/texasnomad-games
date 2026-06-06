@@ -55,6 +55,11 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
         roomRef.current = r;
         setRoom(r);
 
+        // CRITICAL: Immediately fetch fresh room data after connecting to ensure we have latest state
+        const freshRoom = await base44.entities.GameRoom.get(r.id);
+        roomRef.current = freshRoom;
+        setRoom({ ...freshRoom });
+
         // Subscribe to real-time changes
         unsubscribeRef.current = base44.entities.GameRoom.subscribe((event) => {
           if (event.type === 'update' && event.data) {
