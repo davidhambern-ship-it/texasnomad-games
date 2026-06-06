@@ -4,7 +4,7 @@ import ConnectionStatus from '@/components/host/ConnectionStatus';
 import BFFHostPanel from '@/components/host/panels/BFFHostPanel';
 import SquareBizHostPanel from '@/components/host/panels/SquareBizHostPanel';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
-import SpadesHostPanel from '@/components/host/panels/SpadesHostPanel';
+import SpadesHostPanel from '@/components/host/panels/SpadesHostPanel.jsx';
 
 export default function HostConsole({ game, roomCode, onDisconnect }) {
   const { room, loading, error, updateState, sendCommand, updateRoomStatus } = useGameRoom(roomCode, game.id, 'host');
