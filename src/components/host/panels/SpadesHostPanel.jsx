@@ -794,13 +794,21 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <Btn onClick={scoreRound} color="#FF5F1F" size="sm">📊 Score Round</Btn>
           <Btn 
             onClick={async () => {
-              await updateState({ cpu_enabled: false, phase: 'setup', current_trick: [], current_turn_seat: null, current_bidder_seat: null });
+              if (gs.cpu_enabled && gs.phase === 'playing') {
+                // Stop automation
+                await updateState({ cpu_enabled: false, phase: 'setup', current_trick: [], current_turn_seat: null, current_bidder_seat: null });
+              } else {
+                // Start automation - resume play
+                const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+                if (seated.length >= 2 && gs.deck && gs.deck.length > 0) {
+                  await updateState({ cpu_enabled: true, phase: 'playing' });
+                }
+              }
             }} 
-            color="#ef4444" 
+            color={gs.cpu_enabled && gs.phase === 'playing' ? "#ef4444" : "#4ade80"} 
             size="sm"
-            disabled={!gs.cpu_enabled && gs.phase !== 'playing'}
           >
-            ⏹ Stop Automation
+            {gs.cpu_enabled && gs.phase === 'playing' ? '⏹ Stop' : '▶ Start'}
           </Btn>
         </div>
         <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
