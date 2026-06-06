@@ -513,6 +513,39 @@ function SpadesViewer({ roomCode }) {
   }, [room, isWaitingForPlayers, occupiedSeats.length]);
 
   // Host arrival announcement
+  // Smooth jazz playlist - rotates through tracks
+  const jazzPlaylist = [
+    'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
+    'https://cdn.pixabay.com/download/audio/2022/03/24/audio_31f62e0f6e.mp3?filename=smooth-jazz-11510.mp3',
+    'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d1718ab42b.mp3?filename=lofi-chill-11042.mp3',
+    'https://cdn.pixabay.com/download/audio/2022/04/27/audio_5106f0193f.mp3?filename=relaxing-jazz-11436.mp3',
+    'https://cdn.pixabay.com/download/audio/2022/03/09/audio_c9c3d394e9.mp3?filename=smooth-jazz-11562.mp3',
+  ];
+  const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
+
+  // Rotate to next track when current one ends
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleEnded = () => {
+      const nextIndex = (currentTrackIndex + 1) % jazzPlaylist.length;
+      setCurrentTrackIndex(nextIndex);
+      audio.src = jazzPlaylist[nextIndex];
+      audio.play().catch(() => {});
+    };
+
+    audio.addEventListener('ended', handleEnded);
+    return () => audio.removeEventListener('ended', handleEnded);
+  }, [currentTrackIndex]);
+
+  // Load initial track
+  useEffect(() => {
+    if (audioRef.current && !audioRef.current.src) {
+      audioRef.current.src = jazzPlaylist[0];
+    }
+  }, []);
+
   const [hostAnnounced, setHostAnnounced] = useState(false);
   useEffect(() => {
     if (!room?.host_connected || hostAnnounced || !audioRef.current) return;
@@ -564,10 +597,8 @@ function SpadesViewer({ roomCode }) {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
-      {/* Smooth Jazz Audio - plays while waiting for players */}
-      <audio ref={audioRef} loop preload="auto">
-        <source src="https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3" type="audio/mpeg" />
-      </audio>
+      {/* Smooth Jazz Audio - rotates through multiple tracks */}
+      <audio ref={audioRef} loop preload="auto" />
 
       {/* Waiting for Players Banner */}
       {isWaitingForPlayers && occupiedSeats.length < 4 && (
