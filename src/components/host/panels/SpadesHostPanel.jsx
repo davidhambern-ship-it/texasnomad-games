@@ -347,6 +347,8 @@ export default function SpadesHostPanel({ gs, updateState }) {
     setIsShuffling(true);
     setShufflePhase('shuffling');
     const deck = shuffleDeckRules(generateFullDeck());
+    // Debug: Log first 5 cards to verify shuffle is random
+    console.log('🔀 SHUFFLED DECK - First 5 cards:', deck.slice(0, 5).map(c => `${c.value}${c.suit}`));
     await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
     // isShuffling reset happens when animation completes via onComplete
   };
@@ -362,6 +364,8 @@ export default function SpadesHostPanel({ gs, updateState }) {
     const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
     if (seated.length < 2) return;
     const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeckRules(generateFullDeck());
+    // Debug: Log deck order being dealt
+    console.log('🃏 DEALING - First 5 cards:', workingDeck.slice(0, 5).map(c => `${c.value}${c.suit}`));
     const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
@@ -778,6 +782,16 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <Btn onClick={handleNewDeck} color="#22d3ee" size="sm">🂠 New Deck</Btn>
           <Btn onClick={evaluateTrick} color="#BC13FE" size="sm" disabled={(gs.current_trick || []).length < seatedPlayers.length}>✓ Eval Trick</Btn>
           <Btn onClick={scoreRound} color="#FF5F1F" size="sm">📊 Score Round</Btn>
+          <Btn 
+            onClick={async () => {
+              await updateState({ cpu_enabled: false, phase: 'setup', current_trick: [], current_turn_seat: null, current_bidder_seat: null });
+            }} 
+            color="#ef4444" 
+            size="sm"
+            disabled={!gs.cpu_enabled && gs.phase !== 'playing'}
+          >
+            ⏹ Stop Automation
+          </Btn>
         </div>
         <div className="flex flex-wrap gap-2 border-t border-white/10 pt-3">
           <Btn onClick={resetRound} color="#ffffff" size="sm">↺ Reset Round</Btn>
