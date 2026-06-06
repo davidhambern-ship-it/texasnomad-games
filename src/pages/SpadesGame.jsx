@@ -53,6 +53,13 @@ function SpadesViewer({ roomCode }) {
   const gs = room?.game_state || {};
   const players = gs.players || [];
 
+  // Debug: Log players whenever room updates
+  useEffect(() => {
+    if (room?.game_state?.players) {
+      console.log('🎮 SpadesGame - Room players:', room.game_state.players.map(p => ({ seat: p.seatNumber, role: p.role, type: p.playerType, id: p.playerId?.slice(0,8) })));
+    }
+  }, [room?.game_state?.players?.length, room?.game_state?.players?.map(p => p.playerId).join(',')]);
+
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handler);

@@ -151,10 +151,10 @@ export default function SpadesHostPanel({ gs, updateState }) {
 
   // Sync occupied seats on mount - ensure host panel sees live players
   useEffect(() => {
-    if (seatedPlayers.length > 0) {
-      console.log('🎮 Host Panel - Occupied seats:', seatedPlayers.map(p => ({ seat: p.seatNumber, role: p.role, type: p.playerType })));
-    }
-  }, [seatedPlayers.length, seatedPlayers.map(p => p.seatNumber).join(',')]);
+    console.log('🎮 Host Panel - ALL players:', players.map(p => ({ seat: p.seatNumber, role: p.role, type: p.playerType, id: p.playerId?.slice(0,8) })));
+    console.log('🎮 Host Panel - Seated players:', seatedPlayers.map(p => ({ seat: p.seatNumber, role: p.role, type: p.playerType })));
+    console.log('🎮 Host Panel - Available seats:', availableSeats);
+  }, [players?.length, seatedPlayers?.length, availableSeats?.length]);
 
 
 
