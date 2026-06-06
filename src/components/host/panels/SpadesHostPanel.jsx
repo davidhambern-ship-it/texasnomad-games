@@ -469,6 +469,16 @@ export default function SpadesHostPanel({ gs, updateState }) {
     });
   };
 
+  const resetToFirstHand = async () => {
+    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    await updateState({
+      phase: 'setup', score1: 0, score2: 0, current_trick: [], tricks_played: 0,
+      bid1: 0, bid2: 0, books1: 0, books2: 0,
+      first_hand_books: {}, first_hand_no_bid: true,
+      players: players.map(p => (p.role === 'player' || p.role === 'hostPlayer') ? { ...p, hand: [], bid: null, tricksWon: 0 } : p),
+    });
+  };
+
   return (
     <div className="max-w-4xl mx-auto space-y-4">
       {/* New Player Alert */}
@@ -797,6 +807,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <Btn onClick={resetRound} color="#ffffff" size="sm">↺ Reset Round</Btn>
           <Btn onClick={resetScore} color="#ef4444" size="sm">Reset Score</Btn>
           <Btn onClick={newGame} color="#ffffff" size="sm">New Game</Btn>
+          <Btn onClick={resetToFirstHand} color="#FFD700" size="sm">🃏 First Hand</Btn>
         </div>
       </div>
 
