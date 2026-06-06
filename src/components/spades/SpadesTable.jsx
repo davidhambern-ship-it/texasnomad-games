@@ -157,7 +157,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             player={seatPlayer}
             isMe={isMe}
             isAvailable={availableSeats.includes(seatNumber)}
-            isSpectator={isSpectator}
+            isSpectator={isSpectator || myRole === null}
             onSit={() => onSitInSeat(seatNumber)}
             onStand={onStandUp}
             onTakeOver={() => onTakeOverCPU?.(seatNumber)}

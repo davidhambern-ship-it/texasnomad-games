@@ -107,7 +107,7 @@ export default function SpadesSeat({
               </div>
             )}
           </>
-        ) : isAvailable && isSpectator ? (
+        ) : isAvailable ? (
           <>
             <div className="font-heading text-xs tracking-widest text-white/30 mb-1">EMPTY</div>
             <button
