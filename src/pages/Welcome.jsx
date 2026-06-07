@@ -180,26 +180,44 @@ export default function Welcome() {
               </div>
             ))}
           </div>
-        </Section>
+       </Section>
 
-        {/* Games */}
-        <Section title="Current Games">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {[
-              { name: 'BFF', sub: 'BIGO Family Feud', color: '#BC13FE', emoji: '🟣' },
-              { name: 'Square Biz!', sub: 'Trivia Tic-Tac-Toe', color: '#FF5F1F', emoji: '🟠' },
-              { name: 'Hangman', sub: 'Word Guessing', color: '#FFD700', emoji: '🟡' },
-            ].map(g => (
-              <div key={g.name} className="px-4 py-4 rounded-xl border text-center"
-                style={{ borderColor: `${g.color}40`, background: `${g.color}08` }}>
-                <div className="text-2xl mb-2">{g.emoji}</div>
-                <div className="font-heading text-lg tracking-widest uppercase" style={{ color: g.color }}>{g.name}</div>
-                <div className="text-[8px] text-white/40 tracking-widest mt-1" style={sty}>{g.sub}</div>
-              </div>
-            ))}
-          </div>
-        </Section>
+{/* Games */}
+<Section title="Current Games">
+  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    {[
+      { name: 'BFF', sub: 'BIGO Family Feud', color: '#BC13FE', emoji: '🟣' },
+      { name: 'Square Biz!', sub: 'Trivia Tic-Tac-Toe', color: '#FF5F1F', emoji: '🟠' },
+      { name: 'Hangman', sub: 'Word Guessing', color: '#FFD700', emoji: '🟡' },
+      { name: 'Spades', sub: 'Multiplayer Card Game', color: '#3B82F6', emoji: '♠️' },
+    ].map(g => (
+      <div
+        key={g.name}
+        className="px-4 py-4 rounded-xl border text-center"
+        style={{
+          borderColor: `${g.color}40`,
+          background: `${g.color}08`
+        }}
+      >
+        <div className="text-2xl mb-2">{g.emoji}</div>
 
+        <div
+          className="font-heading text-lg tracking-widest uppercase"
+          style={{ color: g.color }}
+        >
+          {g.name}
+        </div>
+
+        <div
+          className="text-[8px] text-white/40 tracking-widest mt-1"
+          style={sty}
+        >
+          {g.sub}
+        </div>
+      </div>
+    ))}
+  </div>
+</Section>
         {/* Coming Soon */}
         <Section title="Coming Soon">
           <BulletList items={['Spades', 'Additional party games', 'Tournament systems', 'Single-player games', 'Community leaderboards', 'More livestream integrations']} />
