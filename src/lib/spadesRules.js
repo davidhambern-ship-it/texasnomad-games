@@ -106,6 +106,57 @@ export function shuffleDeck(deck) {
   return fisherYatesShuffle(deck);
 }
 
+/**
+ * Filter and sort seated players by seat number for consistent dealing.
+ */
+export function getSeatedPlayers(players) {
+  return (players || [])
+    .filter(p => p.seatNumber != null && (p.role === 'player' || p.role === 'hostPlayer'))
+    .sort((a, b) => a.seatNumber - b.seatNumber);
+}
+
+/**
+ * Shuffle a fresh deck and deal round-robin starting left of the dealer.
+ * Always produces a new random shuffle — never reuse a prior deck order.
+ * @returns {{ dealSequence, handsBySeatNumber, shuffledDeck, dealStartSeat }}
+ */
+export function shuffleAndDealToPlayers(seatedPlayers, dealerSeat = null) {
+  const seated = getSeatedPlayers(seatedPlayers);
+  const shuffledDeck = shuffleDeck(generateFullDeck());
+
+  if (seated.length < 2) {
+    return { dealSequence: [], handsBySeatNumber: new Map(), shuffledDeck, dealStartSeat: null };
+  }
+
+  let startIdx = 0;
+  if (dealerSeat != null) {
+    const dealerIdx = seated.findIndex(p => p.seatNumber === dealerSeat);
+    if (dealerIdx >= 0) startIdx = (dealerIdx + 1) % seated.length;
+  }
+
+  const hands = seated.map(() => []);
+  const dealSequence = [];
+
+  for (let i = 0; i < shuffledDeck.length; i++) {
+    const playerIdx = (startIdx + i) % seated.length;
+    const card = shuffledDeck[i];
+    hands[playerIdx].push(card);
+    dealSequence.push(card);
+  }
+
+  const handsBySeatNumber = new Map();
+  seated.forEach((player, idx) => {
+    handsBySeatNumber.set(player.seatNumber, hands[idx]);
+  });
+
+  return {
+    dealSequence,
+    handsBySeatNumber,
+    shuffledDeck,
+    dealStartSeat: seated[startIdx]?.seatNumber ?? null,
+  };
+}
+
 // Validate dealt hands — no card in more than one hand
 export function validateDealtHands(players) {
   const errors = [];

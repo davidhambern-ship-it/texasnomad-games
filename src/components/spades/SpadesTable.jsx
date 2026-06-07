@@ -240,7 +240,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {[1, 2, 3, 4].map(renderSeat)}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20">
           {shufflePhase !== 'idle' && <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />}
-          {dealPhase !== 'idle' && gs.deck && <SpadesDealAnimation deck={gs.deck} players={players} mySeatNumber={mySeatNumber} onComplete={() => setDealPhase('idle')} />}
+          {dealPhase !== 'idle' && gs.deck && <SpadesDealAnimation deck={gs.deck} players={players} mySeatNumber={mySeatNumber} dealStartSeat={gs.deal_start_seat} onComplete={() => setDealPhase('idle')} />}
           {shufflePhase === 'idle' && dealPhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} />}
         </div>
       </div>

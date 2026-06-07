@@ -11,38 +11,44 @@ const SEAT_POSITIONS = {
   4: { x: 240, y: 0, rotation: 270, label: 'Right' },   // Right
 };
 
-export default function SpadesDealAnimation({ deck, players, mySeatNumber, onComplete }) {
+export default function SpadesDealAnimation({ deck, players, mySeatNumber, dealStartSeat, onComplete }) {
   const [dealtCards, setDealtCards] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   
   const DEAL_SPEED = 90; // Fast professional deal speed (0.09s per card)
 
-  const seatedPlayers = (players || [])
-    .filter(p => (p.role === 'player' || p.role === 'hostPlayer') && p.seatNumber && p.hand)
+  const seatedSorted = (players || [])
+    .filter(p => (p.role === 'player' || p.role === 'hostPlayer') && p.seatNumber != null)
     .sort((a, b) => a.seatNumber - b.seatNumber);
 
+  const startIdx = dealStartSeat != null
+    ? Math.max(0, seatedSorted.findIndex(p => p.seatNumber === dealStartSeat))
+    : 0;
+  const seatedPlayers = startIdx > 0
+    ? [...seatedSorted.slice(startIdx), ...seatedSorted.slice(0, startIdx)]
+    : seatedSorted;
+
   useEffect(() => {
+    setDealtCards([]);
+    setCurrentIndex(0);
+
     if (!deck || deck.length === 0 || seatedPlayers.length === 0) {
       onComplete?.();
       return;
     }
 
+    let index = 0;
     const totalCards = deck.length;
-    
+
     const interval = setInterval(() => {
-      if (currentIndex >= totalCards) {
+      if (index >= totalCards) {
         clearInterval(interval);
         setTimeout(() => onComplete?.(), 400);
         return;
       }
 
-      const playerIndex = currentIndex % seatedPlayers.length;
-      const player = seatedPlayers[playerIndex];
-      
-      const indexInHand = currentIndex < deck.length
-        ? Math.floor(currentIndex / seatedPlayers.length)
-        : 0;
-      const card = deck[currentIndex];
+      const player = seatedPlayers[index % seatedPlayers.length];
+      const card = deck[index];
 
       setDealtCards(prev => [
         ...prev,
@@ -54,11 +60,12 @@ export default function SpadesDealAnimation({ deck, players, mySeatNumber, onCom
         }
       ]);
 
-      setCurrentIndex(prev => prev + 1);
+      index += 1;
+      setCurrentIndex(index);
     }, DEAL_SPEED);
 
     return () => clearInterval(interval);
-  }, [deck.length, seatedPlayers.length, currentIndex, onComplete]);
+  }, [deck, seatedPlayers, onComplete]);
 
   return (
     <div className="absolute inset-0 flex items-center justify-center pointer-events-none overflow-visible">

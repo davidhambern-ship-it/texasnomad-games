@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { generateFullDeck, shuffleDeck as shuffleDeckSecure } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck as shuffleDeckSecure, shuffleAndDealToPlayers, getSeatedPlayers } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -56,33 +56,34 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     onStandUp?.();
   };
 
-  // DEAL: Trigger deal animation and progressively add cards to hands
+  // DEAL: Fresh crypto shuffle + round-robin deal starting left of dealer
   const handleDeal = async () => {
     if (isDealing) return;
     const currentPlayers = gs.players || [];
-    const allSeated = currentPlayers.filter(p => p.seatNumber != null);
+    const allSeated = getSeatedPlayers(currentPlayers);
     if (allSeated.length < 2) {
       alert('Need at least 2 players to deal');
       return;
     }
 
-    const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0)
-      ? gs.deck
-      : shuffleDeckSecure(generateFullDeck());
+    const dealerSeat = gs.dealer_seat || allSeated[0]?.seatNumber || 1;
+    const { dealSequence, handsBySeatNumber, dealStartSeat } = shuffleAndDealToPlayers(allSeated, dealerSeat);
 
     setIsDealing(true);
 
-    // Reset hands to empty so animation can build them up
     const clearedPlayers = currentPlayers.map(p =>
       p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p
     );
-    const dealerSeat = allSeated[0]?.seatNumber || 1;
-    const firstBidder = allSeated[1]?.seatNumber || allSeated[0]?.seatNumber;
     const hasCpu = allSeated.some(p => p.playerType === 'cpu');
+    const sortedSeated = [...allSeated].sort((a, b) => a.seatNumber - b.seatNumber);
+    const dealerIdx = sortedSeated.findIndex(p => p.seatNumber === dealerSeat);
+    const firstBidder = sortedSeated[(dealerIdx + 1) % sortedSeated.length]?.seatNumber;
 
     await updateState({
       players: clearedPlayers,
-      deck: workingDeck,
+      deck: dealSequence,
+      deck_shuffled: true,
+      deal_start_seat: dealStartSeat,
       phase: 'setup',
       status: 'active',
       current_trick: [],
@@ -92,34 +93,29 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       books1: 0, books2: 0,
     });
 
-    // Start deal animation
     onDealStart?.();
 
-    // Deal cards round-robin, updating state every card
-    const DEAL_DELAY = 120; // ms per card
-    const cardsPerPlayer = Math.floor(workingDeck.length / allSeated.length);
+    const DEAL_DELAY = 120;
     const playerHands = allSeated.map(() => []);
+    const startIdx = Math.max(0, allSeated.findIndex(p => p.seatNumber === dealStartSeat));
 
-    for (let round = 0; round < cardsPerPlayer; round++) {
-      for (let j = 0; j < allSeated.length; j++) {
-        const cardIdx = round * allSeated.length + j;
-        if (cardIdx >= workingDeck.length) break;
-        playerHands[j].push(workingDeck[cardIdx]);
+    for (let i = 0; i < dealSequence.length; i++) {
+      const playerIdx = (startIdx + i) % allSeated.length;
+      playerHands[playerIdx].push(dealSequence[i]);
 
-        const updatedPlayers = currentPlayers.map(p => {
-          const si = allSeated.findIndex(s => s.playerId === p.playerId);
-          return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
-        });
+      const updatedPlayers = currentPlayers.map(p => {
+        const si = allSeated.findIndex(s => s.playerId === p.playerId);
+        return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
+      });
 
-        await updateState({ players: updatedPlayers });
-        await new Promise(resolve => setTimeout(resolve, DEAL_DELAY));
-      }
+      await updateState({ players: updatedPlayers });
+      await new Promise(resolve => setTimeout(resolve, DEAL_DELAY));
     }
 
-    // Transition to bidding/playing
     const finalPlayers = currentPlayers.map(p => {
-      const si = allSeated.findIndex(s => s.playerId === p.playerId);
-      return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: hasCpu ? 0 : null, tricksWon: 0 } : p;
+      const hand = handsBySeatNumber.get(p.seatNumber);
+      if (hand) return { ...p, hand: [...hand], bid: hasCpu ? 0 : null, tricksWon: 0 };
+      return p;
     });
 
     await updateState({
@@ -131,6 +127,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       bid1: hasCpu ? 0 : null,
       bid2: hasCpu ? 0 : null,
       first_hand_no_bid: hasCpu,
+      deal_start_seat: dealStartSeat,
     });
 
     setIsDealing(false);

@@ -4,7 +4,7 @@ import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
-import { generateFullDeck, shuffleDeck as shuffleDeckRules, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck as shuffleDeckRules, shuffleAndDealToPlayers, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const HOST_PLAYER_ID = 'host_player_spades';
@@ -136,21 +136,23 @@ export default function SpadesHostPanel({ gs, updateState }) {
   };
 
   const handleDeal = async () => {
-    const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+    const seated = getSeatedPlayers(players);
     if (seated.length < 2) return;
-    const workingDeck = (gs.deck_shuffled && gs.deck?.length > 0) ? gs.deck : shuffleDeckRules(generateFullDeck());
-    const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
+    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
+    const { handsBySeatNumber, dealStartSeat } = shuffleAndDealToPlayers(seated, dealerSeat);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
-      const idx = seated.findIndex(s => s.playerId === p.playerId);
-      return { ...p, hand: workingDeck.slice(idx * cardsPerPlayer, (idx + 1) * cardsPerPlayer), bid: null, tricksWon: 0 };
+      return { ...p, hand: handsBySeatNumber.get(p.seatNumber) || [], bid: null, tricksWon: 0 };
     });
-    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const isFirstRound = !gs.first_hand_books || Object.keys(gs.first_hand_books).length === 0;
-    const firstSeat = isFirstRound ? seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber : dealerSeat;
+    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
+    const firstSeat = isFirstRound
+      ? seated[(dealerIdx + 1) % seated.length]?.seatNumber
+      : dealerSeat;
     await updateState({
       players: updatedPlayers, phase: isFirstRound ? 'playing' : 'bidding', status: 'active',
-      deck: [], current_trick: [], current_turn_seat: firstSeat,
+      deck: [], deck_shuffled: true, deal_start_seat: dealStartSeat,
+      current_trick: [], current_turn_seat: firstSeat,
       current_bidder_seat: isFirstRound ? null : firstSeat,
       tricks_played: 0, bid1: isFirstRound ? 0 : null, bid2: isFirstRound ? 0 : null,
       books1: 0, books2: 0, first_hand_no_bid: isFirstRound, spades_broken: false,

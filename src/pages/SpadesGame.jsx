@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
-import { generateFullDeck, shuffleDeck, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck, shuffleAndDealToPlayers, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -62,27 +62,21 @@ function SpadesViewer({ roomCode }) {
   }, [room, playerId]);
 
   const handleAutoDeal = async () => {
-    const seated = (gs.players || []).filter(p => p.seatNumber != null);
+    const seated = getSeatedPlayers(gs.players || []);
     if (seated.length < 2) return;
-    const workingDeck = shuffleDeck(generateFullDeck());
-    const cardsPerPlayer = Math.floor(workingDeck.length / seated.length);
-    const playerHands = [];
-    for (let i = 0; i < seated.length; i++) {
-      const startIdx = i * cardsPerPlayer;
-      playerHands.push(workingDeck.slice(startIdx, startIdx + cardsPerPlayer));
-    }
+    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
+    const { handsBySeatNumber, dealStartSeat } = shuffleAndDealToPlayers(seated, dealerSeat);
     const updatedPlayers = (gs.players || []).map(p => {
-      const seatedIdx = seated.findIndex(s => s.playerId === p.playerId);
-      if (seatedIdx >= 0) {
-        return { ...p, hand: playerHands[seatedIdx], bid: 0, tricksWon: 0 };
-      }
+      const hand = handsBySeatNumber.get(p.seatNumber);
+      if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
       return p;
     });
-    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
-    const firstBidder = seated[(seated.findIndex(s => s.seatNumber === dealerSeat) + 1) % seated.length]?.seatNumber;
+    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
+    const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
     await updateState({
       players: updatedPlayers, phase: 'playing', status: 'active',
-      deck: [], current_trick: [], current_turn_seat: firstBidder,
+      deck: [], deck_shuffled: true, deal_start_seat: dealStartSeat,
+      current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
       first_hand_no_bid: true, spades_broken: false, completed_books: [],
     });
@@ -93,12 +87,9 @@ function SpadesViewer({ roomCode }) {
     if (gs.phase !== 'setup' && gs.phase) return;
     if (!gs.deck || gs.deck.length === 0) {
       const timer = setTimeout(async () => {
-        for (let i = 0; i < 3; i++) {
-          const deck = generateFullDeck();
-          await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-        await new Promise(resolve => setTimeout(resolve, 500));
+        const previewDeck = shuffleDeck(generateFullDeck());
+        await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
+        await new Promise(resolve => setTimeout(resolve, 1200));
         await handleAutoDeal();
       }, 1000);
       return () => clearTimeout(timer);
@@ -226,11 +217,9 @@ function SpadesViewer({ roomCode }) {
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
     await updateState({ players: filledPlayers, cpu_enabled: true, dealer_seat: gs.dealer_seat || 1, phase: 'setup' });
     setCpuChoiceShown(false);
-    for (let i = 0; i < 3; i++) {
-      const deck = generateFullDeck();
-      await updateState({ deck: shuffleDeck(deck), deck_shuffled: true, shuffle_count: i + 1 });
-      await new Promise(resolve => setTimeout(resolve, 400));
-    }
+    const previewDeck = shuffleDeck(generateFullDeck());
+    await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
+    await new Promise(resolve => setTimeout(resolve, 1200));
     await handleAutoDeal();
   };
 
