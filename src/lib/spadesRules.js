@@ -230,25 +230,43 @@ export function getShuffleDebugStats(deck, players, previousHandHashes = null) {
 }
 
 // Get card strength (for determining winner)
-export function getCardStrength(card, activeSuit) {
+export function getCardStrength(card, activeSuit = null) {
   if (!card) return -1;
 
-  // Jokers are absolute highest
-  if (card.value === 'BJ') return 100;
-  if (card.value === 'LJ') return 99;
+  const valueRank = {
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    '10': 10,
+    'J': 11,
+    'Q': 12,
+    'K': 13,
+    'A': 14,
+    'LJ': 100,
+    'BJ': 101,
+  };
 
-  // Spades are trump
+  // Jokers are highest trump
+  if (card.value === 'BJ') return 101;
+  if (card.value === 'LJ') return 100;
+
+  // Spades are trump and beat all non-spades
   if (card.suit === '♠') {
-    return 50 + (CARD_ORDER[card.value] || 0);
+    return 50 + (valueRank[card.value] || 0);
   }
 
-  // Active suit cards
-  if (card.suit === activeSuit && activeSuit !== '♠') {
-    return CARD_ORDER[card.value] || 0;
+  // Cards matching the led suit beat off-suit non-trump cards
+  if (activeSuit && card.suit === activeSuit) {
+    return 20 + (valueRank[card.value] || 0);
   }
 
-  // Off-suit cards (cannot win)
-  return -1;
+  // Off-suit non-spades cannot win
+  return valueRank[card.value] || 0;
 }
 
 // Check if a card play is valid
