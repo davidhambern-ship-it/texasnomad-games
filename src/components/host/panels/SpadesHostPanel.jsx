@@ -4,7 +4,7 @@ import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
-import { generateFullDeck, shuffleDeck as shuffleDeckRules, shuffleAndDealToPlayers, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck as shuffleDeckRules, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const HOST_PLAYER_ID = 'host_player_spades';
@@ -138,8 +138,9 @@ export default function SpadesHostPanel({ gs, updateState }) {
   const handleDeal = async () => {
     const seated = getSeatedPlayers(players);
     if (seated.length < 2) return;
+    if (!gs.deck_shuffled || !gs.deck?.length) return;
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
-    const { handsBySeatNumber, dealStartSeat } = shuffleAndDealToPlayers(seated, dealerSeat);
+    const { handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(gs.deck, seated, dealerSeat);
     const updatedPlayers = players.map(p => {
       if (p.role !== 'player' && p.role !== 'hostPlayer') return p;
       return { ...p, hand: handsBySeatNumber.get(p.seatNumber) || [], bid: null, tricksWon: 0 };
@@ -151,7 +152,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
       : dealerSeat;
     await updateState({
       players: updatedPlayers, phase: isFirstRound ? 'playing' : 'bidding', status: 'active',
-      deck: [], deck_shuffled: true, deal_start_seat: dealStartSeat,
+      deck: [], deck_shuffled: false, deal_start_seat: dealStartSeat,
       current_trick: [], current_turn_seat: firstSeat,
       current_bidder_seat: isFirstRound ? null : firstSeat,
       tricks_played: 0, bid1: isFirstRound ? 0 : null, bid2: isFirstRound ? 0 : null,
@@ -290,7 +291,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
         <h3 className="font-heading text-xs tracking-[0.2em] text-white/40 uppercase">Controls</h3>
         <div className="flex flex-wrap gap-2">
           <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={isShuffling}>{isShuffling ? '⏳ Shuffling...' : gs.deck_shuffled ? '✓ Shuffled' : '🔀 Shuffle'}</Btn>
-          <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={seatedPlayers.length < 2}>🃏 Deal</Btn>
+          <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={seatedPlayers.length < 2 || !gs.deck_shuffled || !gs.deck?.length}>🃏 Deal</Btn>
           <Btn onClick={handleNewDeck} color="#22d3ee" size="sm">🂠 New Deck</Btn>
           <Btn onClick={scoreRound} color="#FF5F1F" size="sm">📊 Score Round</Btn>
           <Btn onClick={async () => { if (gs.cpu_enabled && gs.phase === 'playing') { await updateState({ cpu_enabled: false, phase: 'setup', current_trick: [], current_turn_seat: null, current_bidder_seat: null }); } else { const seated = players.filter(p => p.role === 'player' || p.role === 'hostPlayer'); if (seated.length >= 2 && gs.deck && gs.deck.length > 0) { await updateState({ cpu_enabled: true, phase: 'playing' }); } } }} color={gs.cpu_enabled && gs.phase === 'playing' ? "#ef4444" : "#4ade80"} size="sm">{gs.cpu_enabled && gs.phase === 'playing' ? '⏹ Stop' : '▶ Start'}</Btn>

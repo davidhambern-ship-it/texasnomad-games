@@ -116,16 +116,16 @@ export function getSeatedPlayers(players) {
 }
 
 /**
- * Shuffle a fresh deck and deal round-robin starting left of the dealer.
- * Always produces a new random shuffle — never reuse a prior deck order.
- * @returns {{ dealSequence, handsBySeatNumber, shuffledDeck, dealStartSeat }}
+ * Deal an existing shuffled deck round-robin starting left of the dealer.
+ * Card order in the deck is preserved — index 0 is dealt first, then 1, etc.
+ * @returns {{ dealSequence, handsBySeatNumber, dealStartSeat }}
  */
-export function shuffleAndDealToPlayers(seatedPlayers, dealerSeat = null) {
+export function dealFromShuffledDeck(shuffledDeck, seatedPlayers, dealerSeat = null) {
   const seated = getSeatedPlayers(seatedPlayers);
-  const shuffledDeck = shuffleDeck(generateFullDeck());
+  const deck = [...(shuffledDeck || [])];
 
-  if (seated.length < 2) {
-    return { dealSequence: [], handsBySeatNumber: new Map(), shuffledDeck, dealStartSeat: null };
+  if (seated.length < 2 || deck.length === 0) {
+    return { dealSequence: [], handsBySeatNumber: new Map(), dealStartSeat: null };
   }
 
   let startIdx = 0;
@@ -137,9 +137,9 @@ export function shuffleAndDealToPlayers(seatedPlayers, dealerSeat = null) {
   const hands = seated.map(() => []);
   const dealSequence = [];
 
-  for (let i = 0; i < shuffledDeck.length; i++) {
+  for (let i = 0; i < deck.length; i++) {
     const playerIdx = (startIdx + i) % seated.length;
-    const card = shuffledDeck[i];
+    const card = deck[i];
     hands[playerIdx].push(card);
     dealSequence.push(card);
   }
@@ -152,9 +152,18 @@ export function shuffleAndDealToPlayers(seatedPlayers, dealerSeat = null) {
   return {
     dealSequence,
     handsBySeatNumber,
-    shuffledDeck,
     dealStartSeat: seated[startIdx]?.seatNumber ?? null,
   };
+}
+
+/**
+ * Shuffle a fresh deck and deal in one step (CPU auto-deal paths).
+ * @returns {{ dealSequence, handsBySeatNumber, shuffledDeck, dealStartSeat }}
+ */
+export function shuffleAndDealToPlayers(seatedPlayers, dealerSeat = null) {
+  const shuffledDeck = shuffleDeck(generateFullDeck());
+  const result = dealFromShuffledDeck(shuffledDeck, seatedPlayers, dealerSeat);
+  return { ...result, shuffledDeck };
 }
 
 // Validate dealt hands — no card in more than one hand

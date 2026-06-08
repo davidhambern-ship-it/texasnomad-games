@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
-import { generateFullDeck, shuffleDeck, shuffleAndDealToPlayers, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -61,11 +61,12 @@ function SpadesViewer({ roomCode }) {
     }
   }, [room, playerId]);
 
-  const handleAutoDeal = async () => {
+  const handleAutoDeal = async (shuffledDeck) => {
     const seated = getSeatedPlayers(gs.players || []);
     if (seated.length < 2) return;
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
-    const { handsBySeatNumber, dealStartSeat } = shuffleAndDealToPlayers(seated, dealerSeat);
+    const deckToDeal = shuffledDeck ?? ((gs.deck_shuffled && gs.deck?.length) ? gs.deck : shuffleDeck(generateFullDeck()));
+    const { handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
     const updatedPlayers = (gs.players || []).map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
       if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
@@ -75,7 +76,7 @@ function SpadesViewer({ roomCode }) {
     const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
     await updateState({
       players: updatedPlayers, phase: 'playing', status: 'active',
-      deck: [], deck_shuffled: true, deal_start_seat: dealStartSeat,
+      deck: [], deck_shuffled: false, deal_start_seat: dealStartSeat,
       current_trick: [], current_turn_seat: firstBidder,
       tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
       first_hand_no_bid: true, spades_broken: false, completed_books: [],
@@ -95,7 +96,7 @@ function SpadesViewer({ roomCode }) {
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
         await new Promise(resolve => setTimeout(resolve, 1200));
-        await handleAutoDeal();
+        await handleAutoDeal(previewDeck);
       }, 1000);
       return () => clearTimeout(timer);
     }
