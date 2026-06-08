@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
-import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY } from '@/lib/spadesCPU';
+import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import { generateFullDeck, shuffleDeck, shuffleAndDealToPlayers, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -86,6 +86,11 @@ function SpadesViewer({ roomCode }) {
     if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
     if (gs.phase !== 'setup' && gs.phase) return;
     if (!gs.deck || gs.deck.length === 0) {
+      const seated = getSeatedPlayers(gs.players || []);
+      const dealer = seated.find(p => p.seatNumber === gs.dealer_seat);
+      // Only auto-shuffle/deal when the dealer seat is CPU-controlled
+      if (!dealer || dealer.playerType !== 'cpu') return;
+
       const timer = setTimeout(async () => {
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
@@ -171,11 +176,21 @@ function SpadesViewer({ roomCode }) {
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
-  const occupiedSeats = players.filter(p => p.role === 'player' || p.role === 'hostPlayer').map(p => p.seatNumber);
-  const availableSeats = SPADES_SEATS.filter(s => !occupiedSeats.includes(s));
+  const emptySeats = SPADES_SEATS.filter(s =>
+    !players.some(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'))
+  );
+  const joinableSeats = SPADES_SEATS.filter(s => {
+    const occupant = players.find(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'));
+    return !occupant || occupant.playerType === 'cpu';
+  });
 
   const sitInSeat = async (seatNum) => {
     if (!room) return;
+    const cpuAtSeat = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
+    if (cpuAtSeat) {
+      await takeOverCpuSeat(seatNum);
+      return;
+    }
     const newPlayer = { playerId, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true, joinedAt: Date.now(), lastActionAt: Date.now() };
     const existing = players.find(p => p.playerId === playerId);
     const updatedPlayers = existing
@@ -187,9 +202,21 @@ function SpadesViewer({ roomCode }) {
     setMySeatNumber(seatNum);
   };
 
+  const takeOverCpuSeat = async (seatNum) => {
+    if (!room || mySeatNumber) return;
+    const cpuPlayer = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
+    if (!cpuPlayer) return;
+    let updatedPlayers = replaceCPUWithHuman(players, seatNum, playerId, 'player');
+    updatedPlayers = updatedPlayers.filter(p => !(p.playerId === playerId && p.seatNumber !== seatNum));
+    await updateState({ players: updatedPlayers });
+    localStorage.setItem(`spades_role_${roomCode}`, 'player');
+    setMyRole('player');
+    setMySeatNumber(seatNum);
+  };
+
   const handleChooseSit = async () => {
     if (!room) return;
-    if (availableSeats.length === 0) {
+    if (joinableSeats.length === 0) {
       const newPlayer = { playerId, seatNumber: null, role: 'spectator', connected: true, joinedAt: Date.now(), lastActionAt: Date.now() };
       const existing = players.find(p => p.playerId === playerId);
       const updatedPlayers = existing ? players.map(p => p.playerId === playerId ? { ...p, role: 'spectator', connected: true } : p) : [...players, newPlayer];
@@ -198,7 +225,8 @@ function SpadesViewer({ roomCode }) {
       setMyRole('spectator');
       return;
     }
-    await sitInSeat(availableSeats[0]);
+    const preferEmpty = joinableSeats.find(s => emptySeats.includes(s));
+    await sitInSeat(preferEmpty ?? joinableSeats[0]);
   };
 
   const handleChooseSpectate = async () => {
@@ -215,12 +243,13 @@ function SpadesViewer({ roomCode }) {
     if (!room) return;
     const currentPlayers = gs.players || [];
     const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
-    await updateState({ players: filledPlayers, cpu_enabled: true, dealer_seat: gs.dealer_seat || 1, phase: 'setup' });
+    await updateState({
+      players: filledPlayers,
+      cpu_enabled: true,
+      dealer_seat: gs.dealer_seat || mySeatNumber || 1,
+      phase: 'setup',
+    });
     setCpuChoiceShown(false);
-    const previewDeck = shuffleDeck(generateFullDeck());
-    await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
-    await new Promise(resolve => setTimeout(resolve, 1200));
-    await handleAutoDeal();
   };
 
   const handleWaitForRealPlayers = async () => {
@@ -272,24 +301,17 @@ function SpadesViewer({ roomCode }) {
   };
 
   const handleTakeOverCPU = async (seatNum) => {
-    if (!room || !isSpectator) return;
-    const cpuPlayer = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
-    if (!cpuPlayer) return;
-    const updatedPlayers = players.map(p => p.playerId === cpuPlayer.playerId ? { ...p, playerId, playerType: 'human', role: 'player' } : p);
-    await updateState({ players: updatedPlayers });
-    localStorage.setItem(`spades_role_${roomCode}`, 'player');
-    setMyRole('player');
-    setMySeatNumber(seatNum);
+    await takeOverCpuSeat(seatNum);
   };
 
   const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
   const isSpectator = myRole === 'spectator';
 
   useEffect(() => {
-    if (isPlayer && availableSeats.length > 0 && !gs.cpu_enabled && !cpuChoiceShown) {
+    if (isPlayer && emptySeats.length > 0 && !gs.cpu_enabled && !cpuChoiceShown) {
       setCpuChoiceShown(true);
     }
-  }, [isPlayer, availableSeats.length, gs.cpu_enabled, cpuChoiceShown, myRole]);
+  }, [isPlayer, emptySeats.length, gs.cpu_enabled, cpuChoiceShown, myRole]);
 
   useEffect(() => {
     if (!isPlayer) setCpuChoiceShown(false);
@@ -354,12 +376,12 @@ function SpadesViewer({ roomCode }) {
               <div className="text-white/60 text-sm">Choose how you want to join</div>
             </div>
             <div className="space-y-3">
-              {availableSeats.length > 0 ? (
+              {joinableSeats.length > 0 ? (
                 <button onClick={handleChooseSit} className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>🎯 Play (Join Seat)</button>
               ) : (
                 <button onClick={handleChooseSpectate} className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>👁 Start Spectating</button>
               )}
-              {availableSeats.length > 0 && (
+              {joinableSeats.length > 0 && (
                 <button onClick={handleChooseSpectate} className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>👁 Spectate Only</button>
               )}
             </div>
@@ -395,7 +417,8 @@ function SpadesViewer({ roomCode }) {
             isPlayer={isPlayer}
             isSpectator={isSpectator}
             updateState={updateState}
-            availableSeats={availableSeats}
+            joinableSeats={joinableSeats}
+            emptySeats={emptySeats}
             onSitInSeat={sitInSeat}
             roomCode={roomCode}
             cpuChoiceShown={cpuChoiceShown && !isWaitingForPlayers}

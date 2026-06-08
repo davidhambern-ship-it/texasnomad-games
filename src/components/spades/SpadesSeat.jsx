@@ -7,8 +7,7 @@ export default function SpadesSeat({
   seatNumber, 
   player, 
   isMe, 
-  isAvailable, 
-  isSpectator, 
+  isJoinable, 
   onSit, 
   onStand,
   onTakeOver,
@@ -72,14 +71,14 @@ export default function SpadesSeat({
               </button>
             )}
             
-            {/* TAKE OVER button for CPU seats */}
-            {isCPU && isSpectator && (
+            {/* SIT button to replace CPU */}
+            {isCPU && isJoinable && (
               <button
                 onClick={onTakeOver}
                 className="mt-1.5 px-2 py-1 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95 w-full"
                 style={PS2}
               >
-                Take Over
+                Sit
               </button>
             )}
             
@@ -107,7 +106,7 @@ export default function SpadesSeat({
               </div>
             )}
           </>
-        ) : isAvailable ? (
+        ) : isJoinable ? (
           <>
             <div className="font-heading text-xs tracking-widest text-white/30 mb-1">EMPTY</div>
             <button

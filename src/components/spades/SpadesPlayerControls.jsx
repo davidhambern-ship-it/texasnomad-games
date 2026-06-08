@@ -32,10 +32,12 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
   const hasDeck = gs.deck?.length > 0;
   const canStandUp = gs.phase === 'setup' || !hasCards;
+  const dealerSeat = gs.dealer_seat || getSeatedPlayers(gs.players || [])[0]?.seatNumber || null;
+  const isDealer = dealerSeat != null && seatNumber === dealerSeat;
 
   // SHUFFLE: Trigger animation then update deck in state
   const handleShuffle = async () => {
-    if (isShuffling) return;
+    if (isShuffling || !isDealer) return;
     setIsShuffling(true);
 
     // Start shuffle animation
@@ -58,7 +60,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
   // DEAL: Fresh crypto shuffle + round-robin deal starting left of dealer
   const handleDeal = async () => {
-    if (isDealing) return;
+    if (isDealing || !isDealer) return;
     const currentPlayers = gs.players || [];
     const allSeated = getSeatedPlayers(currentPlayers);
     if (allSeated.length < 2) {
@@ -178,6 +180,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   };
 
   const handleReset = async () => {
+    if (!isDealer) return;
     await updateState({
       phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null, deck: [],
       players: (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
@@ -194,14 +197,29 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         Seat {seatNumber} Controls
       </div>
       
+      {isSetup && isDealer && (
+        <div className="text-[7px] tracking-widest text-[#FFD700]/80 uppercase mb-2 text-center" style={PS2}>
+          🎴 You are the dealer
+        </div>
+      )}
+      {isSetup && !isDealer && dealerSeat && (
+        <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2 text-center" style={PS2}>
+          Waiting for Seat {dealerSeat} to deal
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2 justify-center">
-        <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || isDealing}>
-          {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
-        </Btn>
-        <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || isDealing || seatedPlayers.length < 2}>
-          {isDealing ? '🃏 Dealing...' : '🃏 Deal'}
-        </Btn>
-        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={isSetup && !hasCards && !hasBid}>
+        {isDealer && (
+          <>
+            <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || isDealing}>
+              {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
+            </Btn>
+            <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || isDealing || seatedPlayers.length < 2}>
+              {isDealing ? '🃏 Dealing...' : '🃏 Deal'}
+            </Btn>
+          </>
+        )}
+        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!isDealer || (isSetup && !hasCards && !hasBid)}>
           ↺ Reset
         </Btn>
         <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>

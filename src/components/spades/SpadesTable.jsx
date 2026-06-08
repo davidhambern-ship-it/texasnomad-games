@@ -27,7 +27,7 @@ function getRelativePosition(seatNumber, viewerSeat) {
   return rotation[viewerSeat]?.[seatNumber] || 'bottom';
 }
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, availableSeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, joinableSeats, emptySeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -44,7 +44,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     prevShuffleTs.current = gs.shuffle_ts;
   }, [gs.shuffle_ts]);
 
-  const showCPUChoice = isPlayer && availableSeats.length > 0 && isSetup && cpuChoiceShown;
+  const showCPUChoice = isPlayer && emptySeats.length > 0 && isSetup && cpuChoiceShown;
+  const canJoinSeat = !isPlayer && (isSpectator || myRole === null);
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
   const myPlayer = players.find(p => p.playerId === playerId);
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
@@ -156,8 +157,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             seatNumber={seatNumber}
             player={seatPlayer}
             isMe={isMe}
-            isAvailable={availableSeats.includes(seatNumber)}
-            isSpectator={isSpectator || myRole === null}
+            isJoinable={canJoinSeat && joinableSeats.includes(seatNumber)}
             onSit={() => onSitInSeat(seatNumber)}
             onStand={onStandUp}
             onTakeOver={() => onTakeOverCPU?.(seatNumber)}
@@ -177,7 +177,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3), inset 0 0 60px rgba(0,0,0,0.8)' }}>
             <div className="text-center mb-6">
               <div className="text-2xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Ready to Play?</div>
-              <div className="text-white/60 text-sm">{availableSeats.length} seat{availableSeats.length > 1 ? 's' : ''} available</div>
+              <div className="text-white/60 text-sm">{emptySeats.length} empty seat{emptySeats.length !== 1 ? 's' : ''}</div>
             </div>
             <div className="space-y-3">
               <button onClick={onPlayAgainstCPU} className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>🤖 Play vs CPU</button>
@@ -189,7 +189,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
       {!isPlaying && !isBidding && (
         <div className="w-full px-4 py-3 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
-          <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>{gs.phase === 'setup' || !gs.phase ? '⏳ Waiting for Host to Deal...' : gs.phase.toUpperCase()}</div>
+          <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
+            {gs.phase === 'setup' || !gs.phase
+              ? (gs.dealer_seat ? `⏳ Waiting for Seat ${gs.dealer_seat} to Shuffle & Deal...` : '⏳ Waiting for Dealer...')
+              : gs.phase.toUpperCase()}
+          </div>
           {gs.first_hand_no_bid && (<div className="text-[6px] tracking-widest text-[#FFD700]/50 uppercase mt-1" style={PS2}>First Hand - No Bidding</div>)}
         </div>
       )}
