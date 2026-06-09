@@ -16,6 +16,7 @@ function preloadCardImages(cards) {
 }
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+const DEAL_INTERVAL_MS = 130; // must match SpadesDealAnimation's DEAL_INTERVAL_MS
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'sm', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -30,11 +31,12 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'sm', disabled = fal
   );
 };
 
-export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onDealStart, onStandUp }) {
+export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onStandUp, isDealing: isExternalDealing }) {
   const [bidInput, setBidInput] = useState('');
   const [blindAmount, setBlindAmount] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
   const [isDealing, setIsDealing] = useState(false);
+  const dealingActive = isDealing || isExternalDealing;
   
   if (!isMySeat || !player) return null;
   
@@ -107,6 +109,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       deck: dealSequence,
       deck_shuffled: true,
       deal_start_seat: dealStartSeat,
+      deal_ts: Date.now(),
       phase: 'setup',
       status: 'active',
       current_trick: [],
@@ -116,30 +119,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       books1: 0, books2: 0,
     });
 
-    onDealStart?.();
-
-    // Batch updates: one update per full round-robin pass (every N players)
-    // This avoids rate limit errors from 52 individual updateState calls
-    const ROUND_DELAY = 500;
-    const playerHands = allSeated.map(() => []);
-    const startIdx = Math.max(0, allSeated.findIndex(p => p.seatNumber === dealStartSeat));
-    const batchSize = allSeated.length; // one full pass per batch
-
-    for (let i = 0; i < dealSequence.length; i++) {
-      const playerIdx = (startIdx + i) % allSeated.length;
-      playerHands[playerIdx].push(dealSequence[i]);
-
-      // Only push state update at the end of each complete round-robin pass
-      const isEndOfRound = (i + 1) % batchSize === 0 || i === dealSequence.length - 1;
-      if (isEndOfRound) {
-        const updatedPlayers = currentPlayers.map(p => {
-          const si = allSeated.findIndex(s => s.playerId === p.playerId);
-          return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
-        });
-        await updateState({ players: updatedPlayers });
-        await new Promise(resolve => setTimeout(resolve, ROUND_DELAY));
-      }
-    }
+    // Wait for the local deal animation to finish (52 cards × 130ms ≈ 7s), then push final state
+    const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
+    await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
@@ -240,15 +222,15 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       <div className="flex flex-wrap gap-2 justify-center">
         {isDealer && (
           <>
-            <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || isDealing}>
+            <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive}>
               {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
             </Btn>
-            <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || isDealing || seatedPlayers.length < 2 || !gs.deck_shuffled || !hasDeck}>
-              {isDealing ? '🃏 Dealing...' : '🃏 Deal'}
+            <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2 || !gs.deck_shuffled || !hasDeck}>
+              {dealingActive ? '🃏 Dealing...' : '🃏 Deal'}
             </Btn>
           </>
         )}
-        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!isDealer || (isSetup && !hasCards && !hasBid)}>
+        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!isDealer || dealingActive || (isSetup && !hasCards && !hasBid)}>
           ↺ Reset
         </Btn>
         <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
@@ -256,7 +238,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         </Btn>
       </div>
 
-      {isBidding && !hasBid && (
+      {isBidding && !hasBid && !dealingActive && (
         <div className="mt-3 pt-3 border-t border-white/10">
           <div className="text-[7px] tracking-widest text-[#FF5F1F]/60 uppercase mb-2 text-center" style={PS2}>
             Place Your Bid

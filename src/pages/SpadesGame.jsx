@@ -78,31 +78,15 @@ function SpadesViewer({ roomCode }) {
     await updateState({
       players: clearedPlayers, phase: 'setup', status: 'active',
       deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
+      deal_ts: Date.now(),
       current_trick: [], tricks_played: 0,
       bid1: 0, bid2: 0, books1: 0, books2: 0,
       shuffle_count: 0, spades_broken: false, completed_books: [],
     });
 
-    // Batch updates per round-robin pass to avoid rate limit errors
-    const startIdx = Math.max(0, seated.findIndex(p => p.seatNumber === dealStartSeat));
-    const playerHands = seated.map(() => []);
-    const ROUND_DELAY = 500;
-    const batchSize = seated.length;
-
-    for (let i = 0; i < dealSequence.length; i++) {
-      const playerIdx = (startIdx + i) % seated.length;
-      playerHands[playerIdx].push(dealSequence[i]);
-
-      const isEndOfRound = (i + 1) % batchSize === 0 || i === dealSequence.length - 1;
-      if (isEndOfRound) {
-        const updatedPlayers = currentPlayers.map(p => {
-          const si = seated.findIndex(s => s.playerId === p.playerId);
-          return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: 0, tricksWon: 0 } : p;
-        });
-        await updateState({ players: updatedPlayers });
-        await new Promise(resolve => setTimeout(resolve, ROUND_DELAY));
-      }
-    }
+    // Wait for local deal animation to finish, then push one final state update
+    const DEAL_INTERVAL_MS = 130;
+    await new Promise(resolve => setTimeout(resolve, dealSequence.length * DEAL_INTERVAL_MS + 600));
 
     // Finalize: set full hands and start playing phase
     const finalPlayers = currentPlayers.map(p => {

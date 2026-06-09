@@ -35,7 +35,19 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   const [shufflePhase, setShufflePhase] = useState('idle');
   const [dealPhase, setDealPhase] = useState('idle');
+  // localHands: card accumulator during deal animation, keyed by seatNumber
+  const [localHands, setLocalHands] = useState({});
   const prevShuffleTs = useRef(gs.shuffle_ts);
+  const prevDealTs = useRef(gs.deal_ts);
+
+  // Trigger deal animation when deal_ts changes (works for both human dealer and CPU auto-deal)
+  useEffect(() => {
+    if (gs.deal_ts && gs.deal_ts !== prevDealTs.current && dealPhase === 'idle') {
+      setLocalHands({});
+      setDealPhase('dealing');
+    }
+    prevDealTs.current = gs.deal_ts;
+  }, [gs.deal_ts]);
 
   useEffect(() => {
     if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
@@ -74,14 +86,24 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     return Math.max(16, Math.min(overlap, 58));
   };
 
+  const isDealing = dealPhase !== 'idle';
+
   const renderSeat = (seatNumber) => {
     const position = getRelativePosition(seatNumber, isPlayer ? mySeatNumber : null);
     const isMe = mySeatNumber === seatNumber;
     const seatPlayer = getPlayerAtSeat(seatNumber);
+
+    // During deal animation: show locally accumulated cards (my seat face-up, others face-down)
+    // After animation: fall back to gs hand
+    let displayHand;
+    if (isDealing) {
+      displayHand = localHands[seatNumber] || [];
+    } else {
+      displayHand = (isMe && isPlayer && seatPlayer?.hand) ? seatPlayer.hand : [];
+    }
     const showFaceUp = isMe && isPlayer;
-    const seatHand = showFaceUp && seatPlayer?.hand ? seatPlayer.hand : [];
     
-    const sortedSeatHand = seatHand.length > 0 ? [...seatHand].sort((a, b) => {
+    const sortedSeatHand = displayHand.length > 0 ? [...displayHand].sort((a, b) => {
       const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
       const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
       const suitDiff = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
@@ -106,25 +128,29 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     const isHorizontal = position === 'top' || position === 'bottom';
     const getOverlap = isHorizontal ? getHorizontalOverlap : getVerticalOverlap;
 
+    // Show hand for: my seat (face-up), opponents during deal (face-down backs), skip if empty
+    const showHand = (showFaceUp || isDealing) && sortedSeatHand.length > 0;
+
     return (
       <React.Fragment key={seatNumber}>
-        {showFaceUp && sortedSeatHand.length > 0 && (
+        {showHand && (
           <div className={`absolute z-20 flex ${isHorizontal ? 'justify-center' : 'flex-col items-center'}`} style={handContainerStyles[position]}>
             {sortedSeatHand.map((card, i, arr) => {
               const overlap = getOverlap(arr.length) * 0.5;
-              const isMyTurn = gs.current_turn_seat === seatNumber && gs.phase === 'playing';
-              const isBidding = gs.phase === 'bidding';
+              const isMyTurn = !isDealing && gs.current_turn_seat === seatNumber && gs.phase === 'playing';
+              const isBiddingPhase = !isDealing && gs.phase === 'bidding';
               const hasBid = myPlayer?.bid != null;
+              const faceUp = showFaceUp && !isDealing ? true : (isDealing && isMe);
               return (
                 <div
                   key={card.id || i}
                   onClick={() => isMyTurn && onPlayCard?.(card)}
-                  className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 cursor-pointer ${
+                  className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 ${
                     isMyTurn 
-                      ? 'hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
-                      : isBidding && !hasBid
-                      ? 'hover:-translate-y-2'
-                      : 'opacity-90 cursor-not-allowed'
+                      ? 'cursor-pointer hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
+                      : isBiddingPhase && !hasBid
+                      ? 'cursor-pointer hover:-translate-y-2'
+                      : isDealing ? 'cursor-default' : 'opacity-90 cursor-not-allowed'
                   }`}
                   style={{
                     width: 64, height: 90,
@@ -132,12 +158,13 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                     transform: isHorizontal 
                       ? `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`
                       : 'none',
-                    filter: isBidding && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.25)',
+                    filter: isBiddingPhase && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.1)',
+                    animation: isDealing ? 'card-arrive 0.15s ease-out' : 'none',
                   }}
                 >
                   <img 
-                    src={getCardImage(card)} 
-                    alt={`${card.suit} ${card.value}`} 
+                    src={faceUp ? getCardImage(card) : getCardBack()} 
+                    alt={faceUp ? `${card.suit} ${card.value}` : 'Card back'} 
                     className="w-full h-full"
                     style={{ objectFit: 'contain', imageRendering: 'auto', transform: 'translateZ(0)' }}
                     onError={(e) => { e.target.src = getCardBack(); }}
@@ -245,14 +272,31 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         {[1, 2, 3, 4].map(renderSeat)}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20">
           {shufflePhase !== 'idle' && <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />}
-          {dealPhase !== 'idle' && gs.deck && <SpadesDealAnimation deck={gs.deck} players={players} mySeatNumber={mySeatNumber} dealStartSeat={gs.deal_start_seat} onComplete={() => setDealPhase('idle')} />}
+          {dealPhase !== 'idle' && gs.deck && gs.deck.length > 0 && (
+            <SpadesDealAnimation
+              dealSequence={gs.deck}
+              seatedPlayers={players.filter(p => p.seatNumber != null && (p.role === 'player' || p.role === 'hostPlayer'))}
+              dealStartSeat={gs.deal_start_seat}
+              mySeatNumber={mySeatNumber}
+              onCardDealt={(seatNumber, card) => {
+                setLocalHands(prev => ({
+                  ...prev,
+                  [seatNumber]: [...(prev[seatNumber] || []), card],
+                }));
+              }}
+              onComplete={() => {
+                setDealPhase('idle');
+                setLocalHands({});
+              }}
+            />
+          )}
           {shufflePhase === 'idle' && dealPhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} />}
         </div>
       </div>
 
       {isPlayer && myPlayer && (
         <div className="w-full max-w-md mx-auto mt-4 space-y-3">
-          <SpadesPlayerControls seatNumber={mySeatNumber} player={myPlayer} gs={gs} updateState={updateState} isMySeat={true} onShuffleStart={() => setShufflePhase('shuffling')} onDealStart={() => setDealPhase('dealing')} onStandUp={onStandUp} />
+          <SpadesPlayerControls seatNumber={mySeatNumber} player={myPlayer} gs={gs} updateState={updateState} isMySeat={true} onShuffleStart={() => setShufflePhase('shuffling')} onStandUp={onStandUp} isDealing={isDealing} />
           <button onClick={onStandUp} className="w-full py-3 px-4 rounded-lg border-2 border-white/30 text-white/60 font-heading text-sm tracking-widest uppercase hover:border-red-500/60 hover:text-red-400 hover:bg-red-500/10 transition-all" style={PS2}>🚶 Stand Up (Spectate)</button>
         </div>
       )}
