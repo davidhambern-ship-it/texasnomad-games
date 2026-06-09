@@ -379,7 +379,7 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
               </div>
             )}
             <Btn onClick={startGame} color="#4ade80" size="lg" className="w-full"
-              disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0 || participantPlayers.length < 1}>
+              disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0}>
               ▶ START GAME
             </Btn>
           </div>
