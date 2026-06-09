@@ -196,10 +196,11 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
 
   // Load a random trivia question
   const loadQuestion = async () => {
-    const all = await base44.entities.SquareBizTrivia.filter({ active: true }, '-created_date', 100);
+    const all = await base44.entities.SquareBizTrivia.list('-created_date', 100);
     if (!all || all.length === 0) return null;
-    const unused = all.filter(q => !usedQuestionIds.includes(q.id));
-    const pool = unused.length > 0 ? unused : all;
+    const active = all.filter(q => q.active !== false);
+    const unused = active.filter(q => !usedQuestionIds.includes(q.id));
+    const pool = unused.length > 0 ? unused : active;
     const q = pool[Math.floor(Math.random() * pool.length)];
     setUsedQuestionIds(prev => [...prev, q.id]);
     return q;
