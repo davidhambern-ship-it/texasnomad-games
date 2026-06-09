@@ -9,6 +9,7 @@ import RoleSelection from '@/components/game/RoleSelection.jsx';
 import { findMatchingAnswer } from '@/lib/bffAnswerMatch';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
+import { base44 } from '@/api/base44Client';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -64,6 +65,63 @@ function BFFViewer({ roomCode, cpuId }) {
     const me = (gs.players || []).find(p => p.playerId === playerId);
     if (me?.familyTeam && !myFamily) setMyFamily(me.familyTeam);
   }, [gs.players, playerId]);
+
+  // 1P mode: auto-init game without host
+  const spInitRef = useRef(false);
+  useEffect(() => {
+    if (!isSinglePlayer || !room || !isSeated || !playerId || spInitRef.current) return;
+    if (gs.phase === 'playing') return; // already running
+    spInitRef.current = true;
+
+    const init1P = async () => {
+      // Auto-set role and family
+      if (!myRole) {
+        localStorage.setItem(`bff_role_${roomCode}`, 'participant');
+        setMyRole('participant');
+      }
+      const fam = myFamily || 1;
+      if (!myFamily) setMyFamily(fam);
+
+      // Load a random survey
+      const surveys = await base44.entities.BFFSurvey.filter({ active: true }, '-created_date', 50);
+      if (!surveys || surveys.length === 0) return;
+      const survey = surveys[Math.floor(Math.random() * surveys.length)];
+
+      const meAsPlayer = {
+        playerId, seatNumber, role: 'participant', familyTeam: fam,
+        joinedAt: Date.now(), lastActionAt: Date.now(),
+      };
+      const currentPlayers = gs.players || [];
+      const updatedPlayers = currentPlayers.find(p => p.playerId === playerId)
+        ? currentPlayers.map(p => p.playerId === playerId ? { ...p, ...meAsPlayer } : p)
+        : [...currentPlayers, meAsPlayer];
+
+      await updateState({
+        single_player: true,
+        cpu_opponent_id: cpuId || null,
+        family1: 'You',
+        family2: cpuCharacter?.name || 'CPU',
+        score1: gs.score1 || 0,
+        score2: gs.score2 || 0,
+        active_turn: fam,
+        phase: 'playing',
+        current_question: survey.question,
+        answers: (survey.answers || []).map(a => ({ ...a, revealed: false })),
+        round_bank: 0,
+        bye_count: 0,
+        bye_counts_2p: {},
+        steal_mode: false,
+        steal_player_id: null,
+        answering_player_id: playerId,
+        faceoff_mode: false,
+        buzz_winner: null,
+        two_player_mode: true,
+        players: updatedPlayers,
+      });
+    };
+
+    init1P().catch(() => { spInitRef.current = false; });
+  }, [isSinglePlayer, room, isSeated, playerId]);
 
   // Watch last_submission to show notifications
   const lastSubRef = useRef(null);
@@ -284,8 +342,8 @@ function BFFViewer({ roomCode, cpuId }) {
     });
   };
 
-  // Show role gate if not yet chosen and seat is assigned
-  if (isSeated && !myRole) {
+  // Show role gate if not yet chosen and seat is assigned (skip in 1P mode — auto-handled)
+  if (isSeated && !myRole && !isSinglePlayer) {
     return (
       <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
         <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} isSinglePlayer={isSinglePlayer} />
@@ -299,8 +357,8 @@ function BFFViewer({ roomCode, cpuId }) {
     );
   }
 
-  // Participant: family selection (if no family yet)
-  if (isParticipant && !myFamily) {
+  // Participant: family selection (if no family yet) — skip in 1P mode
+  if (isParticipant && !myFamily && !isSinglePlayer) {
     return (
       <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
         <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} isSinglePlayer={isSinglePlayer} />
@@ -312,7 +370,7 @@ function BFFViewer({ roomCode, cpuId }) {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
       <SeatNotification notification={notification} />
-      <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
+      <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} isSinglePlayer={isSinglePlayer} />
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center">

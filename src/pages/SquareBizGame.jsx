@@ -50,6 +50,32 @@ function SquareBizViewer({ roomCode, cpuId }) {
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // 1P mode: auto-set display_mode to 'board' without needing a host
+  const spInitRef = useRef(false);
+  useEffect(() => {
+    if (!isSinglePlayer || !room || spInitRef.current) return;
+    if (gs.display_mode) return;
+    spInitRef.current = true;
+    // Auto-select participant role in 1P mode
+    if (!chosenRole) setChosenRole('participant');
+    updateState({
+      display_mode: 'board',
+      single_player: true,
+      cpu_opponent_id: cpuId || gs.cpu_opponent_id || null,
+      board: Array(9).fill(''),
+      current_turn: 'X',
+      board_locked: true,
+      winner: null,
+    });
+  }, [room, isSinglePlayer]);
+
+  // Also auto-set chosenRole for 1P on load if displayMode already set
+  useEffect(() => {
+    if (isSinglePlayer && gs.display_mode && !chosenRole) {
+      setChosenRole('participant');
+    }
+  }, [isSinglePlayer, gs.display_mode]);
+
   const displayMode = gs.display_mode;
   const createdFromHostPanel = room?.created_from_host_panel || false;
 

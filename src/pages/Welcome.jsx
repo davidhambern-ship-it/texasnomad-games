@@ -146,10 +146,14 @@ export default function Welcome() {
         </Section>
 
         {/* Hosts */}
-        <Section title="All Multiplayer Games Require a Host">
-          <p>A Host is responsible for controlling the game.</p>
+        <Section title="Multiplayer Games Require a Host">
+          <p>A Host is responsible for controlling the game in multiplayer sessions.</p>
           <BulletList items={['Revealing answers', 'Starting rounds', 'Managing game flow', 'Running the scoreboard', 'Operating game controls']} />
-          <p className="text-white/50">Without a Host, multiplayer games cannot begin. Future single-player games will not require a Host.</p>
+          <InfoBox color="#22d3ee">
+            <p className="font-heading text-sm tracking-wide text-[#22d3ee] mb-2">🤖 Single Player / 1P Mode</p>
+            <p>All games support <strong className="text-white">1P vs CPU mode</strong>. In 1P mode, no Host is required — the AI opponent controls the game automatically. Select "VS CPU" from the game lobby to play solo against the TexasNomad Team characters.</p>
+          </InfoBox>
+          <p className="text-white/50">In multiplayer mode, a Host must be connected to start and manage the game.</p>
         </Section>
 
         {/* Host Panel */}
@@ -220,7 +224,7 @@ export default function Welcome() {
 </Section>
         {/* Coming Soon */}
         <Section title="Coming Soon">
-          <BulletList items={['Spades', 'Additional party games', 'Tournament systems', 'Single-player games', 'Community leaderboards', 'More livestream integrations']} />
+          <BulletList items={['Additional party games', 'Tournament systems', 'Community leaderboards', 'More livestream integrations']} />
           <p className="text-white/40 text-xs">More games are being added regularly.</p>
         </Section>
 
