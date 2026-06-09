@@ -66,20 +66,50 @@ function SpadesViewer({ roomCode }) {
     if (seated.length < 2) return;
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
     const deckToDeal = shuffledDeck ?? ((gs.deck_shuffled && gs.deck?.length) ? gs.deck : shuffleDeck(generateFullDeck()));
-    const { handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
-    const updatedPlayers = (gs.players || []).map(p => {
+    const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
+    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
+    const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
+    const currentPlayers = gs.players || [];
+
+    // Clear hands and set up deal start
+    const clearedPlayers = currentPlayers.map(p =>
+      p.seatNumber != null ? { ...p, hand: [], bid: 0, tricksWon: 0 } : p
+    );
+    await updateState({
+      players: clearedPlayers, phase: 'setup', status: 'active',
+      deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
+      current_trick: [], tricks_played: 0,
+      bid1: 0, bid2: 0, books1: 0, books2: 0,
+      shuffle_count: 0, spades_broken: false, completed_books: [],
+    });
+
+    // Deal card-by-card so players see cards arrive in real time
+    const startIdx = seated.findIndex(p => p.seatNumber === dealStartSeat);
+    const playerHands = seated.map(() => []);
+    const DEAL_DELAY = 110;
+
+    for (let i = 0; i < dealSequence.length; i++) {
+      const playerIdx = (Math.max(0, startIdx) + i) % seated.length;
+      playerHands[playerIdx].push(dealSequence[i]);
+      const updatedPlayers = currentPlayers.map(p => {
+        const si = seated.findIndex(s => s.playerId === p.playerId);
+        return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: 0, tricksWon: 0 } : p;
+      });
+      await updateState({ players: updatedPlayers });
+      await new Promise(resolve => setTimeout(resolve, DEAL_DELAY));
+    }
+
+    // Finalize: set full hands and start playing phase
+    const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
       if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
       return p;
     });
-    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
-    const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
     await updateState({
-      players: updatedPlayers, phase: 'playing', status: 'active',
-      deck: [], deck_shuffled: false, deal_start_seat: dealStartSeat,
-      current_trick: [], current_turn_seat: firstBidder,
-      tricks_played: 0, bid1: 0, bid2: 0, books1: 0, books2: 0, shuffle_count: 0,
-      first_hand_no_bid: true, spades_broken: false, completed_books: [],
+      players: finalPlayers, phase: 'playing',
+      deck: [], deck_shuffled: false,
+      current_turn_seat: firstBidder,
+      first_hand_no_bid: true,
     });
   };
 

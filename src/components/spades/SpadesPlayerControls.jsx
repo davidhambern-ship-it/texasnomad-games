@@ -1,5 +1,19 @@
 import React, { useState, useRef } from 'react';
 import { generateFullDeck, shuffleDeck as shuffleDeckSecure, dealFromShuffledDeck, getSeatedPlayers } from '@/lib/spadesRules';
+import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
+
+// Preload all card images so they're in browser cache before the deal animation
+function preloadCardImages(cards) {
+  const urls = new Set([getCardBack()]);
+  for (const card of cards) urls.add(getCardImage(card));
+  return Promise.all(
+    [...urls].map(url => new Promise(resolve => {
+      const img = new Image();
+      img.onload = img.onerror = resolve;
+      img.src = url;
+    }))
+  );
+}
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -76,6 +90,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(gs.deck, allSeated, dealerSeat);
 
     setIsDealing(true);
+
+    // Preload all card images before the deal animation starts
+    await preloadCardImages(dealSequence);
 
     const clearedPlayers = currentPlayers.map(p =>
       p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p

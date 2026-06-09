@@ -87,7 +87,7 @@ export default function SpadesDealAnimation({ deck, players, mySeatNumber, dealS
                 filter: 'brightness(1.05)',
               }}
             >
-              <img src={getCardBack()} alt="Card back" className="w-full h-full object-cover" />
+              <img src={getCardBack()} alt="Card back" className="w-full h-full" style={{ objectFit: 'contain', imageRendering: 'auto', transform: 'translateZ(0)' }} />
             </div>
           ) : null;
         })}
@@ -137,7 +137,7 @@ export default function SpadesDealAnimation({ deck, players, mySeatNumber, dealS
               filter: 'brightness(1.08) contrast(1.02)',
             }}
           >
-            <img src={cardSrc} alt="Card" className="w-full h-full object-cover" onError={(e) => { e.target.src = getCardBack(); }} />
+            <img src={cardSrc} alt="Card" className="w-full h-full" style={{ objectFit: 'contain', imageRendering: 'auto', transform: 'translateZ(0)' }} onError={(e) => { e.target.src = getCardBack(); }} />
           </div>
         );
       })}

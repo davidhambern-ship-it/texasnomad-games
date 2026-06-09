@@ -138,7 +138,8 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
                   <img 
                     src={getCardImage(card)} 
                     alt={`${card.suit} ${card.value}`} 
-                    className="w-full h-full object-cover"
+                    className="w-full h-full"
+                    style={{ objectFit: 'contain', imageRendering: 'auto', transform: 'translateZ(0)' }}
                     onError={(e) => { e.target.src = getCardBack(); }}
                   />
                   {isMyTurn && (
