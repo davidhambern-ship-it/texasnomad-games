@@ -129,10 +129,16 @@ function SpadesViewer({ roomCode }) {
     if (!dealer || dealer.playerType !== 'cpu') return;
 
     const timer = setTimeout(async () => {
-      const previewDeck = shuffleDeck(generateFullDeck());
-      await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
-      await new Promise(resolve => setTimeout(resolve, 1200));
-      await handleAutoDeal(previewDeck);
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
+      try {
+        const previewDeck = shuffleDeck(generateFullDeck());
+        await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await handleAutoDeal(previewDeck);
+      } finally {
+        isUpdatingRef.current = false;
+      }
     }, 1000);
     return () => clearTimeout(timer);
   }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
