@@ -200,7 +200,7 @@ export function selectCPUCard(hand, currentTrick, partnerBid = 0, myBid = 0, boo
   const partner = players.find(p => p.seatNumber === partnerSeat);
   const actualPartnerBid = partner?.bid || 0;
 
-  const context = buildContext(hand, trick, actualPartnerBid, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds || new Set());
+  const context = buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, mySeatNumber, playedCardIds || new Set());;
 
   if (trick.length === 0) {
     return selectLeadCard(context);
@@ -233,7 +233,7 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
 
   const tricksLeft = Math.max(0, 13 - (gameState.tricks_played || 0));
   const teamNeedsBooksMore = Math.max(0, teamBid - teamBooksWon); // how many more we need
-  const teamHasMadeBid = teamBooksWon >= teamBid;
+  const teamHasMadeBid = teamBid > 0 && teamBooksWon >= teamBid;
 
   // ─── SET TRACKING: Opponent team status ────────────────────────────────────
   const oppTeamBooksWon = players
