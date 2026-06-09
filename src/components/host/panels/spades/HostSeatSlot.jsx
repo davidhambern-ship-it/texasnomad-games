@@ -40,8 +40,15 @@ export default function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, 
       {occupied ? (
         <>
           <div className="font-heading text-xs text-white flex items-center justify-center gap-1">
-            {player.role === 'hostPlayer' ? '🎛 HOST' : isCPU ? '🤖 CPU' : `👤 SEAT ${seatNumber}`}
+            {player.role === 'hostPlayer' ? '🎛 HOST' : isCPU && player.characterId ? (
+              <span style={{ color: { berna: '#BC13FE', dexter: '#22d3ee', lemonade: '#FFD700', carlos: '#FF5F1F', violet: '#8b5cf6', tank: '#4ade80' }[player.characterId] || '#FFD700' }}>
+                🤖 {player.name}
+              </span>
+            ) : isCPU ? '🤖 CPU' : `👤 SEAT ${seatNumber}`}
           </div>
+          {isCPU && player.characterRole && (
+            <div className="text-[5px] text-white/30 uppercase tracking-widest" style={PS2}>{player.characterRole}</div>
+          )}
           {isBidding && (
             <>
               {player.bid != null ? (

@@ -2,6 +2,7 @@
 // Implements skilled bidding and playing strategy
 
 import { CARD_ORDER, getCardStrength, getActiveSuit, determineTrickWinner, getTeamFromSeat } from './spadesRules';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
 const CPU_NAMES = [
   'CPU Outlaw',
@@ -87,6 +88,88 @@ export function replaceCPUWithHuman(players, cpuSeatNumber, humanPlayerId, human
 
 export function removeCPUPlayers(players) {
   return players.filter(p => p.playerType !== 'cpu');
+}
+
+// ─── TexasNomad character-based CPU creation ─────────────────────────────────
+
+/** Create a CPU player using a specific TexasNomad character */
+export function createTNCharacterPlayer(seatNumber, team, character) {
+  return {
+    playerId: `cpu_tn_${character.id}_seat${seatNumber}`,
+    seatNumber,
+    role: 'player',
+    playerType: 'cpu',
+    name: character.name,
+    characterId: character.id,
+    characterRole: character.role,
+    characterAvatar: character.avatar,
+    characterDifficulty: character.difficulty,
+    team,
+    connected: true,
+    joinedAt: Date.now(),
+    lastActionAt: Date.now(),
+    hand: [],
+    bid: null,
+    tricksWon: 0,
+  };
+}
+
+/** Fill empty seats with randomly selected, non-duplicate TexasNomad characters */
+export function fillEmptySeatsWithTNCharacters(players, gs, specificAssignments = {}) {
+  // specificAssignments: { seatNumber: characterId | 'random' }
+  const seatedPlayers = players.filter(p => p.role === 'player' || p.role === 'hostPlayer');
+  const occupiedSeats = seatedPlayers.map(p => p.seatNumber);
+  const emptySeats = [1, 2, 3, 4].filter(s => !occupiedSeats.includes(s));
+
+  // Track used character IDs to avoid duplicates
+  const usedIds = seatedPlayers
+    .filter(p => p.characterId)
+    .map(p => p.characterId);
+
+  const available = TEXASNOMAD_CHARACTERS.filter(c => !usedIds.includes(c.id));
+  let pool = [...available].sort(() => Math.random() - 0.5);
+
+  const updatedPlayers = [...players];
+  for (const seat of emptySeats) {
+    const team = [1, 3].includes(seat) ? 1 : 2;
+    const specificId = specificAssignments[seat];
+
+    let character;
+    if (specificId && specificId !== 'random') {
+      character = TEXASNOMAD_CHARACTERS.find(c => c.id === specificId);
+      pool = pool.filter(c => c.id !== specificId);
+    } else {
+      character = pool.shift();
+    }
+
+    if (!character) {
+      // Fallback to generic CPU if no characters left
+      updatedPlayers.push(createCPUPlayer(seat, team));
+    } else {
+      updatedPlayers.push(createTNCharacterPlayer(seat, team, character));
+    }
+  }
+  return updatedPlayers;
+}
+
+/** Assign a single TN character to a seat (removing any existing player there first) */
+export function assignTNCharacterToSeat(players, seatNumber, characterId) {
+  const team = [1, 3].includes(seatNumber) ? 1 : 2;
+  const filtered = players.filter(p => p.seatNumber !== seatNumber);
+
+  if (!characterId || characterId === 'none') return filtered;
+
+  if (characterId === 'random') {
+    const usedIds = filtered.filter(p => p.characterId).map(p => p.characterId);
+    const available = TEXASNOMAD_CHARACTERS.filter(c => !usedIds.includes(c.id));
+    if (available.length === 0) return filtered;
+    const character = available[Math.floor(Math.random() * available.length)];
+    return [...filtered, createTNCharacterPlayer(seatNumber, team, character)];
+  }
+
+  const character = TEXASNOMAD_CHARACTERS.find(c => c.id === characterId);
+  if (!character) return filtered;
+  return [...filtered, createTNCharacterPlayer(seatNumber, team, character)];
 }
 
 // ─── Pro Bidding Logic ───────────────────────────────────────────────────────

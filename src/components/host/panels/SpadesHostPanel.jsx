@@ -4,7 +4,8 @@ import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
 import HostHandBox from './spades/HostHandBox';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
-import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
+import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer, fillEmptySeatsWithTNCharacters, assignTNCharacterToSeat, removeCPUPlayers } from '@/lib/spadesCPU';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateFullDeck, shuffleDeck as shuffleDeckRules, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -279,14 +280,87 @@ export default function SpadesHostPanel({ gs, updateState }) {
         ))}
       </div>
 
-      <div className="p-4 border border-[#FF5F1F]/30 rounded-xl bg-black/60 space-y-3">
-        <h3 className="font-heading text-xs tracking-[0.2em] text-[#FF5F1F]/80 uppercase">🤖 CPU Players</h3>
-        <div className="flex flex-wrap gap-2">
-          <Btn onClick={async () => { const filled = fillEmptySeatsWithCPU(players, gs); await updateState({ players: filled, cpu_enabled: true }); }} color="#4ade80" size="sm" disabled={availableSeats.length === 0}>🤖 Fill Empty Seats w/ CPU</Btn>
-          {availableSeats.map(s => (
-            <Btn key={s} onClick={async () => { const team = [1, 3].includes(s) ? 1 : 2; const cpu = createCPUPlayer(s, team); await updateState({ players: [...players, cpu], cpu_enabled: true }); }} color="#4ade80" size="sm">+ CPU Seat {s}</Btn>
-          ))}
-          <Btn onClick={async () => { const newPlayers = players.filter(p => p.playerType !== 'cpu'); await updateState({ players: newPlayers, cpu_enabled: newPlayers.some(p => p.playerType === 'cpu') }); }} color="#FF5F1F" size="sm" disabled={!players.some(p => p.playerType === 'cpu')}>Remove All CPUs</Btn>
+      {/* ── TexasNomad AI Team Panel ── */}
+      <div className="p-4 border border-[#FFD700]/30 rounded-xl bg-black/60 space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="font-heading text-xs tracking-[0.2em] text-[#FFD700]/80 uppercase">🤖 TexasNomad AI Team</h3>
+          <div className="flex gap-2">
+            <Btn onClick={async () => {
+              const filled = fillEmptySeatsWithTNCharacters(players, gs);
+              await updateState({ players: filled, cpu_enabled: true });
+            }} color="#FFD700" size="sm" disabled={availableSeats.length === 0}>⚡ Randomize AI Seats</Btn>
+            <Btn onClick={async () => {
+              const newPlayers = removeCPUPlayers(players);
+              await updateState({ players: newPlayers, cpu_enabled: newPlayers.some(p => p.playerType === 'cpu') });
+            }} color="#ef4444" size="sm" disabled={!players.some(p => p.playerType === 'cpu')}>✕ Clear All AI</Btn>
+          </div>
+        </div>
+
+        {/* Per-seat AI assignment */}
+        <div className="grid grid-cols-2 gap-3">
+          {[1, 2, 3, 4].map(seat => {
+            const seatPlayer = getPlayerAtSeat(seat);
+            const isCPU = seatPlayer?.playerType === 'cpu';
+            const isHuman = seatPlayer && !isCPU;
+            const charColors = { berna: '#BC13FE', dexter: '#22d3ee', lemonade: '#FFD700', carlos: '#FF5F1F', violet: '#8b5cf6', tank: '#4ade80' };
+            const cc = seatPlayer?.characterId ? charColors[seatPlayer.characterId] || '#FFD700' : '#ffffff20';
+            const partnerSeat = seat === 1 ? 3 : seat === 3 ? 1 : seat === 2 ? 4 : 2;
+            return (
+              <div key={seat} className="p-3 rounded-xl border space-y-2" style={{ borderColor: isCPU ? `${cc}40` : isHuman ? '#4ade8030' : '#ffffff10', background: isCPU ? `${cc}08` : '#000000' }}>
+                <div className="flex items-center justify-between">
+                  <div className="text-[7px] tracking-widest text-white/50 uppercase" style={PS2}>
+                    Seat {seat} · T{[1,3].includes(seat) ? 1 : 2} · w/ {partnerSeat}
+                  </div>
+                  {isCPU && seatPlayer.characterAvatar && (
+                    <img src={seatPlayer.characterAvatar} alt={seatPlayer.name} className="w-6 h-6 rounded border object-cover" style={{ borderColor: cc }} />
+                  )}
+                </div>
+
+                {isHuman ? (
+                  <div className="text-[7px] text-[#4ade80]/70 uppercase tracking-widest" style={PS2}>👤 Human Player</div>
+                ) : (
+                  <select
+                    value={seatPlayer?.characterId || ''}
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      if (!val) {
+                        // Remove AI from seat
+                        const updated = players.filter(p => p.seatNumber !== seat);
+                        const hasCPU = updated.some(p => p.playerType === 'cpu');
+                        await updateState({ players: updated, cpu_enabled: hasCPU });
+                      } else {
+                        const updated = assignTNCharacterToSeat(players, seat, val);
+                        await updateState({ players: updated, cpu_enabled: true });
+                      }
+                    }}
+                    className="w-full px-2 py-1.5 rounded-lg bg-black/80 border text-white font-body text-xs focus:outline-none"
+                    style={{ borderColor: isCPU ? `${cc}40` : '#ffffff20' }}
+                  >
+                    <option value="">— Human Player —</option>
+                    <option value="random">🎲 Random AI</option>
+                    {TEXASNOMAD_CHARACTERS.map(c => {
+                      const inUse = players.some(p => p.characterId === c.id && p.seatNumber !== seat);
+                      return (
+                        <option key={c.id} value={c.id} disabled={inUse}>
+                          {c.name} ({c.role}){inUse ? ' — in use' : ''}
+                        </option>
+                      );
+                    })}
+                  </select>
+                )}
+
+                {isCPU && seatPlayer.name && (
+                  <div className="text-[7px] uppercase tracking-widest" style={{ ...PS2, color: cc }}>
+                    {seatPlayer.name} · {seatPlayer.characterRole}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="text-[6px] text-white/20 uppercase tracking-widest text-center" style={PS2}>
+          Seat 1 ↔ Seat 3 · Seat 2 ↔ Seat 4 · No duplicate characters allowed
         </div>
       </div>
 

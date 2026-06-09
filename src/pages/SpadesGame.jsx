@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
-import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
+import { fillEmptySeatsWithTNCharacters, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
@@ -175,11 +175,26 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const isLead = (gs.current_trick || []).length === 0;
     const activeSuit = getActiveSuit(gs.current_trick || []);
 
+    // Personality-based delay: Lemonade/Carlos act fast, Tank/Dexter are slower
+    const character = currentPlayer.characterId
+      ? TEXASNOMAD_CHARACTERS.find(c => c.id === currentPlayer.characterId)
+      : null;
+    const personalityDelay = character
+      ? ({ berna: 0, dexter: 600, lemonade: -400, carlos: 300, violet: 200, tank: 800 }[character.id] || 0)
+      : 0;
+
     const timer = setTimeout(async () => {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
         let cardToPlay = selectCPUCard(hand, gs.current_trick || [], 0, currentPlayer.bid || 0, currentPlayer.tricksWon || 0, gs.spades_broken || false, gs, currentTurnSeat);
+
+        // Personality-based mistakes: Lemonade and Carlos occasionally make suboptimal plays
+        if (character && ['lemonade', 'carlos'].includes(character.id) && Math.random() < (character.id === 'lemonade' ? 0.15 : 0.2)) {
+          const legalCards = hand.filter(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
+          if (legalCards.length > 1) cardToPlay = legalCards[Math.floor(Math.random() * legalCards.length)];
+        }
+
         if (!cardToPlay || !isValidPlay(cardToPlay, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid) {
           cardToPlay = hand.find(c => isValidPlay(c, hand, gs.current_trick || [], activeSuit, gs.spades_broken || false, isLead).valid);
           if (!cardToPlay) return;
@@ -202,7 +217,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       } finally {
         setTimeout(() => { isUpdatingRef.current = false; }, 800);
       }
-    }, CPU_ACTION_DELAY + 500);
+    }, Math.max(400, CPU_ACTION_DELAY + 500 + personalityDelay));
     return () => clearTimeout(timer);
   }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players]);
 
@@ -351,11 +366,11 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     }
   };
 
-  // CPU choice handlers
+  // CPU choice handlers — use TexasNomad characters
   const handlePlayAgainstCPU = async () => {
     if (!room) return;
     const currentPlayers = gs.players || [];
-    const filledPlayers = fillEmptySeatsWithCPU(currentPlayers, gs);
+    const filledPlayers = fillEmptySeatsWithTNCharacters(currentPlayers, gs);
     await updateState({
       players: filledPlayers,
       cpu_enabled: true,
@@ -526,9 +541,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
             </div>
             <div className="space-y-3">
               <button onClick={handlePlayAgainstCPU}
-                className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
-                🤖 Play with CPU
-                <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Fill empty seats with AI players</div>
+               className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                🤖 Play vs TexasNomad AI
+               <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Berna · Dexter · Tank · Lemonade · Carlos · Violet</div>
               </button>
               <button onClick={handleWaitForRealPlayers}
                 className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>

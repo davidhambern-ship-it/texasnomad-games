@@ -201,6 +201,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             onTakeOver={() => onTakeOverCPU?.(seatNumber)}
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
+            gs={gs}
           />
         </div>
       </React.Fragment>
