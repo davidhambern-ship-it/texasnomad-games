@@ -374,9 +374,57 @@ function selectLeadCard(ctx) {
         }
       }
     }
+    return leadAggressive(ctx);
+  }
+function leadAggressive(ctx) {
+  const { bySuit, hand, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, setPressure } = ctx;
+  const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
+
+  // If we already made bid and there is no pressure, avoid extra bags.
+  if (teamHasMadeBid && setPressure === 0) {
     return leadLowest(bySuit, spadesBroken, hasNonSpade);
   }
 
+  const options = [];
+
+  for (const suit of ['♥', '♦', '♣']) {
+    const cards = bySuit[suit] || [];
+
+    cards.forEach((card, index) => {
+      const v = cardVal(card);
+
+      options.push({
+        card,
+        score:
+          v * 4 +
+          cards.length * 2 +
+          (v === 14 ? 30 : 0) +
+          (v === 13 ? 24 : 0) +
+          (v === 12 ? 18 : 0) +
+          (v === 11 ? 12 : 0) -
+          index,
+      });
+    });
+  }
+
+  options.sort((a, b) => b.score - a.score);
+
+  if (options.length > 0) {
+    return options[0].card;
+  }
+
+  const spades = bySuit['♠'] || [];
+  if ((spadesBroken || !hasNonSpade) && spades.length > 0) {
+    return spades[0];
+  }
+
+  const jokers = bySuit['Joker'] || [];
+  if (teamNeedsBooksMore >= 2 && jokers.length > 0) {
+    return jokers[0];
+  }
+
+  return leadLowest(bySuit, spadesBroken, hasNonSpade);
+}
   // ── TEAM NEEDS BOOKS: Lead offensively ──────────────────────────────────────
 
   // LATE GAME DESPERATION (≤3 tricks left): Lead highest available winner
