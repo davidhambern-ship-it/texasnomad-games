@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import { base44 } from '@/api/base44Client';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import CPUOpponentSelect from '@/components/cpu/CPUOpponentSelect';
 
 // ── Particle System ──────────────────────────────────────────────────────────
 function Particles() {
@@ -91,7 +92,7 @@ function NeonSign({ text, color = '#BC13FE', size = 'md' }) {
 }
 
 // ── Arcade Cabinet ───────────────────────────────────────────────────────────
-function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creating, roomCode, setRoomCode }) {
+function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSinglePlayer, creating, roomCode, setRoomCode }) {
   const [hovered, setHovered] = useState(false);
   const [joining, setJoining] = useState(false);
 
@@ -198,6 +199,19 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
             }}
           >
             {creating === game.id ? '⚙ CREATING…' : '⚡ CREATE ROOM'}
+          </button>
+
+          {/* VS CPU — Single Player */}
+          <button
+            onClick={() => onSinglePlayer?.(game)}
+            className="w-full py-2 rounded-lg font-heading text-xs tracking-[0.15em] uppercase transition-all duration-200 hover:scale-105 active:scale-95"
+            style={{
+              background: 'transparent',
+              border: `1px solid #FFD70040`,
+              color: '#FFD700aa',
+            }}
+          >
+            🤖 VS CPU — Single Player
           </button>
 
           <div className="flex gap-2">
@@ -330,12 +344,16 @@ const COMING_SOON = [
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
 
+// Map game ID to gameKey used in character system
+const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades' };
+
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
   const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
+  const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
 
   const generateRoomCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -371,6 +389,34 @@ export default function Games() {
 
   const setRoomCode = (gameId, val) => {
     setRoomCodes(prev => ({ ...prev, [gameId]: val }));
+  };
+
+  const handleSinglePlayer = (game) => {
+    const gameKey = GAME_ID_TO_KEY[game.id];
+    if (!gameKey) return;
+    setCpuSelectGame({ id: game.id, title: game.title, gameKey, path: game.path });
+  };
+
+  const handleCpuSelected = async (character) => {
+    if (!cpuSelectGame) return;
+    // Create a room and navigate with CPU opponent param
+    const code = generateRoomCode();
+    try {
+      await base44.entities.GameRoom.create({
+        room_code: code,
+        game_id: cpuSelectGame.id,
+        status: 'waiting',
+        host_connected: false,
+        screen_connected: false,
+        players_connected: 0,
+        created_from_host_panel: false,
+        game_state: { cpu_opponent_id: character.id, single_player: true },
+      });
+      navigate(`${cpuSelectGame.path}?room=${code}&creator=1&cpu=${character.id}`);
+    } catch (e) {
+      console.error('Failed to create CPU room', e);
+    }
+    setCpuSelectGame(null);
   };
 
   const toggleMute = () => {
@@ -449,6 +495,7 @@ export default function Games() {
                   featured={true}
                   onCreateRoom={handleCreateRoom}
                   onJoinRoom={handleJoinRoom}
+                  onSinglePlayer={handleSinglePlayer}
                   creating={creating}
                   roomCode={roomCodes[featuredGame.id]}
                   setRoomCode={(v) => setRoomCode(featuredGame.id, v)}
@@ -474,6 +521,7 @@ export default function Games() {
                   featured={false}
                   onCreateRoom={handleCreateRoom}
                   onJoinRoom={handleJoinRoom}
+                  onSinglePlayer={handleSinglePlayer}
                   creating={creating}
                   roomCode={roomCodes[game.id]}
                   setRoomCode={(v) => setRoomCode(game.id, v)}
@@ -511,6 +559,18 @@ export default function Games() {
           </div>
         </section>
       </div>
+
+      {/* CPU Opponent Select Overlay */}
+      {cpuSelectGame && (
+        <div className="fixed inset-0 z-[200] overflow-y-auto">
+          <CPUOpponentSelect
+            gameKey={cpuSelectGame.gameKey}
+            gameName={cpuSelectGame.title}
+            onSelect={handleCpuSelected}
+            onBack={() => setCpuSelectGame(null)}
+          />
+        </div>
+      )}
 
       {/* Mute button */}
       <button
