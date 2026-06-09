@@ -331,13 +331,12 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
 
   // Setup screen
   if (isSetup) {
-    const totalPlayers = players.length;
-    const canStart1P = totalPlayers >= 1;
-
     return (
       <div className="max-w-2xl mx-auto space-y-5">
+
+        {/* Family Names — required before starting */}
         <div className="p-6 border border-[#BC13FE]/30 rounded-xl bg-black/60" style={{ boxShadow: '0 0 20px rgba(188,19,254,0.1)' }}>
-          <h2 className="font-heading text-xl tracking-[0.15em] text-[#FFD700] uppercase mb-6 text-center">⚙ Enter Family Names</h2>
+          <h2 className="font-heading text-xl tracking-[0.15em] text-[#FFD700] uppercase mb-6 text-center">⚙ Family Names</h2>
           <div className="space-y-4 mb-6">
             <div>
               <label className="block font-heading text-xs tracking-widest text-white/50 uppercase mb-2">Family 1 Name</label>
@@ -369,19 +368,25 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
 
           <div className="space-y-3">
             <div className="px-4 py-3 rounded-lg border border-white/10 bg-white/5 text-center">
-              <div className="text-[8px] tracking-widest text-white/40 uppercase mb-1" style={sty}>
-                Mode Auto-Detection
-              </div>
+              <div className="text-[8px] tracking-widest text-white/40 uppercase mb-1" style={sty}>Mode Auto-Detection</div>
               <div className="font-heading text-sm text-white/60">
                 {participantPlayers.length === 2 ? '⚔ 2 Player Mode' : participantPlayers.length >= 6 ? '👨‍👩‍👧 Full Family Mode' : `${participantPlayers.length} participant${participantPlayers.length !== 1 ? 's' : ''} — need 2 or 6+`}
               </div>
             </div>
+            {(!family1Input.trim() || !family2Input.trim()) && (
+              <div className="px-4 py-2 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5 text-center text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={sty}>
+                ⚠ Enter both family names to start
+              </div>
+            )}
             <Btn onClick={startGame} color="#4ade80" size="lg" className="w-full"
               disabled={!family1Input.trim() || !family2Input.trim() || surveys.length === 0 || (participantPlayers.length !== 2 && participantPlayers.length < 2)}>
               ▶ START GAME
             </Btn>
           </div>
         </div>
+
+        {/* Player Roster (visible on setup screen too) */}
+        <PlayerRoster players={players} gs={{ ...gs, family1: family1Input || gs.family1, family2: family2Input || gs.family2 }} />
       </div>
     );
   }
