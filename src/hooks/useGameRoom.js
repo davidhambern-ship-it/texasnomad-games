@@ -4,7 +4,13 @@ import { getDefaultGameState } from '@/lib/roomUtils';
 
 /**
  * Shared hook for both Host Panel and Public Game Screen.
- * Finds or creates a GameRoom by roomCode+gameId, then subscribes to real-time updates.
+ * role = 'host' | 'viewer'
+ *
+ * Presence model:
+ *   game_state.connectedUsers = [{ playerId, role, connectedAt, lastSeen }]
+ *   game_state.players = seated gameplay users (role: 'player' | 'hostPlayer')
+ *
+ * Host joining NEVER modifies game_state.players — only sets host_connected.
  */
 export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const [room, setRoom] = useState(null);
@@ -13,6 +19,7 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const roomRef = useRef(null);
   const unsubscribeRef = useRef(null);
   const pollRef = useRef(null);
+  const heartbeatRef = useRef(null);
 
   useEffect(() => {
     if (!roomCode || !gameId) return;
@@ -41,28 +48,26 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             last_command: null,
           });
         } else {
-          // Viewer: room doesn't exist yet — show waiting state, poll will pick it up
+          // Viewer: room doesn't exist yet — poll will pick it up
           setLoading(false);
           return;
         }
 
-        // If host role, check if another host is already connected (but allow reconnect)
-        // Removed hard block — just let host reconnect if needed
-
-        // Mark connection
-        const patch = role === 'host' ? { host_connected: true } : { screen_connected: true };
-        r = await base44.entities.GameRoom.update(r.id, patch);
+        // Mark connection — host only sets host_connected, never touches players or game_state
+        if (role === 'host') {
+          r = await base44.entities.GameRoom.update(r.id, { host_connected: true });
+        }
         roomRef.current = r;
-        setRoom(r);
+        setRoom({ ...r });
 
-        // CRITICAL: Immediately fetch fresh room data after connecting to ensure we have latest state
+        // Fetch fresh state to be sure
         const freshRoom = await base44.entities.GameRoom.get(r.id);
         roomRef.current = freshRoom;
         setRoom({ ...freshRoom });
 
         // Subscribe to real-time changes
         unsubscribeRef.current = base44.entities.GameRoom.subscribe((event) => {
-          if (event.type === 'update' && event.data) {
+          if ((event.type === 'update' || event.type === 'create') && event.data) {
             const updated = event.data;
             const updatedId = updated.id || event.id;
             if (updatedId === roomRef.current?.id) {
@@ -72,23 +77,24 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
           }
         });
 
-        // Poll every 3s as a reliable fallback
+        // Poll every 3s as fallback — checks ALL fields including host_connected
         pollRef.current = setInterval(async () => {
           try {
             const fresh = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
             if (fresh.length > 0) {
               const fr = fresh[0];
-              // If viewer just found the room for the first time, connect
               if (!roomRef.current) {
-                const patched = await base44.entities.GameRoom.update(fr.id, { screen_connected: true });
-                roomRef.current = patched;
-                setRoom({ ...patched });
+                roomRef.current = fr;
+                setRoom({ ...fr });
                 return;
               }
-              if (JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
-                  fr.host_connected !== roomRef.current?.host_connected ||
-                  fr.players_connected !== roomRef.current?.players_connected ||
-                  fr.status !== roomRef.current?.status) {
+              // Compare broadly — include host_connected
+              const changed =
+                JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
+                fr.host_connected !== roomRef.current?.host_connected ||
+                fr.players_connected !== roomRef.current?.players_connected ||
+                fr.status !== roomRef.current?.status;
+              if (changed) {
                 roomRef.current = fr;
                 setRoom({ ...fr });
               }
@@ -108,10 +114,10 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     return () => {
       if (unsubscribeRef.current) unsubscribeRef.current();
       if (pollRef.current) clearInterval(pollRef.current);
-      // Disconnect on unmount
-      if (roomRef.current) {
-        const patch = role === 'host' ? { host_connected: false } : { screen_connected: false };
-        base44.entities.GameRoom.update(roomRef.current.id, patch).catch(() => {});
+      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      // Disconnect: only host_connected flag — never touch game_state or players
+      if (roomRef.current && role === 'host') {
+        base44.entities.GameRoom.update(roomRef.current.id, { host_connected: false }).catch(() => {});
       }
     };
   }, [roomCode, gameId, role]);

@@ -56,8 +56,9 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     prevShuffleTs.current = gs.shuffle_ts;
   }, [gs.shuffle_ts]);
 
-  const showCPUChoice = isPlayer && emptySeats.length > 0 && isSetup && cpuChoiceShown;
-  const canJoinSeat = !isPlayer && (isSpectator || myRole === null);
+  // CPU choice dialog is now managed entirely in SpadesGame — never shown from SpadesTable
+  // Can join if not already seated AND there are joinable (empty/CPU) seats available
+  const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
   const myPlayer = players.find(p => p.playerId === playerId);
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
@@ -200,22 +201,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
 
   return (
     <div className="flex flex-col items-center p-6 gap-6 max-w-6xl mx-auto w-full">
-      {showCPUChoice && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#FFD700]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
-            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3), inset 0 0 60px rgba(0,0,0,0.8)' }}>
-            <div className="text-center mb-6">
-              <div className="text-2xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Ready to Play?</div>
-              <div className="text-white/60 text-sm">{emptySeats.length} empty seat{emptySeats.length !== 1 ? 's' : ''}</div>
-            </div>
-            <div className="space-y-3">
-              <button onClick={onPlayAgainstCPU} className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>🤖 Play vs CPU</button>
-              <button onClick={onWaitForRealPlayers} className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>👥 Wait for Players</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {!isPlaying && !isBidding && (
         <div className="w-full px-4 py-3 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
           <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
@@ -295,10 +280,32 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         </div>
       </div>
 
-      {isPlayer && myPlayer && (
+      {/* Player controls: always render for seated humans — never hide when host connects */}
+      {isPlayer && myPlayer && mySeatNumber && (
         <div className="w-full max-w-md mx-auto mt-4 space-y-3">
-          <SpadesPlayerControls seatNumber={mySeatNumber} player={myPlayer} gs={gs} updateState={updateState} isMySeat={true} onShuffleStart={() => setShufflePhase('shuffling')} onStandUp={onStandUp} isDealing={isDealing} />
-          <button onClick={onStandUp} className="w-full py-3 px-4 rounded-lg border-2 border-white/30 text-white/60 font-heading text-sm tracking-widest uppercase hover:border-red-500/60 hover:text-red-400 hover:bg-red-500/10 transition-all" style={PS2}>🚶 Stand Up (Spectate)</button>
+          {/* Turn indicator banner */}
+          {gs.phase === 'playing' && (
+            <div className={`w-full px-3 py-2 rounded-lg border text-center text-[7px] tracking-widest uppercase ${
+              gs.current_turn_seat === mySeatNumber
+                ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700] animate-pulse'
+                : 'border-white/10 bg-transparent text-white/30'
+            }`} style={PS2}>
+              {gs.current_turn_seat === mySeatNumber ? '▶ YOUR TURN — CLICK A CARD TO PLAY' : `⏳ Waiting... Seat ${gs.current_turn_seat || '?'}'s turn`}
+            </div>
+          )}
+          <SpadesPlayerControls
+            seatNumber={mySeatNumber}
+            player={myPlayer}
+            gs={gs}
+            updateState={updateState}
+            isMySeat={true}
+            onShuffleStart={() => setShufflePhase('shuffling')}
+            onStandUp={onStandUp}
+            isDealing={isDealing}
+          />
+          <button onClick={onStandUp} className="w-full py-3 px-4 rounded-lg border-2 border-white/30 text-white/60 font-heading text-sm tracking-widest uppercase hover:border-red-500/60 hover:text-red-400 hover:bg-red-500/10 transition-all" style={PS2}>
+            🚶 Stand Up (Spectate)
+          </button>
         </div>
       )}
     </div>

@@ -18,9 +18,35 @@ export default function SpadesGame() {
   return <SpadesViewer roomCode={roomCode} />;
 }
 
+// ─── Seating helpers ─────────────────────────────────────────────────────────
+
+/** True if this seat is occupied by a HUMAN (not CPU) */
+function isHumanSeat(players, seatNumber) {
+  const p = players.find(p => p.seatNumber === seatNumber && (p.role === 'player' || p.role === 'hostPlayer'));
+  return p && p.playerType !== 'cpu';
+}
+
+/** Count human-occupied seats */
+function humanSeatCount(players) {
+  return SPADES_SEATS.filter(s => isHumanSeat(players, s)).length;
+}
+
+/** Seats a human can sit in: empty or CPU-occupied */
+function joinableSeatsFor(players) {
+  return SPADES_SEATS.filter(s => !isHumanSeat(players, s));
+}
+
+/** Empty seats (no player at all) */
+function emptySeatsIn(players) {
+  return SPADES_SEATS.filter(s => !players.some(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer')));
+}
+
+// ─── Main viewer component ────────────────────────────────────────────────────
+
 function SpadesViewer({ roomCode }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'spades', 'viewer');
 
+  // Stable per-browser player ID
   const [playerId] = useState(() => {
     const key = `tn_pid_${roomCode}`;
     let id = localStorage.getItem(key);
@@ -32,96 +58,86 @@ function SpadesViewer({ roomCode }) {
   });
 
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [myRole, setMyRole] = useState(() => localStorage.getItem(`spades_role_${roomCode}`) || null);
-  const [mySeatNumber, setMySeatNumber] = useState(null);
-  const [cpuChoiceShown, setCpuChoiceShown] = useState(false);
-  const [isWaitingForPlayers, setIsWaitingForPlayers] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(false);
   const [volume, setVolume] = useState(0.3);
+
+  // Join-flow state
+  // 'unknown' → waiting for room load
+  // 'choose'  → show Play/Spectate dialog (joining existing room)
+  // 'cpu'     → show CPU-or-wait dialog (room creator who just sat)
+  // 'seated'  → in a seat
+  // 'spectating' → spectator
+  const [joinFlow, setJoinFlow] = useState('unknown');
+  const [mySeatNumber, setMySeatNumber] = useState(null);
+  const [myRole, setMyRole] = useState(null); // 'player' | 'spectator' | null
 
   const containerRef = useRef(null);
   const isUpdatingRef = useRef(false);
   const audioRef = useRef(null);
+  const didInitJoin = useRef(false);
+
   const gs = room?.game_state || {};
   const players = gs.players || [];
 
+  // ── Fullscreen listener ──
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
 
+  // ── On room load: detect if I'm already seated/spectating ──
   useEffect(() => {
-    if (!room || !playerId) return;
+    if (!room || didInitJoin.current) return;
+    didInitJoin.current = true;
+
     const me = players.find(p => p.playerId === playerId);
     if (me) {
-      setMySeatNumber(me.seatNumber);
-      setMyRole(me.role);
-      localStorage.setItem(`spades_role_${roomCode}`, me.role);
+      // Already in this room from a previous visit
+      if (me.seatNumber != null && (me.role === 'player' || me.role === 'hostPlayer')) {
+        setMySeatNumber(me.seatNumber);
+        setMyRole('player');
+        setJoinFlow('seated');
+      } else {
+        setMyRole('spectator');
+        setJoinFlow('spectating');
+      }
+    } else {
+      // New visitor — show Play/Spectate
+      setJoinFlow('choose');
     }
-  }, [room, playerId]);
+  }, [room]);
 
-  const handleAutoDeal = async (shuffledDeck) => {
-    const seated = getSeatedPlayers(gs.players || []);
-    if (seated.length < 2) return;
-    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
-    const deckToDeal = shuffledDeck ?? ((gs.deck_shuffled && gs.deck?.length) ? gs.deck : shuffleDeck(generateFullDeck()));
-    const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
-    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
-    const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
-    const currentPlayers = gs.players || [];
+  // ── Keep mySeatNumber in sync if the game state updates my seat ──
+  useEffect(() => {
+    if (!room) return;
+    const me = players.find(p => p.playerId === playerId);
+    if (me && me.seatNumber != null && (me.role === 'player' || me.role === 'hostPlayer')) {
+      setMySeatNumber(me.seatNumber);
+      setMyRole('player');
+    }
+  }, [room]);
 
-    // Clear hands and set up deal start
-    const clearedPlayers = currentPlayers.map(p =>
-      p.seatNumber != null ? { ...p, hand: [], bid: 0, tricksWon: 0 } : p
-    );
-    await updateState({
-      players: clearedPlayers, phase: 'setup', status: 'active',
-      deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
-      deal_ts: Date.now(),
-      current_trick: [], tricks_played: 0,
-      bid1: 0, bid2: 0, books1: 0, books2: 0,
-      shuffle_count: 0, spades_broken: false, completed_books: [],
-    });
-
-    // Wait for local deal animation to finish, then push one final state update
-    const DEAL_INTERVAL_MS = 130;
-    await new Promise(resolve => setTimeout(resolve, dealSequence.length * DEAL_INTERVAL_MS + 600));
-
-    // Finalize: set full hands and start playing phase
-    const finalPlayers = currentPlayers.map(p => {
-      const hand = handsBySeatNumber.get(p.seatNumber);
-      if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
-      return p;
-    });
-    await updateState({
-      players: finalPlayers, phase: 'playing',
-      deck: [], deck_shuffled: false,
-      current_turn_seat: firstBidder,
-      first_hand_no_bid: true,
-    });
-  };
-
+  // ── CPU auto-shuffle/deal (only when dealer seat is CPU) ──
   useEffect(() => {
     if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
     if (gs.phase !== 'setup' && gs.phase) return;
-    if (!gs.deck || gs.deck.length === 0) {
-      const seated = getSeatedPlayers(gs.players || []);
-      const dealer = seated.find(p => p.seatNumber === gs.dealer_seat);
-      // Only auto-shuffle/deal when the dealer seat is CPU-controlled
-      if (!dealer || dealer.playerType !== 'cpu') return;
+    if (gs.deck && gs.deck.length > 0) return;
 
-      const timer = setTimeout(async () => {
-        const previewDeck = shuffleDeck(generateFullDeck());
-        await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        await handleAutoDeal(previewDeck);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
+    const seated = getSeatedPlayers(gs.players || []);
+    const dealer = seated.find(p => p.seatNumber === gs.dealer_seat);
+    if (!dealer || dealer.playerType !== 'cpu') return;
+
+    const timer = setTimeout(async () => {
+      const previewDeck = shuffleDeck(generateFullDeck());
+      await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await handleAutoDeal(previewDeck);
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
 
-  // CPU turn handler
+  // ── CPU turn handler ──
   useEffect(() => {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     const currentTurnSeat = gs.current_turn_seat;
@@ -132,8 +148,10 @@ function SpadesViewer({ roomCode }) {
     if (hasPlayed) return;
     const hand = currentPlayer.hand || [];
     if (hand.length === 0) return;
+
     const isLead = (gs.current_trick || []).length === 0;
     const activeSuit = getActiveSuit(gs.current_trick || []);
+
     const timer = setTimeout(async () => {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
@@ -165,7 +183,7 @@ function SpadesViewer({ roomCode }) {
     return () => clearTimeout(timer);
   }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players, room]);
 
-  // Trick completion handler
+  // ── Trick completion handler ──
   useEffect(() => {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     const trick = gs.current_trick || [];
@@ -174,6 +192,7 @@ function SpadesViewer({ roomCode }) {
     const activeSuit = getActiveSuit(trick);
     const winner = determineTrickWinner(trick, activeSuit);
     if (!winner) return;
+
     const timer = setTimeout(async () => {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
@@ -181,12 +200,13 @@ function SpadesViewer({ roomCode }) {
         const winningSeat = winner.seatNumber;
         const winningTeam = getTeamFromSeat(winningSeat);
         const updatedPlayers = players.map(p => p.seatNumber === winningSeat ? { ...p, tricksWon: (p.tricksWon || 0) + 1 } : p);
-        const newTricksPlayed = (gs.tricks_played || 0) + 1;
-        const newBooks1 = winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0;
-        const newBooks2 = winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0;
         await updateState({
-          players: updatedPlayers, current_trick: [], current_turn_seat: winningSeat,
-          tricks_played: newTricksPlayed, books1: newBooks1, books2: newBooks2,
+          players: updatedPlayers,
+          current_trick: [],
+          current_turn_seat: winningSeat,
+          tricks_played: (gs.tricks_played || 0) + 1,
+          books1: winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0,
+          books2: winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0,
           spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
         });
       } finally {
@@ -196,69 +216,116 @@ function SpadesViewer({ roomCode }) {
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
 
-  const emptySeats = SPADES_SEATS.filter(s =>
-    !players.some(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'))
-  );
-  const joinableSeats = SPADES_SEATS.filter(s => {
-    const occupant = players.find(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'));
-    return !occupant || occupant.playerType === 'cpu';
-  });
+  // ─── Handlers ──────────────────────────────────────────────────────────────
 
+  const handleAutoDeal = async (shuffledDeck) => {
+    const seated = getSeatedPlayers(gs.players || []);
+    if (seated.length < 2) return;
+    const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
+    const deckToDeal = shuffledDeck ?? ((gs.deck_shuffled && gs.deck?.length) ? gs.deck : shuffleDeck(generateFullDeck()));
+    const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
+    const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
+    const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
+    const currentPlayers = gs.players || [];
+
+    const clearedPlayers = currentPlayers.map(p =>
+      p.seatNumber != null ? { ...p, hand: [], bid: 0, tricksWon: 0 } : p
+    );
+    await updateState({
+      players: clearedPlayers, phase: 'setup', status: 'active',
+      deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
+      deal_ts: Date.now(),
+      current_trick: [], tricks_played: 0,
+      bid1: 0, bid2: 0, books1: 0, books2: 0,
+      shuffle_count: 0, spades_broken: false, completed_books: [],
+    });
+
+    const DEAL_INTERVAL_MS = 130;
+    await new Promise(resolve => setTimeout(resolve, dealSequence.length * DEAL_INTERVAL_MS + 600));
+
+    const finalPlayers = currentPlayers.map(p => {
+      const hand = handsBySeatNumber.get(p.seatNumber);
+      if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
+      return p;
+    });
+    await updateState({
+      players: finalPlayers, phase: 'playing',
+      deck: [], deck_shuffled: false,
+      current_turn_seat: firstBidder,
+      first_hand_no_bid: true,
+    });
+  };
+
+  // Sit in a specific seat
   const sitInSeat = async (seatNum) => {
     if (!room) return;
-    const cpuAtSeat = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
+    const currentPlayers = gs.players || [];
+
+    // Check if a CPU is at this seat — replace it
+    const cpuAtSeat = currentPlayers.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
     if (cpuAtSeat) {
-      await takeOverCpuSeat(seatNum);
+      let updatedPlayers = replaceCPUWithHuman(currentPlayers, seatNum, playerId, 'player');
+      // Remove self from any other seat
+      updatedPlayers = updatedPlayers.filter(p => !(p.playerId === playerId && p.seatNumber !== seatNum));
+      await updateState({ players: updatedPlayers });
+      setMyRole('player');
+      setMySeatNumber(seatNum);
+      setJoinFlow('seated');
       return;
     }
-    const newPlayer = { playerId, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true, joinedAt: Date.now(), lastActionAt: Date.now() };
-    const existing = players.find(p => p.playerId === playerId);
+
+    // Seat must be empty
+    const existing = currentPlayers.find(p => p.playerId === playerId);
+    const newPlayer = { playerId, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true, joinedAt: Date.now(), lastActionAt: Date.now(), hand: [], bid: null, tricksWon: 0 };
     const updatedPlayers = existing
-      ? players.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true } : p)
-      : [...players, newPlayer];
+      ? currentPlayers.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true } : p)
+      : [...currentPlayers, newPlayer];
+
     await updateState({ players: updatedPlayers });
-    localStorage.setItem(`spades_role_${roomCode}`, 'player');
     setMyRole('player');
     setMySeatNumber(seatNum);
+    setJoinFlow('seated');
   };
 
-  const takeOverCpuSeat = async (seatNum) => {
-    if (!room || mySeatNumber) return;
-    const cpuPlayer = players.find(p => p.seatNumber === seatNum && p.playerType === 'cpu');
-    if (!cpuPlayer) return;
-    let updatedPlayers = replaceCPUWithHuman(players, seatNum, playerId, 'player');
-    updatedPlayers = updatedPlayers.filter(p => !(p.playerId === playerId && p.seatNumber !== seatNum));
-    await updateState({ players: updatedPlayers });
-    localStorage.setItem(`spades_role_${roomCode}`, 'player');
-    setMyRole('player');
-    setMySeatNumber(seatNum);
-  };
-
+  // Join flow: user clicks "Play"
   const handleChooseSit = async () => {
     if (!room) return;
-    if (joinableSeats.length === 0) {
-      const newPlayer = { playerId, seatNumber: null, role: 'spectator', connected: true, joinedAt: Date.now(), lastActionAt: Date.now() };
-      const existing = players.find(p => p.playerId === playerId);
-      const updatedPlayers = existing ? players.map(p => p.playerId === playerId ? { ...p, role: 'spectator', connected: true } : p) : [...players, newPlayer];
-      await updateState({ players: updatedPlayers });
-      localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
-      setMyRole('spectator');
+    const joinable = joinableSeatsFor(players);
+    if (joinable.length === 0) {
+      // All human, become spectator
+      await handleChooseSpectate();
       return;
     }
-    const preferEmpty = joinableSeats.find(s => emptySeats.includes(s));
-    await sitInSeat(preferEmpty ?? joinableSeats[0]);
+    // Prefer empty over CPU
+    const emptySeats = emptySeatsIn(players);
+    const target = emptySeats.length > 0 ? emptySeats[0] : joinable[0];
+    await sitInSeat(target);
   };
 
+  // Join flow: user clicks "Spectate"
   const handleChooseSpectate = async () => {
     if (!room) return;
-    const newPlayer = { playerId, seatNumber: null, role: 'spectator', connected: true, joinedAt: Date.now(), lastActionAt: Date.now() };
-    const existing = players.find(p => p.playerId === playerId);
-    const updatedPlayers = existing ? players.map(p => p.playerId === playerId ? { ...p, role: 'spectator', connected: true } : p) : [...players, newPlayer];
+    const currentPlayers = gs.players || [];
+    const existing = currentPlayers.find(p => p.playerId === playerId);
+    const updatedPlayers = existing
+      ? currentPlayers.map(p => p.playerId === playerId ? { ...p, role: 'spectator', seatNumber: null, hand: [], connected: true } : p)
+      : [...currentPlayers, { playerId, seatNumber: null, role: 'spectator', playerType: 'human', connected: true, joinedAt: Date.now() }];
     await updateState({ players: updatedPlayers });
-    localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
     setMyRole('spectator');
+    setJoinFlow('spectating');
   };
 
+  // After sitting, if there are empty seats → show CPU choice
+  const handleAfterSit = () => {
+    const emptySeats = emptySeatsIn(players);
+    if (emptySeats.length > 0 && !gs.cpu_enabled) {
+      setJoinFlow('cpu');
+    } else {
+      setJoinFlow('seated');
+    }
+  };
+
+  // CPU choice handlers
   const handlePlayAgainstCPU = async () => {
     if (!room) return;
     const currentPlayers = gs.players || [];
@@ -269,21 +336,20 @@ function SpadesViewer({ roomCode }) {
       dealer_seat: gs.dealer_seat || mySeatNumber || 1,
       phase: 'setup',
     });
-    setCpuChoiceShown(false);
+    setJoinFlow('seated');
   };
 
   const handleWaitForRealPlayers = async () => {
-    if (!room) return;
-    setCpuChoiceShown(false);
-    setIsWaitingForPlayers(true);
+    setJoinFlow('seated');
     if (audioRef.current) {
       audioRef.current.volume = 0.3;
       audioRef.current.play().catch(() => {});
     }
   };
 
+  // Play a card
   const handlePlayCard = async (card) => {
-    if (!room || !isPlayer || gs.phase !== 'playing') return;
+    if (!room || myRole !== 'player' || gs.phase !== 'playing') return;
     if (gs.current_turn_seat !== mySeatNumber) {
       alert('Not your turn!');
       return;
@@ -297,59 +363,53 @@ function SpadesViewer({ roomCode }) {
       alert(validation.errors[0] || 'Invalid play');
       return;
     }
-    const updatedPlayers = players.map(p => p.playerId === playerId ? { ...p, hand: p.hand.filter(c => c.id !== card.id), lastActionAt: Date.now() } : p);
+    const updatedPlayers = players.map(p =>
+      p.playerId === playerId ? { ...p, hand: p.hand.filter(c => c.id !== card.id), lastActionAt: Date.now() } : p
+    );
     const newTrick = [...(gs.current_trick || []), { playerId, seatNumber: mySeatNumber, card }];
     const seatedPlayers = players.filter(p => p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
     const currentIndex = seatedPlayers.findIndex(p => p.seatNumber === mySeatNumber);
     const nextPlayer = seatedPlayers[(currentIndex + 1) % seatedPlayers.length];
     const spadesBroken = gs.spades_broken || card.suit === '♠';
-    await updateState({ players: updatedPlayers, current_trick: newTrick, current_turn_seat: nextPlayer?.seatNumber || mySeatNumber, spades_broken: spadesBroken });
+    await updateState({
+      players: updatedPlayers,
+      current_trick: newTrick,
+      current_turn_seat: nextPlayer?.seatNumber || mySeatNumber,
+      spades_broken: spadesBroken,
+    });
   };
 
+  // Stand up
   const handleStandUp = async () => {
-    if (!room || !isPlayer) return;
+    if (!room || myRole !== 'player') return;
     if (gs.phase === 'playing' || gs.phase === 'bidding') {
       const confirmed = window.confirm('Standing during an active hand may affect gameplay. Are you sure?');
       if (!confirmed) return;
     }
-    const updatedPlayers = players.map(p => p.playerId === playerId ? { ...p, role: 'spectator', seatNumber: null, hand: [], tricksWon: 0, bid: null } : p);
+    const updatedPlayers = players.map(p =>
+      p.playerId === playerId ? { ...p, role: 'spectator', seatNumber: null, hand: [], tricksWon: 0, bid: null } : p
+    );
     await updateState({ players: updatedPlayers });
-    localStorage.setItem(`spades_role_${roomCode}`, 'spectator');
     setMyRole('spectator');
     setMySeatNumber(null);
-    setIsWaitingForPlayers(false);
+    setJoinFlow('spectating');
   };
 
+  // Take over a CPU seat (from seat button)
   const handleTakeOverCPU = async (seatNum) => {
-    await takeOverCpuSeat(seatNum);
+    await sitInSeat(seatNum);
   };
 
-  const isPlayer = myRole === 'player' || myRole === 'hostPlayer';
-  const isSpectator = myRole === 'spectator';
-
-  useEffect(() => {
-    if (isPlayer && emptySeats.length > 0 && !gs.cpu_enabled && !cpuChoiceShown) {
-      setCpuChoiceShown(true);
-    }
-  }, [isPlayer, emptySeats.length, gs.cpu_enabled, cpuChoiceShown, myRole]);
-
-  useEffect(() => {
-    if (!isPlayer) setCpuChoiceShown(false);
-  }, [isPlayer]);
-
+  // Music
   const jazzPlaylist = [
     'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=lofi-study-112191.mp3',
     'https://cdn.pixabay.com/download/audio/2022/03/24/audio_31f62e0f6e.mp3?filename=smooth-jazz-11510.mp3',
     'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d1718ab42b.mp3?filename=lofi-chill-11042.mp3',
   ];
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
-
   useEffect(() => {
-    if (audioRef.current && !audioRef.current.src) {
-      audioRef.current.src = jazzPlaylist[0];
-    }
+    if (audioRef.current && !audioRef.current.src) audioRef.current.src = jazzPlaylist[0];
   }, []);
-
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -365,45 +425,74 @@ function SpadesViewer({ roomCode }) {
 
   const toggleMusic = () => {
     if (!audioRef.current) return;
-    if (musicEnabled) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => {});
-    }
+    if (musicEnabled) { audioRef.current.pause(); } else { audioRef.current.play().catch(() => {}); }
     setMusicEnabled(!musicEnabled);
   };
-
   const handleVolumeChange = (e) => {
-    const newVolume = parseFloat(e.target.value);
-    setVolume(newVolume);
-    if (audioRef.current) {
-      audioRef.current.volume = newVolume;
-    }
+    const v = parseFloat(e.target.value);
+    setVolume(v);
+    if (audioRef.current) audioRef.current.volume = v;
   };
 
-  const showRoleSelection = myRole === null && !loading && room;
+  // ─── Derived state ────────────────────────────────────────────────────────
+  const isPlayer = myRole === 'player';
+  const isSpectator = myRole === 'spectator';
+  const myPlayer = players.find(p => p.playerId === playerId);
+  const joinable = joinableSeatsFor(players);
+  const emptySeats = emptySeatsIn(players);
+
+  // CPU choice dialog: only shown to the room creator after sitting (not to joiners)
+  const showCPUChoice = joinFlow === 'cpu';
+  // Play/Spectate dialog: shown to new visitors
+  const showJoinChoice = joinFlow === 'choose' && !loading && room;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
       <audio ref={audioRef} loop preload="auto" />
 
-      {showRoleSelection && (
+      {/* ── Join dialog: Play or Spectate ─────────────────────────────────── */}
+      {showJoinChoice && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#BC13FE]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
-            style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3), inset 0 0 60px rgba(0,0,0,0.8)' }}>
+            style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3)' }}>
             <div className="text-center mb-6">
-              <div className="text-2xl font-heading text-[#BC13FE] uppercase tracking-widest mb-2" style={PS2}>🎮 Join Game</div>
-              <div className="text-white/60 text-sm">Choose how you want to join</div>
+              <div className="text-xl font-heading text-[#BC13FE] uppercase tracking-widest mb-2" style={PS2}>🎮 Join Room</div>
+              <div className="text-white/60 text-sm">ROOM {roomCode}</div>
             </div>
             <div className="space-y-3">
-              {joinableSeats.length > 0 ? (
-                <button onClick={handleChooseSit} className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>🎯 Play (Join Seat)</button>
-              ) : (
-                <button onClick={handleChooseSpectate} className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>👁 Start Spectating</button>
-              )}
-              {joinableSeats.length > 0 && (
-                <button onClick={handleChooseSpectate} className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>👁 Spectate Only</button>
-              )}
+              {joinable.length > 0 ? (
+                <button onClick={handleChooseSit}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                  🎯 Play (Take a Seat)
+                </button>
+              ) : null}
+              <button onClick={handleChooseSpectate}
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                👁 Spectate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── CPU choice dialog: only for room creator ──────────────────────── */}
+      {showCPUChoice && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#FFD700]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
+            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
+            <div className="text-center mb-6">
+              <div className="text-xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Empty Seats</div>
+              <div className="text-white/60 text-sm">{emptySeats.length} seat{emptySeats.length !== 1 ? 's' : ''} still open</div>
+            </div>
+            <div className="space-y-3">
+              <button onClick={handlePlayAgainstCPU}
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                🤖 Fill with CPU
+              </button>
+              <button onClick={handleWaitForRealPlayers}
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                👥 Wait for Players
+              </button>
             </div>
           </div>
         </div>
@@ -437,11 +526,12 @@ function SpadesViewer({ roomCode }) {
             isPlayer={isPlayer}
             isSpectator={isSpectator}
             updateState={updateState}
-            joinableSeats={joinableSeats}
+            joinableSeats={joinable}
             emptySeats={emptySeats}
             onSitInSeat={sitInSeat}
             roomCode={roomCode}
-            cpuChoiceShown={cpuChoiceShown && !isWaitingForPlayers}
+            // CPU choice is handled locally — never pass it down to SpadesTable
+            cpuChoiceShown={false}
             onPlayAgainstCPU={handlePlayAgainstCPU}
             onWaitForRealPlayers={handleWaitForRealPlayers}
             onChooseSpectate={handleChooseSpectate}
