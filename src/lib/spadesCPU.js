@@ -575,61 +575,55 @@ function followWithSuit(ctx, suitCards) {
 }
 
 function voidPlay(ctx) {
-  const { 
-    bySuit, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
-    activeSuit, tricksLeft, winnerStrength,
-    oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
+  const {
+    bySuit, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore,
+    activeSuit, tricksLeft, winnerStrength, trick, mySeatNumber,
+    oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure,
   } = ctx;
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
 
-  const spades = bySuit['♠'] || [];
-  const jokers = bySuit['Joker'] || [];
-  const allTrump = [...jokers, ...spades];
-  allTrump.sort((a, b) => cardVal(b) - cardVal(a));
-  const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
+  // Build all trump (spades + jokers), sort ascending by strength so [0] = lowest
+  const spades = [...(bySuit['♠'] || [])];
+  const jokers = [...(bySuit['Joker'] || [])];
+  const allTrump = [...spades, ...jokers];
+  allTrump.sort((a, b) => getCardStrength(a, activeSuit) - getCardStrength(b, activeSuit)); // ascending
 
-  // ─── PARTNER IS WINNING — never cut partner ─────────────────────────────────
-  // Only break this rule if team absolutely cannot make bid in endgame.
+  // Lowest trump that still beats the current winner
+  const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
+  // winningTrump[0] = cheapest winning trump (ascending sort)
+
+  // Detect if CPU is last to act this trick
+  const seatedCount = (ctx.teamSeats?.length || 0) + (ctx.oppSeats?.length || 0);
+  const isLastToPlay = trick.length === seatedCount - 1;
+
+  // ─── PARTNER IS WINNING ─────────────────────────────────────────────────────
   if (partnerIsWinning) {
+    // Only override in desperate endgame (partner may still lose to a later player)
     const desperateEndgame = tricksLeft <= 2 && teamNeedsBooksMore >= tricksLeft;
     if (desperateEndgame && winningTrump.length > 0) {
-      // Cut with cheapest winning trump to guarantee we get the book
-      return winningTrump[winningTrump.length - 1];
+      return winningTrump[0]; // cheapest winning trump
     }
     return sluffLowest(bySuit);
   }
 
-  // ─── TEAM HAS MADE BID: dump garbage, no cutting ───────────────────────────
-  if (teamHasMadeBid) {
-    return sluffLowest(bySuit);
-  }
+  // ─── OPPONENT IS WINNING ────────────────────────────────────────────────────
 
-  // ─── OPPONENT WINNING — decide whether to cut ──────────────────────────────
+  // If we have winning trump, cut — this is the core fix.
+  // Use the cheapest winning trump to preserve high trump for later.
+  if (winningTrump.length > 0) {
+    // Don't burn a Joker if a regular spade can win, unless it's the only option
+    const cheapestWinner = winningTrump[0];
+    const isJoker = cheapestWinner.suit === 'Joker';
 
-  // SET STRATEGY: cut opponents off a critical book
-  if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0 && winningTrump.length > 0) {
-    const isCriticalBook = oppTeamNeedsBooks <= tricksLeft && tricksLeft <= 3;
-    if (isCriticalBook || setPressure >= 2) {
-      return winningTrump[winningTrump.length - 1]; // lowest winning trump
+    // If only Jokers can win but we already made bid and it's not critical, sluff
+    if (isJoker && teamHasMadeBid && setPressure === 0 && !iNeedBook) {
+      return sluffLowest(bySuit);
     }
+
+    return cheapestWinner;
   }
 
-  // TEAM NEEDS BOOKS: cut with lowest winning trump, protect high trump
-  if (iNeedBook && winningTrump.length > 0) {
-    const wouldWasteHighTrump = winningTrump[winningTrump.length - 1] &&
-      cardVal(winningTrump[winningTrump.length - 1]) >= 14 && winningTrump.length === 1;
-    // Don't burn a Joker/Ace to win an early book unless it's endgame
-    if (!wouldWasteHighTrump || tricksLeft <= 3) {
-      return winningTrump[winningTrump.length - 1];
-    }
-  }
-
-  // LATE GAME DESPERATION: ≤3 tricks left and team needs books
-  if (iNeedBook && tricksLeft <= 3 && winningTrump.length > 0) {
-    return winningTrump[winningTrump.length - 1];
-  }
-
-  // DEFAULT: sluff lowest — don't waste trump unnecessarily
+  // No winning trump available — sluff lowest non-trump
   return sluffLowest(bySuit);
 }
 
