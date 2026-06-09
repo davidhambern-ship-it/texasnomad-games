@@ -38,7 +38,7 @@ export function fisherYatesShuffle(deck) {
   return shuffled;
 }
 
-// Generate a fresh full Spades deck (54 cards: 52 standard - 2♥ - 2♦ + 2 jokers = 54)
+// Generate a fresh full Spades deck (52 cards: 54 standard - 2♥ - 2♦ + 2 jokers = 52)
 // Each card gets a unique ID based on suit+value for deduplication checks
 export function generateFullDeck() {
   const deck = [];
@@ -58,9 +58,10 @@ export function generateFullDeck() {
 export function validateDeck(deck) {
   const errors = [];
   
-  // Check deck size (should be 54 for TexasNomad Spades)
-  if (deck.length !== 54) {
-    errors.push(`Invalid deck size: ${deck.length} (expected 54)`);
+  // Check deck size (should be 52 for TexasNomad Spades)
+  if (deck.length !== 52) {
+  errors.push(`Invalid deck size: ${deck.length} (expected 52)`);
+}
   }
 
   // Check for duplicate card IDs
