@@ -260,7 +260,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
         </div>
       </div>
 
-      <HostHandBox hostPlayerId={HOST_PLAYER_ID} players={players} />
+      <HostHandBox hostPlayerId={HOST_PLAYER_ID} players={players} gs={gs} updateState={updateState} />
 
       <div className="grid grid-cols-2 gap-4">
         {[
