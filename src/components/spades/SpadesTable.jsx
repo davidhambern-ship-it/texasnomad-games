@@ -49,6 +49,14 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     prevDealTs.current = gs.deal_ts;
   }, [gs.deal_ts]);
 
+  // Safety reset: if deck is cleared (deal finished) but animation never fired onComplete, unblock cards
+  useEffect(() => {
+    if (dealPhase !== 'idle' && (!gs.deck || gs.deck.length === 0)) {
+      setDealPhase('idle');
+      setLocalHands({});
+    }
+  }, [gs.deck]);
+
   useEffect(() => {
     if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
       setShufflePhase('shuffling');
