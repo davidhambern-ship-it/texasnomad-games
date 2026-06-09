@@ -139,9 +139,18 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
       const cleanAns = normalize(a.answer || a.text);
       return cleanAns === cleanGuess || (cleanAns.length >= 4 && cleanGuess.includes(cleanAns)) || (cleanGuess.length >= 4 && cleanAns.includes(cleanGuess));
     });
-    if (matchIdx === -1) setCheckResult({ type: 'miss', message: `"${guess}" — NOT on the board` });
-    else if (answers[matchIdx].revealed) setCheckResult({ type: 'warn', message: `Already revealed: "${answers[matchIdx].text || answers[matchIdx].answer}"` });
-    else setCheckResult({ type: 'hit', message: `✓ Match: "${answers[matchIdx].text || answers[matchIdx].answer}" — ${answers[matchIdx].points} pts. Click it to reveal.` });
+    if (matchIdx === -1) {
+      setCheckResult({ type: 'miss', message: `"${guess}" — NOT on the board` });
+    } else if (answers[matchIdx].revealed) {
+      setCheckResult({ type: 'warn', message: `Already revealed: "${answers[matchIdx].text || answers[matchIdx].answer}"` });
+    } else {
+      // Auto-reveal the answer on the board and add points to the bank
+      const ans = answers[matchIdx];
+      const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+      const newBank = (gs.round_bank || 0) + (ans.points || 0);
+      await updateState({ answers: newAnswers, round_bank: newBank });
+      setCheckResult({ type: 'hit', message: `✓ Revealed: "${ans.text || ans.answer}" — ${ans.points} pts added to bank!` });
+    }
     setAnswerInput('');
     setTimeout(() => setCheckResult(null), 5000);
   };
