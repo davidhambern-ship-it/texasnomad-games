@@ -125,8 +125,9 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       right: { width: 140, height: 600, right: 1, top: '50%', transform: 'translateY(-50%) rotate(90deg)' },
     };
 
-    const isHorizontal = position === 'top' || position === 'bottom';
-    const getOverlap = isHorizontal ? getHorizontalOverlap : getVerticalOverlap;
+    // left/right containers are CSS-rotated 90deg, so cards inside should always lay out horizontally
+    const isHorizontal = true;
+    const getOverlap = getHorizontalOverlap;
 
     // Show hand for: my seat (face-up), opponents during deal (face-down backs), skip if empty
     const showHand = (showFaceUp || isDealing) && sortedSeatHand.length > 0;
@@ -134,7 +135,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     return (
       <React.Fragment key={seatNumber}>
         {showHand && (
-          <div className={`absolute z-20 flex ${isHorizontal ? 'justify-center' : 'flex-col items-center'}`} style={handContainerStyles[position]}>
+          <div className="absolute z-20 flex justify-center" style={handContainerStyles[position]}>
             {sortedSeatHand.map((card, i, arr) => {
               const overlap = getOverlap(arr.length) * 0.5;
               const isMyTurn = !isDealing && gs.current_turn_seat === seatNumber && gs.phase === 'playing';
