@@ -135,7 +135,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     return (
       <React.Fragment key={seatNumber}>
         {showHand && (
-          <div className="absolute z-20 flex justify-center" style={handContainerStyles[position]}>
+          <div className="absolute z-30 flex justify-center" style={handContainerStyles[position]}>
             {sortedSeatHand.map((card, i, arr) => {
               const overlap = getOverlap(arr.length) * 0.5;
               const isMyTurn = !isDealing && gs.current_turn_seat === seatNumber && gs.phase === 'playing';
@@ -271,7 +271,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
           <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Games" className="w-32 h-32 object-contain" />
         </div>
         {[1, 2, 3, 4].map(renderSeat)}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20 pointer-events-none">
           {shufflePhase !== 'idle' && <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />}
           {dealPhase !== 'idle' && gs.deck && gs.deck.length > 0 && (
             <SpadesDealAnimation
@@ -291,7 +291,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               }}
             />
           )}
-          {shufflePhase === 'idle' && dealPhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} />}
+          {shufflePhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} />}
         </div>
       </div>
 

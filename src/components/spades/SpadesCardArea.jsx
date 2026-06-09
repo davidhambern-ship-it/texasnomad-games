@@ -16,7 +16,7 @@ export default function SpadesCardArea({ trick, players }) {
   const hasDealtCards = players?.some(p => p.hand && p.hand.length > 0);
   
   return (
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72">
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-72 h-72 pointer-events-none">
       {trick.length === 0 && !hasDealtCards ? (
         <div className="w-full h-full flex items-center justify-center">
           {/* Deck of cards visual */}
