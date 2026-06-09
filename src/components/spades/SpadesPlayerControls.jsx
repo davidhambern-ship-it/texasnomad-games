@@ -118,21 +118,27 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
     onDealStart?.();
 
-    const DEAL_DELAY = 120;
+    // Batch updates: one update per full round-robin pass (every N players)
+    // This avoids rate limit errors from 52 individual updateState calls
+    const ROUND_DELAY = 500;
     const playerHands = allSeated.map(() => []);
     const startIdx = Math.max(0, allSeated.findIndex(p => p.seatNumber === dealStartSeat));
+    const batchSize = allSeated.length; // one full pass per batch
 
     for (let i = 0; i < dealSequence.length; i++) {
       const playerIdx = (startIdx + i) % allSeated.length;
       playerHands[playerIdx].push(dealSequence[i]);
 
-      const updatedPlayers = currentPlayers.map(p => {
-        const si = allSeated.findIndex(s => s.playerId === p.playerId);
-        return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
-      });
-
-      await updateState({ players: updatedPlayers });
-      await new Promise(resolve => setTimeout(resolve, DEAL_DELAY));
+      // Only push state update at the end of each complete round-robin pass
+      const isEndOfRound = (i + 1) % batchSize === 0 || i === dealSequence.length - 1;
+      if (isEndOfRound) {
+        const updatedPlayers = currentPlayers.map(p => {
+          const si = allSeated.findIndex(s => s.playerId === p.playerId);
+          return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: null, tricksWon: 0 } : p;
+        });
+        await updateState({ players: updatedPlayers });
+        await new Promise(resolve => setTimeout(resolve, ROUND_DELAY));
+      }
     }
 
     const finalPlayers = currentPlayers.map(p => {

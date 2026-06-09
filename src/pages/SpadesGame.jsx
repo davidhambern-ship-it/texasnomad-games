@@ -83,20 +83,25 @@ function SpadesViewer({ roomCode }) {
       shuffle_count: 0, spades_broken: false, completed_books: [],
     });
 
-    // Deal card-by-card so players see cards arrive in real time
-    const startIdx = seated.findIndex(p => p.seatNumber === dealStartSeat);
+    // Batch updates per round-robin pass to avoid rate limit errors
+    const startIdx = Math.max(0, seated.findIndex(p => p.seatNumber === dealStartSeat));
     const playerHands = seated.map(() => []);
-    const DEAL_DELAY = 110;
+    const ROUND_DELAY = 500;
+    const batchSize = seated.length;
 
     for (let i = 0; i < dealSequence.length; i++) {
-      const playerIdx = (Math.max(0, startIdx) + i) % seated.length;
+      const playerIdx = (startIdx + i) % seated.length;
       playerHands[playerIdx].push(dealSequence[i]);
-      const updatedPlayers = currentPlayers.map(p => {
-        const si = seated.findIndex(s => s.playerId === p.playerId);
-        return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: 0, tricksWon: 0 } : p;
-      });
-      await updateState({ players: updatedPlayers });
-      await new Promise(resolve => setTimeout(resolve, DEAL_DELAY));
+
+      const isEndOfRound = (i + 1) % batchSize === 0 || i === dealSequence.length - 1;
+      if (isEndOfRound) {
+        const updatedPlayers = currentPlayers.map(p => {
+          const si = seated.findIndex(s => s.playerId === p.playerId);
+          return si >= 0 ? { ...p, hand: [...playerHands[si]], bid: 0, tricksWon: 0 } : p;
+        });
+        await updateState({ players: updatedPlayers });
+        await new Promise(resolve => setTimeout(resolve, ROUND_DELAY));
+      }
     }
 
     // Finalize: set full hands and start playing phase
