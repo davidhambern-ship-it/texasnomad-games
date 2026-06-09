@@ -95,9 +95,66 @@ function HangmanViewer({ roomCode, cpuId }) {
     if (gs.phase) return; // already initialized
     initDoneRef.current = true;
 
-    // Auto-start in 1P mode with word setter
-    updateState({ phase: 'setup', single_player: true, cpu_opponent_id: cpuId || null });
+    // Human sets first in 1P mode
+    updateState({
+      phase: 'setup',
+      single_player: true,
+      cpu_opponent_id: cpuId || null,
+      word_setter_seat: seatNumber, // human sets first
+    });
   }, [room, isSinglePlayer]);
+
+  // Detect new human player joining → disable 1P mode
+  const prevPlayerCountRef = useRef(null);
+  useEffect(() => {
+    if (!room || !isSinglePlayer) return;
+    const humanPlayers = (gs.players || []).filter(p => p.playerType !== 'cpu');
+    const count = humanPlayers.length;
+    if (prevPlayerCountRef.current === null) {
+      prevPlayerCountRef.current = count;
+      return;
+    }
+    if (count > prevPlayerCountRef.current) {
+      // New human joined — turn off 1P mode
+      updateState({ single_player: false, cpu_opponent_id: null, phase: null, secret_word: '', guessed_letters: [], wrong_letters: [] });
+    }
+    prevPlayerCountRef.current = count;
+  }, [gs.players]);
+
+  // CPU auto-sets word when it's the CPU's turn to set
+  const cpuSetRef = useRef(false);
+  useEffect(() => {
+    if (!isSinglePlayer || !room) return;
+    if (gs.phase !== 'setup' && gs.phase !== 'word_set') return;
+    if (gs.secret_word) { cpuSetRef.current = false; return; }
+    // CPU sets when the word_setter_seat is NOT the human's seat (or is null = CPU's turn)
+    const cpuIsSetterThisRound = gs.word_setter_seat !== seatNumber && seatNumber != null;
+    if (!cpuIsSetterThisRound) return;
+    if (cpuSetRef.current) return;
+    cpuSetRef.current = true;
+
+    const delay = setTimeout(async () => {
+      const pick = WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+      await updateState({
+        secret_word: pick.word,
+        category: pick.category,
+        hint: pick.hint,
+        hint_revealed: false,
+        guessed_letters: [],
+        wrong_letters: [],
+        phase: 'playing',
+        word_revealed: false,
+        last_action: null,
+        winner_seat: null,
+        winner_player_id: null,
+        seats_that_chose: [],
+        current_go_round: 1,
+        max_wrong: 6,
+      });
+      cpuSetRef.current = false;
+    }, 1500);
+    return () => clearTimeout(delay);
+  }, [gs.phase, gs.word_setter_seat, gs.secret_word, seatNumber, isSinglePlayer]);
 
   const word = gs.secret_word || '';
   const guessed = gs.guessed_letters || [];
@@ -117,20 +174,24 @@ function HangmanViewer({ roomCode, cpuId }) {
   const isGoRoundMode = !isSinglePlayer && totalPeople >= 4;
   const alreadyChosen = seatNumber ? seatsThatChose.includes(seatNumber) : false;
 
+  // Who set the word (winner in previous round)
+  const wordSetter = gs.word_setter_seat || null;
+  const amWordSetter = seatNumber === wordSetter;
+
+  // In 1P: the human set the word if word_setter_seat === seatNumber, so CPU guesses (and vice versa)
+  // Human can only guess when THEY are NOT the word setter
+  const iAmSetter1P = isSinglePlayer && gs.word_setter_seat === seatNumber;
+
   const canGuess =
     isSeated &&
     seatNumber !== null &&
     gs.phase === 'playing' &&
     !gs.word_revealed &&
     !allRevealed &&
-    (isGoRoundMode ? !alreadyChosen : true);
+    (isSinglePlayer ? !iAmSetter1P : (isGoRoundMode ? !alreadyChosen : true));
 
-  // Who set the word (winner in previous round)
-  const wordSetter = gs.word_setter_seat || null;
-  const amWordSetter = seatNumber === wordSetter;
-
-  // In 1P, human player always sets the word (or uses random)
-  const isSetter = isSinglePlayer ? isSeated : amWordSetter;
+  // Show the setter panel: in 1P only when human is setter; in multiplayer when amWordSetter
+  const isSetter = isSinglePlayer ? (isSeated && iAmSetter1P) : amWordSetter;
   const showSetterPanel = isSetter && (gs.phase === 'setup' || gs.phase === 'word_set') && !gs.secret_word;
 
   const cpuCharacter = isSinglePlayer
@@ -288,11 +349,18 @@ function HangmanViewer({ roomCode, cpuId }) {
   };
 
   const handleNextRound = async () => {
-    // Winner becomes word setter in multiplayer; in 1P just reset
-    const newSetter = isSinglePlayer ? seatNumber : (gs.winner_seat || null);
+    let newSetter;
+    if (isSinglePlayer) {
+      // Winner gets to guess next, so LOSER sets next word
+      // If human won → CPU sets next; if CPU won (word revealed, no winner_seat) → human sets next
+      const humanWon = gs.winner_seat === seatNumber;
+      newSetter = humanWon ? null : seatNumber; // null = CPU sets, seatNumber = human sets
+    } else {
+      newSetter = gs.winner_seat || null;
+    }
     await updateState({
       secret_word: '',
-      phase: isSinglePlayer ? 'setup' : 'word_set',
+      phase: 'setup',
       guessed_letters: [],
       wrong_letters: [],
       word_revealed: false,
@@ -430,7 +498,7 @@ function HangmanViewer({ roomCode, cpuId }) {
 
       ) : (!gs.phase || gs.phase === 'setup' || gs.phase === 'word_set') && !gs.secret_word ? (
         /* ── Waiting screen (non-setter or waiting for host) ───────────── */
-        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer} />
+        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer && !!gs.single_player} />
 
       ) : (
         /* ── Game Screen ─────────────────────────────────────────────── */
@@ -547,6 +615,13 @@ function HangmanViewer({ roomCode, cpuId }) {
                 <div className="text-center px-4 py-2 rounded-lg border border-white/10 bg-white/5">
                   <span className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>
                     Joining game, please wait…
+                  </span>
+                </div>
+              )}
+              {isSinglePlayer && iAmSetter1P && (
+                <div className="text-center px-4 py-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5">
+                  <span className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
+                    🔒 You set this word — CPU is guessing!
                   </span>
                 </div>
               )}
