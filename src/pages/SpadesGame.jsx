@@ -151,7 +151,7 @@ function SpadesViewer({ roomCode, isCreator }) {
       }
     }, 1000);
     return () => clearTimeout(timer);
-  }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, room]);
+  }, [gs.dealer_seat, gs.phase, gs.cpu_enabled, gs.deck]);
 
   // ── CPU turn handler ──
   useEffect(() => {
@@ -197,7 +197,7 @@ function SpadesViewer({ roomCode, isCreator }) {
       }
     }, CPU_ACTION_DELAY + 500);
     return () => clearTimeout(timer);
-  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players, room]);
+  }, [gs.current_turn_seat, gs.current_trick, gs.phase, gs.cpu_enabled, gs.spades_broken, players]);
 
   // ── Trick completion handler ──
   useEffect(() => {
@@ -230,7 +230,7 @@ function SpadesViewer({ roomCode, isCreator }) {
       }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, room]);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
