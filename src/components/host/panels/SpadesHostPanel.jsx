@@ -239,13 +239,13 @@ export default function SpadesHostPanel({ gs, updateState }) {
       <div className="relative bg-[#0a1a0a] rounded-3xl border-4 border-[#3d2817]"
         style={{ boxShadow: 'inset 0 0 60px rgba(0,0,0,0.8)', minHeight: 380 }}>
         <div className="absolute top-3 left-1/2 -translate-x-1/2">
-          <HostSeatSlot seatNumber={3} player={getPlayerAtSeat(3)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} />
+          <HostSeatSlot seatNumber={3} player={getPlayerAtSeat(3)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} isHostSeat={getPlayerAtSeat(3)?.playerId === HOST_PLAYER_ID} />
         </div>
         <div className="absolute left-3 top-1/2 -translate-y-1/2">
-          <HostSeatSlot seatNumber={2} player={getPlayerAtSeat(2)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} />
+          <HostSeatSlot seatNumber={2} player={getPlayerAtSeat(2)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} isHostSeat={getPlayerAtSeat(2)?.playerId === HOST_PLAYER_ID} />
         </div>
         <div className="absolute right-3 top-1/2 -translate-y-1/2">
-          <HostSeatSlot seatNumber={4} player={getPlayerAtSeat(4)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} />
+          <HostSeatSlot seatNumber={4} player={getPlayerAtSeat(4)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} isHostSeat={getPlayerAtSeat(4)?.playerId === HOST_PLAYER_ID} />
         </div>
         {shufflePhase !== 'idle' ? (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 z-20">
@@ -255,7 +255,7 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <SpadesCardArea trick={gs.current_trick || []} players={players} />
         )}
         <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
-          <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} />
+          <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} isHostSeat={getPlayerAtSeat(1)?.playerId === HOST_PLAYER_ID} />
         </div>
       </div>
 

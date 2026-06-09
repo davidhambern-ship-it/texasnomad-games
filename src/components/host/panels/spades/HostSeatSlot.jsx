@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { getCardImage } from '@/lib/spadesCardImages';
+import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-export default function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, currentBidderSeat, currentTurnSeat, isBidding, isPlaying, onSetBid }) {
+export default function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, currentBidderSeat, currentTurnSeat, isBidding, isPlaying, onSetBid, isHostSeat }) {
   const [bidInput, setBidInput] = useState('');
   const [countdown, setCountdown] = useState(15);
   const isBiddingTurn = isBidding && currentBidderSeat === seatNumber;
@@ -75,7 +75,7 @@ export default function HostSeatSlot({ seatNumber, player, onKick, onForceTurn, 
                   style={{ transform: `rotate(${(i - 3) * 3}deg)`, marginLeft: i > 0 ? '-6px' : '0' }}
                 >
                   <img
-                    src={getCardImage(card)}
+                    src={isHostSeat ? getCardImage(card) : getCardBack()}
                     alt={`${card.value}${card.suit}`}
                     className="w-full h-full object-cover"
                   />
