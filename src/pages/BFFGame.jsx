@@ -7,22 +7,29 @@ import SeatBadge from '@/components/game/SeatBadge.jsx';
 import BYEDisplay from '@/components/game/BYEDisplay.jsx';
 import RoleSelection from '@/components/game/RoleSelection.jsx';
 import { findMatchingAnswer } from '@/lib/bffAnswerMatch';
+import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
+  const cpuId = params.get('cpu');
   if (!roomCode) {
     window.location.href = '/';
     return null;
   }
-  return <BFFViewer roomCode={roomCode} />;
+  return <BFFViewer roomCode={roomCode} cpuId={cpuId} />;
 }
 
-function BFFViewer({ roomCode }) {
+function BFFViewer({ roomCode, cpuId }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
+  const isSinglePlayer = !!(cpuId || gs.single_player);
+  const cpuCharacter = isSinglePlayer
+    ? TEXASNOMAD_CHARACTERS.find(c => c.id === (cpuId || gs.cpu_opponent_id)) || null
+    : null;
 
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'bff', updateState);
 
@@ -281,7 +288,7 @@ function BFFViewer({ roomCode }) {
   if (isSeated && !myRole) {
     return (
       <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
-        <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
+        <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} isSinglePlayer={isSinglePlayer} />
         <RoleSelection
           roomCode={roomCode}
           seatNumber={seatNumber}
@@ -296,7 +303,7 @@ function BFFViewer({ roomCode }) {
   if (isParticipant && !myFamily) {
     return (
       <div ref={containerRef} className="min-h-screen bg-[#070311] text-white">
-        <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} />
+        <BFFHeader roomCode={roomCode} room={room} isFullscreen={isFullscreen} containerRef={containerRef} seatNumber={seatNumber} isSeated={isSeated} isSinglePlayer={isSinglePlayer} />
         <FamilySelector gs={gs} f1Count={f1Count} f2Count={f2Count} onChoose={handleChooseFamily} />
       </div>
     );
@@ -312,7 +319,7 @@ function BFFViewer({ roomCode }) {
           <div className="w-10 h-10 border-4 border-[#BC13FE] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !isPlaying ? (
-        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} role={myRole} gs={gs} />
+        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} role={myRole} gs={gs} isSinglePlayer={isSinglePlayer} />
       ) : (
         <GameScreen
           gs={gs}
@@ -333,13 +340,15 @@ function BFFViewer({ roomCode }) {
           onBuzz={handleBuzz}
           onVoice={toggleVoice}
           myFamily={myFamily}
+          isSinglePlayer={isSinglePlayer}
+          cpuCharacter={cpuCharacter}
         />
       )}
     </div>
   );
 }
 
-function BFFHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, isSeated }) {
+function BFFHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, isSeated, isSinglePlayer }) {
   return (
     <header className="sticky top-0 z-50 border-b border-[#BC13FE]/30 bg-[#070311]/90 backdrop-blur-xl">
       <div className="px-4 h-12 flex items-center justify-between gap-2">
@@ -352,7 +361,12 @@ function BFFHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, isS
             <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse shrink-0" />
             <span className="text-[8px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>ROOM {roomCode}</span>
           </div>
-          {room?.host_connected && (
+          {isSinglePlayer && (
+            <span className="px-2 py-0.5 bg-[#FFD700]/10 border border-[#FFD700]/40 rounded text-[#FFD700] text-[7px] tracking-widest uppercase" style={PS2}>
+              🤖 1P vs CPU
+            </span>
+          )}
+          {!isSinglePlayer && room?.host_connected && (
             <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[7px] tracking-widest uppercase hidden sm:inline" style={PS2}>
               🔴 HOST LIVE
             </span>
@@ -402,7 +416,7 @@ function FamilySelector({ gs, f1Count, f2Count, onChoose }) {
   );
 }
 
-function GameScreen({ gs, playerId, seatNumber, players, isParticipant, canAnswer, amAnswering, amInSteal, answerInput, isSubmitting, submitResult, isListening, inputRef, onTyping, onSubmit, onBuzz, onVoice, myFamily }) {
+function GameScreen({ gs, playerId, seatNumber, players, isParticipant, canAnswer, amAnswering, amInSteal, answerInput, isSubmitting, submitResult, isListening, inputRef, onTyping, onSubmit, onBuzz, onVoice, myFamily, isSinglePlayer, cpuCharacter }) {
   const isPlaying = gs.phase === 'playing';
   const answers = gs.answers || [];
   const faceoffMode = gs.faceoff_mode || false;
@@ -551,16 +565,27 @@ function GameScreen({ gs, playerId, seatNumber, players, isParticipant, canAnswe
           <div className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>👁 Watching — no controls</div>
         </div>
       )}
+
+      {/* 1P CPU Panel */}
+      {isSinglePlayer && cpuCharacter && (
+        <SinglePlayerPanel cpuCharacter={cpuCharacter} gameLabel="BFF">
+          <div className="text-[7px] text-white/30 uppercase tracking-widest" style={PS2}>
+            Human team vs {cpuCharacter.name} · New players join the human team
+          </div>
+        </SinglePlayerPanel>
+      )}
     </div>
   );
 }
 
-function WaitingScreen({ isSeated, seatNumber, role, gs }) {
+function WaitingScreen({ isSeated, seatNumber, role, gs, isSinglePlayer }) {
   return (
     <div className="flex-1 flex items-center justify-center text-center px-4">
       <div className="space-y-5">
         <div className="text-6xl">🎯</div>
-        <div className="text-lg tracking-widest text-white/40 uppercase" style={PS2}>Waiting for Host…</div>
+        <div className="text-lg tracking-widest text-white/40 uppercase" style={PS2}>
+          {isSinglePlayer ? '⏳ Starting 1P Mode…' : 'Waiting for Host…'}
+        </div>
         {isSeated ? (
           <div className="px-6 py-4 rounded-xl border-2 border-[#BC13FE]/50 bg-[#BC13FE]/10"
             style={{ boxShadow: '0 0 20px rgba(188,19,254,0.2)' }}>

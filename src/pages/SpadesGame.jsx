@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import { fillEmptySeatsWithCPU, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
+import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -12,11 +14,12 @@ export default function SpadesGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const isCreator = params.get('creator') === '1';
+  const cpuId = params.get('cpu');
   if (!roomCode) {
     window.location.href = '/games';
     return null;
   }
-  return <SpadesViewer roomCode={roomCode} isCreator={isCreator} />;
+  return <SpadesViewer roomCode={roomCode} isCreator={isCreator} cpuId={cpuId} />;
 }
 
 // ─── Seating helpers ─────────────────────────────────────────────────────────
@@ -44,8 +47,12 @@ function emptySeatsIn(players) {
 
 // ─── Main viewer component ────────────────────────────────────────────────────
 
-function SpadesViewer({ roomCode, isCreator }) {
+function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'spades', 'viewer');
+  const isSinglePlayer = !!(cpuId);
+  const cpuCharacter = isSinglePlayer
+    ? TEXASNOMAD_CHARACTERS.find(c => c.id === cpuId) || null
+    : null;
 
   // Stable per-browser player ID
   const [playerId] = useState(() => {
@@ -553,6 +560,15 @@ function SpadesViewer({ roomCode, isCreator }) {
         </div>
       ) : (
         <div className="flex-1 relative">
+          {isSinglePlayer && cpuCharacter && isPlayer && (
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4">
+              <SinglePlayerPanel cpuCharacter={cpuCharacter} gameLabel="Spades">
+                <div className="text-[7px] text-white/30 uppercase tracking-widest" style={PS2}>
+                  CPU fills empty seats · 1P mode
+                </div>
+              </SinglePlayerPanel>
+            </div>
+          )}
           <SpadesTable
             gs={gs}
             playerId={playerId}

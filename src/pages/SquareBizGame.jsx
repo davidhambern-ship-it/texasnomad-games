@@ -4,12 +4,15 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import RoleSelector from '@/components/game/RoleSelector.jsx';
+import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
 export default function SquareBizGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
+  const cpuId = params.get('cpu');
   if (!roomCode) { window.location.href = '/'; return null; }
-  return <SquareBizViewer roomCode={roomCode} />;
+  return <SquareBizViewer roomCode={roomCode} cpuId={cpuId} />;
 }
 
 function checkWinner(b) {
@@ -20,9 +23,13 @@ function checkWinner(b) {
   return null;
 }
 
-function SquareBizViewer({ roomCode }) {
+function SquareBizViewer({ roomCode, cpuId }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'square-biz', 'viewer');
   const gs = room?.game_state || {};
+  const isSinglePlayer = !!(cpuId || gs.single_player);
+  const cpuCharacter = isSinglePlayer
+    ? TEXASNOMAD_CHARACTERS.find(c => c.id === (cpuId || gs.cpu_opponent_id)) || null
+    : null;
   const roomPlayers = gs.players || [];
   const sbPlayers = gs.sb_players || [];
   const sbQueue = gs.sb_queue || [];
@@ -102,7 +109,12 @@ function SquareBizViewer({ roomCode }) {
               <div className="w-2 h-2 rounded-full bg-[#BC13FE] animate-pulse" />
               <span className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>ROOM {roomCode}</span>
             </div>
-            {room?.host_connected && (
+            {isSinglePlayer && (
+              <span className="px-2 py-0.5 bg-[#FFD700]/10 border border-[#FFD700]/40 rounded text-[#FFD700] text-[7px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                🤖 1P vs CPU
+              </span>
+            )}
+            {!isSinglePlayer && room?.host_connected && (
               <span className="px-2 py-0.5 bg-green-500/20 border border-green-500/50 rounded text-green-400 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 🔴 HOST LIVE
               </span>
@@ -129,7 +141,7 @@ function SquareBizViewer({ roomCode }) {
       ) : displayMode === 'panel' ? (
         <PanelModeBoard gs={gs} />
       ) : (
-        <BoardModeBoard gs={gs} updateState={updateState} playerId={playerId} seatNumber={seatNumber} isSeated={isSeated} chosenRole={chosenRole} />
+        <BoardModeBoard gs={gs} updateState={updateState} playerId={playerId} seatNumber={seatNumber} isSeated={isSeated} chosenRole={chosenRole} isSinglePlayer={isSinglePlayer} cpuCharacter={cpuCharacter} />
       )}
     </div>
   );
@@ -226,7 +238,7 @@ function PanelModeBoard({ gs }) {
 }
 
 /* ── BOARD MODE ── */
-function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chosenRole }) {
+function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chosenRole, isSinglePlayer, cpuCharacter }) {
   const board = gs.board || Array(9).fill('');
   const currentTurn = gs.current_turn || 'X';
   const boardLocked = gs.board_locked !== false;
@@ -560,6 +572,17 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
       </div>
 
       <div className="flex-1" />
+
+      {/* 1P CPU Panel — shown in single player mode */}
+      {isSinglePlayer && cpuCharacter && (
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 w-full max-w-sm px-4">
+          <SinglePlayerPanel cpuCharacter={cpuCharacter} gameLabel="Square Biz">
+            <div className="text-[7px] text-white/30 uppercase tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              Playing as {myRole || 'Player'} · CPU controls the other side
+            </div>
+          </SinglePlayerPanel>
+        </div>
+      )}
     </div>
   );
 }
