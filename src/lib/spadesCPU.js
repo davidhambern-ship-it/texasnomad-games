@@ -264,8 +264,8 @@ function buildContext(hand, trick, myBid, booksWon, spadesBroken, gameState, myS
   // What's winning the current trick
   const activeSuit = trick.length > 0 ? getActiveSuit(trick) : null;
   const currentWinner = trick.length > 0 ? determineTrickWinner(trick, activeSuit) : null;
-  const partnerIsWinning = currentWinner && partnerSeat !== undefined &&
-    players.find(p => p.seatNumber === partnerSeat)?.playerId === currentWinner.playerId;
+  // Partner is winning if the current trick winner's seat is the partner's seat
+  const partnerIsWinning = !!(currentWinner && currentWinner.seatNumber === partnerSeat);
 
   // Partner-aware: who played before me and what did they play?
   const lastPlay = trick.length > 0 ? trick[trick.length - 1] : null;
@@ -515,74 +515,54 @@ function selectFollowCard(ctx) {
 function followWithSuit(ctx, suitCards) {
   // suitCards are sorted descending (highest first)
   const { 
-    activeSuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
-    trick, myBid, booksWon, tricksLeft, partnerPlayedLow, partnerPlayedHigh, 
-    partnerPlayedMid, partnerMayBeFishing, partnerSeat, winnerStrength,
-    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
+    activeSuit, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
+    tricksLeft, partnerPlayedMid, winnerStrength,
+    oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
   } = ctx;
   
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
-  
-  // Find lowest card that can beat current winner
+  const lowest = suitCards[suitCards.length - 1]; // suitCards sorted descending → last is lowest
+
+  // Find lowest card that beats the current winner
   const winningCards = suitCards.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
 
-  // ─── PARTNER IS WINNING ─────────────────────────────────────────────────────
-  // Partner is currently winning the trick
+  // ─── PARTNER IS WINNING — highest priority ──────────────────────────────────
+  // Never overtake or waste a high card on partner's winning play.
+  // Only break this rule in desperate endgame (≤2 tricks left AND team will miss bid
+  // AND we have a card that definitely wins).
   if (partnerIsWinning) {
-    // Default: play lowest to avoid overtaking partner
-    // Save high cards for when we really need them
-    return suitCards[suitCards.length - 1];
+    const desperateEndgame = tricksLeft <= 2 && teamNeedsBooksMore >= tricksLeft && winningCards.length > 0;
+    if (desperateEndgame) {
+      // Use the absolute cheapest card that wins to take the book ourselves
+      return winningCards[winningCards.length - 1];
+    }
+    // Normal case: duck — play the lowest legal card in suit
+    return lowest;
   }
 
   // ─── OPPONENT IS WINNING ────────────────────────────────────────────────────
-  // Opponent is currently winning
-  
-  // SET STRATEGY: Opponent winning a critical book that helps them make bid
+
+  // SET STRATEGY: steal a critical book from opponents cheaply
   if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0 && winningCards.length > 0) {
-    // Try to win this book away from opponents if we can do it cheaply
-    // Don't waste high cards unless it's a critical book (last few they need)
     const isCriticalBook = oppTeamNeedsBooks <= tricksLeft && tricksLeft <= 3;
     if (isCriticalBook || setPressure >= 2) {
-      // Critical: use lowest winning card to steal the book
-      return winningCards[winningCards.length - 1];
-    }
-  }
-  
-  // TEAM NEEDS BOOKS: Win with lowest possible card
-  if (iNeedBook && winningCards.length > 0) {
-    // LOWEST WINNING CARD RULE: Play the minimum card that wins
-    return winningCards[winningCards.length - 1];
-  }
-
-  // PARTNER PLAYED LOW (signal for help): Partner may need support
-  if (partnerPlayedLow && !iNeedBook) {
-    // Partner led low or played low - may be trying to save high cards
-    // If we can win cheaply, do it to help partner
-    if (winningCards.length > 0) {
       return winningCards[winningCards.length - 1]; // lowest winner
     }
   }
 
-  // PARTNER PLAYED MID (fishing signal): Partner may be fishing
-  if (partnerMayBeFishing && iNeedBook) {
-    // Partner is likely trying to draw out high cards
-    // Support by playing high if we can control the suit
-    if (winningCards.length > 0) {
-      // Play highest useful card to apply pressure and draw out opponent face cards
-      return winningCards[0]; // highest winner
-    }
+  // TEAM NEEDS BOOKS: win with cheapest possible card
+  if (iNeedBook && winningCards.length > 0) {
+    return winningCards[winningCards.length - 1];
   }
 
-  // PARTNER PLAYED HIGH: Partner is winning or tried to win
-  if (partnerPlayedHigh) {
-    // Partner already played high - don't waste another high card
-    // Play lowest regardless of whether we could win
-    return suitCards[suitCards.length - 1];
+  // PARTNER FISHING (mid-card signal): support with highest winner to apply pressure
+  if (partnerPlayedMid && iNeedBook && winningCards.length > 0) {
+    return winningCards[0]; // highest winner
   }
 
-  // TEAM HAS MADE BID: Avoid bags at all costs
+  // TEAM HAS MADE BID or can't win: dump lowest to avoid bags
   if (teamHasMadeBid) {
-    return suitCards[suitCards.length - 1];
+    return lowest;
   }
 
   // LATE GAME DESPERATION: ≤3 tricks left and we need books
@@ -590,95 +570,66 @@ function followWithSuit(ctx, suitCards) {
     return winningCards[winningCards.length - 1];
   }
 
-  // DEFAULT: Win cheaply if possible, otherwise dump lowest
-  if (winningCards.length > 0) {
-    return winningCards[winningCards.length - 1];
-  }
-  return suitCards[suitCards.length - 1];
+  // DEFAULT: win cheaply if possible, otherwise dump lowest
+  return winningCards.length > 0 ? winningCards[winningCards.length - 1] : lowest;
 }
 
 function voidPlay(ctx) {
   const { 
-    bySuit, currentWinner, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
-    activeSuit, tricksLeft, myBid, booksWon, partnerPlayedLow, partnerPlayed,
-    winnerStrength, partnerSeat, voids,
-    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
+    bySuit, partnerIsWinning, teamHasMadeBid, teamNeedsBooksMore, 
+    activeSuit, tricksLeft, winnerStrength,
+    oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure
   } = ctx;
   const iNeedBook = !teamHasMadeBid && teamNeedsBooksMore > 0;
 
   const spades = bySuit['♠'] || [];
   const jokers = bySuit['Joker'] || [];
-  const allTrump = [...jokers, ...spades]; // sorted highest first
+  const allTrump = [...jokers, ...spades];
   allTrump.sort((a, b) => cardVal(b) - cardVal(a));
+  const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
 
-  // ─── PARTNER IS WINNING ─────────────────────────────────────────────────────
-  // NEVER cut partner unless absolutely critical
+  // ─── PARTNER IS WINNING — never cut partner ─────────────────────────────────
+  // Only break this rule if team absolutely cannot make bid in endgame.
   if (partnerIsWinning) {
-    // Partner is winning - throw away lowest non-trump
-    // Save trump for when opponents are winning
+    const desperateEndgame = tricksLeft <= 2 && teamNeedsBooksMore >= tricksLeft;
+    if (desperateEndgame && winningTrump.length > 0) {
+      // Cut with cheapest winning trump to guarantee we get the book
+      return winningTrump[winningTrump.length - 1];
+    }
     return sluffLowest(bySuit);
   }
 
-  // ─── TEAM HAS MADE BID ──────────────────────────────────────────────────────
-  // Avoid bags - don't cut, just dump garbage
+  // ─── TEAM HAS MADE BID: dump garbage, no cutting ───────────────────────────
   if (teamHasMadeBid) {
     return sluffLowest(bySuit);
   }
 
-  // ─── OPPONENT WINNING - CUT DECISION ────────────────────────────────────────
-  // Opponent is winning - decide whether to cut
-  
-  const winningTrump = allTrump.filter(c => getCardStrength(c, activeSuit) > winnerStrength);
-  
-  // SET STRATEGY: Opponent winning a book that helps them make their bid
-  // Cut them off if we can do it without wasting critical trump
+  // ─── OPPONENT WINNING — decide whether to cut ──────────────────────────────
+
+  // SET STRATEGY: cut opponents off a critical book
   if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0 && winningTrump.length > 0) {
     const isCriticalBook = oppTeamNeedsBooks <= tricksLeft && tricksLeft <= 3;
     if (isCriticalBook || setPressure >= 2) {
-      // Cut with lowest winning trump to steal the book
+      return winningTrump[winningTrump.length - 1]; // lowest winning trump
+    }
+  }
+
+  // TEAM NEEDS BOOKS: cut with lowest winning trump, protect high trump
+  if (iNeedBook && winningTrump.length > 0) {
+    const wouldWasteHighTrump = winningTrump[winningTrump.length - 1] &&
+      cardVal(winningTrump[winningTrump.length - 1]) >= 14 && winningTrump.length === 1;
+    // Don't burn a Joker/Ace to win an early book unless it's endgame
+    if (!wouldWasteHighTrump || tricksLeft <= 3) {
       return winningTrump[winningTrump.length - 1];
     }
   }
-  
-  // TEAM NEEDS BOOKS: Cut with lowest winning trump
-  if (iNeedBook && winningTrump.length > 0) {
-    // LOWEST WINNING TRUMP RULE: Don't waste high trump
-    // Save Jokers and Ace/King of Spades for crucial moments
+
+  // LATE GAME DESPERATION: ≤3 tricks left and team needs books
+  if (iNeedBook && tricksLeft <= 3 && winningTrump.length > 0) {
     return winningTrump[winningTrump.length - 1];
   }
 
-  // PARTNER PLAYED LOW (needs help): Consider cutting if we can win
-  if (partnerPlayedLow && allTrump.length > 0 && winningTrump.length > 0) {
-    // Partner may need help - cut with lowest winning trump
-    return winningTrump[winningTrump.length - 1];
-  }
-
-  // ─── HIGH TRUMP PROTECTION ──────────────────────────────────────────────────
-  // Don't waste these unless necessary:
-  // - Big Joker, Little Joker
-  // - Ace of Spades, King of Spades
-  
-  const highTrump = allTrump.filter(c => cardVal(c) >= 14); // Jokers and Ace
-  const wouldWasteHighTrump = winningTrump.some(c => cardVal(c) >= 14);
-  
-  if (wouldWasteHighTrump && !iNeedBook) {
-    // We'd have to waste a high trump but we don't desperately need the book
-    // Sluff lowest instead - save high trump for later
-    return sluffLowest(bySuit);
-  }
-
-  // ─── LATE GAME DESPERATION ──────────────────────────────────────────────────
-  // ≤3 tricks left and we need books - be aggressive with trump
-  if (iNeedBook && tricksLeft <= 3 && allTrump.length > 0) {
-    if (winningTrump.length > 0) {
-      return winningTrump[winningTrump.length - 1]; // lowest winning trump
-    }
-    // Can't win - sluff lowest
-    return sluffLowest(bySuit);
-  }
-
-  // ─── DEFAULT: DON'T CUT UNLESS WE NEED THE BOOK ─────────────────────────────
-  // Opponent winning, we don't need books - sluff lowest
+  // DEFAULT: sluff lowest — don't waste trump unnecessarily
   return sluffLowest(bySuit);
 }
 
