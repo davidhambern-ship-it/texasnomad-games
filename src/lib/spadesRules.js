@@ -60,8 +60,7 @@ export function validateDeck(deck) {
   
   // Check deck size (should be 52 for TexasNomad Spades)
   if (deck.length !== 52) {
-  errors.push(`Invalid deck size: ${deck.length} (expected 52)`);
-}
+    errors.push(`Invalid deck size: ${deck.length} (expected 52)`);
   }
 
   // Check for duplicate card IDs

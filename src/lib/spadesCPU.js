@@ -356,17 +356,15 @@ function collectPlayedCards(gameState, currentTrick) {
 // ─── LEADING ────────────────────────────────────────────────────────────────
 
 function selectLeadCard(ctx) {
-  const { hand, bySuit, myBid, booksWon, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, remainingHigh, tricksLeft, playedCardIds,
-    oppTeamBid, oppTeamBooksWon, oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure } = ctx;
+  const { hand, bySuit, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, tricksLeft, playedCardIds,
+    oppTeamNeedsBooks, oppTeamCanStillMakeBid, setPressure } = ctx;
 
   const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
 
-  // ── TEAM HAS MADE BID: Lead low to avoid bags ───────────────────────────────
+  // ── TEAM HAS MADE BID: Lead aggressively or low depending on set pressure ───
   if (teamHasMadeBid) {
     // SET STRATEGY: If opponents can still make bid, lead aggressively to block them
     if (setPressure >= 1 && oppTeamCanStillMakeBid && oppTeamNeedsBooks > 0) {
-      // Lead from suit where opponents are weak or need to burn high cards
-      // Prefer leading Aces or Kings to force out opponent high cards
       for (const suit of ['♥', '♦', '♣']) {
         const cards = bySuit[suit];
         if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
@@ -376,6 +374,69 @@ function selectLeadCard(ctx) {
     }
     return leadAggressive(ctx);
   }
+
+  // ── TEAM NEEDS BOOKS: Lead offensively ──────────────────────────────────────
+
+  // LATE GAME DESPERATION (≤3 tricks left): Lead highest available winner
+  if (tricksLeft <= 3 && teamNeedsBooksMore > 0) {
+    for (const suit of ['♥', '♦', '♣']) {
+      const cards = bySuit[suit];
+      if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
+        return cards[0];
+      }
+    }
+    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
+    if (spades.length > 0) return spades[0];
+  }
+
+  // FAR BEHIND: Lead Joker if we need 3+ books
+  if (teamNeedsBooksMore >= 3 && bySuit['Joker'].length > 0) {
+    return bySuit['Joker'][0];
+  }
+
+  // SAFE LEAD: Ace of non-spade suit (guaranteed winner if not played)
+  for (const suit of ['♥', '♦', '♣']) {
+    const cards = bySuit[suit];
+    if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
+      return cards[0];
+    }
+  }
+
+  // KING LEAD: Lead King from suit where Ace is gone (now top card)
+  for (const suit of ['♥', '♦', '♣']) {
+    const cards = bySuit[suit];
+    if (cards.length >= 2 && cardVal(cards[0]) === 13) {
+      if (playedCardIds.has(`${suit}A`)) return cards[0];
+    }
+  }
+
+  // LONG SUIT: Lead from long strong suit to establish winners
+  const nonSpades = ['♥', '♦', '♣'].filter(s => bySuit[s].length > 0);
+  if (nonSpades.length > 0 && hasNonSpade) {
+    const longest = nonSpades.reduce((a, b) => bySuit[a].length >= bySuit[b].length ? a : b);
+    const cards = bySuit[longest];
+    if (cards.length >= 3 && cardVal(cards[0]) >= 13) {
+      return cards[0];
+    }
+  }
+
+  // PULL TRUMP: If spades are broken and we need books, lead high spade
+  if (spadesBroken && bySuit['♠'].length > 0 && teamNeedsBooksMore > 0) {
+    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
+    if (spades.length > 0) return spades[0];
+  }
+
+  // MUST LEAD SPADES: Only suit available or spades broken
+  if (bySuit['♠'].length > 0 && (!hasNonSpade || spadesBroken)) {
+    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
+    if (spades.length > 0) return spades[Math.floor(spades.length / 2)];
+    return bySuit['Joker'][0] || bySuit['♠'][0];
+  }
+
+  // DEFAULT: Lead lowest non-spade (safe lead)
+  return leadLowest(bySuit, spadesBroken, hasNonSpade);
+}
+
 function leadAggressive(ctx) {
   const { bySuit, hand, spadesBroken, teamHasMadeBid, teamNeedsBooksMore, setPressure } = ctx;
   const hasNonSpade = hand.some(c => c.suit !== '♠' && c.suit !== 'Joker');
@@ -389,10 +450,8 @@ function leadAggressive(ctx) {
 
   for (const suit of ['♥', '♦', '♣']) {
     const cards = bySuit[suit] || [];
-
     cards.forEach((card, index) => {
       const v = cardVal(card);
-
       options.push({
         card,
         score:
@@ -423,71 +482,6 @@ function leadAggressive(ctx) {
     return jokers[0];
   }
 
-  return leadLowest(bySuit, spadesBroken, hasNonSpade);
-}
-  // ── TEAM NEEDS BOOKS: Lead offensively ──────────────────────────────────────
-
-  // LATE GAME DESPERATION (≤3 tricks left): Lead highest available winner
-  if (tricksLeft <= 3 && teamNeedsBooksMore > 0) {
-    // Check for sure winners first (Aces that haven't been played)
-    for (const suit of ['♥', '♦', '♣']) {
-      const cards = bySuit[suit];
-      if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
-        return cards[0]; // Ace still good
-      }
-    }
-    // Lead highest spade if no side aces (but not Jokers)
-    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
-    if (spades.length > 0) return spades[0];
-  }
-
-  // FAR BEHIND: Lead Joker if we need 3+ books
-  if (teamNeedsBooksMore >= 3 && bySuit['Joker'].length > 0) {
-    return bySuit['Joker'][0]; // BJ first (sorted highest)
-  }
-
-  // SAFE LEAD: Ace of non-spade suit (guaranteed winner if not played)
-  for (const suit of ['♥', '♦', '♣']) {
-    const cards = bySuit[suit];
-    if (cards.length > 0 && cardVal(cards[0]) === 14 && !playedCardIds.has(`${suit}A`)) {
-      return cards[0];
-    }
-  }
-
-  // KING LEAD: Lead King from suit where Ace is gone (now top card)
-  for (const suit of ['♥', '♦', '♣']) {
-    const cards = bySuit[suit];
-    if (cards.length >= 2 && cardVal(cards[0]) === 13) {
-      const aceGone = playedCardIds.has(`${suit}A`);
-      if (aceGone) return cards[0];
-    }
-  }
-
-  // LONG SUIT: Lead from long strong suit to establish winners
-  const nonSpades = ['♥', '♦', '♣'].filter(s => bySuit[s].length > 0);
-  if (nonSpades.length > 0 && hasNonSpade) {
-    const longest = nonSpades.reduce((a, b) => bySuit[a].length >= bySuit[b].length ? a : b);
-    const cards = bySuit[longest];
-    if (cards.length >= 3 && cardVal(cards[0]) >= 13) {
-      return cards[0]; // Lead high from long suit
-    }
-  }
-
-  // PULL TRUMP: If spades are broken and we need books, lead high spade
-  if (spadesBroken && bySuit['♠'].length > 0 && teamNeedsBooksMore > 0) {
-    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
-    if (spades.length > 0) return spades[0]; // Lead highest non-joker spade
-  }
-
-  // MUST LEAD SPADES: Only suit available or spades broken
-  if (bySuit['♠'].length > 0 && (!hasNonSpade || spadesBroken)) {
-    // Lead middle-value spade to pull trump without burning jokers
-    const spades = bySuit['♠'].filter(c => c.value !== 'BJ' && c.value !== 'LJ');
-    if (spades.length > 0) return spades[Math.floor(spades.length / 2)];
-    return bySuit['Joker'][0] || bySuit['♠'][0];
-  }
-
-  // DEFAULT: Lead lowest non-spade (safe lead)
   return leadLowest(bySuit, spadesBroken, hasNonSpade);
 }
 
