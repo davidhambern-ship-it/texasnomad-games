@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
+import HostHandBox from './spades/HostHandBox';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer } from '@/lib/spadesCPU';
 import { generateFullDeck, shuffleDeck as shuffleDeckRules, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
@@ -258,6 +259,8 @@ export default function SpadesHostPanel({ gs, updateState }) {
           <HostSeatSlot seatNumber={1} player={getPlayerAtSeat(1)} onKick={kickPlayer} onForceTurn={forceTurn} currentBidderSeat={gs.current_bidder_seat} currentTurnSeat={gs.current_turn_seat} isBidding={isBidding} isPlaying={isPlaying} onSetBid={() => {}} isHostSeat={getPlayerAtSeat(1)?.playerId === HOST_PLAYER_ID} />
         </div>
       </div>
+
+      <HostHandBox hostPlayerId={HOST_PLAYER_ID} players={players} />
 
       <div className="grid grid-cols-2 gap-4">
         {[
