@@ -5,7 +5,6 @@ import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import RoleSelector from '@/components/game/RoleSelector.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
-import { base44 } from '@/api/base44Client';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -194,16 +193,39 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setTimeout(() => setCpuDialogue(''), 3000);
   };
 
-  // Load a random trivia question
+  // Load a random trivia question from OpenTDB
   const loadQuestion = async () => {
-    const all = await base44.entities.SquareBizTrivia.list('-created_date', 100);
-    if (!all || all.length === 0) return null;
-    const active = all.filter(q => q.active !== false);
-    const unused = active.filter(q => !usedQuestionIds.includes(q.id));
-    const pool = unused.length > 0 ? unused : active;
-    const q = pool[Math.floor(Math.random() * pool.length)];
-    setUsedQuestionIds(prev => [...prev, q.id]);
-    return q;
+    const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
+    const data = await res.json();
+    if (!data.results || data.results.length === 0) return null;
+    const item = data.results[0];
+
+    // Decode HTML entities
+    const decode = (str) => {
+      const txt = document.createElement('textarea');
+      txt.innerHTML = str;
+      return txt.value;
+    };
+
+    const question = decode(item.question);
+    const correct = decode(item.correct_answer);
+    const incorrects = item.incorrect_answers.map(decode);
+
+    // Shuffle answers into A/B/C/D slots
+    const allAnswers = [correct, ...incorrects].sort(() => Math.random() - 0.5);
+    const letters = ['A', 'B', 'C', 'D'];
+    const correctLetter = letters[allAnswers.indexOf(correct)];
+
+    return {
+      id: Math.random().toString(36),
+      question,
+      answer_a: allAnswers[0],
+      answer_b: allAnswers[1],
+      answer_c: allAnswers[2],
+      answer_d: allAnswers[3],
+      correct_answer: correctLetter,
+      category: decode(item.category),
+    };
   };
 
   // Human selects a square → load question for human to answer
