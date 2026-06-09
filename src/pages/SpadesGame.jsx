@@ -11,11 +11,12 @@ const SPADES_SEATS = [1, 2, 3, 4];
 export default function SpadesGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
+  const isCreator = params.get('creator') === '1';
   if (!roomCode) {
     window.location.href = '/games';
     return null;
   }
-  return <SpadesViewer roomCode={roomCode} />;
+  return <SpadesViewer roomCode={roomCode} isCreator={isCreator} />;
 }
 
 // ─── Seating helpers ─────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ function emptySeatsIn(players) {
 
 // ─── Main viewer component ────────────────────────────────────────────────────
 
-function SpadesViewer({ roomCode }) {
+function SpadesViewer({ roomCode, isCreator }) {
   const { room, loading, updateState } = useGameRoom(roomCode, 'spades', 'viewer');
 
   // Stable per-browser player ID
@@ -102,8 +103,17 @@ function SpadesViewer({ roomCode }) {
         setMyRole('spectator');
         setJoinFlow('spectating');
       }
+    } else if (isCreator) {
+      // Room creator — auto-sit in first available seat, then show CPU choice
+      const firstEmpty = emptySeatsIn(players);
+      const seatTarget = firstEmpty.length > 0 ? firstEmpty[0] : null;
+      if (seatTarget) {
+        sitInSeat(seatTarget).then(() => setJoinFlow('cpu'));
+      } else {
+        setJoinFlow('cpu');
+      }
     } else {
-      // New visitor — show Play/Spectate
+      // Joiner — show Play/Spectate
       setJoinFlow('choose');
     }
   }, [room]);
@@ -293,19 +303,22 @@ function SpadesViewer({ roomCode }) {
     setJoinFlow('seated');
   };
 
-  // Join flow: user clicks "Play"
+  // Join flow: user clicks "Play" (joiners only — no CPU prompt)
   const handleChooseSit = async () => {
     if (!room) return;
-    const joinable = joinableSeatsFor(players);
-    if (joinable.length === 0) {
-      // All human, become spectator
+    // Empty seats first, then CPU seats — never replace a human
+    const emptySeats = emptySeatsIn(players);
+    const cpuSeats = SPADES_SEATS.filter(s => {
+      const p = players.find(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'));
+      return p && p.playerType === 'cpu';
+    });
+    const available = [...emptySeats, ...cpuSeats];
+    if (available.length === 0) {
+      // All 4 seats taken by humans — spectate only
       await handleChooseSpectate();
       return;
     }
-    // Prefer empty over CPU
-    const emptySeats = emptySeatsIn(players);
-    const target = emptySeats.length > 0 ? emptySeats[0] : joinable[0];
-    await sitInSeat(target);
+    await sitInSeat(available[0]);
   };
 
   // Join flow: user clicks "Spectate"
@@ -466,14 +479,28 @@ function SpadesViewer({ roomCode }) {
               <div className="text-white/60 text-sm">ROOM {roomCode}</div>
             </div>
             <div className="space-y-3">
-              {joinable.length > 0 ? (
-                <button onClick={handleChooseSit}
-                  className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
-                  🎯 Play (Take a Seat)
-                </button>
-              ) : null}
+              {(() => {
+                const cpuSeats = SPADES_SEATS.filter(s => {
+                  const p = players.find(p => p.seatNumber === s && (p.role === 'player' || p.role === 'hostPlayer'));
+                  return p && p.playerType === 'cpu';
+                });
+                const canPlay = emptySeats.length > 0 || cpuSeats.length > 0;
+                return canPlay ? (
+                  <button onClick={handleChooseSit}
+                    className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                    🎯 Play (Take a Seat)
+                    {cpuSeats.length > 0 && emptySeats.length === 0 && (
+                      <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Replace a CPU player</div>
+                    )}
+                  </button>
+                ) : (
+                  <div className="w-full py-3 px-6 border border-white/10 rounded-xl text-center text-white/30 text-[8px] tracking-widest uppercase" style={PS2}>
+                    🚫 All seats taken by players
+                  </div>
+                );
+              })()}
               <button onClick={handleChooseSpectate}
-                className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#6b7280] to-[#4b5563] hover:from-[#4b5563] hover:to-[#6b7280] text-white font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
                 👁 Spectate
               </button>
             </div>
@@ -487,17 +514,19 @@ function SpadesViewer({ roomCode }) {
           <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#FFD700]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
             style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
             <div className="text-center mb-6">
-              <div className="text-xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Empty Seats</div>
-              <div className="text-white/60 text-sm">{emptySeats.length} seat{emptySeats.length !== 1 ? 's' : ''} still open</div>
+              <div className="text-xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Set Up Room</div>
+              <div className="text-white/60 text-sm">How do you want to fill the empty seats?</div>
             </div>
             <div className="space-y-3">
               <button onClick={handlePlayAgainstCPU}
-                className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
-                🤖 Fill with CPU
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                🤖 Play with CPU
+                <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Fill empty seats with AI players</div>
               </button>
               <button onClick={handleWaitForRealPlayers}
-                className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-lg uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
+                className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
                 👥 Wait for Players
+                <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Share room code and play with humans</div>
               </button>
             </div>
           </div>

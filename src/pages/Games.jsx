@@ -357,7 +357,7 @@ export default function Games() {
         game_state: {},
       });
       const game = GAMES.find(g => g.id === gameId);
-      navigate(`${game.path}?room=${code}`);
+      navigate(`${game.path}?room=${code}&creator=1`);
     } catch (e) {
       console.error('Failed to create room', e);
     } finally {
