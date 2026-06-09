@@ -6,6 +6,7 @@ import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import BYEDisplay from '@/components/game/BYEDisplay.jsx';
 import RoleSelection from '@/components/game/RoleSelection.jsx';
+import { findMatchingAnswer } from '@/lib/bffAnswerMatch';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -109,8 +110,6 @@ function BFFViewer({ roomCode }) {
     setMyFamily(familyTeam);
   };
 
-  const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-
   // Helper: get steal player from opposing family
   const getStealPlayerForFamily = (byeFamily, currentPlayers) => {
     const oppFam = byeFamily === 1 ? 2 : 1;
@@ -124,12 +123,7 @@ function BFFViewer({ roomCode }) {
     setSubmitResult(null);
 
     const answers = gs.answers || [];
-    const cleanGuess = normalize(guess);
-    const matchIdx = answers.findIndex((a) => {
-      if (a.revealed) return false; // already revealed
-      const cleanAns = normalize(a.answer || a.text);
-      return cleanAns === cleanGuess || (cleanAns.length >= 4 && cleanGuess.includes(cleanAns)) || (cleanGuess.length >= 4 && cleanAns.includes(cleanGuess));
-    });
+    const { idx: matchIdx } = findMatchingAnswer(guess, answers, true);
 
     const me = players.find(p => p.playerId === playerId);
 

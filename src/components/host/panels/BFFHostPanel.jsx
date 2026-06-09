@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { base44 } from '@/api/base44Client';
 import { pickFaceoffPlayers, getNextPlayer, getActivePlayers } from '@/lib/bffRotation';
+import { findMatchingAnswer } from '@/lib/bffAnswerMatch';
 
 const Btn = ({ children, onClick, color = '#BC13FE', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -130,26 +131,28 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     };
   }, [gs.steal_result]);
 
-  const normalize = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
-
   const checkAnswer = async (guess) => {
     if (!guess.trim() || answers.length === 0) return;
-    const cleanGuess = normalize(guess);
-    const matchIdx = answers.findIndex((a) => {
-      const cleanAns = normalize(a.answer || a.text);
-      return cleanAns === cleanGuess || (cleanAns.length >= 4 && cleanGuess.includes(cleanAns)) || (cleanGuess.length >= 4 && cleanAns.includes(cleanGuess));
+    const { idx: matchIdx, result: matchResult } = findMatchingAnswer(guess, answers, true);
+
+    // Check if already revealed (findMatchingAnswer skips revealed, so check separately)
+    const alreadyRevealedIdx = answers.findIndex((a) => {
+      if (!a.revealed) return false;
+      const { match } = findMatchingAnswer(guess, [{ ...a, revealed: false }], false);
+      return match;
     });
-    if (matchIdx === -1) {
+
+    if (alreadyRevealedIdx !== -1) {
+      setCheckResult({ type: 'warn', message: `Already revealed: "${answers[alreadyRevealedIdx].text || answers[alreadyRevealedIdx].answer}"` });
+    } else if (matchIdx === -1) {
       setCheckResult({ type: 'miss', message: `"${guess}" — NOT on the board` });
-    } else if (answers[matchIdx].revealed) {
-      setCheckResult({ type: 'warn', message: `Already revealed: "${answers[matchIdx].text || answers[matchIdx].answer}"` });
     } else {
-      // Auto-reveal the answer on the board and add points to the bank
       const ans = answers[matchIdx];
       const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
       const newBank = (gs.round_bank || 0) + (ans.points || 0);
       await updateState({ answers: newAnswers, round_bank: newBank });
-      setCheckResult({ type: 'hit', message: `✓ Revealed: "${ans.text || ans.answer}" — ${ans.points} pts added to bank!` });
+      const typeLabel = matchResult?.type || 'match';
+      setCheckResult({ type: 'hit', message: `✓ [${typeLabel}] Revealed: "${ans.text || ans.answer}" — ${ans.points} pts added to bank!` });
     }
     setAnswerInput('');
     setTimeout(() => setCheckResult(null), 5000);
