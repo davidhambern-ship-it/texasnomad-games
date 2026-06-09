@@ -260,9 +260,9 @@ export function getCardStrength(card, activeSuit = null) {
     'BJ': 101,
   };
 
-  // Jokers are highest trump
-  if (card.value === 'BJ') return 101;
-  if (card.value === 'LJ') return 100;
+  // Jokers are classified as Spades — highest trump cards
+  if (card.value === 'BJ') return 50 + 16; // Big Joker: highest spade
+  if (card.value === 'LJ') return 50 + 15; // Little Joker: second highest spade
 
   // Spades are trump and beat all non-spades
   if (card.suit === '♠') {
@@ -301,8 +301,14 @@ export function isValidPlay(card, hand, currentTrick, activeSuit, spadesBroken, 
   }
 
   // Following — must follow active suit if possible
-  const hasActiveSuit = hand.some(c => c.suit === activeSuit);
-  if (hasActiveSuit && card.suit !== activeSuit) {
+  // Jokers count as Spades for follow-suit purposes
+  const isSpadeOrJoker = (c) => c.suit === '♠' || c.suit === 'Joker';
+  const cardMatchesSuit = activeSuit === '♠' ? isSpadeOrJoker(card) : card.suit === activeSuit;
+  const hasActiveSuit = activeSuit === '♠'
+    ? hand.some(isSpadeOrJoker)
+    : hand.some(c => c.suit === activeSuit);
+
+  if (hasActiveSuit && !cardMatchesSuit) {
     errors.push('You must follow suit');
     return { valid: false, errors };
   }
