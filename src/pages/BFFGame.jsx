@@ -203,15 +203,108 @@ function BFFViewer({ roomCode, isVsAI }) {
 
     const answers = gs.answers || [];
     const { idx: matchIdx } = findMatchingAnswer(guess, answers, true);
+    const submission = { playerId, seatNumber, familyTeam: 1, submittedAnswer: guess, timestamp: Date.now(), result: matchIdx !== -1 ? 'correct' : 'wrong' };
 
+    // ── FACEOFF: first_answer (human buzzed first) ──────────────────────────
+    if (gs.faceoff_phase === 'first_answer') {
+      if (matchIdx !== -1) {
+        const ans = answers[matchIdx];
+        const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+        if (matchIdx === 0) {
+          // #1 answer — instant win, start playing for team 1
+          await updateState({
+            answers: newAnswers, last_submission: submission,
+            faceoff_phase: null, faceoff_first_answer: null, buzz_winner: null,
+            phase: 'playing', buzzer_phase: 'playing',
+            control_team: 1, active_turn: 1,
+            answering_player_id: playerId, answering_ai: false,
+            round_bank: 0, bye_count: 0, wrong_guesses: [], steal_mode: false, current_typing: '',
+          });
+        } else {
+          // Correct but not #1 — AI gets one shot
+          await updateState({
+            answers: newAnswers, last_submission: submission,
+            faceoff_phase: 'second_answer',
+            faceoff_first_answer: { rank: matchIdx, points: ans.points, text: ans.text || ans.answer, team: 1 },
+            answering_player_id: null, answering_ai: true, ai_thinking: true,
+            active_turn: 2, current_typing: '',
+          });
+        }
+        setSubmitResult('hit');
+      } else {
+        // Human wrong on first answer — AI gets one shot
+        await updateState({
+          last_submission: submission,
+          faceoff_phase: 'second_answer',
+          faceoff_first_answer: { rank: -1, points: 0, text: guess, team: 1, wrong: true },
+          answering_player_id: null, answering_ai: true, ai_thinking: true,
+          active_turn: 2, current_typing: '',
+        });
+        setSubmitResult('miss');
+      }
+      setAnswerInput('');
+      setIsSubmitting(false);
+      setTimeout(() => setSubmitResult(null), 3000);
+      return;
+    }
+
+    // ── FACEOFF: second_answer (human is counter-answering) ─────────────────
+    if (gs.faceoff_phase === 'second_answer') {
+      const firstAnswer = gs.faceoff_first_answer || {};
+      if (matchIdx !== -1) {
+        const ans = answers[matchIdx];
+        const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
+        const firstRank = firstAnswer.wrong ? 999 : (firstAnswer.rank ?? 999);
+        const humanWins = matchIdx < firstRank;
+        await updateState({
+          answers: newAnswers, last_submission: submission,
+          faceoff_phase: null, faceoff_first_answer: null, buzz_winner: null,
+          phase: 'playing', buzzer_phase: 'playing',
+          control_team: humanWins ? 1 : 2,
+          active_turn: humanWins ? 1 : 2,
+          answering_player_id: humanWins ? playerId : null,
+          answering_ai: !humanWins,
+          round_bank: 0, bye_count: 0, wrong_guesses: [], steal_mode: false, current_typing: '',
+        });
+        setSubmitResult('hit');
+      } else {
+        // Human wrong on second answer
+        const firstRank = firstAnswer.wrong ? 999 : (firstAnswer.rank ?? 999);
+        if (firstRank < 999) {
+          // AI had a correct first answer → AI wins
+          await updateState({
+            last_submission: submission,
+            faceoff_phase: null, faceoff_first_answer: null, buzz_winner: null,
+            phase: 'playing', buzzer_phase: 'playing',
+            control_team: 2, active_turn: 2,
+            answering_player_id: null, answering_ai: true,
+            round_bank: 0, bye_count: 0, wrong_guesses: [], steal_mode: false, current_typing: '',
+          });
+        } else {
+          // Both wrong → new faceoff
+          await updateState({
+            last_submission: submission,
+            faceoff_phase: null, faceoff_first_answer: null, buzz_winner: null,
+            buzzer_phase: 'board_shown',
+            answering_player_id: null, answering_ai: false,
+            bye_count: 0, wrong_guesses: [], active_turn: 1, current_typing: '',
+          });
+        }
+        setSubmitResult('miss');
+      }
+      setAnswerInput('');
+      setIsSubmitting(false);
+      setTimeout(() => setSubmitResult(null), 3000);
+      return;
+    }
+
+    // ── Normal survey play ───────────────────────────────────────────────────
     if (matchIdx !== -1) {
       const ans = answers[matchIdx];
       const newAnswers = answers.map((a, i) => i === matchIdx ? { ...a, revealed: true } : a);
       const newBank = (gs.round_bank || 0) + (ans.points || 0);
       const allRevealed = newAnswers.every(a => a.revealed);
       const wasSteal = gs.steal_mode;
-
-      const submission = { playerId, seatNumber, familyTeam: 1, submittedAnswer: guess, timestamp: Date.now(), result: 'correct' };
 
       if (wasSteal || allRevealed) {
         const scoreKey = wasSteal ? 'score1' : (gs.active_turn === 1 ? 'score1' : 'score2');
@@ -224,7 +317,6 @@ function BFFViewer({ roomCode, isVsAI }) {
           ...(allRevealed ? { phase: 'round_over' } : {}),
         });
       } else {
-        // Rotate to next human player
         const nextHuman = getNextHumanPlayer(humanPlayers, playerId);
         await updateState({
           answers: newAnswers, round_bank: newBank,
@@ -238,7 +330,6 @@ function BFFViewer({ roomCode, isVsAI }) {
       // Wrong
       const newByeCount = Math.min(3, (gs.bye_count || 0) + 1);
       const newWrong = [...(gs.wrong_guesses || []), guess];
-      const submission = { playerId, seatNumber, familyTeam: 1, submittedAnswer: guess, timestamp: Date.now(), result: 'wrong' };
 
       if (gs.steal_mode) {
         await updateState({
@@ -247,17 +338,14 @@ function BFFViewer({ roomCode, isVsAI }) {
           wrong_guesses: newWrong,
         });
       } else if (newByeCount >= 3) {
-        // BYE complete — switch to AI team
         await updateState({
           bye_count: newByeCount, last_submission: submission,
           wrong_guesses: newWrong,
           answering_player_id: null, current_typing: '',
           answering_ai: true, ai_thinking: true,
-          active_turn: 2,
-          buzz_winner: null,
+          active_turn: 2, buzz_winner: null,
         });
       } else {
-        // Rotate to next human
         const nextHuman = getNextHumanPlayer(humanPlayers, playerId);
         await updateState({
           bye_count: newByeCount, last_submission: submission,
