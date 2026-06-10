@@ -11,7 +11,7 @@ import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
-// ── Word categories for random generation ────────────────────────────────────
+// ── Word bank fallback (used if AI generation fails) ─────────────────────────
 const WORD_BANK = [
   { word: 'JAVASCRIPT', category: 'Technology', hint: 'A programming language for the web' },
   { word: 'QUARTERBACK', category: 'Sports', hint: 'Football field general' },
@@ -34,6 +34,64 @@ const WORD_BANK = [
   { word: 'PHOTOGRAPHY', category: 'Art', hint: 'Capturing light to make images' },
   { word: 'TRAPEZOID', category: 'Math', hint: 'A quadrilateral with one pair of parallel sides' },
 ];
+
+// ── Per-character word themes for AI generation ───────────────────────────────
+const CHARACTER_WORD_THEMES = {
+  dexter:   'intelligent, science, technology, logic, strategy, engineering, mathematics',
+  lemonade: 'bold, action, competition, speed, intensity, high-energy sports',
+  carlos:   'funny, random, entertaining, pop culture, food, silly phrases',
+  violet:   'positive, inspirational, mindfulness, thoughtful, uplifting',
+  tank:     'tough, strength, discipline, military, endurance, power',
+  berna:    'leadership, motivation, competitive, achievement, ambition',
+};
+
+// ── AI word generation via LLM ────────────────────────────────────────────────
+async function generateAIWord(characterId, difficulty) {
+  const theme = CHARACTER_WORD_THEMES[characterId] || 'general knowledge';
+  const diffMap = {
+    easy:   'a common, simple word (4-6 letters)',
+    medium: 'a moderately difficult word or short phrase (6-10 letters)',
+    hard:   'a long, uncommon word or tricky phrase (10+ letters)',
+  };
+  const diffDesc = diffMap[difficulty] || diffMap.medium;
+  try {
+    const res = await base44.integrations.Core.InvokeLLM({
+      prompt: `You are generating a Hangman puzzle word for the character "${characterId}". Their personality themes are: ${theme}. Pick ${diffDesc} that fits their personality. Return ONLY valid JSON with no extra text.`,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          word: { type: 'string', description: 'The secret word or short phrase (uppercase, letters and spaces only, no punctuation)' },
+          category: { type: 'string', description: 'One-word category label' },
+          hint: { type: 'string', description: 'A short helpful hint (1 sentence)' },
+        },
+        required: ['word', 'category', 'hint'],
+      },
+    });
+    const word = (res.word || '').toUpperCase().replace(/[^A-Z ]/g, '').trim();
+    if (word.length >= 3) return { word, category: res.category || 'AI Pick', hint: res.hint || '' };
+  } catch (_) {}
+  // Fallback to word bank
+  return WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+}
+
+// ── CPU guess logic: pick best unguessed letter ───────────────────────────────
+function cpuPickLetter(secretWord, guessedLetters, wrongLetters, difficulty) {
+  const all = guessedLetters.concat(wrongLetters);
+  // Frequency order (most common English letters)
+  const freq = 'ETAOINSHRDLCUMWFGYPBVKJXQZ'.split('');
+  // Hard chars: uncommon letters
+  const available = freq.filter(l => !all.includes(l) && /[A-Z]/.test(l));
+  if (available.length === 0) return null;
+
+  // Smart: filter letters that appear in revealed pattern context
+  const upper = secretWord.toUpperCase();
+  const smart = available.filter(l => upper.includes(l));
+
+  // Difficulty: harder = smarter picks
+  const useSmartChance = difficulty >= 7 ? 0.9 : difficulty >= 4 ? 0.6 : 0.35;
+  if (smart.length > 0 && Math.random() < useSmartChance) return smart[0];
+  return available[0];
+}
 
 export default function HangmanGame() {
   const params = new URLSearchParams(window.location.search);
@@ -95,12 +153,17 @@ function HangmanViewer({ roomCode, cpuId }) {
     if (gs.phase) return; // already initialized
     initDoneRef.current = true;
 
-    // Human sets first in 1P mode
+    // Round 1: human is host (sets word), CPU guesses
     updateState({
       phase: 'setup',
       single_player: true,
       cpu_opponent_id: cpuId || null,
-      word_setter_seat: seatNumber, // human sets first
+      word_setter_seat: seatNumber, // human hosts round 1
+      round_number: 1,
+      score_human: 0,
+      score_cpu: 0,
+      // host_is_human: true means human is setter this round
+      host_is_human: true,
     });
   }, [room, isSinglePlayer]);
 
@@ -121,20 +184,22 @@ function HangmanViewer({ roomCode, cpuId }) {
     prevPlayerCountRef.current = count;
   }, [gs.players]);
 
-  // CPU auto-sets word when it's the CPU's turn to set
+  // CPU auto-sets word when it's the CPU's turn to host
   const cpuSetRef = useRef(false);
   useEffect(() => {
     if (!isSinglePlayer || !room) return;
     if (gs.phase !== 'setup' && gs.phase !== 'word_set') return;
     if (gs.secret_word) { cpuSetRef.current = false; return; }
-    // CPU sets when the word_setter_seat is NOT the human's seat (or is null = CPU's turn)
-    const cpuIsSetterThisRound = gs.word_setter_seat !== seatNumber && seatNumber != null;
-    if (!cpuIsSetterThisRound) return;
+    // CPU is host this round when host_is_human is false
+    const cpuIsHost = gs.host_is_human === false;
+    if (!cpuIsHost) return;
     if (cpuSetRef.current) return;
     cpuSetRef.current = true;
 
     const delay = setTimeout(async () => {
-      const pick = WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+      const charId = cpuId || gs.cpu_opponent_id || 'dexter';
+      const diff = cpuCharacter?.difficulty >= 8 ? 'hard' : cpuCharacter?.difficulty >= 5 ? 'medium' : 'easy';
+      const pick = await generateAIWord(charId, diff);
       await updateState({
         secret_word: pick.word,
         category: pick.category,
@@ -152,9 +217,48 @@ function HangmanViewer({ roomCode, cpuId }) {
         max_wrong: 6,
       });
       cpuSetRef.current = false;
-    }, 1500);
+    }, 1800);
     return () => clearTimeout(delay);
-  }, [gs.phase, gs.word_setter_seat, gs.secret_word, seatNumber, isSinglePlayer]);
+  }, [gs.phase, gs.host_is_human, gs.secret_word, seatNumber, isSinglePlayer]);
+
+  // CPU auto-guesses letters when it's the guesser (host_is_human === true)
+  const cpuGuessRef = useRef(false);
+  useEffect(() => {
+    if (!isSinglePlayer || !room) return;
+    if (gs.phase !== 'playing') return;
+    if (gs.host_is_human === false) return; // CPU is host, not guesser
+    if (!gs.secret_word) return;
+    if (gs.word_revealed || allRevealed) return;
+    if (wrongCount >= maxWrong) return;
+    if (cpuGuessRef.current) return;
+    cpuGuessRef.current = true;
+
+    const delay = Math.max(1200, 1000 + Math.random() * 1200);
+    const timer = setTimeout(async () => {
+      const diff = cpuCharacter?.difficulty || 5;
+      const letter = cpuPickLetter(gs.secret_word, gs.guessed_letters || [], gs.wrong_letters || [], diff);
+      if (!letter) { cpuGuessRef.current = false; return; }
+
+      const secretWord = (gs.secret_word || '').toUpperCase();
+      const isCorrect = secretWord.includes(letter);
+      const newGuessed = isCorrect ? [...(gs.guessed_letters || []), letter] : (gs.guessed_letters || []);
+      const newWrong = !isCorrect ? [...(gs.wrong_letters || []), letter] : (gs.wrong_letters || []);
+      const newAllRevealed = secretWord.split('').every(ch => ch === ' ' || newGuessed.includes(ch));
+      const newPhase = newAllRevealed ? 'finished' : (newWrong.length >= maxWrong ? 'finished' : 'playing');
+
+      await updateState({
+        guessed_letters: newGuessed,
+        wrong_letters: newWrong,
+        phase: newPhase,
+        word_revealed: newPhase === 'finished' && !newAllRevealed,
+        last_action: { letter, result: isCorrect ? 'correct' : 'wrong', type: 'cpu_guess', timestamp: Date.now() },
+        // CPU wins if it guessed the word
+        ...(newAllRevealed ? { winner_cpu: true } : {}),
+      });
+      cpuGuessRef.current = false;
+    }, delay);
+    return () => { clearTimeout(timer); cpuGuessRef.current = false; };
+  }, [gs.phase, gs.guessed_letters, gs.wrong_letters, gs.secret_word, gs.host_is_human, isSinglePlayer]);
 
   const word = gs.secret_word || '';
   const guessed = gs.guessed_letters || [];
@@ -174,13 +278,15 @@ function HangmanViewer({ roomCode, cpuId }) {
   const isGoRoundMode = !isSinglePlayer && totalPeople >= 4;
   const alreadyChosen = seatNumber ? seatsThatChose.includes(seatNumber) : false;
 
-  // Who set the word (winner in previous round)
+  // 1P turn tracking: host_is_human===true → human is host (sets word), CPU guesses
+  //                   host_is_human===false → CPU is host (sets word), human guesses
+  const hostIsHuman = gs.host_is_human !== false; // default true for round 1
+  const iAmSetter1P = isSinglePlayer && hostIsHuman; // human is host = human sets word
+  const iAmGuesser1P = isSinglePlayer && !hostIsHuman; // CPU is host = human guesses
+
+  // Who set the word (winner in previous round) — multiplayer only
   const wordSetter = gs.word_setter_seat || null;
   const amWordSetter = seatNumber === wordSetter;
-
-  // In 1P: the human set the word if word_setter_seat === seatNumber, so CPU guesses (and vice versa)
-  // Human can only guess when THEY are NOT the word setter
-  const iAmSetter1P = isSinglePlayer && gs.word_setter_seat === seatNumber;
 
   const canGuess =
     isSeated &&
@@ -188,9 +294,9 @@ function HangmanViewer({ roomCode, cpuId }) {
     gs.phase === 'playing' &&
     !gs.word_revealed &&
     !allRevealed &&
-    (isSinglePlayer ? !iAmSetter1P : (isGoRoundMode ? !alreadyChosen : true));
+    (isSinglePlayer ? iAmGuesser1P : (isGoRoundMode ? !alreadyChosen : true));
 
-  // Show the setter panel: in 1P only when human is setter; in multiplayer when amWordSetter
+  // Show the setter panel: in 1P only when human is host; in multiplayer when amWordSetter
   const isSetter = isSinglePlayer ? (isSeated && iAmSetter1P) : amWordSetter;
   const showSetterPanel = isSetter && (gs.phase === 'setup' || gs.phase === 'word_set') && !gs.secret_word;
 
@@ -349,28 +455,55 @@ function HangmanViewer({ roomCode, cpuId }) {
   };
 
   const handleNextRound = async () => {
-    let newSetter;
     if (isSinglePlayer) {
-      // Winner gets to guess next, so LOSER sets next word
-      // If human won → CPU sets next; if CPU won (word revealed, no winner_seat) → human sets next
-      const humanWon = gs.winner_seat === seatNumber;
-      newSetter = humanWon ? null : seatNumber; // null = CPU sets, seatNumber = human sets
+      // Strict alternation: whoever was host switches to guesser
+      const nextHostIsHuman = !hostIsHuman;
+
+      // Score tracking: human wins if they guessed (guesser) and got it right
+      // CPU wins if it guessed (guesser) and got it right
+      let scoreHuman = gs.score_human || 0;
+      let scoreCpu = gs.score_cpu || 0;
+      if (hostIsHuman) {
+        // CPU was guessing — did CPU win?
+        if (gs.winner_cpu) scoreCpu += 1;
+      } else {
+        // Human was guessing — did human win?
+        if (gs.winner_seat === seatNumber) scoreHuman += 1;
+      }
+
+      await updateState({
+        secret_word: '',
+        phase: 'setup',
+        guessed_letters: [],
+        wrong_letters: [],
+        word_revealed: false,
+        last_action: null,
+        winner_seat: null,
+        winner_player_id: null,
+        winner_cpu: false,
+        word_setter_seat: nextHostIsHuman ? seatNumber : null,
+        host_is_human: nextHostIsHuman,
+        seats_that_chose: [],
+        current_go_round: 1,
+        round_number: (gs.round_number || 1) + 1,
+        score_human: scoreHuman,
+        score_cpu: scoreCpu,
+      });
     } else {
-      newSetter = gs.winner_seat || null;
+      await updateState({
+        secret_word: '',
+        phase: 'setup',
+        guessed_letters: [],
+        wrong_letters: [],
+        word_revealed: false,
+        last_action: null,
+        winner_seat: null,
+        winner_player_id: null,
+        word_setter_seat: gs.winner_seat || null,
+        seats_that_chose: [],
+        current_go_round: 1,
+      });
     }
-    await updateState({
-      secret_word: '',
-      phase: 'setup',
-      guessed_letters: [],
-      wrong_letters: [],
-      word_revealed: false,
-      last_action: null,
-      winner_seat: null,
-      winner_player_id: null,
-      word_setter_seat: newSetter,
-      seats_that_chose: [],
-      current_go_round: 1,
-    });
   };
 
   // Hangman SVG parts
@@ -442,8 +575,13 @@ function HangmanViewer({ roomCode, cpuId }) {
 
           <div className="w-full space-y-1">
             <h2 className="text-center font-heading text-xl tracking-widest text-[#FFD700] uppercase mb-4">
-              {amWordSetter && !isSinglePlayer ? `🏆 You Won! Set the Next Word` : `📝 Set the Word`}
+              {isSinglePlayer ? `🎛 Round ${gs.round_number || 1} — You Are Host` : amWordSetter ? `🏆 You Won! Set the Next Word` : `📝 Set the Word`}
             </h2>
+            {isSinglePlayer && cpuCharacter && (
+              <div className="text-center text-[8px] tracking-widest text-white/40 uppercase mb-4" style={PS2}>
+                {cpuCharacter.name} will try to guess your word
+              </div>
+            )}
 
             {/* Random button */}
             <button
@@ -498,11 +636,52 @@ function HangmanViewer({ roomCode, cpuId }) {
 
       ) : (!gs.phase || gs.phase === 'setup' || gs.phase === 'word_set') && !gs.secret_word ? (
         /* ── Waiting screen (non-setter or waiting for host) ───────────── */
-        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer && !!gs.single_player} />
+        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer && !!gs.single_player} cpuCharacter={cpuCharacter} hostIsHuman={hostIsHuman} />
 
       ) : (
         /* ── Game Screen ─────────────────────────────────────────────── */
         <div className="flex-1 flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full">
+
+          {/* 1P: Round info — Host / Guesser / Score */}
+          {isSinglePlayer && cpuCharacter && (
+            <div className="w-full grid grid-cols-3 gap-2">
+              {/* Host */}
+              <div className="px-3 py-2 rounded-xl border text-center"
+                style={{ borderColor: '#BC13FE40', background: '#BC13FE08' }}>
+                <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>🎛 Host</div>
+                <div className="text-[8px] tracking-widest uppercase" style={{ ...PS2, color: '#BC13FE' }}>
+                  {hostIsHuman ? 'You' : cpuCharacter.name}
+                </div>
+              </div>
+              {/* Round */}
+              <div className="px-3 py-2 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
+                <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>Round</div>
+                <div className="text-[10px] text-[#FFD700]" style={PS2}>{gs.round_number || 1}</div>
+              </div>
+              {/* Guesser */}
+              <div className="px-3 py-2 rounded-xl border text-center"
+                style={{ borderColor: '#4ade8040', background: '#4ade8008' }}>
+                <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>🔤 Guessing</div>
+                <div className="text-[8px] tracking-widest uppercase" style={{ ...PS2, color: '#4ade80' }}>
+                  {hostIsHuman ? cpuCharacter.name : 'You'}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1P scoreboard */}
+          {isSinglePlayer && cpuCharacter && (
+            <div className="w-full grid grid-cols-2 gap-2">
+              <div className="px-3 py-2 rounded-xl border border-[#22d3ee]/30 bg-[#22d3ee]/5 text-center">
+                <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>You</div>
+                <div className="font-heading text-2xl text-[#22d3ee]">{gs.score_human || 0}</div>
+              </div>
+              <div className="px-3 py-2 rounded-xl border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 text-center">
+                <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>{cpuCharacter.name}</div>
+                <div className="font-heading text-2xl text-[#FF5F1F]">{gs.score_cpu || 0}</div>
+              </div>
+            </div>
+          )}
 
           {/* Mode indicator (multiplayer only) */}
           {!isSinglePlayer && gs.phase === 'playing' && (
@@ -621,7 +800,14 @@ function HangmanViewer({ roomCode, cpuId }) {
               {isSinglePlayer && iAmSetter1P && (
                 <div className="text-center px-4 py-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5">
                   <span className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
-                    🔒 You set this word — CPU is guessing!
+                    🔒 You are Host — {cpuCharacter?.name || 'CPU'} is guessing!
+                  </span>
+                </div>
+              )}
+              {isSinglePlayer && iAmGuesser1P && (
+                <div className="text-center px-4 py-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/5">
+                  <span className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>
+                    🔤 {cpuCharacter?.name || 'CPU'} is Host — Guess their word!
                   </span>
                 </div>
               )}
@@ -673,6 +859,8 @@ function HangmanViewer({ roomCode, cpuId }) {
               isSinglePlayer={isSinglePlayer}
               seatNumber={seatNumber}
               onNextRound={handleNextRound}
+              cpuCharacter={cpuCharacter}
+              hostIsHuman={hostIsHuman}
             />
           )}
 
@@ -739,29 +927,56 @@ function GuessWordPanel({ onGuess, isListening, onToggleVoice, transcript, onTra
 }
 
 // ── Finished Panel ────────────────────────────────────────────────────────────
-function FinishedPanel({ gs, isSinglePlayer, seatNumber, onNextRound }) {
-  const won = !gs.word_revealed || (gs.winner_seat === seatNumber);
-  const isWinner = gs.winner_seat === seatNumber;
+function FinishedPanel({ gs, isSinglePlayer, seatNumber, onNextRound, cpuCharacter, hostIsHuman }) {
   const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+  let resultLabel, resultColor;
+  if (isSinglePlayer) {
+    if (hostIsHuman) {
+      // Human was host, CPU was guessing
+      if (gs.winner_cpu) {
+        resultLabel = `🤖 ${cpuCharacter?.name || 'CPU'} Guessed It!`;
+        resultColor = '#FF5F1F';
+      } else {
+        resultLabel = gs.word_revealed ? `🏳 ${cpuCharacter?.name || 'CPU'} Couldn't Guess It` : '🎉 Round Over';
+        resultColor = '#4ade80';
+      }
+    } else {
+      // CPU was host, human was guessing
+      if (gs.winner_seat === seatNumber) {
+        resultLabel = '🏆 You Guessed It!';
+        resultColor = '#4ade80';
+      } else {
+        resultLabel = "🏳 You Couldn't Get It";
+        resultColor = '#FFD700';
+      }
+    }
+  } else {
+    const isWinner = gs.winner_seat === seatNumber;
+    resultLabel = isWinner ? '🏆 You Guessed It!' : gs.winner_seat ? `🏆 Seat ${gs.winner_seat} Wins!` : gs.word_revealed ? '🏳 Revealed' : '🎉 Complete!';
+    resultColor = isWinner ? '#4ade80' : '#FFD700';
+  }
+
+  const isMultiWinner = !isSinglePlayer && gs.winner_seat === seatNumber;
 
   return (
     <div className="text-center p-5 border-2 rounded-2xl max-w-sm w-full space-y-4"
-      style={{ borderColor: isWinner ? '#4ade80' : '#FFD700', background: isWinner ? '#4ade8010' : '#FFD70010' }}>
-      <div className="text-xl tracking-widest uppercase" style={{ ...PS2, color: isWinner ? '#4ade80' : '#FFD700' }}>
-        {isWinner ? '🏆 You Guessed It!' : gs.winner_seat ? `🏆 Seat ${gs.winner_seat} Wins!` : gs.word_revealed ? '🏳 Revealed' : '🎉 Complete!'}
+      style={{ borderColor: `${resultColor}60`, background: `${resultColor}10` }}>
+      <div className="text-xl tracking-widest uppercase" style={{ ...PS2, color: resultColor }}>
+        {resultLabel}
       </div>
       <div className="text-2xl text-white mt-3 tracking-[0.3em]" style={PS2}>{gs.secret_word}</div>
 
-      {/* Next round / set word */}
-      {(isSinglePlayer || isWinner) && (
+      {/* Next round button */}
+      {(isSinglePlayer || isMultiWinner) && (
         <button
           onClick={onNextRound}
           className="w-full py-3 rounded-xl font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95 mt-2"
           style={{ background: '#22d3ee', color: '#000', boxShadow: '0 0 20px rgba(34,211,238,0.4)' }}>
-          {isWinner && !isSinglePlayer ? '🏆 You Won — Set Next Word' : '▶ Play Again'}
+          {isSinglePlayer ? '▶ Next Round' : '🏆 You Won — Set Next Word'}
         </button>
       )}
-      {!isSinglePlayer && !isWinner && (
+      {!isSinglePlayer && !isMultiWinner && (
         <div className="text-[7px] text-white/30 uppercase tracking-widest" style={PS2}>
           Waiting for winner to set next word…
         </div>
@@ -771,14 +986,23 @@ function FinishedPanel({ gs, isSinglePlayer, seatNumber, onNextRound }) {
 }
 
 // ── Waiting Screen ────────────────────────────────────────────────────────────
-function WaitingScreen({ isSeated, seatNumber, players, isSinglePlayer }) {
+function WaitingScreen({ isSeated, seatNumber, players, isSinglePlayer, cpuCharacter, hostIsHuman }) {
+  const PS2loc = { fontFamily: "'Press Start 2P', monospace" };
+  const cpuIsGenerating = isSinglePlayer && !hostIsHuman;
   return (
     <div className="flex-1 flex items-center justify-center text-center px-4">
       <div className="space-y-5">
-        <div className="text-6xl">🔤</div>
-        <div className="text-lg tracking-widest text-white/40 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          {isSinglePlayer ? 'Setting up…' : 'Waiting for Host…'}
+        <div className="text-6xl">{cpuIsGenerating ? '🤖' : '🔤'}</div>
+        <div className="text-lg tracking-widest text-white/40 uppercase" style={PS2loc}>
+          {cpuIsGenerating ? `${cpuCharacter?.name || 'CPU'} is picking a word…` : isSinglePlayer ? 'Setting up…' : 'Waiting for Host…'}
         </div>
+        {cpuIsGenerating && (
+          <div className="flex justify-center gap-2">
+            {[0,1,2].map(i => (
+              <div key={i} className="w-2 h-2 rounded-full bg-[#FF5F1F] animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+        )}
         {isSeated ? (
           <div className="px-6 py-4 rounded-xl border-2 border-[#BC13FE]/50 bg-[#BC13FE]/10" style={{ boxShadow: '0 0 20px rgba(188,19,254,0.2)' }}>
             <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>You are</div>
