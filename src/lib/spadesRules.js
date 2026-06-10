@@ -100,10 +100,43 @@ export function getHandHash(hand) {
   return sorted.map(c => c.id).join('|');
 }
 
-// Cryptographically strong Fisher-Yates shuffle
+// Riffle-style interleave: split deck roughly in half, then interleave
+// simulates real-world card riffling to break up suit runs
+function riffleShuffle(deck) {
+  const mid = Math.floor(deck.length / 2) + (secureRandomInt(5) - 2); // slight random split
+  const top = deck.slice(0, Math.max(1, mid));
+  const bottom = deck.slice(Math.max(1, mid));
+  const result = [];
+  let t = 0, b = 0;
+  while (t < top.length || b < bottom.length) {
+    // Randomly drop 1-3 cards from each half (like real riffling)
+    const dropTop = Math.min(top.length - t, secureRandomInt(3) + 1);
+    for (let i = 0; i < dropTop; i++) result.push(top[t++]);
+    const dropBot = Math.min(bottom.length - b, secureRandomInt(3) + 1);
+    for (let i = 0; i < dropBot; i++) result.push(bottom[b++]);
+  }
+  return result;
+}
+
+// Cryptographically strong shuffle: multiple Fisher-Yates passes + riffle passes + cut
 // Uses crypto.getRandomValues() for true randomness - NEVER use Math.random()
 export function shuffleDeck(deck) {
-  return fisherYatesShuffle(deck);
+  let d = [...deck];
+  // 3 Fisher-Yates passes
+  d = fisherYatesShuffle(d);
+  d = fisherYatesShuffle(d);
+  d = fisherYatesShuffle(d);
+  // 4 riffle passes to break up any suit clustering
+  d = riffleShuffle(d);
+  d = riffleShuffle(d);
+  d = riffleShuffle(d);
+  d = riffleShuffle(d);
+  // Final Fisher-Yates to fully randomize after riffling
+  d = fisherYatesShuffle(d);
+  // Random cut: rotate the deck at a random point
+  const cutPoint = secureRandomInt(d.length);
+  d = [...d.slice(cutPoint), ...d.slice(0, cutPoint)];
+  return d;
 }
 
 /**
