@@ -121,7 +121,7 @@ function BFFViewer({ roomCode, isVsAI }) {
       // Ensure room exists before writing state
       await ensureRoom('bff', roomCode);
       // Initialize the game
-      const surveys = await base44.entities.BFFSurvey.filter({ active: true }, '-created_date', 50);
+      const surveys = await base44.entities.BFFSurvey.list('-created_date', 50);
       const survey = surveys && surveys.length > 0 ? surveys[Math.floor(Math.random() * surveys.length)] : null;
 
       const meAsPlayer = {

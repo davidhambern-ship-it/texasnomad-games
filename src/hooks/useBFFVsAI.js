@@ -214,7 +214,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     const t = setTimeout(async () => {
       try {
         const { base44 } = await import('@/api/base44Client');
-        const surveys = await base44.entities.BFFSurvey.filter({ active: true }, '-created_date', 50);
+        const surveys = await base44.entities.BFFSurvey.list('-created_date', 50);
         if (!surveys || surveys.length === 0) return;
         const survey = surveys[Math.floor(Math.random() * surveys.length)];
         const nextStartTeam = gs.active_turn === 1 ? 2 : 1;
