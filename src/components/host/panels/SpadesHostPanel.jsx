@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import SpadesCardArea from '@/components/spades/SpadesCardArea.jsx';
+import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
 import HostHandBox from './spades/HostHandBox';

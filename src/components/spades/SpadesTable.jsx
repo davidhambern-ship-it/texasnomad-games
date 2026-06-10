@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SpadesSeat from './SpadesSeat';
-import SpadesCardArea from '@/components/spades/SpadesCardArea.jsx';
+import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesPlayerControls from './SpadesPlayerControls';
 import SpadesShuffleAnimation from './SpadesShuffleAnimation';
 import SpadesDealAnimation from './SpadesDealAnimation';
