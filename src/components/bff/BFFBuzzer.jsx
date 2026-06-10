@@ -23,13 +23,13 @@ export default function BFFBuzzer({ phase, buzzWinner, canBuzz, onBuzz }) {
 
   if (phase === 'get_ready') {
     return (
-      <div className="flex flex-col items-center justify-center py-8 gap-4">
-        <div className="text-[#FFD700] animate-pulse" style={{ ...PS2, fontSize: '14px', letterSpacing: '0.4em' }}>
+      <div className="px-4 py-3 rounded-xl border border-[#FFD700]/40 bg-[#FFD700]/5 flex items-center justify-center gap-3">
+        <div className="text-[#FFD700] animate-pulse" style={{ ...PS2, fontSize: '10px', letterSpacing: '0.3em' }}>
           GET READY!
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5">
           {[0, 1, 2].map(i => (
-            <div key={i} className="w-3 h-3 rounded-full bg-[#FFD700] animate-bounce"
+            <div key={i} className="w-2 h-2 rounded-full bg-[#FFD700] animate-bounce"
               style={{ animationDelay: `${i * 0.2}s` }} />
           ))}
         </div>
