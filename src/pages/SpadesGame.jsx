@@ -119,14 +119,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         setJoinFlow('spectating');
       }
     } else if (isCreator) {
-      // Room creator — auto-sit in first available seat, then show CPU choice
+      // Room creator — ask for name first, then sit and show CPU choice
       const firstEmpty = emptySeatsIn(players);
       const seatTarget = firstEmpty.length > 0 ? firstEmpty[0] : null;
-      if (seatTarget) {
-        sitInSeat(seatTarget).then(() => setJoinFlow('cpu'));
-      } else {
+      requireName(async () => {
+        if (seatTarget) {
+          await sitInSeat(seatTarget);
+        }
         setJoinFlow('cpu');
-      }
+      });
     } else {
       // Joiner — show Play/Spectate
       setJoinFlow('choose');
