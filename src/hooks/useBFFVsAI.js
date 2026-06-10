@@ -243,21 +243,44 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
         const newAnswers = answers.map(a => a.text === result.text || a.answer === result.text ? { ...a, revealed: true } : a);
         const newBank = (gs.round_bank || 0) + (result.points || 0);
         const allRevealed = newAnswers.every(a => a.revealed);
-        const nextIdx = getNextAIMember(gs.ai_member_idx || 0);
-        await updateState({
-          answers: newAnswers, round_bank: newBank,
-          last_ai_answer: { character: character.name, answer: result.text, correct: true },
-          ai_thinking: false, wrong_guesses: [],
-          ai_member_idx: allRevealed ? (gs.ai_member_idx || 0) : nextIdx,
-          answering_ai: !allRevealed,
-          ...(allRevealed ? { score2: (gs.score2 || 0) + newBank, round_bank: 0, phase: 'round_over' } : {}),
-        });
+
+        if (gs.steal_mode) {
+          // AI stealing — correct means AI team gets the bank, round over
+          await updateState({
+            answers: newAnswers, round_bank: 0,
+            score2: (gs.score2 || 0) + newBank,
+            last_ai_answer: { character: character.name, answer: result.text, correct: true },
+            ai_thinking: false, answering_ai: false,
+            steal_mode: false, steal_player_id: null,
+            answering_player_id: null, phase: 'round_over',
+          });
+        } else {
+          const nextIdx = getNextAIMember(gs.ai_member_idx || 0);
+          await updateState({
+            answers: newAnswers, round_bank: newBank,
+            last_ai_answer: { character: character.name, answer: result.text, correct: true },
+            ai_thinking: false, wrong_guesses: [],
+            ai_member_idx: allRevealed ? (gs.ai_member_idx || 0) : nextIdx,
+            answering_ai: !allRevealed,
+            ...(allRevealed ? { score2: (gs.score2 || 0) + newBank, round_bank: 0, phase: 'round_over' } : {}),
+          });
+        }
       } else {
         const wrongAnswer = typeof result === 'string' ? result : String(result);
         const newByeCount = Math.min(3, (gs.bye_count || 0) + 1);
         const newWrong = [...alreadyWrong, wrongAnswer];
 
-        if (newByeCount >= 3) {
+        if (gs.steal_mode) {
+          // AI wrong on steal — no points, next round
+          await updateState({
+            bye_count: newByeCount, wrong_guesses: newWrong,
+            last_ai_answer: { character: character.name, answer: wrongAnswer, correct: false },
+            ai_thinking: false, answering_ai: false,
+            steal_mode: false, steal_player_id: null,
+            answering_player_id: null, phase: 'round_over',
+          });
+        } else if (newByeCount >= 3) {
+          // AI got 3 wrong — human team gets steal opportunity
           const stealPlayer = humanPlayers[0] || null;
           await updateState({
             bye_count: newByeCount, wrong_guesses: newWrong,
@@ -277,7 +300,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     }, randomBetween(1200, 2800));
 
     return () => clearTimeout(aiTimerRef.current);
-  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.ai_member_idx, gs.bye_count, gs.phase, (gs.answers || []).filter(a => a.revealed).length]);
+  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.steal_mode, gs.ai_member_idx, gs.bye_count, gs.phase, (gs.answers || []).filter(a => a.revealed).length]);
 
   // ── Auto round-over → next question ──────────────────────────────────────
   useEffect(() => {

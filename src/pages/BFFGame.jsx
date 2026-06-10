@@ -303,15 +303,24 @@ function BFFViewer({ roomCode, isVsAI }) {
       const allRevealed = newAnswers.every(a => a.revealed);
       const wasSteal = gs.steal_mode;
 
-      if (wasSteal || allRevealed) {
-        const scoreKey = wasSteal ? 'score1' : (gs.active_turn === 1 ? 'score1' : 'score2');
+      if (wasSteal) {
+        // Correct steal — human team gets the bank
         await updateState({
-          answers: newAnswers, round_bank: allRevealed ? 0 : newBank,
-          [scoreKey]: (gs[scoreKey] || 0) + (allRevealed ? newBank : newBank),
+          answers: newAnswers, round_bank: 0,
+          score1: (gs.score1 || 0) + newBank,
           last_submission: submission,
           steal_mode: false, steal_player_id: null,
           answering_player_id: null, current_typing: '',
-          ...(allRevealed ? { phase: 'round_over' } : {}),
+          phase: 'round_over',
+        });
+      } else if (allRevealed) {
+        const scoreKey = gs.active_turn === 1 ? 'score1' : 'score2';
+        await updateState({
+          answers: newAnswers, round_bank: 0,
+          [scoreKey]: (gs[scoreKey] || 0) + newBank,
+          last_submission: submission,
+          answering_player_id: null, current_typing: '',
+          phase: 'round_over',
         });
       } else {
         const nextHuman = getNextHumanPlayer(humanPlayers, playerId);
@@ -329,10 +338,11 @@ function BFFViewer({ roomCode, isVsAI }) {
       const newWrong = [...(gs.wrong_guesses || []), guess];
 
       if (gs.steal_mode) {
+        // Wrong steal — no points, next round
         await updateState({
           last_submission: submission, steal_mode: false, steal_player_id: null,
           round_bank: 0, answering_player_id: null, current_typing: '',
-          wrong_guesses: newWrong,
+          wrong_guesses: newWrong, phase: 'round_over',
         });
       } else if (newByeCount >= 3) {
         await updateState({
