@@ -181,13 +181,10 @@ function BFFViewer({ roomCode, isVsAI }) {
   // ── Buzzer handler (human buzzes) ─────────────────────────────────────────
   const handleBuzz = async () => {
     if (gs.buzzer_phase !== 'buzzer_active' || gs.buzz_winner) return;
-    const me = (gs.players || []).find(p => p.playerId === playerId);
     await updateState({
       buzz_winner: { playerId, playerName: playerName || `Seat ${seatNumber}`, teamName: gs.family1 || 'Human Family', isAI: false },
       buzzer_phase: 'buzzed',
-      answering_ai: false,
-      active_turn: 1,
-      answering_player_id: playerId,
+      // Let the hook's "after buzz" effect assign faceoff_phase and answering_player_id
     });
   };
 
