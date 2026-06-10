@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
+import SpadesRoundSummary from '@/components/spades/SpadesRoundSummary';
+import SpadesMatchOver from '@/components/spades/SpadesMatchOver';
 import { fillEmptySeatsWithTNCharacters, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
-import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat, calculateScore } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SPADES_SEATS = [1, 2, 3, 4];
@@ -69,12 +71,18 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const [musicEnabled, setMusicEnabled] = useState(false);
   const [volume, setVolume] = useState(0.3);
 
+  // Player name requirement
+  const [playerName, setPlayerName] = useState(() => localStorage.getItem(`spades_name_${roomCode}`) || '');
+  const [nameInput, setNameInput] = useState('');
+  const [nameError, setNameError] = useState('');
+  const [showNamePrompt, setShowNamePrompt] = useState(false);
+  const [pendingJoinAction, setPendingJoinAction] = useState(null); // callback to run after name confirmed
+
+  // Round summary / match over
+  const [roundResult, setRoundResult] = useState(null);
+  const [matchOver, setMatchOver] = useState(false);
+
   // Join-flow state
-  // 'unknown' → waiting for room load
-  // 'choose'  → show Play/Spectate dialog (joining existing room)
-  // 'cpu'     → show CPU-or-wait dialog (room creator who just sat)
-  // 'seated'  → in a seat
-  // 'spectating' → spectator
   const [joinFlow, setJoinFlow] = useState('unknown');
   const [mySeatNumber, setMySeatNumber] = useState(null);
   const [myRole, setMyRole] = useState(null); // 'player' | 'spectator' | null
@@ -254,7 +262,136 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     return () => clearTimeout(timer);
   }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players]);
 
+  // ── AI bidding handler ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled || gs.phase !== 'bidding') return;
+    if (gs.first_hand_no_bid) return;
+    const currentBidderSeat = gs.current_bidder_seat;
+    if (!currentBidderSeat) return;
+    const bidder = players.find(p => p.seatNumber === currentBidderSeat);
+    if (!bidder || bidder.playerType !== 'cpu' || bidder.bid != null) return;
+
+    const character = bidder.characterId ? TEXASNOMAD_CHARACTERS.find(c => c.id === bidder.characterId) : null;
+    const hand = bidder.hand || [];
+    const spadeCount = hand.filter(c => c.suit === '♠' || c.suit === 'Joker').length;
+
+    // Personality-based bid calculation
+    let bid = 3; // default
+    if (character) {
+      const base = Math.round(spadeCount * 0.8);
+      const personality = {
+        dexter:   () => Math.min(13, Math.max(1, base)),        // careful/logical
+        tank:     () => Math.min(13, Math.max(1, base - 1)),    // conservative
+        violet:   () => Math.min(13, Math.max(2, base)),        // balanced
+        berna:    () => Math.min(13, Math.max(2, base + (Math.random() < 0.3 ? 1 : 0))), // competitive
+        lemonade: () => Math.min(13, Math.max(2, base + 1 + (Math.random() < 0.4 ? 1 : 0))), // risky
+        carlos:   () => Math.min(13, Math.max(1, base + (Math.random() < 0.5 ? 1 : -1))),    // unpredictable
+      };
+      bid = (personality[character.id] || (() => base))();
+    }
+
+    const delay = 1500 + Math.random() * 2000;
+    const timer = setTimeout(async () => {
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
+      try {
+        await advanceBid(bidder, bid);
+      } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 500);
+      }
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [gs.current_bidder_seat, gs.phase, gs.cpu_enabled, players]);
+
+  // ── Round end: detect all 13 tricks played → score & show summary ─────────
+  useEffect(() => {
+    if (!room || !gs.cpu_enabled) return;
+    if (gs.phase !== 'playing') return;
+    const seatedCount = (gs.players || []).filter(p => p.seatNumber != null).length;
+    const totalTricks = 52 / seatedCount; // 13 tricks for 4 players
+    if ((gs.tricks_played || 0) < totalTricks) return;
+    if (gs.round_scored) return; // prevent double-scoring
+
+    const timer = setTimeout(async () => {
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
+      try {
+        // Calculate scores
+        const team1Bid = gs.bid1 || 0;
+        const team2Bid = gs.bid2 || 0;
+        const team1Books = gs.books1 || 0;
+        const team2Books = gs.books2 || 0;
+        const round1Score = calculateScore(team1Bid, team1Books);
+        const round2Score = calculateScore(team2Bid, team2Books);
+        const newScore1 = (gs.score1 || 0) + round1Score;
+        const newScore2 = (gs.score2 || 0) + round2Score;
+        const handNumber = (gs.hand_number || 0) + 1;
+
+        setRoundResult({
+          team1: { bid: team1Bid, books: team1Books, roundScore: round1Score, totalScore: newScore1 },
+          team2: { bid: team2Bid, books: team2Books, roundScore: round2Score, totalScore: newScore2 },
+          team1Name: gs.team1Name || 'Team A',
+          team2Name: gs.team2Name || 'Team B',
+          handNumber,
+        });
+
+        await updateState({
+          score1: newScore1, score2: newScore2,
+          round_scored: true,
+          hand_number: handNumber,
+          phase: 'round_over',
+        });
+
+        // Check win condition
+        if (newScore1 >= 100 || newScore2 >= 100) {
+          setMatchOver(true);
+        }
+      } finally {
+        setTimeout(() => { isUpdatingRef.current = false; }, 500);
+      }
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, [gs.tricks_played, gs.phase, gs.cpu_enabled, gs.round_scored]);
+
   // ─── Handlers ──────────────────────────────────────────────────────────────
+
+  // Advance bid for a player (human or AI)
+  const advanceBid = async (bidder, bid) => {
+    const updatedPlayers = (gs.players || []).map(p => p.playerId === bidder.playerId ? { ...p, bid } : p);
+    const seated = updatedPlayers.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
+    const bidderIdx = seated.findIndex(p => p.playerId === bidder.playerId);
+    const nextBidder = seated[(bidderIdx + 1) % seated.length];
+    const allBid = seated.every(p => p.bid != null);
+
+    if (allBid) {
+      const team1Bid = updatedPlayers.filter(p => p.team === 1 || p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
+      const team2Bid = updatedPlayers.filter(p => p.team === 2 || p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => {
+        if (p.seatNumber === 2 || p.seatNumber === 4) return s + (p.bid || 0);
+        return s;
+      }, 0);
+      // Recalculate properly by seat teams
+      const t1 = updatedPlayers.filter(p => p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
+      const t2 = updatedPlayers.filter(p => p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => s + (p.bid || 0), 0);
+      const dealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
+      const firstSeat = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
+      await updateState({
+        players: updatedPlayers, phase: 'playing',
+        bid1: t1, bid2: t2,
+        current_turn_seat: firstSeat || seated[0]?.seatNumber,
+        current_bidder_seat: null,
+      });
+    } else {
+      await updateState({ players: updatedPlayers, current_bidder_seat: nextBidder?.seatNumber });
+    }
+  };
+
+  // Bid timeout handler (human or AI auto-bid 3)
+  const handleBidTimeout = async (seatNum) => {
+    if (!seatNum) return;
+    const bidder = players.find(p => p.seatNumber === seatNum);
+    if (!bidder || bidder.bid != null) return;
+    await advanceBid(bidder, 3);
+  };
 
   const handleAutoDeal = async (shuffledDeck) => {
     const seated = getSeatedPlayers(gs.players || []);
@@ -266,16 +403,20 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
     const currentPlayers = gs.players || [];
 
+    const isFirstHand = !gs.hand_number || gs.hand_number === 0;
+
     const clearedPlayers = currentPlayers.map(p =>
-      p.seatNumber != null ? { ...p, hand: [], bid: 0, tricksWon: 0 } : p
+      p.seatNumber != null ? { ...p, hand: [], bid: isFirstHand ? 0 : null, tricksWon: 0 } : p
     );
     await updateState({
       players: clearedPlayers, phase: 'setup', status: 'active',
       deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
       deal_ts: Date.now(),
       current_trick: [], tricks_played: 0,
-      bid1: 0, bid2: 0, books1: 0, books2: 0,
+      bid1: isFirstHand ? 0 : null, bid2: isFirstHand ? 0 : null,
+      books1: 0, books2: 0,
       shuffle_count: 0, spades_broken: false, completed_books: [],
+      round_scored: false,
     });
 
     const DEAL_INTERVAL_MS = 130;
@@ -283,15 +424,48 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
 
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
-      if (hand) return { ...p, hand, bid: 0, tricksWon: 0 };
+      if (hand) return { ...p, hand, bid: isFirstHand ? 0 : null, tricksWon: 0 };
       return p;
     });
-    await updateState({
-      players: finalPlayers, phase: 'playing',
-      deck: [], deck_shuffled: false,
-      current_turn_seat: firstBidder,
-      first_hand_no_bid: true,
-    });
+
+    if (isFirstHand) {
+      // First hand: skip bidding, go straight to playing
+      await updateState({
+        players: finalPlayers, phase: 'playing',
+        deck: [], deck_shuffled: false,
+        current_turn_seat: firstBidder,
+        first_hand_no_bid: true,
+        bid1: 0, bid2: 0,
+      });
+    } else {
+      // Subsequent hands: bidding phase
+      await updateState({
+        players: finalPlayers, phase: 'bidding',
+        deck: [], deck_shuffled: false,
+        current_bidder_seat: firstBidder,
+        first_hand_no_bid: false,
+        bid1: null, bid2: null,
+      });
+    }
+  };
+
+  // Name confirmation helper
+  const requireName = (callback) => {
+    if (playerName) { callback(); return; }
+    setNameInput('');
+    setNameError('');
+    setPendingJoinAction(() => callback);
+    setShowNamePrompt(true);
+  };
+
+  const confirmName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) { setNameError('Please enter your player name.'); return; }
+    localStorage.setItem(`spades_name_${roomCode}`, trimmed);
+    setPlayerName(trimmed);
+    setShowNamePrompt(false);
+    pendingJoinAction?.();
+    setPendingJoinAction(null);
   };
 
   // Sit in a specific seat
@@ -314,9 +488,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
 
     // Seat must be empty
     const existing = currentPlayers.find(p => p.playerId === playerId);
-    const newPlayer = { playerId, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true, joinedAt: Date.now(), lastActionAt: Date.now(), hand: [], bid: null, tricksWon: 0 };
+    const newPlayer = { playerId, seatNumber: seatNum, role: 'player', playerType: 'human', playerName: playerName, connected: true, joinedAt: Date.now(), lastActionAt: Date.now(), hand: [], bid: null, tricksWon: 0 };
     const updatedPlayers = existing
-      ? currentPlayers.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', playerType: 'human', connected: true } : p)
+      ? currentPlayers.map(p => p.playerId === playerId ? { ...p, seatNumber: seatNum, role: 'player', playerType: 'human', playerName: playerName, connected: true } : p)
       : [...currentPlayers, newPlayer];
 
     await updateState({ players: updatedPlayers });
@@ -326,8 +500,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   };
 
   // Join flow: user clicks "Play" (joiners only — no CPU prompt)
-  const handleChooseSit = async () => {
-    if (!room) return;
+  const handleChooseSit = () => {
+    requireName(async () => {
+      if (!room) return;
     // Empty seats first, then CPU seats — never replace a human
     const emptySeats = emptySeatsIn(players);
     const cpuSeats = SPADES_SEATS.filter(s => {
@@ -335,12 +510,12 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       return p && p.playerType === 'cpu';
     });
     const available = [...emptySeats, ...cpuSeats];
-    if (available.length === 0) {
-      // All 4 seats taken by humans — spectate only
-      await handleChooseSpectate();
-      return;
-    }
-    await sitInSeat(available[0]);
+      if (available.length === 0) {
+        await handleChooseSpectate();
+        return;
+      }
+      await sitInSeat(available[0]);
+    });
   };
 
   // Join flow: user clicks "Spectate"
@@ -420,6 +595,51 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     });
   };
 
+  // Round summary dismissed → deal next hand
+  const handleRoundSummaryDismiss = async () => {
+    setRoundResult(null);
+    if (matchOver) return;
+    // CPU-driven: auto-deal next hand
+    if (gs.cpu_enabled) {
+      if (isUpdatingRef.current) return;
+      isUpdatingRef.current = true;
+      try {
+        const newDealer = gs.dealer_seat ? (gs.dealer_seat % 4) + 1 : 1;
+        const previewDeck = shuffleDeck(generateFullDeck());
+        await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        await handleAutoDeal(previewDeck);
+      } finally {
+        isUpdatingRef.current = false;
+      }
+    }
+  };
+
+  // Play Again: reset scores and start fresh
+  const handlePlayAgain = async () => {
+    setMatchOver(false);
+    setRoundResult(null);
+    if (isUpdatingRef.current) return;
+    isUpdatingRef.current = true;
+    try {
+      const newDealer = 1;
+      const cleared = (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 }));
+      await updateState({
+        score1: 0, score2: 0, hand_number: 0,
+        phase: 'setup', round_scored: false,
+        players: cleared, current_trick: [], tricks_played: 0,
+        bid1: null, bid2: null, books1: 0, books2: 0,
+        dealer_seat: newDealer,
+      });
+      const previewDeck = shuffleDeck(generateFullDeck());
+      await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      await handleAutoDeal(previewDeck);
+    } finally {
+      isUpdatingRef.current = false;
+    }
+  };
+
   // Stand up
   const handleStandUp = async () => {
     if (!room || myRole !== 'player') return;
@@ -490,6 +710,43 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
       <audio ref={audioRef} loop preload="auto" />
+
+      {/* ── Player name prompt ─────────────────────────────────────────────── */}
+      {showNamePrompt && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[90] flex items-center justify-center p-4">
+          <div className="bg-gradient-to-br from-[#0a0a1a] to-[#050510] border-4 border-[#BC13FE]/50 rounded-2xl p-6 max-w-xs w-full shadow-2xl text-center space-y-4"
+            style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3)' }}>
+            <div className="font-heading text-xl text-[#BC13FE] uppercase tracking-widest" style={PS2}>Your Name</div>
+            <div className="text-white/50 text-sm">Enter a display name before joining the table.</div>
+            <input
+              type="text" maxLength={18} autoFocus
+              value={nameInput} onChange={e => { setNameInput(e.target.value); setNameError(''); }}
+              onKeyDown={e => e.key === 'Enter' && confirmName()}
+              className="w-full px-4 py-3 rounded-xl bg-black/80 border-2 border-[#BC13FE]/40 text-white text-center focus:outline-none focus:border-[#BC13FE] transition-colors"
+              placeholder="e.g. BigTex" />
+            {nameError && <div className="text-red-400 text-xs">{nameError}</div>}
+            <button onClick={confirmName}
+              className="w-full py-3 rounded-xl border-2 border-[#BC13FE] text-[#BC13FE] font-heading tracking-widest uppercase hover:bg-[#BC13FE]/20 transition-all active:scale-95"
+              style={PS2}>
+              Let's Play
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Round summary overlay ─────────────────────────────────────────── */}
+      {roundResult && !matchOver && (
+        <SpadesRoundSummary roundResult={roundResult} onDismiss={handleRoundSummaryDismiss} />
+      )}
+
+      {/* ── Match over overlay ────────────────────────────────────────────── */}
+      {matchOver && (
+        <SpadesMatchOver
+          gs={gs}
+          onPlayAgain={handlePlayAgain}
+          onLobby={() => window.location.href = '/games'}
+        />
+      )}
 
       {/* ── Join dialog: Play or Spectate ─────────────────────────────────── */}
       {showJoinChoice && (
@@ -596,6 +853,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
             onPlayCard={handlePlayCard}
             onStandUp={handleStandUp}
             onTakeOverCPU={handleTakeOverCPU}
+            onBidTimeout={handleBidTimeout}
           />
         </div>
       )}

@@ -45,6 +45,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const hasCards = player.hand?.length > 0;
   const isMyTurn = gs.current_turn_seat === seatNumber && gs.phase === 'playing';
   const hasBid = player.bid != null;
+  const isMyBidTurn = isBidding && gs.current_bidder_seat === seatNumber && !hasBid;
   const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
   const hasDeck = gs.deck?.length > 0;
   const canStandUp = gs.phase === 'setup' || !hasCards;
@@ -123,24 +124,38 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
     await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
+    const isFirstHand = !gs.hand_number || gs.hand_number === 0;
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
-      if (hand) return { ...p, hand: [...hand], bid: hasCpu ? 0 : null, tricksWon: 0 };
+      if (hand) return { ...p, hand: [...hand], bid: isFirstHand ? 0 : null, tricksWon: 0 };
       return p;
     });
 
-    await updateState({
-      players: finalPlayers,
-      phase: hasCpu ? 'playing' : 'bidding',
-      deck: [],
-      deck_shuffled: false,
-      current_bidder_seat: firstBidder,
-      current_turn_seat: hasCpu ? firstBidder : null,
-      bid1: hasCpu ? 0 : null,
-      bid2: hasCpu ? 0 : null,
-      first_hand_no_bid: hasCpu,
-      deal_start_seat: dealStartSeat,
-    });
+    if (isFirstHand) {
+      await updateState({
+        players: finalPlayers,
+        phase: 'playing',
+        deck: [], deck_shuffled: false,
+        current_turn_seat: firstBidder,
+        current_bidder_seat: null,
+        bid1: 0, bid2: 0,
+        first_hand_no_bid: true,
+        deal_start_seat: dealStartSeat,
+        round_scored: false,
+      });
+    } else {
+      await updateState({
+        players: finalPlayers,
+        phase: 'bidding',
+        deck: [], deck_shuffled: false,
+        current_bidder_seat: firstBidder,
+        current_turn_seat: null,
+        bid1: null, bid2: null,
+        first_hand_no_bid: false,
+        deal_start_seat: dealStartSeat,
+        round_scored: false,
+      });
+    }
 
     setIsDealing(false);
   };
@@ -153,14 +168,16 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const seated = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === player.playerId);
     const nextBidder = seated[(bidderIdx + 1) % seated.length];
-    const allBid = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').every(p => p.bid != null);
+    const allBid = seated.every(p => p.bid != null);
 
     if (allBid) {
-      const team1Bid = updated.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
-      const team2Bid = updated.filter(p => p.team === 2).reduce((sum, p) => sum + (p.bid || 0), 0);
+      const t1 = updated.filter(p => p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
+      const t2 = updated.filter(p => p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => s + (p.bid || 0), 0);
+      const dealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
+      const firstSeat = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
       await updateState({
-        players: updated, phase: 'playing', bid1: team1Bid, bid2: team2Bid,
-        current_turn_seat: seated[0]?.seatNumber, current_bidder_seat: null,
+        players: updated, phase: 'playing', bid1: t1, bid2: t2,
+        current_turn_seat: firstSeat || seated[0]?.seatNumber, current_bidder_seat: null,
       });
     } else {
       await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
@@ -174,14 +191,16 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const seated = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === player.playerId);
     const nextBidder = seated[(bidderIdx + 1) % seated.length];
-    const allBid = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').every(p => p.bid != null);
+    const allBid = seated.every(p => p.bid != null);
 
     if (allBid) {
-      const team1Bid = updated.filter(p => p.team === 1).reduce((sum, p) => sum + (p.bid || 0), 0);
-      const team2Bid = updated.filter(p => p.team === 2).reduce((sum, p) => sum + (p.bid || 0), 0);
+      const t1 = updated.filter(p => p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
+      const t2 = updated.filter(p => p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => s + (p.bid || 0), 0);
+      const dealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
+      const firstSeat = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
       await updateState({
-        players: updated, phase: 'playing', bid1: team1Bid, bid2: team2Bid,
-        current_turn_seat: seated[0]?.seatNumber, current_bidder_seat: null,
+        players: updated, phase: 'playing', bid1: t1, bid2: t2,
+        current_turn_seat: firstSeat || seated[0]?.seatNumber, current_bidder_seat: null,
       });
     } else {
       await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
@@ -218,6 +237,11 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
           Waiting for Seat {dealerSeat} to deal
         </div>
       )}
+      {isBidding && !isMyBidTurn && !hasBid && (
+        <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2 text-center" style={PS2}>
+          Waiting for Seat {gs.current_bidder_seat || '?'} to bid…
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2 justify-center">
         {isDealer && (
@@ -238,7 +262,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         </Btn>
       </div>
 
-      {isBidding && !hasBid && !dealingActive && (
+      {isBidding && isMyBidTurn && !dealingActive && (
         <div className="mt-3 pt-3 border-t border-white/10">
           <div className="text-[7px] tracking-widest text-[#FF5F1F]/60 uppercase mb-2 text-center" style={PS2}>
             Place Your Bid

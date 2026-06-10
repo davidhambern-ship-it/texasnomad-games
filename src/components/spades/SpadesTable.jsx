@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SpadesSeat from './SpadesSeat';
-import SpadesCardArea from './SpadesCardArea';
+import SpadesCardArea from '@/components/spades/SpadesCardArea.jsx';
 import SpadesPlayerControls from './SpadesPlayerControls';
 import SpadesShuffleAnimation from './SpadesShuffleAnimation';
 import SpadesDealAnimation from './SpadesDealAnimation';
+import SpadesBidTimer from './SpadesBidTimer';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -27,7 +28,7 @@ function getRelativePosition(seatNumber, viewerSeat) {
   return rotation[viewerSeat]?.[seatNumber] || 'bottom';
 }
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, joinableSeats, emptySeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU }) {
+export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, joinableSeats, emptySeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU, onBidTimeout }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
@@ -141,8 +142,56 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     // Show hand for: my seat (face-up), opponents during deal (face-down backs), skip if empty
     const showHand = (showFaceUp || isDealing) && sortedSeatHand.length > 0;
 
+    const isActiveTurn = gs.current_turn_seat === seatNumber && (gs.phase === 'playing' || gs.phase === 'bidding');
+    const isCPUSeat = seatPlayer?.playerType === 'cpu';
+    const seatPlayerName = seatPlayer?.playerName || seatPlayer?.name || (seatPlayer ? `Seat ${seatNumber}` : null);
+
     return (
       <React.Fragment key={seatNumber}>
+        {/* Turn indicator glow around seat area */}
+        {isActiveTurn && (
+          <div className="absolute z-5 rounded-full animate-pulse pointer-events-none"
+            style={{
+              ...positionStyles[position],
+              width: 80, height: 80,
+              background: 'transparent',
+              border: '3px solid #FFD700',
+              boxShadow: '0 0 20px rgba(255,215,0,0.7), 0 0 40px rgba(255,215,0,0.3)',
+              transform: positionStyles[position].transform + ' scale(1.4)',
+            }} />
+        )}
+        {/* Player name label near seat */}
+        {seatPlayerName && (
+          <div className="absolute z-40 pointer-events-none"
+            style={{
+              ...(position === 'bottom' ? { bottom: 90, left: '50%', transform: 'translateX(-50%)' } :
+                  position === 'top'    ? { top: 90,    left: '50%', transform: 'translateX(-50%)' } :
+                  position === 'left'   ? { left: 90,   top: '50%',  transform: 'translateY(-50%)' } :
+                                          { right: 90,  top: '50%',  transform: 'translateY(-50%)' }),
+            }}>
+            <div className="px-2 py-1 rounded-lg border whitespace-nowrap"
+              style={{
+                ...PS2, fontSize: 7,
+                borderColor: isActiveTurn ? '#FFD700' : '#ffffff20',
+                background: isActiveTurn ? 'rgba(255,215,0,0.15)' : 'rgba(0,0,0,0.6)',
+                color: isActiveTurn ? '#FFD700' : '#ffffff80',
+                boxShadow: isActiveTurn ? '0 0 12px rgba(255,215,0,0.4)' : 'none',
+              }}>
+              {isActiveTurn && (
+                <span className="mr-1">
+                  {isMe ? '▶' : isCPUSeat ? '🤖' : '⏳'}
+                </span>
+              )}
+              {seatPlayerName}
+              {isActiveTurn && isMe && (
+                <span className="ml-1 text-[#FFD700]"> ← YOU</span>
+              )}
+              {isActiveTurn && isCPUSeat && (
+                <span className="ml-1 animate-pulse"> thinking…</span>
+              )}
+            </div>
+          </div>
+        )}
         {showHand && (
           <div className="absolute z-30 flex justify-center" style={handContainerStyles[position]}>
             {sortedSeatHand.map((card, i, arr) => {
@@ -224,7 +273,24 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
       {isBidding && !gs.first_hand_no_bid && (
         <div className="w-full px-4 py-3 rounded-xl border-2 border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-center" style={{ boxShadow: '0 0 20px rgba(255,95,31,0.2)' }}>
           <div className="font-heading text-lg tracking-widest text-[#FF5F1F] uppercase">📋 Bidding Round</div>
-          <div className="text-[7px] text-white/40 uppercase mt-1" style={PS2}>Seat {gs.current_bidder_seat || '?'} is bidding</div>
+          {(() => {
+            const bidder = players.find(p => p.seatNumber === gs.current_bidder_seat);
+            const bidderName = bidder?.playerName || bidder?.name || `Seat ${gs.current_bidder_seat || '?'}`;
+            const isMyBidTurn = gs.current_bidder_seat === mySeatNumber;
+            return (
+              <>
+                <div className="text-[7px] text-white/40 uppercase mt-1" style={PS2}>
+                  {isMyBidTurn ? '▶ YOUR TURN TO BID' : `${bidderName} is bidding…`}
+                </div>
+                <SpadesBidTimer
+                  isActive={!!(gs.current_bidder_seat)}
+                  playerName={bidderName}
+                  onBidPlaced={bidder?.bid != null}
+                  onTimeout={() => onBidTimeout?.(gs.current_bidder_seat)}
+                />
+              </>
+            );
+          })()}
         </div>
       )}
 
@@ -285,7 +351,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               }}
             />
           )}
-          {shufflePhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} />}
+          {shufflePhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} mySeatNumber={mySeatNumber} />}
         </div>
       </div>
 
