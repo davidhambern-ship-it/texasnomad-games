@@ -391,7 +391,30 @@ export default function Games() {
     setRoomCodes(prev => ({ ...prev, [gameId]: val }));
   };
 
-  const handleSinglePlayer = (game) => {
+  const handleSinglePlayer = async (game) => {
+    // BFF has a special "vs AI Team" mode — skip character picker and go directly
+    if (game.id === 'bff') {
+      setCreating('bff');
+      try {
+        const code = generateRoomCode();
+        await base44.entities.GameRoom.create({
+          room_code: code,
+          game_id: 'bff',
+          status: 'waiting',
+          host_connected: false,
+          screen_connected: false,
+          players_connected: 0,
+          created_from_host_panel: false,
+          game_state: { vs_ai: true },
+        });
+        navigate(`/games/bff?room=${code}&creator=1&vsai=1`);
+      } catch (e) {
+        console.error('Failed to create BFF vs AI room', e);
+      } finally {
+        setCreating(null);
+      }
+      return;
+    }
     const gameKey = GAME_ID_TO_KEY[game.id];
     if (!gameKey) return;
     setCpuSelectGame({ id: game.id, title: game.title, gameKey, path: game.path });
