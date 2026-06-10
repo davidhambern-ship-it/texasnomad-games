@@ -372,7 +372,7 @@ function BFFViewer({ roomCode, isVsAI }) {
   const aiCharacter = TN_TEAM[gs.ai_member_idx || 0];
   const isAIThinking = gs.answering_ai && !stealMode;
   const buzzWinner = gs.buzz_winner || null;
-  const canBuzz = isVsAI && buzzerPhase === 'buzzer_active' && !buzzWinner;
+  const canBuzz = isVsAI && (buzzerPhase === 'buzzer_active') && !buzzWinner;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
@@ -425,13 +425,20 @@ function BFFViewer({ roomCode, isVsAI }) {
           </div>
 
           {/* Buzzer phase */}
-          {isVsAI && (buzzerPhase === 'get_ready' || buzzerPhase === 'buzzer_active' || buzzerPhase === 'buzzed') && (
+          {isVsAI && (buzzerPhase === 'get_ready' || buzzerPhase === 'board_shown' || buzzerPhase === 'buzzer_active' || buzzerPhase === 'buzzed') && (
             <BFFBuzzer
               phase={buzzerPhase}
               buzzWinner={buzzWinner}
               canBuzz={canBuzz}
               onBuzz={handleBuzz}
             />
+          )}
+
+          {/* Board shown — buzzer arming soon */}
+          {isVsAI && buzzerPhase === 'board_shown' && (
+            <div className="text-center px-4 py-2 rounded-xl border border-[#FFD700]/20 bg-[#FFD700]/5 animate-pulse">
+              <span className="text-[7px] text-[#FFD700]/60 uppercase tracking-widest" style={PS2}>⚡ Get ready to buzz in…</span>
+            </div>
           )}
 
           {/* Question */}

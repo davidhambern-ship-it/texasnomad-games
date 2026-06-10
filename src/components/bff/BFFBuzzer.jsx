@@ -19,7 +19,7 @@ export default function BFFBuzzer({ phase, buzzWinner, canBuzz, onBuzz }) {
     return () => clearInterval(id);
   }, [phase]);
 
-  if (!phase || phase === 'playing') return null;
+  if (!phase || phase === 'playing' || phase === 'board_shown') return null;
 
   if (phase === 'get_ready') {
     return (

@@ -21,13 +21,14 @@ const AI_ACCURACY = {
 };
 
 // Per-character buzzer reaction range [min, max] ms
+// Minimum 2500ms so humans always have time to read the question first
 const AI_REACTION = {
-  berna: [350, 850],
-  dexter: [400, 900],
-  lemonade: [250, 700],
-  carlos: [500, 1200],
-  violet: [450, 950],
-  tank: [500, 1000],
+  berna: [2800, 5000],
+  dexter: [3200, 6000],
+  lemonade: [2500, 4500],
+  carlos: [4000, 7000],
+  violet: [3500, 5500],
+  tank: [3800, 6500],
 };
 
 const TN_TEAM = TEXASNOMAD_CHARACTERS;
@@ -241,21 +242,33 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     return () => clearTimeout(t);
   }, [enabled, gs.phase]);
 
-  // ── Get Ready → activate buzzer after random delay ────────────────────────
+  // ── Get Ready → reveal board → activate buzzer ───────────────────────────
+  // Step 1: after random 2-5s delay, reveal the question & board (phase=playing, buzzer=board_shown)
+  // Step 2: after another 1.5s (give players time to read), activate the buzzer
   useEffect(() => {
     if (!enabled || gs.buzzer_phase !== 'get_ready') return;
-    const delay = randomBetween(2000, 5000);
+    const revealDelay = randomBetween(2000, 5000);
     const t = setTimeout(async () => {
+      // Reveal board first — buzzer NOT yet active
       await updateState({
         phase: 'playing',
-        buzzer_phase: 'buzzer_active',
+        buzzer_phase: 'board_shown',
         current_question: gs.pending_question || gs.current_question,
         answers: gs.pending_answers || gs.answers || [],
         pending_question: null,
         pending_answers: null,
         buzz_winner: null,
       });
-    }, delay);
+    }, revealDelay);
+    return () => clearTimeout(t);
+  }, [enabled, gs.buzzer_phase]);
+
+  // Step 2: board_shown → buzzer_active after 1.5s
+  useEffect(() => {
+    if (!enabled || gs.buzzer_phase !== 'board_shown') return;
+    const t = setTimeout(async () => {
+      await updateState({ buzzer_phase: 'buzzer_active' });
+    }, 1500);
     return () => clearTimeout(t);
   }, [enabled, gs.buzzer_phase]);
 
