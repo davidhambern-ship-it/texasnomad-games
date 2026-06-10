@@ -160,38 +160,7 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               transform: positionStyles[position].transform + ' scale(1.4)',
             }} />
         )}
-        {/* Player name label near seat */}
-        {seatPlayerName && (
-          <div className="absolute z-40 pointer-events-none"
-            style={{
-              ...(position === 'bottom' ? { bottom: 90, left: '50%', transform: 'translateX(-50%)' } :
-                  position === 'top'    ? { top: 90,    left: '50%', transform: 'translateX(-50%)' } :
-                  position === 'left'   ? { left: 90,   top: '50%',  transform: 'translateY(-50%)' } :
-                                          { right: 90,  top: '50%',  transform: 'translateY(-50%)' }),
-            }}>
-            <div className="px-2 py-1 rounded-lg border whitespace-nowrap"
-              style={{
-                ...PS2, fontSize: 7,
-                borderColor: isActiveTurn ? '#FFD700' : '#ffffff20',
-                background: isActiveTurn ? 'rgba(255,215,0,0.15)' : 'rgba(0,0,0,0.6)',
-                color: isActiveTurn ? '#FFD700' : '#ffffff80',
-                boxShadow: isActiveTurn ? '0 0 12px rgba(255,215,0,0.4)' : 'none',
-              }}>
-              {isActiveTurn && (
-                <span className="mr-1">
-                  {isMe ? '▶' : isCPUSeat ? '🤖' : '⏳'}
-                </span>
-              )}
-              {seatPlayerName}
-              {isActiveTurn && isMe && (
-                <span className="ml-1 text-[#FFD700]"> ← YOU</span>
-              )}
-              {isActiveTurn && isCPUSeat && (
-                <span className="ml-1 animate-pulse"> thinking…</span>
-              )}
-            </div>
-          </div>
-        )}
+
         {showHand && (
           <div className="absolute z-30 flex justify-center" style={handContainerStyles[position]}>
             {sortedSeatHand.map((card, i, arr) => {
