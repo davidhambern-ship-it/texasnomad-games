@@ -575,15 +575,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         </div>
       ) : (
         <div className="flex-1 relative">
-          {isSinglePlayer && cpuCharacter && isPlayer && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 w-full max-w-sm px-4">
-              <SinglePlayerPanel cpuCharacter={cpuCharacter} gameLabel="Spades">
-                <div className="text-[7px] text-white/30 uppercase tracking-widest" style={PS2}>
-                  CPU fills empty seats · 1P mode
-                </div>
-              </SinglePlayerPanel>
-            </div>
-          )}
           <SpadesTable
             gs={gs}
             playerId={playerId}
