@@ -122,6 +122,25 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     };
   }, [roomCode, gameId, role]);
 
+  const ensureRoom = async (gameId, roomCode) => {
+    if (roomRef.current) return roomRef.current;
+    // Room doesn't exist yet — create it now
+    const r = await base44.entities.GameRoom.create({
+      room_code: roomCode.toUpperCase(),
+      game_id: gameId,
+      status: 'active',
+      host_connected: false,
+      screen_connected: false,
+      players_connected: 1,
+      created_from_host_panel: false,
+      game_state: {},
+      last_command: null,
+    });
+    roomRef.current = r;
+    setRoom({ ...r });
+    return r;
+  };
+
   const updateState = async (newState) => {
     if (!roomRef.current) return;
     const updated = await base44.entities.GameRoom.update(roomRef.current.id, {
@@ -147,5 +166,5 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     setRoom({ ...updated });
   };
 
-  return { room, loading, error, updateState, sendCommand, updateRoomStatus };
+  return { room, loading, error, updateState, sendCommand, updateRoomStatus, ensureRoom };
 }

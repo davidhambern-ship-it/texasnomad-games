@@ -25,7 +25,7 @@ export default function BFFGame() {
 
 // ─── Main BFF Viewer ──────────────────────────────────────────────────────────
 function BFFViewer({ roomCode, isVsAI }) {
-  const { room, loading, updateState } = useGameRoom(roomCode, 'bff', 'viewer');
+  const { room, loading, updateState, ensureRoom } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
 
   // Stable playerId
@@ -118,6 +118,8 @@ function BFFViewer({ roomCode, isVsAI }) {
 
     if (!gs.phase || gs.phase === 'waiting') {
       spInitRef.current = true;
+      // Ensure room exists before writing state
+      await ensureRoom('bff', roomCode);
       // Initialize the game
       const surveys = await base44.entities.BFFSurvey.filter({ active: true }, '-created_date', 50);
       const survey = surveys && surveys.length > 0 ? surveys[Math.floor(Math.random() * surveys.length)] : null;
