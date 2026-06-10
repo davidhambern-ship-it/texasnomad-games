@@ -220,10 +220,12 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
         const nextStartTeam = gs.active_turn === 1 ? 2 : 1;
 
         await updateState({
-          phase: 'get_ready',
-          buzzer_phase: 'get_ready',
-          current_question: null,
-          answers: [],
+          phase: 'playing',
+          buzzer_phase: 'board_shown',
+          current_question: survey.question,
+          answers: (survey.answers || []).map(a => ({ ...a, revealed: false })),
+          pending_question: null,
+          pending_answers: null,
           round_bank: 0,
           bye_count: 0,
           wrong_guesses: [],
@@ -234,39 +236,13 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
           buzz_winner: null,
           last_ai_answer: null,
           active_turn: nextStartTeam,
-          pending_question: survey.question,
-          pending_answers: (survey.answers || []).map(a => ({ ...a, revealed: false })),
         });
       } catch {}
     }, 3000);
     return () => clearTimeout(t);
   }, [enabled, gs.phase]);
 
-  // ── Get Ready → reveal board → activate buzzer ───────────────────────────
-  // Step 1: after random 2-5s delay, reveal the question & board (phase=playing, buzzer=board_shown)
-  // Step 2: after another 1.5s (give players time to read), activate the buzzer
-  useEffect(() => {
-    if (!enabled) return;
-    if (gs.buzzer_phase !== 'get_ready') return;
-    // Must have a pending question to reveal
-    const question = gs.pending_question || gs.current_question;
-    const answers = gs.pending_answers || gs.answers || [];
-    const revealDelay = randomBetween(2000, 4000);
-    const t = setTimeout(async () => {
-      await updateState({
-        phase: 'playing',
-        buzzer_phase: 'board_shown',
-        current_question: question,
-        answers: answers,
-        pending_question: null,
-        pending_answers: null,
-        buzz_winner: null,
-      });
-    }, revealDelay);
-    return () => clearTimeout(t);
-  }, [enabled, gs.buzzer_phase]);
-
-  // Step 2: board_shown → buzzer_active after 1.5s
+  // ── board_shown → buzzer_active after 2s (gives players time to read the board) ──
   useEffect(() => {
     if (!enabled || gs.buzzer_phase !== 'board_shown') return;
     const t = setTimeout(async () => {
