@@ -251,7 +251,6 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     // Must have a pending question to reveal
     const question = gs.pending_question || gs.current_question;
     const answers = gs.pending_answers || gs.answers || [];
-    if (!question) return; // wait until question is available
     const revealDelay = randomBetween(2000, 4000);
     const t = setTimeout(async () => {
       await updateState({
@@ -265,7 +264,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
       });
     }, revealDelay);
     return () => clearTimeout(t);
-  }, [enabled, gs.buzzer_phase, gs.pending_question, gs.current_question]);
+  }, [enabled, gs.buzzer_phase]);
 
   // Step 2: board_shown → buzzer_active after 1.5s
   useEffect(() => {
