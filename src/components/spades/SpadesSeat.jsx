@@ -15,6 +15,7 @@ export default function SpadesSeat({
   currentTurnSeat, 
   isPlaying,
   gs,
+  position,
 }) {
   // isMyTurn drives the seat badge glow — no external golden ring
   const isMyTurn = currentTurnSeat === seatNumber && isPlaying;
@@ -120,21 +121,35 @@ export default function SpadesSeat({
             )}
 
             {/* Show face-down card count for all occupied seats */}
-            {player?.hand?.length > 0 && !isMe && (
-              <div className="mt-1 flex justify-center gap-0.5">
-                {[...player.hand].slice(0, Math.min(5, player.hand.length)).map((card, i) => (
-                  <div key={i} className="w-4 h-6 rounded border border-white/20 overflow-hidden shadow-sm"
-                    style={{ transform: `rotate(${(i - 2) * 3}deg)`, marginLeft: i > 0 ? '-6px' : '0' }}>
-                    <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-                  </div>
-                ))}
-                {player.hand.length > 5 && (
-                  <div className="w-4 h-6 rounded border border-white/20 bg-black/60 flex items-center justify-center text-[5px] text-white/60" style={{ marginLeft: '-6px' }}>
-                    +{player.hand.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
+            {player?.hand?.length > 0 && !isMe && (() => {
+              const isLR = position === 'left' || position === 'right';
+              const cards = [...player.hand].slice(0, Math.min(5, player.hand.length));
+              return (
+                <div className={`mt-1 flex justify-center ${isLR ? 'flex-col items-center' : ''}`}
+                  style={{ gap: isLR ? '-8px' : '0' }}>
+                  {cards.map((card, i) => {
+                    const spread = (i - (cards.length - 1) / 2) * 3;
+                    const baseRot = isLR ? 90 : 0;
+                    return (
+                      <div key={i} className="w-4 h-6 rounded border border-white/20 overflow-hidden shadow-sm"
+                        style={{
+                          transform: `rotate(${baseRot + spread}deg)`,
+                          marginLeft: i > 0 && !isLR ? '-6px' : '0',
+                          marginTop: i > 0 && isLR ? '-8px' : '0',
+                        }}>
+                        <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
+                      </div>
+                    );
+                  })}
+                  {player.hand.length > 5 && (
+                    <div className="w-4 h-6 rounded border border-white/20 bg-black/60 flex items-center justify-center text-[5px] text-white/60"
+                      style={{ marginLeft: !isLR ? '-6px' : '0', marginTop: isLR ? '-8px' : '0' }}>
+                      +{player.hand.length - 5}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* Stand up — only for the human "me" seat */}
             {isMe && isTNCharacter === false && (

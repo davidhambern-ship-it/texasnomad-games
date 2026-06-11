@@ -29,10 +29,10 @@ function getRelativePosition(seatNumber, viewerSeat) {
 }
 
 const SEAT_POSITION_STYLES = {
-  top:    { top: 6,    left: '50%', transform: 'translateX(-50%)' },
-  bottom: { bottom: 6, left: '50%', transform: 'translateX(-50%)' },
-  left:   { left: 6,  top: '50%',  transform: 'translateY(-50%)' },
-  right:  { right: 6, top: '50%',  transform: 'translateY(-50%)' },
+  top:    { top: 12,    left: '50%', transform: 'translateX(-50%)' },
+  bottom: { bottom: 12, left: '50%', transform: 'translateX(-50%)' },
+  left:   { left: 8,   top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: 8,  top: '50%',  transform: 'translateY(-50%)' },
 };
 
 function sortHand(hand) {
@@ -105,23 +105,30 @@ export default function SpadesTable({
             currentTurnSeat={gs.current_turn_seat}
             isPlaying={isPlaying}
             gs={gs}
+            position={position}
           />
         </div>
 
         {/* Face-down fan for opponents during deal animation */}
         {showOpponentFan && (
-          <div className="absolute z-20 pointer-events-none flex justify-center"
+          <div className="absolute z-20 pointer-events-none"
             style={getOpponentHandStyle(position)}>
-            {Array.from({ length: Math.min(localCount, 7) }).map((_, i, arr) => (
-              <div key={i} style={{
-                width: 32, height: 46,
-                marginLeft: i > 0 ? '-16px' : '0',
-                transform: `rotate(${(i - (arr.length - 1) / 2) * 3}deg)`,
-                position: 'relative', zIndex: i,
-              }}>
-                <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-lg" style={{ objectFit: 'contain' }} />
-              </div>
-            ))}
+            {Array.from({ length: Math.min(localCount, 7) }).map((_, i, arr) => {
+              const spread = (i - (arr.length - 1) / 2) * 3;
+              // Left/right seats: rotate the entire fan 90° so cards face the player
+              const baseRotate = (position === 'left' || position === 'right') ? 90 : 0;
+              return (
+                <div key={i} style={{
+                  width: 32, height: 46,
+                  marginLeft: i > 0 ? (position === 'top' || position === 'bottom' ? '-16px' : '-24px') : '0',
+                  transform: `rotate(${baseRotate + spread}deg)`,
+                  position: 'relative', zIndex: i,
+                  display: 'inline-block',
+                }}>
+                  <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-lg" style={{ objectFit: 'contain' }} />
+                </div>
+              );
+            })}
           </div>
         )}
       </React.Fragment>
@@ -197,7 +204,7 @@ export default function SpadesTable({
           border: '4px solid rgba(255,120,30,0.6)',
           boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)',
           backdropFilter: 'blur(2px)',
-          minHeight: 300,
+          minHeight: 420,
         }}>
 
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-15">
@@ -323,10 +330,10 @@ export default function SpadesTable({
 
 function getOpponentHandStyle(position) {
   switch (position) {
-    case 'top':    return { top: 50,   left: '50%', transform: 'translateX(-50%)' };
-    case 'bottom': return { bottom: 50, left: '50%', transform: 'translateX(-50%)' };
-    case 'left':   return { left: 50,  top: '50%',  transform: 'translateY(-50%)' };
-    case 'right':  return { right: 50, top: '50%',  transform: 'translateY(-50%)' };
+    case 'top':    return { top: 68,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'bottom': return { bottom: 68, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'left':   return { left: 64,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'right':  return { right: 64,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
     default:       return {};
   }
 }
