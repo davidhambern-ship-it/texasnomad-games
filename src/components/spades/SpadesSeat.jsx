@@ -92,7 +92,7 @@ export default function SpadesSeat({
               </div>
             ) : (
               /* Human or generic CPU seat */
-              <div className="flex flex-col items-center gap-1">
+              <div className={`flex items-center gap-2 ${isTopBottom ? 'flex-row' : 'flex-col'}`}>
                 <div className="font-heading text-sm tracking-widest text-white">
                   {isMe ? 'YOU' : `SEAT ${seatNumber}`}
                 </div>
