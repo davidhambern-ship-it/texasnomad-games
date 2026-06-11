@@ -16,6 +16,7 @@ export default function SpadesSeat({
   isPlaying,
   gs,
 }) {
+  // isMyTurn drives the seat badge glow — no external golden ring
   const isMyTurn = currentTurnSeat === seatNumber && isPlaying;
   const occupied = !!player;
   const isCPU = player?.playerType === 'cpu';

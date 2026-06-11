@@ -9,39 +9,64 @@ import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-// Get relative position based on viewer's seat - rotates the table
+/**
+ * Seat rotation: the human player always sits at the bottom.
+ * Returns 'bottom' | 'left' | 'top' | 'right' for a given seatNumber
+ * relative to the viewer's seat.
+ *
+ * Partnership: Seats 1&3 = Team 1, Seats 2&4 = Team 2.
+ * Rotation ensures partner is always at the top.
+ */
+const ROTATION = {
+  1: { 1: 'bottom', 2: 'left',   3: 'top',    4: 'right'  },
+  2: { 1: 'right',  2: 'bottom', 3: 'left',   4: 'top'    },
+  3: { 1: 'top',    2: 'right',  3: 'bottom', 4: 'left'   },
+  4: { 1: 'left',   2: 'top',    3: 'right',  4: 'bottom' },
+};
+
 function getRelativePosition(seatNumber, viewerSeat) {
   if (!viewerSeat) {
-    // Spectator mode: fixed overhead view
-    const positions = { 1: 'bottom', 2: 'left', 3: 'top', 4: 'right' };
-    return positions[seatNumber];
+    // Spectator: fixed overhead (Seat 1 = bottom)
+    return { 1: 'bottom', 2: 'left', 3: 'top', 4: 'right' }[seatNumber] || 'bottom';
   }
-  
-  // Rotation mapping: viewer always sees themselves at bottom
-  const rotation = {
-    1: { 1: 'bottom', 2: 'left', 3: 'top', 4: 'right' },
-    2: { 1: 'right', 2: 'bottom', 3: 'left', 4: 'top' },
-    3: { 1: 'top', 2: 'right', 3: 'bottom', 4: 'left' },
-    4: { 1: 'left', 2: 'top', 3: 'right', 4: 'bottom' },
-  };
-  
-  return rotation[viewerSeat]?.[seatNumber] || 'bottom';
+  return ROTATION[viewerSeat]?.[seatNumber] || 'bottom';
 }
 
-export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator, updateState, joinableSeats, emptySeats, onSitInSeat, roomCode, onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown, onChooseSpectate, onChooseSit, onPlayCard, onStandUp, onTakeOverCPU, onBidTimeout }) {
+// Seat label positions around the oval table
+const SEAT_POSITION_STYLES = {
+  top:    { top: 6,    left: '50%', transform: 'translateX(-50%)' },
+  bottom: { bottom: 6, left: '50%', transform: 'translateX(-50%)' },
+  left:   { left: 6,  top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: 6, top: '50%',  transform: 'translateY(-50%)' },
+};
+
+function sortHand(hand) {
+  if (!hand || hand.length === 0) return [];
+  const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
+  const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
+  return [...hand].sort((a, b) => {
+    const sd = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
+    return sd !== 0 ? sd : (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
+  });
+}
+
+export default function SpadesTable({
+  gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator,
+  updateState, joinableSeats, emptySeats, onSitInSeat, roomCode,
+  onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown,
+  onChooseSpectate, onChooseSit, onPlayCard, onStandUp,
+  onTakeOverCPU, onBidTimeout,
+}) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
   const isBidding = gs.phase === 'bidding';
-  const isSetup = !gs.phase || gs.phase === 'setup';
 
   const [shufflePhase, setShufflePhase] = useState('idle');
   const [dealPhase, setDealPhase] = useState('idle');
-  // localHands: card accumulator during deal animation, keyed by seatNumber
   const [localHands, setLocalHands] = useState({});
   const prevShuffleTs = useRef(gs.shuffle_ts);
   const prevDealTs = useRef(gs.deal_ts);
 
-  // Trigger deal animation when deal_ts changes (works for both human dealer and CPU auto-deal)
   useEffect(() => {
     if (gs.deal_ts && gs.deal_ts !== prevDealTs.current && dealPhase === 'idle') {
       setLocalHands({});
@@ -50,7 +75,6 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     prevDealTs.current = gs.deal_ts;
   }, [gs.deal_ts]);
 
-  // Safety reset: if deck is cleared (deal finished) but animation never fired onComplete, unblock cards
   useEffect(() => {
     if (dealPhase !== 'idle' && (!gs.deck || gs.deck.length === 0)) {
       setDealPhase('idle');
@@ -65,150 +89,30 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
     prevShuffleTs.current = gs.shuffle_ts;
   }, [gs.shuffle_ts]);
 
-  // CPU choice dialog is now managed entirely in SpadesGame — never shown from SpadesTable
-  // Can join if not already seated AND there are joinable (empty/CPU) seats available
   const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
   const getPlayerAtSeat = (seatNum) => players.find(p => p.seatNumber === seatNum && (p.role === 'player' || p.role === 'hostPlayer'));
   const myPlayer = players.find(p => p.playerId === playerId);
+
+  // The human player's hand — used in the dedicated hand box below the table
   const myHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
-
-  const sortedHand = myHand.length > 0 ? [...myHand].sort((a, b) => {
-    const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
-    const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
-    const suitDiff = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
-    if (suitDiff !== 0) return suitDiff;
-    return (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
-  }) : [];
-
-  const getHorizontalOverlap = (cardCount) => {
-    if (cardCount <= 1) return 0;
-    const availableWidth = 460;
-    const cardWidth = 52;
-    const overlap = cardCount > 1 ? (cardWidth * cardCount - availableWidth) / (cardCount - 1) : 0;
-    return Math.max(12, Math.min(overlap, 40));
-  };
-
-  const getVerticalOverlap = (cardCount) => {
-    if (cardCount <= 1) return 0;
-    const availableHeight = 420;
-    const cardHeight = 73;
-    const overlap = cardCount > 1 ? (cardHeight * cardCount - availableHeight) / (cardCount - 1) : 0;
-    return Math.max(16, Math.min(overlap, 58));
-  };
-
+  const sortedMyHand = sortHand(myHand);
   const isDealing = dealPhase !== 'idle';
 
+  // Render an opponent seat badge on the table edge (no cards shown here for human player)
   const renderSeat = (seatNumber) => {
     const position = getRelativePosition(seatNumber, isPlayer ? mySeatNumber : null);
     const isMe = mySeatNumber === seatNumber;
     const seatPlayer = getPlayerAtSeat(seatNumber);
-
-    // During deal animation: show locally accumulated cards (my seat face-up, others face-down)
-    // After animation: fall back to gs hand
-    let displayHand;
-    if (isDealing) {
-      displayHand = localHands[seatNumber] || [];
-    } else {
-      displayHand = (isMe && isPlayer && seatPlayer?.hand) ? seatPlayer.hand : [];
-    }
-    const showFaceUp = isMe && isPlayer;
-    
-    const sortedSeatHand = displayHand.length > 0 ? [...displayHand].sort((a, b) => {
-      const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
-      const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
-      const suitDiff = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
-      if (suitDiff !== 0) return suitDiff;
-      return (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
-    }) : [];
-
-    const positionStyles = {
-      top: { top: 3, left: '50%', transform: 'translateX(-50%)' },
-      bottom: { bottom: 0, left: '50%', transform: 'translateX(-50%)' },
-      left: { left: 3, top: '50%', transform: 'translateY(-50%)' },
-      right: { right: 3, top: '50%', transform: 'translateY(-50%)' },
-    };
-
-    const handContainerStyles = {
-      top: { width: 700, height: 140, top: 1, left: '50%', transform: 'translateX(-50%) rotate(180deg)' },
-      bottom: { width: 700, height: 140, bottom: 0, left: '50%', transform: 'translateX(-50%)' },
-      left: { width: 140, height: 600, left: 1, top: '50%', transform: 'translateY(-50%) rotate(-90deg)' },
-      right: { width: 140, height: 600, right: 1, top: '50%', transform: 'translateY(-50%) rotate(90deg)' },
-    };
-
-    // left/right containers are CSS-rotated 90deg, so cards inside should always lay out horizontally
-    const isHorizontal = true;
-    const getOverlap = getHorizontalOverlap;
-
-    // Show hand for: my seat (face-up), opponents during deal (face-down backs), skip if empty
-    const showHand = (showFaceUp || isDealing) && sortedSeatHand.length > 0;
-
     const isActiveTurn = gs.current_turn_seat === seatNumber && (gs.phase === 'playing' || gs.phase === 'bidding');
-    const isCPUSeat = seatPlayer?.playerType === 'cpu';
-    const seatPlayerName = seatPlayer?.playerName || seatPlayer?.name || (seatPlayer ? `Seat ${seatNumber}` : null);
+
+    // For non-human seats: show face-down card fans during deal animation
+    const isDealtHere = isDealing && !isMe;
+    const localCount = (localHands[seatNumber] || []).length;
 
     return (
       <React.Fragment key={seatNumber}>
-        {/* Turn indicator glow around seat area */}
-        {isActiveTurn && (
-          <div className="absolute z-5 rounded-full animate-pulse pointer-events-none"
-            style={{
-              ...positionStyles[position],
-              width: 80, height: 80,
-              background: 'transparent',
-              border: '3px solid #FFD700',
-              boxShadow: '0 0 20px rgba(255,215,0,0.7), 0 0 40px rgba(255,215,0,0.3)',
-              transform: positionStyles[position].transform + ' scale(1.4)',
-            }} />
-        )}
-
-        {showHand && (
-          <div className="absolute z-30 flex justify-center" style={handContainerStyles[position]}>
-            {sortedSeatHand.map((card, i, arr) => {
-              const overlap = getOverlap(arr.length) * 0.5;
-              const isMyTurn = !isDealing && gs.current_turn_seat === seatNumber && gs.phase === 'playing';
-              const isBiddingPhase = !isDealing && gs.phase === 'bidding';
-              const hasBid = myPlayer?.bid != null;
-              const faceUp = showFaceUp && !isDealing ? true : (isDealing && isMe);
-              return (
-                <div
-                  key={card.id || i}
-                  onClick={() => isMyTurn && onPlayCard?.(card)}
-                  className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-200 ${
-                    isMyTurn 
-                      ? 'cursor-pointer hover:-translate-y-4 hover:z-30 hover:shadow-[0_0_20px_rgba(255,215,0,0.6)]' 
-                      : isBiddingPhase && !hasBid
-                      ? 'cursor-pointer hover:-translate-y-2'
-                      : isDealing ? 'cursor-default' : 'opacity-90 cursor-not-allowed'
-                  }`}
-                  style={{
-                    width: 64, height: 90,
-                    [isHorizontal ? 'marginLeft' : 'marginTop']: i > 0 ? `-${overlap}px` : '0',
-                    transform: isHorizontal 
-                      ? `rotate(${(i - (arr.length - 1) / 2) * 2}deg) translateY(${Math.abs(i - (arr.length - 1) / 2) * -1}px)`
-                      : 'none',
-                    filter: isBiddingPhase && !hasBid ? 'brightness(1.35) drop-shadow(0 0 10px rgba(255,215,0,0.6))' : 'brightness(1.1)',
-                    animation: isDealing ? 'card-arrive 0.15s ease-out' : 'none',
-                  }}
-                >
-                  <img 
-                    src={faceUp ? getCardImage(card) : getCardBack()} 
-                    alt={faceUp ? `${card.suit} ${card.value}` : 'Card back'} 
-                    className="w-full h-full"
-                    style={{ objectFit: 'contain', imageRendering: 'auto', transform: 'translateZ(0)' }}
-                    onError={(e) => { e.target.src = getCardBack(); }}
-                  />
-                  {isMyTurn && (
-                    <div className="absolute inset-0 bg-[#FFD700]/20 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <div className="text-[10px] font-heading text-[#FFD700] uppercase tracking-widest" style={PS2}>Play</div>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        
-        <div className={`absolute z-10 ${positionStyles[position].left ? 'left-1/2 -translate-x-1/2' : positionStyles[position].top ? 'top-1/2 -translate-y-1/2' : ''}`} style={positionStyles[position]}>
+        {/* Seat badge */}
+        <div className="absolute z-10" style={SEAT_POSITION_STYLES[position]}>
           <SpadesSeat
             seatNumber={seatNumber}
             player={seatPlayer}
@@ -222,12 +126,34 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             gs={gs}
           />
         </div>
+
+        {/* Face-down card fan for opponent seats during deal */}
+        {isDealtHere && localCount > 0 && (
+          <div className="absolute z-20 pointer-events-none flex justify-center"
+            style={{
+              ...getOpponentHandStyle(position),
+            }}>
+            {Array.from({ length: Math.min(localCount, 7) }).map((_, i, arr) => (
+              <div key={i} style={{
+                width: 36, height: 50,
+                marginLeft: i > 0 ? '-18px' : '0',
+                transform: `rotate(${(i - (arr.length - 1) / 2) * 3}deg)`,
+                zIndex: i,
+                position: 'relative',
+              }}>
+                <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-lg" style={{ objectFit: 'contain' }} />
+              </div>
+            ))}
+          </div>
+        )}
       </React.Fragment>
     );
   };
 
   return (
-    <div className="flex flex-col items-center p-6 gap-6 max-w-6xl mx-auto w-full">
+    <div className="flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full">
+
+      {/* ── Phase banner ──────────────────────────────────────────────────────── */}
       {!isPlaying && !isBidding && (
         <div className="w-full px-4 py-3 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
           <div className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
@@ -235,10 +161,11 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               ? (gs.dealer_seat ? `⏳ Waiting for Seat ${gs.dealer_seat} to Shuffle & Deal...` : '⏳ Waiting for Dealer...')
               : gs.phase.toUpperCase()}
           </div>
-          {gs.first_hand_no_bid && (<div className="text-[6px] tracking-widest text-[#FFD700]/50 uppercase mt-1" style={PS2}>First Hand - No Bidding</div>)}
+          {gs.first_hand_no_bid && <div className="text-[6px] tracking-widest text-[#FFD700]/50 uppercase mt-1" style={PS2}>First Hand - No Bidding</div>}
         </div>
       )}
 
+      {/* ── Bidding banner ────────────────────────────────────────────────────── */}
       {isBidding && !gs.first_hand_no_bid && (
         <div className="w-full px-4 py-3 rounded-xl border-2 border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-center" style={{ boxShadow: '0 0 20px rgba(255,95,31,0.2)' }}>
           <div className="font-heading text-lg tracking-widest text-[#FF5F1F] uppercase">📋 Bidding Round</div>
@@ -263,45 +190,58 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
         </div>
       )}
 
+      {/* ── Score row ─────────────────────────────────────────────────────────── */}
       <div className="w-full grid grid-cols-2 gap-3">
-        <div className="p-3 border-2 rounded-xl text-center relative" style={{ borderColor: '#BC13FE30', background: '#BC13FE08' }}>
-          <div className="font-heading text-sm tracking-widest text-white uppercase truncate">{gs.team1Name || 'Team 1'}</div>
-          <div className="font-heading text-2xl text-[#BC13FE]">{gs.score1 || 0}</div>
-          <div className="text-[7px] text-white/30 mt-0.5" style={PS2}>Bid: {gs.bid1 ?? '-'} | Books: {gs.books1 ?? '-'}</div>
-          <div className="mt-2 flex flex-wrap justify-center gap-1 min-h-[20px]">
-            {Array.from({ length: gs.books1 || 0 }).map((_, i) => (
-              <div key={i} className="w-4 h-3 bg-gradient-to-br from-[#BC13FE] to-[#6b21a8] rounded-sm border border-[#BC13FE]/50" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} title={`Book ${i + 1}`} />
-            ))}
+        {[
+          { name: gs.team1Name || 'Team 1', score: gs.score1 || 0, bid: gs.bid1, books: gs.books1, color: '#BC13FE' },
+          { name: gs.team2Name || 'Team 2', score: gs.score2 || 0, bid: gs.bid2, books: gs.books2, color: '#FF5F1F' },
+        ].map((t, idx) => (
+          <div key={idx} className="p-3 border-2 rounded-xl text-center" style={{ borderColor: `${t.color}30`, background: `${t.color}08` }}>
+            <div className="font-heading text-sm tracking-widest text-white uppercase truncate">{t.name}</div>
+            <div className="font-heading text-2xl" style={{ color: t.color }}>{t.score}</div>
+            <div className="text-[7px] text-white/30 mt-0.5" style={PS2}>Bid: {t.bid ?? '-'} | Books: {t.books ?? '-'}</div>
+            <div className="mt-2 flex flex-wrap justify-center gap-1 min-h-[20px]">
+              {Array.from({ length: t.books || 0 }).map((_, i) => (
+                <div key={i} className="w-4 h-3 rounded-sm border"
+                  style={{ background: `linear-gradient(135deg, ${t.color}, ${t.color}88)`, borderColor: `${t.color}50`, boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} />
+              ))}
+            </div>
           </div>
-        </div>
-        <div className="p-3 border-2 rounded-xl text-center relative" style={{ borderColor: '#FF5F1F30', background: '#FF5F1F08' }}>
-          <div className="font-heading text-sm tracking-widest text-white uppercase truncate">{gs.team2Name || 'Team 2'}</div>
-          <div className="font-heading text-2xl text-[#FF5F1F]">{gs.score2 || 0}</div>
-          <div className="text-[7px] text-white/30 mt-0.5" style={PS2}>Bid: {gs.bid2 ?? '-'} | Books: {gs.books2 ?? '-'}</div>
-          <div className="mt-2 flex flex-wrap justify-center gap-1 min-h-[20px]">
-            {Array.from({ length: gs.books2 || 0 }).map((_, i) => (
-              <div key={i} className="w-4 h-3 bg-gradient-to-br from-[#FF5F1F] to-[#c2410c] rounded-sm border border-[#FF5F1F]/50" style={{ boxShadow: '0 1px 2px rgba(0,0,0,0.3)' }} title={`Book ${i + 1}`} />
-            ))}
-          </div>
-        </div>
+        ))}
       </div>
 
+      {/* ── Trick info strip ──────────────────────────────────────────────────── */}
       {(gs.phase === 'playing' || gs.phase === 'bidding') && (
         <div className="w-full px-4 py-2 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 grid grid-cols-3 gap-2 text-[7px]" style={PS2}>
           <div className="text-center"><div className="text-white/40 uppercase">Book</div><div className="text-[#FFD700]">{(gs.tricks_played || 0) + 1}/13</div></div>
-          <div className="text-center"><div className="text-white/40 uppercase">Active Suit</div><div className="text-[#FFD700] text-lg">{(gs.current_trick?.[0]?.card?.suit) || '-'}</div></div>
+          <div className="text-center"><div className="text-white/40 uppercase">Led Suit</div><div className="text-[#FFD700] text-lg">{gs.current_trick?.[0]?.card?.suit || '-'}</div></div>
           <div className="text-center"><div className="text-white/40 uppercase">Spades</div><div className={gs.spades_broken ? 'text-[#4ade80]' : 'text-[#ef4444]'}>{gs.spades_broken ? 'BROKEN' : 'INTACT'}</div></div>
         </div>
       )}
 
+      {/* ── Oval card table ────────────────────────────────────────────────────── */}
       <div className="relative w-full rounded-3xl border-4 overflow-visible"
-        style={{ background: 'rgba(180,70,10,0.35)', border: '4px solid rgba(255,120,30,0.6)', boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)', minHeight: 520 }}>
+        style={{
+          background: 'rgba(180,70,10,0.35)',
+          border: '4px solid rgba(255,120,30,0.6)',
+          boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)',
+          backdropFilter: 'blur(2px)',
+          minHeight: 360,
+        }}>
+
+        {/* Logo watermark */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-20">
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Games" className="w-32 h-32 object-contain" />
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad" className="w-24 h-24 object-contain" />
         </div>
+
+        {/* Seat badges around the table */}
         {[1, 2, 3, 4].map(renderSeat)}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-56 h-56 z-20 pointer-events-none">
-          {shufflePhase !== 'idle' && <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />}
+
+        {/* Center: shuffle / deal / played cards */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 z-20 pointer-events-none">
+          {shufflePhase !== 'idle' && (
+            <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />
+          )}
           {dealPhase !== 'idle' && gs.deck && gs.deck.length > 0 && (
             <SpadesDealAnimation
               dealSequence={gs.deck}
@@ -309,34 +249,24 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
               dealStartSeat={gs.deal_start_seat}
               mySeatNumber={mySeatNumber}
               onCardDealt={(seatNumber, card) => {
-                setLocalHands(prev => ({
-                  ...prev,
-                  [seatNumber]: [...(prev[seatNumber] || []), card],
-                }));
+                setLocalHands(prev => ({ ...prev, [seatNumber]: [...(prev[seatNumber] || []), card] }));
               }}
-              onComplete={() => {
-                setDealPhase('idle');
-                setLocalHands({});
-              }}
+              onComplete={() => { setDealPhase('idle'); setLocalHands({}); }}
             />
           )}
-          {shufflePhase === 'idle' && <SpadesCardArea trick={gs.current_trick || []} players={players} mySeatNumber={mySeatNumber} />}
+          {shufflePhase === 'idle' && (
+            <SpadesCardArea
+              trick={gs.current_trick || []}
+              players={players}
+              mySeatNumber={mySeatNumber}
+            />
+          )}
         </div>
       </div>
 
-      {/* Player controls: always render for seated humans — never hide when host connects */}
+      {/* ── Player controls (bid/shuffle/deal) ───────────────────────────────── */}
       {isPlayer && myPlayer && mySeatNumber && (
-        <div className="w-full max-w-md mx-auto mt-4 space-y-3">
-          {/* Turn indicator banner */}
-          {gs.phase === 'playing' && (
-            <div className={`w-full px-3 py-2 rounded-lg border text-center text-[7px] tracking-widest uppercase ${
-              gs.current_turn_seat === mySeatNumber
-                ? 'border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700] animate-pulse'
-                : 'border-white/10 bg-transparent text-white/30'
-            }`} style={PS2}>
-              {gs.current_turn_seat === mySeatNumber ? '▶ YOUR TURN — CLICK A CARD TO PLAY' : `⏳ Waiting... Seat ${gs.current_turn_seat || '?'}'s turn`}
-            </div>
-          )}
+        <div className="w-full max-w-md mx-auto space-y-2">
           <SpadesPlayerControls
             seatNumber={mySeatNumber}
             player={myPlayer}
@@ -347,11 +277,104 @@ export default function SpadesTable({ gs, playerId, mySeatNumber, myRole, isPlay
             onStandUp={onStandUp}
             isDealing={isDealing}
           />
-          <button onClick={onStandUp} className="w-full py-3 px-4 rounded-lg border-2 border-white/30 text-white/60 font-heading text-sm tracking-widest uppercase hover:border-red-500/60 hover:text-red-400 hover:bg-red-500/10 transition-all" style={PS2}>
-            🚶 Stand Up (Spectate)
-          </button>
         </div>
+      )}
+
+      {/* ── YOUR HAND — dedicated card box below the table ───────────────────── */}
+      {isPlayer && sortedMyHand.length > 0 && (
+        <div className="w-full max-w-2xl mx-auto">
+          <div className="rounded-2xl border-2 border-[#4ade80]/40 bg-[#4ade80]/5 p-3"
+            style={{ boxShadow: '0 0 20px rgba(74,222,128,0.1)' }}>
+
+            {/* Header row */}
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🃏 Your Hand</div>
+              {gs.phase === 'playing' && (
+                <div className={`text-[7px] tracking-widest uppercase px-2 py-1 rounded ${
+                  gs.current_turn_seat === mySeatNumber
+                    ? 'text-[#FFD700] bg-[#FFD700]/10 border border-[#FFD700]/50 animate-pulse'
+                    : 'text-white/30 border border-white/10'
+                }`} style={PS2}>
+                  {gs.current_turn_seat === mySeatNumber ? '▶ YOUR TURN' : '⏳ WAITING'}
+                </div>
+              )}
+            </div>
+
+            {/* Card fan — scrollable row */}
+            <div className="flex justify-center flex-wrap gap-2 py-1 min-h-[90px]">
+              {sortedMyHand.map((card, i, arr) => {
+                const isMyTurn = gs.phase === 'playing' && gs.current_turn_seat === mySeatNumber;
+                const isBiddingPhase = gs.phase === 'bidding';
+                const hasBid = myPlayer?.bid != null;
+
+                return (
+                  <div
+                    key={card.id || i}
+                    onClick={() => isMyTurn && onPlayCard?.(card)}
+                    className={`relative rounded-lg overflow-hidden shadow-lg transition-all duration-150 select-none ${
+                      isMyTurn
+                        ? 'cursor-pointer hover:-translate-y-3 hover:shadow-[0_0_16px_rgba(255,215,0,0.6)]'
+                        : isBiddingPhase && !hasBid
+                        ? 'cursor-pointer hover:-translate-y-1'
+                        : 'opacity-75 cursor-default'
+                    }`}
+                    style={{
+                      width: 56,
+                      height: 80,
+                      filter: isMyTurn ? 'brightness(1.1)' : isBiddingPhase && !hasBid ? 'brightness(1.25) drop-shadow(0 0 6px rgba(255,215,0,0.5))' : 'brightness(0.9)',
+                      flexShrink: 0,
+                    }}
+                  >
+                    <img
+                      src={getCardImage(card)}
+                      alt={`${card.suit} ${card.value}`}
+                      className="w-full h-full"
+                      style={{ objectFit: 'contain' }}
+                      onError={(e) => { e.target.src = getCardBack(); }}
+                    />
+                    {isMyTurn && (
+                      <div className="absolute inset-0 bg-[#FFD700]/10 opacity-0 hover:opacity-100 transition-opacity flex items-end justify-center pb-1">
+                        <div className="text-[7px] text-[#FFD700] uppercase" style={PS2}>Play</div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bid reminder during bidding */}
+            {gs.phase === 'bidding' && myPlayer?.bid == null && gs.current_bidder_seat === mySeatNumber && (
+              <div className="mt-2 text-center text-[7px] text-[#FF5F1F]/80 uppercase tracking-widest" style={PS2}>
+                Use the controls above to place your bid
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Stand Up button ───────────────────────────────────────────────────── */}
+      {isPlayer && myPlayer && mySeatNumber && (
+        <button
+          onClick={onStandUp}
+          className="w-full max-w-md mx-auto py-2 px-4 rounded-lg border border-white/20 text-white/40 text-[7px] tracking-widest uppercase hover:border-red-500/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+          style={PS2}>
+          🚶 Stand Up (Spectate)
+        </button>
       )}
     </div>
   );
+}
+
+/**
+ * Returns absolute positioning for a face-down card fan
+ * displayed near opponent seats around the table edge.
+ */
+function getOpponentHandStyle(position) {
+  switch (position) {
+    case 'top':    return { top: 52,   left: '50%', transform: 'translateX(-50%)' };
+    case 'bottom': return { bottom: 52, left: '50%', transform: 'translateX(-50%)' };
+    case 'left':   return { left: 52,  top: '50%',  transform: 'translateY(-50%)' };
+    case 'right':  return { right: 52, top: '50%',  transform: 'translateY(-50%)' };
+    default:       return {};
+  }
 }
