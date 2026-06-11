@@ -239,7 +239,7 @@ export default function SpadesTable({
 
       {/* ── YOUR HAND — flush below the table, no gap ─────────────────────────── */}
       {isPlayer && sortedMyHand.length > 0 && (
-        <div className="w-full rounded-2xl border-2 border-[#4ade80]/40 bg-[#4ade80]/5 p-3"
+        <div className="w-full rounded-2xl border-2 border-[#4ade80]/40 bg-[#4ade80]/5 p-3" style={{ position: 'relative', zIndex: 40 }}
           style={{ boxShadow: '0 0 16px rgba(74,222,128,0.08)' }}>
 
           <div className="flex items-center justify-between mb-2 px-1">
@@ -305,6 +305,7 @@ export default function SpadesTable({
 
       {/* ── Player controls (bid/shuffle/deal) ───────────────────────────────── */}
       {isPlayer && myPlayer && mySeatNumber && (
+        <div className="relative" style={{ zIndex: 40 }}>
         <SpadesPlayerControls
           seatNumber={mySeatNumber}
           player={myPlayer}
@@ -315,11 +316,12 @@ export default function SpadesTable({
           onStandUp={onStandUp}
           isDealing={isDealing}
         />
+        </div>
       )}
 
       {/* ── Stand Up button ───────────────────────────────────────────────────── */}
       {isPlayer && myPlayer && mySeatNumber && (
-        <button
+        <button style={{ position: 'relative', zIndex: 40 }}
           onClick={onStandUp}
           className="w-full py-1.5 px-4 rounded-lg border border-white/20 text-white/30 text-[6px] tracking-widest uppercase hover:border-red-500/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
           style={PS2}>
