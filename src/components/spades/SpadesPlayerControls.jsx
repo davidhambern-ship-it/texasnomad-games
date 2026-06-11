@@ -124,7 +124,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
     await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
-    const isFirstHand = !gs.hand_number || gs.hand_number === 0;
+    const handNumber = gs.hand_number || 0;
+    const isFirstHand = handNumber === 0;
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
       if (hand) return { ...p, hand: [...hand], bid: isFirstHand ? 0 : null, tricksWon: 0 };
@@ -236,65 +237,42 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   };
 
   return (
-    <div className="mt-3 p-3 border-2 rounded-xl bg-black/60"
-      style={{ borderColor: '#4ade80', boxShadow: '0 0 15px rgba(74,222,128,0.2)' }}>
-      <div className="text-[7px] tracking-widest text-[#4ade80]/60 uppercase mb-2 text-center" style={PS2}>
-        Seat {seatNumber} Controls
-      </div>
-      
-      {isSetup && isDealer && (
-        <div className="text-[7px] tracking-widest text-[#FFD700]/80 uppercase mb-2 text-center" style={PS2}>
-          🎴 You are the dealer
-        </div>
-      )}
-      {isSetup && !isDealer && dealerSeat && (
-        <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2 text-center" style={PS2}>
-          Waiting for Seat {dealerSeat} to deal
-        </div>
-      )}
-      {isBidding && !isMyBidTurn && !hasBid && (
-        <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2 text-center" style={PS2}>
-          Waiting for Seat {gs.current_bidder_seat || '?'} to bid…
-        </div>
-      )}
+    <div className="flex flex-col gap-2">
 
-      <div className="flex flex-wrap gap-2 justify-center">
-        {isDealer && (
-          <>
-            <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive}>
-              {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
-            </Btn>
-            <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2 || !gs.deck_shuffled || !hasDeck}>
-              {dealingActive ? '🃏 Dealing...' : '🃏 Deal'}
-            </Btn>
-          </>
-        )}
-        <Btn onClick={handleReset} color="#ef4444" size="sm">
-          ↺ Reset
-        </Btn>
-        <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
-          🚶 Stand Up
-        </Btn>
-      </div>
-
+      {/* ── Bid UI: shown prominently when it's the human's turn to bid ── */}
       {isBidding && isMyBidTurn && !dealingActive && (
-        <div className="mt-3 pt-3 border-t border-white/10">
-          <div className="text-[7px] tracking-widest text-[#FF5F1F]/60 uppercase mb-2 text-center" style={PS2}>
-            Place Your Bid
+        <div className="p-4 border-2 rounded-xl bg-black/80 text-center"
+          style={{ borderColor: '#FF5F1F', boxShadow: '0 0 20px rgba(255,95,31,0.4)' }}>
+          <div className="text-[8px] tracking-widest text-[#FF5F1F] uppercase mb-3 animate-pulse" style={PS2}>
+            📋 YOUR TURN TO BID
+          </div>
+          {/* Quick bid buttons 1–7 */}
+          <div className="flex flex-wrap gap-1.5 justify-center mb-3">
+            {[1,2,3,4,5,6,7].map(n => (
+              <button key={n} onClick={() => setBidInput(String(n))}
+                className={`w-9 h-9 rounded-lg border-2 font-heading text-base transition-all active:scale-95 ${
+                  bidInput === String(n)
+                    ? 'border-[#FF5F1F] bg-[#FF5F1F]/30 text-white'
+                    : 'border-white/20 bg-white/5 text-white/70 hover:border-[#FF5F1F]/60'
+                }`}>
+                {n}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 justify-center items-center mb-2">
+            <input type="number" min="0" max="13"
+              className="w-16 px-2 py-2 rounded-lg bg-black/80 border-2 border-[#FF5F1F]/50 text-white text-sm text-center focus:outline-none focus:border-[#FF5F1F]"
+              value={bidInput} onChange={e => setBidInput(e.target.value)} placeholder="0–13"
+              onKeyDown={e => e.key === 'Enter' && bidInput && handleSetBid()} />
+            <Btn onClick={handleSetBid} color="#FF5F1F" size="sm" disabled={!bidInput}>
+              ✓ Confirm Bid
+            </Btn>
           </div>
           <div className="flex gap-2 justify-center items-center">
-            <input type="number" min="0" max="13"
-              className="w-16 px-2 py-1 rounded bg-black/80 border border-[#FF5F1F]/40 text-white text-sm text-center focus:outline-none focus:border-[#FF5F1F]"
-              value={bidInput} onChange={e => setBidInput(e.target.value)} placeholder="0" />
-            <Btn onClick={handleSetBid} color="#FF5F1F" size="sm" disabled={!bidInput}>
-              Set Bid
-            </Btn>
-          </div>
-          <div className="flex gap-2 justify-center items-center mt-2">
             <select
-              className="px-2 py-1 rounded bg-black/80 border border-[#FFD700]/40 text-white text-sm focus:outline-none"
+              className="px-2 py-1.5 rounded-lg bg-black/80 border border-[#FFD700]/40 text-white text-sm focus:outline-none"
               value={blindAmount} onChange={e => setBlindAmount(Number(e.target.value))}>
-              <option value="0">Blind Bid</option>
+              <option value="0">Blind Bid…</option>
               <option value="6">Blind 6</option>
               <option value="7">Blind 7</option>
               <option value="8">Blind 8</option>
@@ -302,28 +280,76 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
               <option value="10">Blind 10</option>
             </select>
             <Btn onClick={handleBlind} color="#FFD700" size="sm" disabled={blindAmount === 0}>
-              Blind
+              Go Blind
             </Btn>
           </div>
         </div>
       )}
 
-      {hasBid && (
-        <div className="mt-3 pt-3 border-t border-white/10 text-center">
-          <div className="text-[7px] tracking-widest text-[#FFD700]/60 uppercase" style={PS2}>
-            Your Bid: <span className="text-[#FFD700]">{player.bid}</span>
+      {/* ── Waiting for bid ── */}
+      {isBidding && !isMyBidTurn && !hasBid && (
+        <div className="px-3 py-2 rounded-xl border border-white/10 bg-white/5 text-center">
+          <div className="text-[6px] tracking-widest text-white/40 uppercase" style={PS2}>
+            ⏳ Waiting for Seat {gs.current_bidder_seat || '?'} to bid…
+          </div>
+        </div>
+      )}
+
+      {/* ── Bid confirmed ── */}
+      {isBidding && hasBid && (
+        <div className="px-3 py-2 rounded-xl border border-[#4ade80]/30 bg-[#4ade80]/5 text-center">
+          <div className="text-[6px] tracking-widest text-[#4ade80] uppercase" style={PS2}>
+            ✓ Bid Placed: <span className="text-white">{player.bid}</span>
             {player.blind && <span className="ml-2 text-[#FF5F1F]">(BLIND)</span>}
           </div>
         </div>
       )}
 
-      {isMyTurn && (
-        <div className="mt-3 pt-3 border-t border-white/10 text-center">
-          <div className="text-[7px] tracking-widest text-[#FFD700] uppercase animate-pulse" style={PS2}>
-            ▶ YOUR TURN TO PLAY
-          </div>
+      {/* ── Main controls panel ── */}
+      <div className="p-3 border-2 rounded-xl bg-black/60"
+        style={{ borderColor: '#4ade80', boxShadow: '0 0 15px rgba(74,222,128,0.2)' }}>
+        <div className="text-[7px] tracking-widest text-[#4ade80]/60 uppercase mb-2 text-center" style={PS2}>
+          Seat {seatNumber} Controls
         </div>
-      )}
+
+        {isSetup && isDealer && (
+          <div className="text-[7px] tracking-widest text-[#FFD700]/80 uppercase mb-2 text-center" style={PS2}>
+            🎴 You are the dealer
+          </div>
+        )}
+        {isSetup && !isDealer && dealerSeat && (
+          <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2 text-center" style={PS2}>
+            Waiting for Seat {dealerSeat} to deal
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2 justify-center">
+          {isDealer && (
+            <>
+              <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive}>
+                {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
+              </Btn>
+              <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2 || !gs.deck_shuffled || !hasDeck}>
+                {dealingActive ? '🃏 Dealing...' : '🃏 Deal'}
+              </Btn>
+            </>
+          )}
+          <Btn onClick={handleReset} color="#ef4444" size="sm">
+            ↺ Reset
+          </Btn>
+          <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
+            🚶 Stand Up
+          </Btn>
+        </div>
+
+        {isMyTurn && (
+          <div className="mt-3 pt-3 border-t border-white/10 text-center">
+            <div className="text-[7px] tracking-widest text-[#FFD700] uppercase animate-pulse" style={PS2}>
+              ▶ YOUR TURN TO PLAY
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
