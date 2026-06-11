@@ -248,7 +248,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
           </div>
           {/* Quick bid buttons 1–7 */}
           <div className="flex flex-wrap gap-1.5 justify-center mb-3">
-            {[1,2,3,4,5,6,7].map(n => (
+            {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map(n => (
               <button key={n} onClick={() => setBidInput(String(n))}
                 className={`w-9 h-9 rounded-lg border-2 font-heading text-base transition-all active:scale-95 ${
                   bidInput === String(n)
