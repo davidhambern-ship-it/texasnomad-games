@@ -19,10 +19,10 @@ const ROTATION = {
 };
 
 const POSITION_STYLES = {
-  bottom: { bottom: 24, left: '50%', transform: 'translateX(-50%)' },
-  top:    { top: 24,    left: '50%', transform: 'translateX(-50%)' },
-  left:   { left: 24,  top: '50%',  transform: 'translateY(-50%)' },
-  right:  { right: 24, top: '50%',  transform: 'translateY(-50%)' },
+  bottom: { bottom: 20, left: '50%', transform: 'translateX(-50%)' },
+  top:    { top: 20,    left: '50%', transform: 'translateX(-50%)' },
+  left:   { left: '30%', top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: '30%', top: '50%',  transform: 'translateY(-50%)' },
 };
 
 export default function SpadesCardArea({ trick = [], players = [], mySeatNumber }) {

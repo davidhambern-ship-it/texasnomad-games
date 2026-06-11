@@ -31,13 +31,15 @@ export default function SpadesSeat({
   };
   const charColor = isTNCharacter ? (charColors[player.characterId] || '#BC13FE') : '#BC13FE';
 
+  const isTopBottom = position === 'top' || position === 'bottom';
+
   return (
     <div className="flex flex-col items-center gap-1">
       <div
         className={`relative rounded-xl border-2 text-center transition-all duration-300`}
         style={{
-          minWidth: isTNCharacter ? 96 : 80,
-          padding: isTNCharacter ? '8px 10px' : '8px 12px',
+          minWidth: isTNCharacter ? 96 : (isTopBottom ? 'auto' : 80),
+          padding: isTNCharacter ? '6px 10px' : '6px 10px',
           borderColor: isMyTurn ? '#FFD700' : isMe ? '#4ade80' : isTNCharacter ? `${charColor}60` : occupied ? '#BC13FE50' : '#ffffff10',
           background: isMyTurn ? '#FFD70015' : isMe ? '#4ade8010' : isTNCharacter ? `${charColor}10` : occupied ? '#BC13FE08' : '#ffffff05',
           boxShadow: isMyTurn ? '0 0 20px rgba(255,215,0,0.4)' : isMe ? '0 0 10px rgba(74,222,128,0.2)' : isTNCharacter ? `0 0 12px ${charColor}25` : 'none',
@@ -88,36 +90,36 @@ export default function SpadesSeat({
               </div>
             ) : (
               /* Human or generic CPU seat */
-              <>
+              <div className={`flex items-center gap-2 ${isTopBottom ? 'flex-row' : 'flex-col'}`}>
                 <div className="font-heading text-sm tracking-widest text-white">
                   {isMe ? 'YOU' : `SEAT ${seatNumber}`}
                 </div>
-                <div className="flex items-center gap-1 justify-center mt-0.5">
+                <div className="flex items-center gap-1 justify-center">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#4ade80]" />
                   <span className="text-[6px] text-[#4ade80]/70 uppercase" style={PS2}>
                     {player.role === 'hostPlayer' ? 'HOST' : isMe ? 'PLAYER' : isCPU ? 'CPU' : 'PLAYER'}
                   </span>
                 </div>
                 {player.bid != null && (
-                  <div className="text-[6px] text-[#FFD700]/60 mt-0.5 uppercase" style={PS2}>
+                  <div className="text-[6px] text-[#FFD700]/60 uppercase" style={PS2}>
                     Bid: {player.bid}
                   </div>
                 )}
                 {isMe && (
                   <button onClick={onStand}
-                    className="mt-1.5 px-2 py-1 rounded border border-red-500/60 text-red-400 text-[6px] tracking-widest uppercase hover:bg-red-500/20 transition-all active:scale-95 w-full"
+                    className="px-2 py-1 rounded border border-red-500/60 text-red-400 text-[6px] tracking-widest uppercase hover:bg-red-500/20 transition-all active:scale-95"
                     style={PS2}>
                     Stand
                   </button>
                 )}
                 {isCPU && isJoinable && (
                   <button onClick={onTakeOver}
-                    className="mt-1.5 px-2 py-1 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95 w-full"
+                    className="px-2 py-1 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95"
                     style={PS2}>
                     Sit
                   </button>
                 )}
-              </>
+              </div>
             )}
 
             {/* Show face-down card count for all occupied seats */}
@@ -151,14 +153,7 @@ export default function SpadesSeat({
               );
             })()}
 
-            {/* Stand up — only for the human "me" seat */}
-            {isMe && isTNCharacter === false && (
-              <button onClick={onStand}
-                className="mt-1.5 px-2 py-1 rounded border border-red-500/60 text-red-400 text-[6px] tracking-widest uppercase hover:bg-red-500/20 transition-all active:scale-95 w-full"
-                style={PS2}>
-                Stand
-              </button>
-            )}
+
           </>
         ) : isJoinable ? (
           <>
