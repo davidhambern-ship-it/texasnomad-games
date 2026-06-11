@@ -109,11 +109,11 @@ export default function SpadesTable({
           />
         </div>
 
-        {/* Face-down fan for opponents during deal animation AND gameplay */}
-        {(showOpponentFan || (!isMe && seatPlayer && (seatPlayer.hand?.length > 0 || (gs.phase === 'playing' || gs.phase === 'bidding')))) && (
+        {/* Face-down fan for opponents during deal animation */}
+        {showOpponentFan && (
           <div className="absolute z-20 pointer-events-none"
             style={getOpponentHandStyle(position)}>
-            {Array.from({ length: Math.min(showOpponentFan ? localCount : (seatPlayer?.hand?.length || 0), 7) }).map((_, i, arr) => {
+            {Array.from({ length: Math.min(localCount, 7) }).map((_, i, arr) => {
               const spread = (i - (arr.length - 1) / 2) * 3;
               // Left/right seats: rotate the entire fan 90° so cards face the player
               const baseRotate = (position === 'left' || position === 'right') ? 90 : 0;
@@ -330,10 +330,10 @@ export default function SpadesTable({
 
 function getOpponentHandStyle(position) {
   switch (position) {
-    case 'top':    return { top: 76,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
-    case 'bottom': return { bottom: 76, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
-    case 'left':   return { left: 76,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
-    case 'right':  return { right: 76,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'top':    return { top: 12,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'bottom': return { bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'left':   return { left: 12,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'right':  return { right: 12,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
     default:       return {};
   }
 }
