@@ -391,7 +391,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     await advanceBid(bidder, 3);
   };
 
-  const handleAutoDeal = async (shuffledDeck) => {
+  const handleAutoDeal = async (shuffledDeck, knownHandNumber = null) => {
     const seated = getSeatedPlayers(gs.players || []);
     if (seated.length < 2) return;
     const dealerSeat = gs.dealer_seat || seated[0]?.seatNumber || 1;
@@ -401,17 +401,19 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
     const currentPlayers = gs.players || [];
 
-    const isFirstHand = !gs.hand_number || gs.hand_number === 0;
+    // Use explicitly passed hand number if available (avoids stale closure issues)
+    const currentHandNumber = knownHandNumber !== null ? knownHandNumber : (gs.hand_number || 0);
+    const isFirstHand = currentHandNumber === 0;
 
     const clearedPlayers = currentPlayers.map(p =>
-      p.seatNumber != null ? { ...p, hand: [], bid: isFirstHand ? 0 : null, tricksWon: 0 } : p
+      p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p
     );
     await updateState({
       players: clearedPlayers, phase: 'setup', status: 'active',
       deck: dealSequence, deck_shuffled: true, deal_start_seat: dealStartSeat,
       deal_ts: Date.now(),
       current_trick: [], tricks_played: 0,
-      bid1: isFirstHand ? 0 : null, bid2: isFirstHand ? 0 : null,
+      bid1: null, bid2: null,
       books1: 0, books2: 0,
       shuffle_count: 0, spades_broken: false, completed_books: [],
       round_scored: false,
@@ -422,14 +424,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
 
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
-      if (hand) return { ...p, hand, bid: isFirstHand ? 0 : null, tricksWon: 0 };
+      if (hand) return { ...p, hand, bid: null, tricksWon: 0 };
       return p;
     });
 
     if (isFirstHand) {
-      // First hand: skip bidding, go straight to playing
+      // Hand 0: skip bidding, go straight to playing
+      const playersWithBid = finalPlayers.map(p => p.seatNumber != null ? { ...p, bid: 0 } : p);
       await updateState({
-        players: finalPlayers, phase: 'playing',
+        players: playersWithBid, phase: 'playing',
         deck: [], deck_shuffled: false,
         current_turn_seat: firstBidder,
         first_hand_no_bid: true,
@@ -441,6 +444,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         players: finalPlayers, phase: 'bidding',
         deck: [], deck_shuffled: false,
         current_bidder_seat: firstBidder,
+        current_turn_seat: null,
         first_hand_no_bid: false,
         bid1: null, bid2: null,
       });
@@ -612,10 +616,11 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       isUpdatingRef.current = true;
       try {
         const newDealer = getNextDealerSeat();
+        const nextHandNumber = gs.hand_number || 0; // already incremented during scoring
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
         await new Promise(resolve => setTimeout(resolve, 1200));
-        await handleAutoDeal(previewDeck);
+        await handleAutoDeal(previewDeck, nextHandNumber);
       } finally {
         isUpdatingRef.current = false;
       }
