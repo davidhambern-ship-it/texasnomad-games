@@ -111,7 +111,7 @@ export default function SpadesTable({
 
         {/* Face-down fan for opponents during deal animation */}
         {showOpponentFan && (
-          <div className="absolute z-20 pointer-events-none"
+          <div className="absolute z-10 pointer-events-none"
             style={getOpponentHandStyle(position)}>
             {Array.from({ length: Math.min(localCount, 7) }).map((_, i, arr) => {
               const spread = (i - (arr.length - 1) / 2) * 3;
@@ -333,7 +333,7 @@ function getOpponentHandStyle(position) {
     case 'top':    return { top: 12,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
     case 'bottom': return { bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
     case 'left':   return { left: 12,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
-    case 'right':  return { right: 90,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'right':  return { right: 8,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
     default:       return {};
   }
 }
