@@ -14,6 +14,7 @@ const PS2 = { fontFamily: "'Press Start 2P', monospace" };
  */
 export default function CPUOpponentSelect({ gameKey, gameName, onSelect, onBack }) {
   const [selectedId, setSelectedId] = useState(null);
+  const isPartnerGame = gameKey === 'spades';
 
   const characters = TEXASNOMAD_CHARACTERS.filter(c => c.gameProfiles?.[gameKey]);
   const selected = characters.find(c => c.id === selectedId);
@@ -50,9 +51,13 @@ export default function CPUOpponentSelect({ gameKey, gameName, onSelect, onBack 
             TexasNomad Team
           </div>
           <h1 className="font-heading text-4xl sm:text-5xl tracking-widest uppercase text-white" style={{ textShadow: '0 0 30px rgba(188,19,254,0.3)' }}>
-            Choose Your Opponent
+            {isPartnerGame ? 'Choose Your Partner' : 'Choose Your Opponent'}
           </h1>
-          <p className="mt-2 text-white/40 text-sm font-body">Play against the TexasNomad Team. Each character plays differently.</p>
+          <p className="mt-2 text-white/40 text-sm font-body">
+            {isPartnerGame
+              ? 'Pick a TexasNomad character as your partner. You\'ll face the other two as opponents.'
+              : 'Play against the TexasNomad Team. Each character plays differently.'}
+          </p>
         </div>
 
         {/* Random button */}
@@ -61,7 +66,7 @@ export default function CPUOpponentSelect({ gameKey, gameName, onSelect, onBack 
             onClick={handleRandom}
             className="px-6 py-3 rounded-xl border-2 font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
             style={{ borderColor: '#BC13FE60', color: '#BC13FEcc', background: '#BC13FE10' }}>
-            🎲 Random Opponent
+            🎲 {isPartnerGame ? 'Random Partner' : 'Random Opponent'}
           </button>
         </div>
 
@@ -85,7 +90,7 @@ export default function CPUOpponentSelect({ gameKey, gameName, onSelect, onBack 
               style={{ background: 'rgba(5,5,5,0.95)', backdropFilter: 'blur(12px)', boxShadow: '0 0 30px rgba(255,215,0,0.2)' }}>
               <img src={selected.avatar} alt={selected.name} className="w-10 h-10 rounded-lg border border-[#FFD700]/40" />
               <div>
-                <div className="text-[7px] text-[#FFD700]/60 uppercase tracking-widest" style={PS2}>Opponent Selected</div>
+                <div className="text-[7px] text-[#FFD700]/60 uppercase tracking-widest" style={PS2}>{isPartnerGame ? 'Partner Selected' : 'Opponent Selected'}</div>
                 <div className="font-heading text-lg text-[#FFD700] tracking-widest uppercase">{selected.name}</div>
               </div>
               <button
