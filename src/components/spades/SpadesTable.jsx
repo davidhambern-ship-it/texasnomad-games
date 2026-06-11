@@ -206,6 +206,7 @@ export default function SpadesTable({
           boxShadow: 'inset 0 0 40px rgba(255,80,0,0.25), inset 0 0 80px rgba(0,0,0,0.5)',
           backdropFilter: 'blur(2px)',
           minHeight: 420,
+          isolation: 'isolate',
         }}>
 
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none opacity-15">

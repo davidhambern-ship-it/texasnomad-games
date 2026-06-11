@@ -253,7 +253,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
             </Btn>
           </>
         )}
-        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={dealingActive || (isSetup && !hasCards && !hasBid)}>
+        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={dealingActive}>
           ↺ Reset
         </Btn>
         <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
