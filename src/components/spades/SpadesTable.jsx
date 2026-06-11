@@ -120,7 +120,7 @@ export default function SpadesTable({
               return (
                 <div key={i} style={{
                   width: 32, height: 46,
-                  marginLeft: i > 0 ? (position === 'top' || position === 'bottom' ? '-16px' : '-24px') : '0',
+                  marginLeft: i > 0 ? (position === 'top' || position === 'bottom' ? '-16px' : '-28px') : '0',
                   transform: `rotate(${baseRotate + spread}deg)`,
                   position: 'relative', zIndex: i,
                   display: 'inline-block',

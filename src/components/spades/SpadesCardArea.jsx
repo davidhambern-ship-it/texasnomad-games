@@ -18,11 +18,12 @@ const ROTATION = {
   4: { 4: 'bottom', 1: 'left',   2: 'top',    3: 'right'  },
 };
 
+// Each position gets a unique offset so cards don't stack
 const POSITION_STYLES = {
-  bottom: { bottom: 20, left: '50%', transform: 'translateX(-50%)' },
-  top:    { top: 20,    left: '50%', transform: 'translateX(-50%)' },
-  left:   { left: '38%', top: '50%',  transform: 'translateY(-50%)' },
-  right:  { right: '38%', top: '50%',  transform: 'translateY(-50%)' },
+  bottom: { bottom: 8,  left: '50%', transform: 'translateX(-50%)' },
+  top:    { top: 8,     left: '50%', transform: 'translateX(-50%)' },
+  left:   { left: '10%', top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: '10%', top: '50%', transform: 'translateY(-50%)' },
 };
 
 export default function SpadesCardArea({ trick = [], players = [], mySeatNumber }) {
