@@ -149,6 +149,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (!room || !gs.dealer_seat || !gs.cpu_enabled) return;
     if (gs.phase !== 'setup' && gs.phase) return;
     if (gs.deck && gs.deck.length > 0) return;
+    if (gs.reset_ts && Date.now() - gs.reset_ts < 3000) return;
 
     const seated = getSeatedPlayers(gs.players || []);
     const dealer = seated.find(p => p.seatNumber === gs.dealer_seat);

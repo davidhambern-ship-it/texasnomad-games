@@ -209,6 +209,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   };
 
   const handleReset = async () => {
+    const confirmed = window.confirm('Reset the game? This will clear all hands, bids, and scores.');
+    if (!confirmed) return;
     await updateState({
       phase: 'setup',
       deck: [],
@@ -228,6 +230,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       shuffle_count: 0,
       shuffle_ts: null,
       deal_ts: null,
+      reset_ts: Date.now(),
       players: (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
     });
   };
