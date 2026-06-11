@@ -54,16 +54,16 @@ export default function SpadesSeat({
           <>
             {/* TN Character: show avatar + name + role */}
             {isTNCharacter ? (
-              <div className={`flex items-center gap-2 ${isTopBottom ? 'flex-row' : 'flex-col'}`}>
+              <div className="flex items-center gap-2">
                 <div className="relative shrink-0">
                   <img
                     src={player.characterAvatar}
                     alt={player.name}
-                    className="w-10 h-10 rounded-lg border-2 object-cover"
+                    className="w-8 h-8 rounded-lg border-2 object-cover"
                     style={{ borderColor: `${charColor}60` }}
                   />
                   {isMyTurn && (
-                    <div className="absolute -bottom-1 -right-1 w-3 h-3 rounded-full border border-[#070311]"
+                    <div className="absolute -bottom-1 -right-1 w-2.5 h-2.5 rounded-full border border-[#070311]"
                       style={{ background: '#FFD700' }} />
                   )}
                 </div>
@@ -71,10 +71,12 @@ export default function SpadesSeat({
                   <div className="font-heading text-xs tracking-widest uppercase" style={{ color: charColor }}>
                     {player.name}
                   </div>
-                  <div className="text-[6px] text-white/40 uppercase tracking-widest" style={PS2}>
-                    {player.characterRole}
+                  <div className="flex items-center gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: charColor }} />
+                    <span className="text-[6px] text-white/40 uppercase tracking-widest" style={PS2}>
+                      {player.characterRole || 'CPU'}
+                    </span>
                   </div>
-                  {aiStatus && <TNCharacterStatus status={aiStatus} />}
                   {player.bid != null && (
                     <div className="text-[6px] text-[#FFD700]/60 uppercase" style={PS2}>
                       Bid: {player.bid}
