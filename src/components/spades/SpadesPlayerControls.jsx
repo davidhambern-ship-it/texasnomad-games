@@ -209,7 +209,6 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   };
 
   const handleReset = async () => {
-    if (!isDealer) return;
     await updateState({
       phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null, deck: [],
       deck_shuffled: false,
@@ -254,7 +253,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
             </Btn>
           </>
         )}
-        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!isDealer || dealingActive || (isSetup && !hasCards && !hasBid)}>
+        <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={dealingActive || (isSetup && !hasCards && !hasBid)}>
           ↺ Reset
         </Btn>
         <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
