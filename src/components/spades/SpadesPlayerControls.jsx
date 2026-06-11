@@ -210,12 +210,25 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
   const handleReset = async () => {
     await updateState({
-      phase: 'setup', current_trick: [], books1: 0, books2: 0, tricks_played: 0, bid1: null, bid2: null, deck: [],
+      phase: 'setup',
+      deck: [],
       deck_shuffled: false,
-      players: (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
-      dealer_seat: null,
+      current_trick: [],
       current_turn_seat: null,
+      current_bidder_seat: null,
+      dealer_seat: null,
+      tricks_played: 0,
+      bid1: null, bid2: null,
+      books1: 0, books2: 0,
+      score1: 0, score2: 0,
+      hand_number: 0,
+      round_scored: false,
+      spades_broken: false,
+      first_hand_no_bid: false,
       shuffle_count: 0,
+      shuffle_ts: null,
+      deal_ts: null,
+      players: (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 })),
     });
   };
 
