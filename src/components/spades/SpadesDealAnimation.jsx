@@ -17,10 +17,10 @@ function getSeatPosition(seatNumber, viewerSeat) {
     return pos[seatNumber] || 'bottom';
   }
   const rotation = {
-    1: { 1: 'bottom', 2: 'left',  3: 'top',    4: 'right' },
-    2: { 1: 'right',  2: 'bottom', 3: 'left',   4: 'top'   },
-    3: { 1: 'top',    2: 'right',  3: 'bottom',  4: 'left'  },
-    4: { 1: 'left',   2: 'top',    3: 'right',   4: 'bottom'},
+    1: { 1: 'bottom', 2: 'left',   3: 'top',    4: 'right'  },
+    2: { 2: 'bottom', 3: 'left',   4: 'top',    1: 'right'  },
+    3: { 3: 'bottom', 4: 'left',   1: 'top',    2: 'right'  },
+    4: { 4: 'bottom', 1: 'left',   2: 'top',    3: 'right'  },
   };
   return rotation[viewerSeat]?.[seatNumber] || 'bottom';
 }
