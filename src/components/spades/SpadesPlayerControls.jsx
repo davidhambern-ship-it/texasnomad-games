@@ -49,12 +49,12 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
   const hasDeck = gs.deck?.length > 0;
   const canStandUp = gs.phase === 'setup' || !hasCards;
-  const dealerSeat = gs.dealer_seat || getSeatedPlayers(gs.players || [])[0]?.seatNumber || null;
-  const isDealer = dealerSeat != null && seatNumber === dealerSeat;
+  const dealerSeat = gs.dealer_seat || seatNumber; // fallback: you are the dealer if no dealer set
+  const isDealer = seatNumber === dealerSeat;
 
   // SHUFFLE: Trigger animation then update deck in state
   const handleShuffle = async () => {
-    if (isShuffling || !isDealer) return;
+    if (isShuffling) return;
     setIsShuffling(true);
 
     // Start shuffle animation
@@ -65,7 +65,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
     // Wait for animation (~1.8s), then update state
     await new Promise(resolve => setTimeout(resolve, 1800));
-    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now() });
+    await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: seatNumber });
     setIsShuffling(false);
   };
 
@@ -77,7 +77,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
   // DEAL: Distribute the already-shuffled deck round-robin starting left of dealer
   const handleDeal = async () => {
-    if (isDealing || !isDealer) return;
+    if (isDealing) return;
     const currentPlayers = gs.players || [];
     const allSeated = getSeatedPlayers(currentPlayers);
     if (allSeated.length < 2) {
