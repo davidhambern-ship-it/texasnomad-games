@@ -93,7 +93,7 @@ export default function SpadesTable({
 
     return (
       <React.Fragment key={seatNumber}>
-        <div className="absolute z-10" style={SEAT_POSITION_STYLES[position]}>
+        <div className="absolute z-30" style={SEAT_POSITION_STYLES[position]}>
           <SpadesSeat
             seatNumber={seatNumber}
             player={seatPlayer}
