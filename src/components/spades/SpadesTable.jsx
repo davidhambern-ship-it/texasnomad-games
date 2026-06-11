@@ -31,8 +31,8 @@ function getRelativePosition(seatNumber, viewerSeat) {
 const SEAT_POSITION_STYLES = {
   top:    { top: 12,    left: '50%', transform: 'translateX(-50%)' },
   bottom: { bottom: 12, left: '50%', transform: 'translateX(-50%)' },
-  left:   { left: 8,   top: '50%',  transform: 'translateY(-50%)' },
-  right:  { right: 8,  top: '50%',  transform: 'translateY(-50%)' },
+  left:   { left: 6,   top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: 6,  top: '50%',  transform: 'translateY(-50%)' },
 };
 
 function sortHand(hand) {
