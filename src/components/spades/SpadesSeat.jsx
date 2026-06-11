@@ -54,8 +54,8 @@ export default function SpadesSeat({
           <>
             {/* TN Character: show avatar + name + role */}
             {isTNCharacter ? (
-              <div className="flex flex-col items-center gap-1">
-                <div className="relative">
+              <div className={`flex items-center gap-2 ${isTopBottom ? 'flex-row' : 'flex-col'}`}>
+                <div className="relative shrink-0">
                   <img
                     src={player.characterAvatar}
                     alt={player.name}
@@ -67,26 +67,27 @@ export default function SpadesSeat({
                       style={{ background: '#FFD700' }} />
                   )}
                 </div>
-                <div className="font-heading text-xs tracking-widest uppercase" style={{ color: charColor }}>
-                  {player.name}
-                </div>
-                <div className="text-[6px] text-white/40 uppercase tracking-widest" style={PS2}>
-                  {player.characterRole}
-                </div>
-                {aiStatus && <TNCharacterStatus status={aiStatus} />}
-                {player.bid != null && (
-                  <div className="text-[6px] text-[#FFD700]/60 uppercase" style={PS2}>
-                    Bid: {player.bid}
+                <div className="flex flex-col items-start gap-0.5">
+                  <div className="font-heading text-xs tracking-widest uppercase" style={{ color: charColor }}>
+                    {player.name}
                   </div>
-                )}
-                {/* SIT button to replace AI */}
-                {isJoinable && (
-                  <button onClick={onTakeOver}
-                    className="mt-1 px-2 py-0.5 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95 w-full"
-                    style={PS2}>
-                    Sit
-                  </button>
-                )}
+                  <div className="text-[6px] text-white/40 uppercase tracking-widest" style={PS2}>
+                    {player.characterRole}
+                  </div>
+                  {aiStatus && <TNCharacterStatus status={aiStatus} />}
+                  {player.bid != null && (
+                    <div className="text-[6px] text-[#FFD700]/60 uppercase" style={PS2}>
+                      Bid: {player.bid}
+                    </div>
+                  )}
+                  {isJoinable && (
+                    <button onClick={onTakeOver}
+                      className="px-2 py-0.5 rounded border border-[#FFD700]/60 text-[#FFD700] text-[6px] tracking-widest uppercase hover:bg-[#FFD700]/20 transition-all active:scale-95"
+                      style={PS2}>
+                      Sit
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               /* Human or generic CPU seat */
