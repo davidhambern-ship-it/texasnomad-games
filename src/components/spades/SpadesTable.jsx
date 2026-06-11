@@ -76,13 +76,6 @@ export default function SpadesTable({
   }, [gs.deal_ts]);
 
   useEffect(() => {
-    if (dealPhase !== 'idle' && (!gs.deck || gs.deck.length === 0)) {
-      setDealPhase('idle');
-      setLocalHands({});
-    }
-  }, [gs.deck]);
-
-  useEffect(() => {
     if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
       setShufflePhase('shuffling');
     }
@@ -242,7 +235,7 @@ export default function SpadesTable({
           {shufflePhase !== 'idle' && (
             <SpadesShuffleAnimation phase={shufflePhase} onComplete={() => setShufflePhase('idle')} />
           )}
-          {dealPhase !== 'idle' && gs.deck && gs.deck.length > 0 && (
+          {dealPhase !== 'idle' && gs.deck?.length > 0 && (
             <SpadesDealAnimation
               dealSequence={gs.deck}
               seatedPlayers={players.filter(p => p.seatNumber != null && (p.role === 'player' || p.role === 'hostPlayer'))}
