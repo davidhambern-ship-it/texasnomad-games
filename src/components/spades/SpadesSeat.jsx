@@ -32,8 +32,23 @@ export default function SpadesSeat({
 
   const isTopBottom = position === 'top' || position === 'bottom';
 
+  // For left seat: box faces right (toward table). For right seat: box faces left.
+  // For top seat: team label goes below (between box and table).
+  const isLeft = position === 'left';
+  const isRight = position === 'right';
+  const isTop = position === 'top';
+
+  // Outer flex direction: left/right seats stack horizontally with team label on the table-facing side
+  const outerClass = isLeft
+    ? 'flex flex-row-reverse items-center gap-1'
+    : isRight
+    ? 'flex flex-row items-center gap-1'
+    : isTop
+    ? 'flex flex-col-reverse items-center gap-1'
+    : 'flex flex-col items-center gap-1';
+
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className={outerClass}>
       <div
         className={`relative rounded-xl border-2 text-center transition-all duration-300`}
         style={{
@@ -142,7 +157,7 @@ export default function SpadesSeat({
         )}
       </div>
 
-      <div className="text-[6px] text-white/20 uppercase tracking-widest" style={PS2}>
+      <div className="text-[6px] text-white/20 uppercase tracking-widest shrink-0" style={PS2}>
         {seatNumber === 1 || seatNumber === 3 ? 'T1' : 'T2'}
       </div>
     </div>
