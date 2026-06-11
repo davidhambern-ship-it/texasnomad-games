@@ -4,6 +4,7 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesRoundSummary from '@/components/spades/SpadesRoundSummary';
 import SpadesMatchOver from '@/components/spades/SpadesMatchOver';
+import CPUOpponentSelect from '@/components/cpu/CPUOpponentSelect';
 import { fillEmptySeatsWithTNCharacters, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
@@ -544,10 +545,18 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   };
 
   // CPU choice handlers — use TexasNomad characters
-  const handlePlayAgainstCPU = async () => {
+  const handlePlayAgainstCPU = async (partnerCharacter = null) => {
     if (!room) return;
     const currentPlayers = gs.players || [];
-    const filledPlayers = fillEmptySeatsWithTNCharacters(currentPlayers, gs);
+
+    // If a partner character was chosen, assign them to the player's partner seat
+    const specificAssignments = {};
+    if (partnerCharacter && mySeatNumber) {
+      const partnerSeat = mySeatNumber === 1 ? 3 : mySeatNumber === 3 ? 1 : mySeatNumber === 2 ? 4 : 2;
+      specificAssignments[partnerSeat] = partnerCharacter.id;
+    }
+
+    const filledPlayers = fillEmptySeatsWithTNCharacters(currentPlayers, gs, specificAssignments);
     await updateState({
       players: filledPlayers,
       cpu_enabled: true,
@@ -799,27 +808,25 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         </div>
       )}
 
-      {/* ── CPU choice dialog: only for room creator ──────────────────────── */}
+      {/* ── CPU choice dialog: partner picker ────────────────────────────── */}
       {showCPUChoice && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-[#0a1a0a] to-[#050a05] border-4 border-[#FFD700]/40 rounded-2xl p-8 max-w-md w-full shadow-2xl"
-            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
-            <div className="text-center mb-6">
-              <div className="text-xl font-heading text-[#FFD700] uppercase tracking-widest mb-2" style={PS2}>🃏 Set Up Room</div>
-              <div className="text-white/60 text-sm">How do you want to fill the empty seats?</div>
-            </div>
-            <div className="space-y-3">
-              <button onClick={handlePlayAgainstCPU}
-               className="w-full py-4 px-6 bg-gradient-to-r from-[#FFD700] to-[#FFA500] hover:from-[#FFA500] hover:to-[#FFD700] text-black font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
-                🤖 Play vs TexasNomad AI
-               <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Berna · Dexter · Tank · Lemonade · Carlos · Violet</div>
-              </button>
-              <button onClick={handleWaitForRealPlayers}
-                className="w-full py-4 px-6 bg-gradient-to-r from-[#BC13FE] to-[#9333ea] hover:from-[#9333ea] hover:to-[#BC13FE] text-white font-heading text-base uppercase tracking-widest rounded-xl transition-all transform hover:scale-105" style={PS2}>
-                👥 Wait for Players
-                <div className="text-[7px] mt-1 opacity-70 normal-case tracking-normal">Share room code and play with humans</div>
+        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/80 backdrop-blur-sm">
+          <div className="relative">
+            {/* "Wait for Players" escape hatch at top */}
+            <div className="absolute top-4 right-4 z-10">
+              <button
+                onClick={handleWaitForRealPlayers}
+                className="px-4 py-2 rounded-xl border border-white/20 text-white/50 text-[7px] tracking-widest uppercase hover:border-white/40 hover:text-white/80 transition-all"
+                style={PS2}>
+                👥 Wait for Players Instead
               </button>
             </div>
+            <CPUOpponentSelect
+              gameKey="spades"
+              gameName="Spades"
+              onSelect={(character) => handlePlayAgainstCPU(character)}
+              onBack={() => setJoinFlow('choose')}
+            />
           </div>
         </div>
       )}
