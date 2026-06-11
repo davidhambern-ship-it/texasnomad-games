@@ -333,7 +333,7 @@ function getOpponentHandStyle(position) {
     case 'top':    return { top: 12,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
     case 'bottom': return { bottom: 12, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
     case 'left':   return { left: 12,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
-    case 'right':  return { right: 8,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'right':  return { right: -30, top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
     default:       return {};
   }
 }
