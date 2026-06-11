@@ -29,7 +29,7 @@ function getRelativePosition(seatNumber, viewerSeat) {
 }
 
 const SEAT_POSITION_STYLES = {
-  top:    { top: 8,     left: '50%', transform: 'translateX(-50%)' },
+  top:    { top: 56,    left: '50%', transform: 'translateX(-50%)' },
   bottom: { bottom: 8,  left: '50%', transform: 'translateX(-50%)' },
   left:   { left: 8,    top: '50%',  transform: 'translateY(-50%)' },
   right:  { right: 8,   top: '50%',  transform: 'translateY(-50%)' },
