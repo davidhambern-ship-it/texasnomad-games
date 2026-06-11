@@ -29,10 +29,10 @@ function getRelativePosition(seatNumber, viewerSeat) {
 }
 
 const SEAT_POSITION_STYLES = {
-  top:    { top: 12,    left: '50%', transform: 'translateX(-50%)' },
-  bottom: { bottom: 12, left: '50%', transform: 'translateX(-50%)' },
-  left:   { left: 6,   top: '50%',  transform: 'translateY(-50%)' },
-  right:  { right: 6,  top: '50%',  transform: 'translateY(-50%)' },
+  top:    { top: 8,     left: '50%', transform: 'translateX(-50%)' },
+  bottom: { bottom: 8,  left: '50%', transform: 'translateX(-50%)' },
+  left:   { left: 8,    top: '50%',  transform: 'translateY(-50%)' },
+  right:  { right: 8,   top: '50%',  transform: 'translateY(-50%)' },
 };
 
 function sortHand(hand) {
@@ -330,10 +330,10 @@ export default function SpadesTable({
 
 function getOpponentHandStyle(position) {
   switch (position) {
-    case 'top':    return { top: 68,    left: '50%', transform: 'translateX(-50%)', display: 'flex' };
-    case 'bottom': return { bottom: 68, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
-    case 'left':   return { left: 64,   top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
-    case 'right':  return { right: 64,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'top':    return { top: 100,   left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'bottom': return { bottom: 100, left: '50%', transform: 'translateX(-50%)', display: 'flex' };
+    case 'left':   return { left: 100,  top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
+    case 'right':  return { right: 100, top: '50%',  transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column' };
     default:       return {};
   }
 }
