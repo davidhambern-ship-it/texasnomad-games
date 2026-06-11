@@ -390,15 +390,9 @@ export function getTeamFromSeat(seatNumber) {
   return null;
 }
 
-// Calculate score based on bids and books
+// Score = simply the number of books won that round
 export function calculateScore(bid, booksWon, isBlind = false) {
-  if (bid === 0) {
-    return booksWon === 0 ? (isBlind ? 200 : 100) : -100;
-  }
-  if (booksWon >= bid) {
-    return bid * 10 + (booksWon - bid);
-  }
-  return -10 * bid;
+  return booksWon;
 }
 
 // Format card for display

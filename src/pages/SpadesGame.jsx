@@ -318,20 +318,16 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        // Calculate scores
-        const team1Bid = gs.bid1 || 0;
-        const team2Bid = gs.bid2 || 0;
+        // Score = books won that round
         const team1Books = gs.books1 || 0;
         const team2Books = gs.books2 || 0;
-        const round1Score = calculateScore(team1Bid, team1Books);
-        const round2Score = calculateScore(team2Bid, team2Books);
-        const newScore1 = (gs.score1 || 0) + round1Score;
-        const newScore2 = (gs.score2 || 0) + round2Score;
+        const newScore1 = (gs.score1 || 0) + team1Books;
+        const newScore2 = (gs.score2 || 0) + team2Books;
         const handNumber = (gs.hand_number || 0) + 1;
 
         setRoundResult({
-          team1: { bid: team1Bid, books: team1Books, roundScore: round1Score, totalScore: newScore1 },
-          team2: { bid: team2Bid, books: team2Books, roundScore: round2Score, totalScore: newScore2 },
+          team1: { bid: gs.bid1, books: team1Books, roundScore: team1Books, totalScore: newScore1 },
+          team2: { bid: gs.bid2, books: team2Books, roundScore: team2Books, totalScore: newScore2 },
           team1Name: gs.team1Name || 'Team A',
           team2Name: gs.team2Name || 'Team B',
           handNumber,
@@ -597,6 +593,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     });
   };
 
+  // Rotate dealer to the next seated player to the left
+  const getNextDealerSeat = () => {
+    const seated = getSeatedPlayers(gs.players || []);
+    if (seated.length === 0) return 1;
+    const currentDealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
+    const nextIdx = (currentDealerIdx + 1) % seated.length;
+    return seated[nextIdx].seatNumber;
+  };
+
   // Round summary dismissed → deal next hand
   const handleRoundSummaryDismiss = async () => {
     setRoundResult(null);
@@ -606,7 +611,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        const newDealer = gs.dealer_seat ? (gs.dealer_seat % 4) + 1 : 1;
+        const newDealer = getNextDealerSeat();
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
         await new Promise(resolve => setTimeout(resolve, 1200));
@@ -624,7 +629,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
     try {
-      const newDealer = 1;
+      const newDealer = getNextDealerSeat();
       const cleared = (gs.players || []).map(p => ({ ...p, hand: [], bid: null, tricksWon: 0 }));
       await updateState({
         score1: 0, score2: 0, hand_number: 0,
