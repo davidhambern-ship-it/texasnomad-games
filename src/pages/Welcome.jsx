@@ -1,16 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gamepad2, Mic2, Trophy, Zap, Users, BarChart2, Bot, Tv2 } from 'lucide-react';
+import { Smartphone, Laptop, Tablet, Mic2, Trophy, Zap, Users, BarChart2, Bot, Tv2, Gamepad2 } from 'lucide-react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 const HOW_IT_WORKS = [
   {
-    icon: <Gamepad2 className="w-10 h-10" />,
-    emoji: '🎮',
+    icon: null,
+    emoji: null,
     title: 'Join A Game',
     text: 'Join a live game and play with others.',
     color: '#BC13FE',
+    devices: true,
   },
   {
     icon: <Mic2 className="w-10 h-10" />,
@@ -115,7 +116,15 @@ export default function Welcome() {
             <div key={i}
               className="relative rounded-2xl border-2 p-6 text-center flex flex-col items-center gap-4 transition-transform hover:scale-105"
               style={{ borderColor: `${card.color}50`, background: `${card.color}08`, boxShadow: `0 0 30px ${card.color}10` }}>
-              <div className="text-5xl leading-none">{card.emoji}</div>
+              {card.devices ? (
+                <div className="flex items-end justify-center gap-2" style={{ color: card.color }}>
+                  <Smartphone className="w-8 h-8" />
+                  <Laptop className="w-10 h-10" />
+                  <Tablet className="w-8 h-8" />
+                </div>
+              ) : (
+                <div className="text-5xl leading-none">{card.emoji}</div>
+              )}
               <div className="font-heading text-2xl tracking-widest uppercase" style={{ color: card.color }}>{card.title}</div>
               <p className="text-white/60 font-body text-sm leading-relaxed">{card.text}</p>
             </div>
