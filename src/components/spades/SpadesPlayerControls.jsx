@@ -33,7 +33,6 @@ const Btn = ({ children, onClick, color = '#BC13FE', size = 'sm', disabled = fal
 
 export default function SpadesPlayerControls({ seatNumber, player, gs, updateState, isMySeat, onShuffleStart, onStandUp, isDealing: isExternalDealing }) {
   const [bidInput, setBidInput] = useState('');
-  const [blindAmount, setBlindAmount] = useState(0);
   const [isShuffling, setIsShuffling] = useState(false);
   const [isDealing, setIsDealing] = useState(false);
   const dealingActive = isDealing || isExternalDealing;
@@ -161,10 +160,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     setIsDealing(false);
   };
 
-  const handleSetBid = async () => {
-    const bid = Number(bidInput);
-    if (isNaN(bid) || bid < 0 || bid > 13) return;
-    
+  const handleSetBidValue = async (bid) => {
+    if (bid == null || bid < 0 || bid > 13) return;
+
     const updated = (gs.players || []).map(p => p.playerId === player.playerId ? { ...p, bid } : p);
     const seated = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === player.playerId);
@@ -186,28 +184,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     setBidInput('');
   };
 
-  const handleBlind = async () => {
-    if (blindAmount === 0) return;
-    const updated = (gs.players || []).map(p => p.playerId === player.playerId ? { ...p, bid: blindAmount, blind: true } : p);
-    const seated = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
-    const bidderIdx = seated.findIndex(p => p.playerId === player.playerId);
-    const nextBidder = seated[(bidderIdx + 1) % seated.length];
-    const allBid = seated.every(p => p.bid != null);
 
-    if (allBid) {
-      const t1 = updated.filter(p => p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
-      const t2 = updated.filter(p => p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => s + (p.bid || 0), 0);
-      const dealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
-      const firstSeat = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
-      await updateState({
-        players: updated, phase: 'playing', bid1: t1, bid2: t2,
-        current_turn_seat: firstSeat || seated[0]?.seatNumber, current_bidder_seat: null,
-      });
-    } else {
-      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
-    }
-    setBlindAmount(0);
-  };
 
   const handleReset = async () => {
     const confirmed = window.confirm('Reset the game? This will clear all hands, bids, and scores.');
@@ -246,42 +223,20 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
           <div className="text-[8px] tracking-widest text-[#FF5F1F] uppercase mb-3 animate-pulse" style={PS2}>
             📋 YOUR TURN TO BID
           </div>
-          {/* Quick bid buttons 1–7 */}
-          <div className="flex flex-wrap gap-1.5 justify-center mb-3">
+          <div className="text-[6px] text-white/40 uppercase mb-3 tracking-widest" style={PS2}>
+            Tap a number to place your bid
+          </div>
+          {/* Number buttons 0–13 — tap once to bid immediately */}
+          <div className="flex flex-wrap gap-2 justify-center">
             {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map(n => (
-              <button key={n} onClick={() => setBidInput(String(n))}
-                className={`w-9 h-9 rounded-lg border-2 font-heading text-base transition-all active:scale-95 ${
-                  bidInput === String(n)
-                    ? 'border-[#FF5F1F] bg-[#FF5F1F]/30 text-white'
-                    : 'border-white/20 bg-white/5 text-white/70 hover:border-[#FF5F1F]/60'
-                }`}>
+              <button
+                key={n}
+                onClick={() => { setBidInput(String(n)); handleSetBidValue(n); }}
+                className="w-10 h-10 rounded-xl border-2 font-heading text-lg transition-all active:scale-90 hover:scale-105 border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-white hover:border-[#FF5F1F] hover:bg-[#FF5F1F]/30"
+              >
                 {n}
               </button>
             ))}
-          </div>
-          <div className="flex gap-2 justify-center items-center mb-2">
-            <input type="number" min="0" max="13"
-              className="w-16 px-2 py-2 rounded-lg bg-black/80 border-2 border-[#FF5F1F]/50 text-white text-sm text-center focus:outline-none focus:border-[#FF5F1F]"
-              value={bidInput} onChange={e => setBidInput(e.target.value)} placeholder="0–13"
-              onKeyDown={e => e.key === 'Enter' && bidInput && handleSetBid()} />
-            <Btn onClick={handleSetBid} color="#FF5F1F" size="sm" disabled={!bidInput}>
-              ✓ Confirm Bid
-            </Btn>
-          </div>
-          <div className="flex gap-2 justify-center items-center">
-            <select
-              className="px-2 py-1.5 rounded-lg bg-black/80 border border-[#FFD700]/40 text-white text-sm focus:outline-none"
-              value={blindAmount} onChange={e => setBlindAmount(Number(e.target.value))}>
-              <option value="0">Blind Bid…</option>
-              <option value="6">Blind 6</option>
-              <option value="7">Blind 7</option>
-              <option value="8">Blind 8</option>
-              <option value="9">Blind 9</option>
-              <option value="10">Blind 10</option>
-            </select>
-            <Btn onClick={handleBlind} color="#FFD700" size="sm" disabled={blindAmount === 0}>
-              Go Blind
-            </Btn>
           </div>
         </div>
       )}
