@@ -121,14 +121,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         setJoinFlow('spectating');
       }
     } else if (isCreator) {
-      // Room creator — ask for name first, then sit and show CPU choice
+      // Room creator — ask for name first, sit, then auto-fill CPU opponents (no partner picker)
       const firstEmpty = emptySeatsIn(players);
       const seatTarget = firstEmpty.length > 0 ? firstEmpty[0] : null;
       requireName(async () => {
         if (seatTarget) {
           await sitInSeat(seatTarget);
         }
-        setJoinFlow('cpu');
+        // Auto-fill remaining seats with random CPU characters, no prompt
+        setJoinFlow('cpu_auto');
       });
     } else {
       // Joiner — show Play/Spectate
@@ -138,6 +139,13 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
 
   // Keep myRoleRef in sync so the effect below can read current value
   useEffect(() => { myRoleRef.current = myRole; }, [myRole]);
+
+  // ── Auto-fill CPU seats when creator skips partner picker ──
+  useEffect(() => {
+    if (joinFlow !== 'cpu_auto' || !room) return;
+    if (!mySeatNumber) return; // wait until we're seated
+    handlePlayAgainstCPU(null);
+  }, [joinFlow, mySeatNumber, room]);
 
   // ── Keep mySeatNumber in sync if the game state updates my seat ──
   useEffect(() => {
@@ -734,8 +742,8 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const joinable = joinableSeatsFor(players);
   const emptySeats = emptySeatsIn(players);
 
-  // CPU choice dialog: only shown to the room creator after sitting (not to joiners)
-  const showCPUChoice = joinFlow === 'cpu';
+  // CPU choice dialog: removed — now auto-fills randomly
+  const showCPUChoice = false;
   // Play/Spectate dialog: shown to new visitors
   const showJoinChoice = joinFlow === 'choose' && !loading && room;
 
