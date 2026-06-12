@@ -319,7 +319,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        await advanceBid(bidder, bid);
+        await advanceBid(bidder, bid, players);
       } finally {
         setTimeout(() => { isUpdatingRef.current = false; }, 500);
       }
@@ -376,20 +376,16 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   // Advance bid for a player (human or AI)
-  const advanceBid = async (bidder, bid) => {
-    const updatedPlayers = (gs.players || []).map(p => p.playerId === bidder.playerId ? { ...p, bid } : p);
+  // currentPlayers must be the LATEST players array (not from stale closure)
+  const advanceBid = async (bidder, bid, currentPlayers) => {
+    const basePlayers = currentPlayers || gs.players || [];
+    const updatedPlayers = basePlayers.map(p => p.playerId === bidder.playerId ? { ...p, bid } : p);
     const seated = updatedPlayers.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === bidder.playerId);
     const nextBidder = seated[(bidderIdx + 1) % seated.length];
     const allBid = seated.every(p => p.bid != null);
 
     if (allBid) {
-      const team1Bid = updatedPlayers.filter(p => p.team === 1 || p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
-      const team2Bid = updatedPlayers.filter(p => p.team === 2 || p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => {
-        if (p.seatNumber === 2 || p.seatNumber === 4) return s + (p.bid || 0);
-        return s;
-      }, 0);
-      // Recalculate properly by seat teams
       const t1 = updatedPlayers.filter(p => p.seatNumber === 1 || p.seatNumber === 3).reduce((s, p) => s + (p.bid || 0), 0);
       const t2 = updatedPlayers.filter(p => p.seatNumber === 2 || p.seatNumber === 4).reduce((s, p) => s + (p.bid || 0), 0);
       const dealerIdx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
@@ -410,7 +406,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (!seatNum) return;
     const bidder = players.find(p => p.seatNumber === seatNum);
     if (!bidder || bidder.bid != null) return;
-    await advanceBid(bidder, 3);
+    await advanceBid(bidder, 3, players);
   };
 
   const handleAutoDeal = async (shuffledDeck, knownHandNumber = null) => {
