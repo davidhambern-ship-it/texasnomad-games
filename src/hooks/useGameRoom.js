@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { getDefaultGameState } from '@/lib/roomUtils';
 
@@ -20,6 +20,7 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const unsubscribeRef = useRef(null);
   const pollRef = useRef(null);
   const heartbeatRef = useRef(null);
+  const playerIdRef = useRef(null); // set by registerPlayer, used for auto-cleanup
 
   useEffect(() => {
     if (!roomCode || !gameId) return;
@@ -115,12 +116,31 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
       if (unsubscribeRef.current) unsubscribeRef.current();
       if (pollRef.current) clearInterval(pollRef.current);
       if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+      // Remove beforeunload / visibilitychange listeners
+      if (playerIdRef._cleanup) { playerIdRef._cleanup(); playerIdRef._cleanup = null; }
       // Disconnect: only host_connected flag — never touch game_state or players
       if (roomRef.current && role === 'host') {
         base44.entities.GameRoom.update(roomRef.current.id, { host_connected: false }).catch(() => {});
       }
+      // Auto-remove player from game_state on unmount (tab close / navigation)
+      if (roomRef.current && playerIdRef.current) {
+        removePlayerFromRoom(roomRef.current, playerIdRef.current);
+      }
     };
   }, [roomCode, gameId, role]);
+
+  // Synchronously remove a player from the room's game_state.players
+  function removePlayerFromRoom(currentRoom, pid) {
+    const gs = currentRoom.game_state || {};
+    const players = gs.players || [];
+    const updatedPlayers = players.filter(p => p.playerId !== pid);
+    if (updatedPlayers.length === players.length) return; // player wasn't there
+    const newConnected = Math.max(0, (currentRoom.players_connected || 1) - 1);
+    base44.entities.GameRoom.update(currentRoom.id, {
+      game_state: { ...gs, players: updatedPlayers },
+      players_connected: newConnected,
+    }).catch(() => {});
+  }
 
   const ensureRoom = async (gameId, roomCode) => {
     if (roomRef.current) return roomRef.current;
@@ -140,6 +160,35 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     setRoom({ ...r });
     return r;
   };
+
+  // Call this once you know the playerId (e.g. after sitting in a seat).
+  // It registers the player for auto-cleanup on tab close / navigation.
+  const registerPlayer = useCallback((pid) => {
+    if (!pid || playerIdRef.current === pid) return;
+    playerIdRef.current = pid;
+
+    // beforeunload: fires when tab is closed or page is refreshed
+    const handleBeforeUnload = () => {
+      if (roomRef.current && playerIdRef.current) {
+        removePlayerFromRoom(roomRef.current, playerIdRef.current);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    // visibilitychange: fires when tab is hidden (mobile background, switch tabs)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'hidden' && roomRef.current && playerIdRef.current) {
+        removePlayerFromRoom(roomRef.current, playerIdRef.current);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Store cleanup on the ref so it can be called on unmount too
+    playerIdRef._cleanup = () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, []);
 
   const updateState = async (newState) => {
     if (!roomRef.current) return;
@@ -166,5 +215,5 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     setRoom({ ...updated });
   };
 
-  return { room, loading, error, updateState, sendCommand, updateRoomStatus, ensureRoom };
+  return { room, loading, error, updateState, sendCommand, updateRoomStatus, ensureRoom, registerPlayer };
 }

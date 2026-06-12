@@ -56,7 +56,7 @@ export default function SquareBizGame() {
 }
 
 function SquareBizViewer({ roomCode, cpuId }) {
-  const { room, loading, updateState } = useGameRoom(roomCode, 'square-biz', 'viewer');
+  const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'square-biz', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
   const cpuCharacter = isSinglePlayer
@@ -66,6 +66,12 @@ function SquareBizViewer({ roomCode, cpuId }) {
   const [chosenRole, setChosenRole] = useState(null);
   const [roleLoading, setRoleLoading] = useState(false);
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'square-biz', updateState, false, chosenRole);
+
+  // Register player for auto-cleanup when seated
+  useEffect(() => {
+    if (isSeated && playerId) registerPlayer(playerId);
+  }, [isSeated, playerId, registerPlayer]);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
   const spInitRef = useRef(false);

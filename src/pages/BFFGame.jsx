@@ -25,7 +25,7 @@ export default function BFFGame() {
 
 // ─── Main BFF Viewer ──────────────────────────────────────────────────────────
 function BFFViewer({ roomCode, isVsAI }) {
-  const { room, loading, updateState, ensureRoom } = useGameRoom(roomCode, 'bff', 'viewer');
+  const { room, loading, updateState, ensureRoom, registerPlayer } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
 
   // Stable playerId
@@ -36,7 +36,7 @@ function BFFViewer({ roomCode, isVsAI }) {
     return id;
   });
 
-  const { seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'bff', updateState);
+  const { playerId: seatPlayerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'bff', updateState);
 
   // Player name/family (persisted locally)
   const [playerName, setPlayerName] = useState(() => localStorage.getItem(`bff_name_${roomCode}`) || '');
@@ -61,6 +61,11 @@ function BFFViewer({ roomCode, isVsAI }) {
     document.addEventListener('fullscreenchange', handler);
     return () => document.removeEventListener('fullscreenchange', handler);
   }, []);
+
+  // Register player for auto-cleanup when seated
+  useEffect(() => {
+    if (isSeated && seatPlayerId) registerPlayer(seatPlayerId);
+  }, [isSeated, seatPlayerId, registerPlayer]);
 
   // Detect my family/name from players list
   useEffect(() => {
