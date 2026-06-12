@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { generateFullDeck, shuffleDeck as shuffleDeckSecure, dealFromShuffledDeck, getSeatedPlayers } from '@/lib/spadesRules';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
+import HandSetup from './HandSetup';
+import { useSuitOrder } from '@/hooks/useSuitOrder';
 
 // Preload all card images so they're in browser cache before the deal animation
 function preloadCardImages(cards) {
@@ -35,6 +37,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const [bidInput, setBidInput] = useState('');
   const [isShuffling, setIsShuffling] = useState(false);
   const [isDealing, setIsDealing] = useState(false);
+  const [showHandSetup, setShowHandSetup] = useState(false);
+  const { suitOrder, setSuitOrder } = useSuitOrder();
   const dealingActive = isDealing || isExternalDealing;
   const gsRef = useRef(gs);
   gsRef.current = gs;
@@ -203,6 +207,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
   return (
     <div className="flex flex-col gap-2">
+      {showHandSetup && (
+        <HandSetup suitOrder={suitOrder} onSuitOrderChange={setSuitOrder} onClose={() => setShowHandSetup(false)} />
+      )}
 
       {/* ── Bid UI: shown prominently when it's the human's turn to bid ── */}
       {isBidding && isMyBidTurn && !dealingActive && (
@@ -272,6 +279,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
               {isShuffling ? '🔀 Shuffling...' : dealingActive ? '🃏 Dealing...' : '🔀 Shuffle & Deal'}
             </Btn>
           )}
+          <Btn onClick={() => setShowHandSetup(true)} color="#BC13FE" size="sm">
+            🃏 Hand Setup
+          </Btn>
           <Btn onClick={handleReset} color="#ef4444" size="sm">
             ↺ Reset
           </Btn>

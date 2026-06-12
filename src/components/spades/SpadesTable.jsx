@@ -253,12 +253,6 @@ export default function SpadesTable({
           <div className="flex items-center justify-between mb-2 px-1">
             <div className="flex items-center gap-2">
               <div className="text-[7px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🃏 Your Hand</div>
-              <button
-                onClick={() => setShowHandSetup(true)}
-                className="px-2 py-0.5 rounded border border-[#BC13FE]/40 text-[#BC13FE]/60 text-[5px] tracking-widest uppercase hover:border-[#BC13FE] hover:text-[#BC13FE] transition-all"
-                style={PS2}>
-                Hand Setup
-              </button>
             </div>
             {gs.phase === 'playing' && (
               <div className={`text-[6px] tracking-widest uppercase px-2 py-0.5 rounded ${
