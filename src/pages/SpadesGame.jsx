@@ -92,6 +92,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const isUpdatingRef = useRef(false);
   const audioRef = useRef(null);
   const didInitJoin = useRef(false);
+  const myRoleRef = useRef(null);
 
   const gs = room?.game_state || {};
   const players = gs.players || [];
@@ -135,13 +136,23 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     }
   }, [room]);
 
+  // Keep myRoleRef in sync so the effect below can read current value
+  useEffect(() => { myRoleRef.current = myRole; }, [myRole]);
+
   // ── Keep mySeatNumber in sync if the game state updates my seat ──
   useEffect(() => {
-    if (!room) return;
+    if (!room || !didInitJoin.current) return;
     const me = players.find(p => p.playerId === playerId);
+    const currentRole = myRoleRef.current;
     if (me && me.seatNumber != null && (me.role === 'player' || me.role === 'hostPlayer')) {
+      // Still seated — keep in sync
       setMySeatNumber(me.seatNumber);
       setMyRole('player');
+    } else if ((!me || (me && me.seatNumber == null)) && currentRole === 'player') {
+      // Host removed/kicked this player — show choose dialog so they can re-sit
+      setMySeatNumber(null);
+      setMyRole(null);
+      setJoinFlow('choose');
     }
   }, [room]);
 
