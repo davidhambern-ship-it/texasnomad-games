@@ -175,6 +175,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const handleReset = async () => {
     const confirmed = window.confirm('Reset the game? This will clear all hands, bids, and scores.');
     if (!confirmed) return;
+    setIsShuffling(false);
+    setIsDealing(false);
     await updateState({
       phase: 'setup',
       deck: [],
