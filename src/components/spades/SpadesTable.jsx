@@ -59,7 +59,11 @@ export default function SpadesTable({
   const { suitOrder, setSuitOrder, sortHand } = useSuitOrder();
 
   useEffect(() => {
-    if (gs.deal_ts && gs.deal_ts !== prevDealTs.current && dealPhase === 'idle') {
+    if (!gs.deal_ts && dealPhase !== 'idle') {
+      // Reset cleared deal_ts — cancel any in-progress deal animation
+      setDealPhase('idle');
+      setLocalHands({});
+    } else if (gs.deal_ts && gs.deal_ts !== prevDealTs.current && dealPhase === 'idle') {
       setLocalHands({});
       setDealPhase('dealing');
     }
@@ -67,7 +71,9 @@ export default function SpadesTable({
   }, [gs.deal_ts]);
 
   useEffect(() => {
-    if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
+    if (!gs.shuffle_ts && shufflePhase !== 'idle') {
+      setShufflePhase('idle');
+    } else if (gs.shuffle_ts && gs.shuffle_ts !== prevShuffleTs.current && shufflePhase === 'idle') {
       setShufflePhase('shuffling');
     }
     prevShuffleTs.current = gs.shuffle_ts;
