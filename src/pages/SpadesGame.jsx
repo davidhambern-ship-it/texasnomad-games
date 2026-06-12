@@ -341,11 +341,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        // Score = books won that round
+        // Score: if team made their bid, add books won; if not, subtract the bid
         const team1Books = gs.books1 || 0;
         const team2Books = gs.books2 || 0;
-        const newScore1 = (gs.score1 || 0) + team1Books;
-        const newScore2 = (gs.score2 || 0) + team2Books;
+        const team1Bid = gs.bid1 || 0;
+        const team2Bid = gs.bid2 || 0;
+        const team1Made = team1Books >= team1Bid;
+        const team2Made = team2Books >= team2Bid;
+        const newScore1 = (gs.score1 || 0) + (team1Made ? team1Books : -team1Bid);
+        const newScore2 = (gs.score2 || 0) + (team2Made ? team2Books : -team2Bid);
         const handNumber = (gs.hand_number || 0) + 1;
 
         // Capture next-hand info now while gs is fresh — dismiss handler reads a stale closure
@@ -358,8 +362,8 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         nextHandInfoRef.current = { handNumber, dealerSeat: nextDealerSeat };
 
         setRoundResult({
-          team1: { bid: gs.bid1, books: team1Books, roundScore: team1Books, totalScore: newScore1 },
-          team2: { bid: gs.bid2, books: team2Books, roundScore: team2Books, totalScore: newScore2 },
+          team1: { bid: team1Bid, books: team1Books, roundScore: team1Made ? team1Books : -team1Bid, totalScore: newScore1, madeBid: team1Made },
+          team2: { bid: team2Bid, books: team2Books, roundScore: team2Made ? team2Books : -team2Bid, totalScore: newScore2, madeBid: team2Made },
           team1Name: gs.team1Name || 'Team A',
           team2Name: gs.team2Name || 'Team B',
           handNumber,

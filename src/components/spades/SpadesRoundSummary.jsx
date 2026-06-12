@@ -33,8 +33,13 @@ export default function SpadesRoundSummary({ roundResult, onDismiss }) {
 
   const TeamRow = ({ team, name, color }) => (
     <div className="border-2 rounded-xl p-4 space-y-2"
-      style={{ borderColor: color + '60', background: color + '08' }}>
-      <div className="font-heading text-lg uppercase tracking-widest text-center" style={{ color }}>{name}</div>
+      style={{ borderColor: team.madeBid === false ? '#ef444460' : color + '60', background: team.madeBid === false ? '#ef444408' : color + '08' }}>
+      <div className="flex items-center justify-center gap-2">
+        <div className="font-heading text-lg uppercase tracking-widest text-center" style={{ color: team.madeBid === false ? '#ef4444' : color }}>{name}</div>
+        {team.madeBid === false && (
+          <span className="px-2 py-0.5 rounded bg-red-500/20 border border-red-500/60 text-red-400 text-[6px] tracking-widest uppercase" style={PS2}>SET!</span>
+        )}
+      </div>
       <div className="grid grid-cols-2 gap-2 text-center">
         <div>
           <div style={{ ...PS2, fontSize: 6, color: '#ffffff40' }} className="uppercase mb-1">Bid</div>
