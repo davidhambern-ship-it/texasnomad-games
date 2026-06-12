@@ -175,6 +175,8 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const dealer = seated.find(p => p.seatNumber === gs.dealer_seat);
     if (!dealer || dealer.playerType !== 'cpu') return;
 
+    const capturedHandNumber = gs.hand_number || 0;
+
     const timer = setTimeout(async () => {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
@@ -182,7 +184,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), shuffle_count: 1 });
         await new Promise(resolve => setTimeout(resolve, 1200));
-        await handleAutoDeal(previewDeck);
+        await handleAutoDeal(previewDeck, capturedHandNumber);
       } finally {
         isUpdatingRef.current = false;
       }
@@ -644,7 +646,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       isUpdatingRef.current = true;
       try {
         const newDealer = getNextDealerSeat();
-        const nextHandNumber = gs.hand_number || 0; // already incremented during scoring
+        // hand_number was already incremented during scoring, so use it directly
+        // but always pass at least 1 so we never re-enter the no-bid first hand
+        const nextHandNumber = Math.max(1, gs.hand_number || 1);
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
         await new Promise(resolve => setTimeout(resolve, 1200));
