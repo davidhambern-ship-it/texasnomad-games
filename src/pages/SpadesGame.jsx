@@ -951,7 +951,7 @@ function SpadesHeader({ roomCode, room, isFullscreen, containerRef, seatNumber, 
               <input type="range" min="0" max="1" step="0.01" value={volume} onChange={onVolumeChange} className="w-20 h-1 bg-[#FFD700]/30 rounded-lg appearance-none cursor-pointer" style={{ accentColor: '#FFD700' }} />
             )}
           </div>
-          <Link to="/games" className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase hidden sm:block" style={PS2}>← LOBBY</Link>
+          <Link to="/games" className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase" style={PS2}>← LOBBY</Link>
           <button onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
             className="px-2 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[7px] tracking-widest uppercase" style={PS2}>
             {isFullscreen ? '✕' : '⛶'}

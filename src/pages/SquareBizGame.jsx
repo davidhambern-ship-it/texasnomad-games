@@ -138,7 +138,7 @@ function SquareBizViewer({ roomCode, cpuId }) {
           </div>
           <div className="flex items-center gap-2">
             <SeatBadge seatNumber={seatNumber} isSeated={isSeated} />
-            <Link to="/games" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase hidden sm:block" style={PS2}>← LOBBY</Link>
+            <Link to="/games" className="px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[8px] tracking-widest uppercase" style={PS2}>← LOBBY</Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
               className="px-3 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[8px] tracking-widest uppercase" style={PS2}>
