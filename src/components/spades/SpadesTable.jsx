@@ -5,6 +5,8 @@ import SpadesPlayerControls from './SpadesPlayerControls';
 import SpadesShuffleAnimation from './SpadesShuffleAnimation';
 import SpadesDealAnimation from './SpadesDealAnimation';
 import SpadesBidTimer from './SpadesBidTimer';
+import HandSetup from './HandSetup';
+import { useSuitOrder } from '@/hooks/useSuitOrder';
 import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -35,15 +37,7 @@ const SEAT_POSITION_STYLES = {
   right:  { right: 8,   top: '50%',  transform: 'translateY(-50%)' },
 };
 
-function sortHand(hand) {
-  if (!hand || hand.length === 0) return [];
-  const suitOrder = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, 'Joker': 4 };
-  const valueOrder = { '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9, '10': 10, 'J': 11, 'Q': 12, 'K': 13, 'A': 14, 'LJ': 15, 'BJ': 16 };
-  return [...hand].sort((a, b) => {
-    const sd = (suitOrder[a.suit] || 5) - (suitOrder[b.suit] || 5);
-    return sd !== 0 ? sd : (valueOrder[a.value] || 0) - (valueOrder[b.value] || 0);
-  });
-}
+
 
 export default function SpadesTable({
   gs, playerId, mySeatNumber, myRole, isPlayer, isSpectator,
@@ -59,8 +53,10 @@ export default function SpadesTable({
   const [shufflePhase, setShufflePhase] = useState('idle');
   const [dealPhase, setDealPhase] = useState('idle');
   const [localHands, setLocalHands] = useState({});
+  const [showHandSetup, setShowHandSetup] = useState(false);
   const prevShuffleTs = useRef(gs.shuffle_ts);
   const prevDealTs = useRef(gs.deal_ts);
+  const { suitOrder, setSuitOrder, sortHand } = useSuitOrder();
 
   useEffect(() => {
     if (gs.deal_ts && gs.deal_ts !== prevDealTs.current && dealPhase === 'idle') {
@@ -138,6 +134,13 @@ export default function SpadesTable({
 
   return (
     <div className="flex flex-col w-full max-w-2xl mx-auto px-3 gap-2">
+      {showHandSetup && (
+        <HandSetup
+          suitOrder={suitOrder}
+          onSuitOrderChange={setSuitOrder}
+          onClose={() => setShowHandSetup(false)}
+        />
+      )}
 
       {/* ── Phase / bidding banner ─────────────────────────────────────────────── */}
       {!isPlaying && !isBidding && (
@@ -242,7 +245,15 @@ export default function SpadesTable({
         <div className="w-full rounded-2xl border-2 border-[#4ade80]/40 bg-[#4ade80]/5 p-3" style={{ position: 'relative', zIndex: 40, boxShadow: '0 0 16px rgba(74,222,128,0.08)' }}>
 
           <div className="flex items-center justify-between mb-2 px-1">
-            <div className="text-[7px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🃏 Your Hand</div>
+            <div className="flex items-center gap-2">
+              <div className="text-[7px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🃏 Your Hand</div>
+              <button
+                onClick={() => setShowHandSetup(true)}
+                className="px-2 py-0.5 rounded border border-[#BC13FE]/40 text-[#BC13FE]/60 text-[5px] tracking-widest uppercase hover:border-[#BC13FE] hover:text-[#BC13FE] transition-all"
+                style={PS2}>
+                Hand Setup
+              </button>
+            </div>
             {gs.phase === 'playing' && (
               <div className={`text-[6px] tracking-widest uppercase px-2 py-0.5 rounded ${
                 gs.current_turn_seat === mySeatNumber
