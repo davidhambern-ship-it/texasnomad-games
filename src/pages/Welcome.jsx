@@ -195,7 +195,7 @@ export default function Welcome() {
             onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 60px rgba(255,215,0,0.4)'}
             onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(255,215,0,0.15)'}
           >
-            <div className="text-6xl">🎮</div>
+            <Smartphone className="w-16 h-16" style={{ color: '#FFD700', filter: 'drop-shadow(0 0 12px rgba(255,215,0,0.6))' }} />
             <div className="font-heading text-4xl tracking-[0.3em] uppercase" style={{ color: '#FFD700', textShadow: '0 0 20px rgba(255,215,0,0.6)' }}>PLAYER</div>
             <p className="text-white/50 font-body text-sm">Join games and compete.</p>
             <div className="mt-2 px-6 py-2 rounded-xl border border-[#FFD700]/60 text-[#FFD700] text-[8px] tracking-widest uppercase" style={PS2}>
