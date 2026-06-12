@@ -82,6 +82,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // Round summary / match over
   const [roundResult, setRoundResult] = useState(null);
   const [matchOver, setMatchOver] = useState(false);
+  const nextHandInfoRef = useRef(null); // { handNumber, dealerSeat } captured at round-end time
 
   // Join-flow state
   const [joinFlow, setJoinFlow] = useState('unknown');
@@ -346,6 +347,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         const newScore1 = (gs.score1 || 0) + team1Books;
         const newScore2 = (gs.score2 || 0) + team2Books;
         const handNumber = (gs.hand_number || 0) + 1;
+
+        // Capture next-hand info now while gs is fresh — dismiss handler reads a stale closure
+        const nextDealerSeat = (() => {
+          const seated = getSeatedPlayers(gs.players || []);
+          if (seated.length === 0) return gs.dealer_seat || 1;
+          const idx = seated.findIndex(p => p.seatNumber === gs.dealer_seat);
+          return seated[(idx + 1) % seated.length].seatNumber;
+        })();
+        nextHandInfoRef.current = { handNumber, dealerSeat: nextDealerSeat };
 
         setRoundResult({
           team1: { bid: gs.bid1, books: team1Books, roundScore: team1Books, totalScore: newScore1 },
@@ -641,16 +651,18 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        const newDealer = getNextDealerSeat();
-        // hand_number was already incremented during scoring, so use it directly
-        // but always pass at least 1 so we never re-enter the no-bid first hand
-        const nextHandNumber = Math.max(1, gs.hand_number || 1);
+        // Use the info captured at round-end time to avoid stale closure issues
+        const { handNumber: nextHandNumber, dealerSeat: newDealer } = nextHandInfoRef.current || {
+          handNumber: Math.max(1, (gs.hand_number || 1)),
+          dealerSeat: getNextDealerSeat(),
+        };
         const previewDeck = shuffleDeck(generateFullDeck());
         await updateState({ deck: previewDeck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: newDealer });
         await new Promise(resolve => setTimeout(resolve, 1200));
         await handleAutoDeal(previewDeck, nextHandNumber);
       } finally {
         isUpdatingRef.current = false;
+        nextHandInfoRef.current = null;
       }
     }
   };
