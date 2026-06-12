@@ -46,62 +46,38 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const hasBid = player.bid != null;
   const isMyBidTurn = isBidding && gs.current_bidder_seat === seatNumber && !hasBid;
   const seatedPlayers = (gs.players || []).filter(p => p.role === 'player' || p.role === 'hostPlayer');
-  const hasDeck = gs.deck?.length > 0;
   const canStandUp = gs.phase === 'setup' || !hasCards;
   const dealerSeat = gs.dealer_seat || seatNumber; // fallback: you are the dealer if no dealer set
   const isDealer = seatNumber === dealerSeat;
 
-  // SHUFFLE: Trigger animation then update deck in state
-  const handleShuffle = async () => {
-    if (isShuffling) return;
+  // SHUFFLE + DEAL: Combined single action
+  const handleShuffleAndDeal = async () => {
+    if (isShuffling || isDealing) return;
+
+    // 1. Shuffle
     setIsShuffling(true);
-
-    // Start shuffle animation
     onShuffleStart?.();
-
-    // Generate shuffled deck (crypto-secure)
     const deck = shuffleDeckSecure(generateFullDeck());
-
-    // Wait for animation (~1.8s), then update state
     await new Promise(resolve => setTimeout(resolve, 1800));
     await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: seatNumber });
     setIsShuffling(false);
-  };
 
-  // STAND UP: Leave seat and become spectator
-  const handleStandUp = () => {
-    if (!canStandUp) return;
-    onStandUp?.();
-  };
-
-  // DEAL: Distribute the already-shuffled deck round-robin starting left of dealer
-  const handleDeal = async () => {
-    if (isDealing) return;
+    // 2. Deal immediately after shuffle
     const currentPlayers = gs.players || [];
     const allSeated = getSeatedPlayers(currentPlayers);
-    if (allSeated.length < 2) {
-      alert('Need at least 2 players to deal');
-      return;
-    }
-    if (!gs.deck_shuffled || !gs.deck?.length) {
-      alert('Shuffle the deck before dealing');
-      return;
-    }
+    if (allSeated.length < 2) return;
 
-    const dealerSeat = gs.dealer_seat || allSeated[0]?.seatNumber || 1;
-    const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(gs.deck, allSeated, dealerSeat);
+    const dealerSeatNum = seatNumber;
+    const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deck, allSeated, dealerSeatNum);
 
     setIsDealing(true);
-
-    // Preload all card images before the deal animation starts
     await preloadCardImages(dealSequence);
 
     const clearedPlayers = currentPlayers.map(p =>
       p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p
     );
-    const hasCpu = allSeated.some(p => p.playerType === 'cpu');
     const sortedSeated = [...allSeated].sort((a, b) => a.seatNumber - b.seatNumber);
-    const dealerIdx = sortedSeated.findIndex(p => p.seatNumber === dealerSeat);
+    const dealerIdx = sortedSeated.findIndex(p => p.seatNumber === dealerSeatNum);
     const firstBidder = sortedSeated[(dealerIdx + 1) % sortedSeated.length]?.seatNumber;
 
     await updateState({
@@ -113,13 +89,12 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       phase: 'setup',
       status: 'active',
       current_trick: [],
-      dealer_seat: dealerSeat,
+      dealer_seat: dealerSeatNum,
       tricks_played: 0,
       bid1: null, bid2: null,
       books1: 0, books2: 0,
     });
 
-    // Wait for the local deal animation to finish (52 cards × 130ms ≈ 7s), then push final state
     const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
     await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
@@ -159,6 +134,14 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
     setIsDealing(false);
   };
+
+  // STAND UP: Leave seat and become spectator
+  const handleStandUp = () => {
+    if (!canStandUp) return;
+    onStandUp?.();
+  };
+
+
 
   const handleSetBidValue = async (bid) => {
     if (bid == null || bid < 0 || bid > 13) return;
@@ -280,14 +263,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
         <div className="flex flex-wrap gap-2 justify-center">
           {isDealer && (
-            <>
-              <Btn onClick={handleShuffle} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive}>
-                {isShuffling ? '🔀 Shuffling...' : '🔀 Shuffle'}
-              </Btn>
-              <Btn onClick={handleDeal} color="#4ade80" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2 || !gs.deck_shuffled || !hasDeck}>
-                {dealingActive ? '🃏 Dealing...' : '🃏 Deal'}
-              </Btn>
-            </>
+            <Btn onClick={handleShuffleAndDeal} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2}>
+              {isShuffling ? '🔀 Shuffling...' : dealingActive ? '🃏 Dealing...' : '🔀 Shuffle & Deal'}
+            </Btn>
           )}
           <Btn onClick={handleReset} color="#ef4444" size="sm">
             ↺ Reset
