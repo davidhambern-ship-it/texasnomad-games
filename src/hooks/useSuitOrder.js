@@ -35,12 +35,14 @@ export function useSuitOrder() {
   const sortHand = useCallback((hand) => {
     if (!hand || hand.length === 0) return [];
     return [...hand].sort((a, b) => {
-      const ai = suitOrder.indexOf(a.suit === 'Joker' ? (a.value === 'BJ' ? '♠' : '♠') : a.suit);
-      const bi = suitOrder.indexOf(b.suit === 'Joker' ? (b.value === 'BJ' ? '♠' : '♠') : b.suit);
-      // Jokers go to end
-      const aIdx = a.suit === 'Joker' ? 99 : (ai === -1 ? 98 : ai);
-      const bIdx = b.suit === 'Joker' ? 99 : (bi === -1 ? 98 : bi);
-      if (aIdx !== bIdx) return aIdx - bIdx;
+      // Jokers are treated as spades (highest-ranked spades)
+      const aSuit = a.suit === 'Joker' ? '♠' : a.suit;
+      const bSuit = b.suit === 'Joker' ? '♠' : b.suit;
+      const aIdx = suitOrder.indexOf(aSuit);
+      const bIdx = suitOrder.indexOf(bSuit);
+      const aOrder = aIdx === -1 ? 98 : aIdx;
+      const bOrder = bIdx === -1 ? 98 : bIdx;
+      if (aOrder !== bOrder) return aOrder - bOrder;
       return (RANK_ORDER[b.value] || 0) - (RANK_ORDER[a.value] || 0);
     });
   }, [suitOrder]);
