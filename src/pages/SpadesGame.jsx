@@ -145,7 +145,8 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   useEffect(() => {
     if (joinFlow !== 'cpu_auto' || !room) return;
     if (!mySeatNumber) return; // wait until we're seated
-    handlePlayAgainstCPU(null);
+    // Pass the chosen CPU partner character (from URL param) and the current seat number
+    handlePlayAgainstCPU(cpuCharacter, mySeatNumber);
   }, [joinFlow, mySeatNumber, room]);
 
   // ── Keep mySeatNumber in sync if the game state updates my seat ──
@@ -576,14 +577,17 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   };
 
   // CPU choice handlers — use TexasNomad characters
-  const handlePlayAgainstCPU = async (partnerCharacter = null) => {
+  const handlePlayAgainstCPU = async (partnerCharacter = null, knownSeatNumber = null) => {
     if (!room) return;
     const currentPlayers = gs.players || [];
 
+    // Use knownSeatNumber if passed (avoids stale mySeatNumber state), fall back to state
+    const activeSeat = knownSeatNumber ?? mySeatNumber;
+
     // If a partner character was chosen, assign them to the player's partner seat
     const specificAssignments = {};
-    if (partnerCharacter && mySeatNumber) {
-      const partnerSeat = mySeatNumber === 1 ? 3 : mySeatNumber === 3 ? 1 : mySeatNumber === 2 ? 4 : 2;
+    if (partnerCharacter && activeSeat) {
+      const partnerSeat = activeSeat === 1 ? 3 : activeSeat === 3 ? 1 : activeSeat === 2 ? 4 : 2;
       specificAssignments[partnerSeat] = partnerCharacter.id;
     }
 
@@ -859,7 +863,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
             <CPUOpponentSelect
               gameKey="spades"
               gameName="Spades"
-              onSelect={(character) => handlePlayAgainstCPU(character)}
+              onSelect={(character) => handlePlayAgainstCPU(character, mySeatNumber)}
               onBack={() => setJoinFlow('choose')}
             />
           </div>
