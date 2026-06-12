@@ -36,6 +36,8 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
   const [isShuffling, setIsShuffling] = useState(false);
   const [isDealing, setIsDealing] = useState(false);
   const dealingActive = isDealing || isExternalDealing;
+  const gsRef = useRef(gs);
+  gsRef.current = gs;
   
   if (!isMySeat || !player) return null;
   
@@ -62,8 +64,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     await updateState({ deck, deck_shuffled: true, shuffle_ts: Date.now(), dealer_seat: seatNumber });
     setIsShuffling(false);
 
-    // 2. Deal immediately after shuffle
-    const currentPlayers = gs.players || [];
+    // 2. Deal immediately after shuffle — read latest gs via ref to avoid stale closure
+    const currentGs = gsRef.current;
+    const currentPlayers = currentGs.players || [];
     const allSeated = getSeatedPlayers(currentPlayers);
     if (allSeated.length < 2) return;
 
@@ -98,7 +101,7 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
     const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
     await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
-    const handNumber = gs.hand_number || 0;
+    const handNumber = currentGs.hand_number || 0;
     const isFirstHand = handNumber === 0;
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
