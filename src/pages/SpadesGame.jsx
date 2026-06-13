@@ -773,7 +773,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const showJoinChoice = joinFlow === 'choose' && !loading && room;
 
   return (
-    <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
+    <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col" style={{ overflowX: 'hidden' }}>
       <audio ref={audioRef} loop preload="auto" />
 
       {/* ── Player name prompt ─────────────────────────────────────────────── */}
