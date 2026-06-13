@@ -281,20 +281,7 @@ function ComingSoonCabinet({ title, emoji, color = '#4a4a6a' }) {
 
 // ── Main Games Page ──────────────────────────────────────────────────────────
 const GAMES = [
-  {
-    id: 'viral',
-    title: 'VIRAL!',
-    tagline: 'Become An Influencer',
-    image: null,
-    color: '#BC13FE',
-    color2: '#7700cc',
-    marqueeText: 'ROLL DICE • COLLECT EQUIPMENT • GO VIRAL • GET SPONSORED',
-    screenText: '🎲 BOARD GAME',
-    description: 'Race around the 120-space board to become a viral sensation! Collect equipment, gain followers, land sponsorships, and be the first to reach Creator Mansion!',
-    tags: ['1-12 Players', 'Board Game', 'Strategy'],
-    path: '/games/viral',
-    featured: false,
-  },
+
   {
     id: 'word-search',
     title: 'Word Search',
@@ -368,6 +355,7 @@ const GAMES = [
 ];
 
 const COMING_SOON = [
+  { title: 'VIRAL!', emoji: '🚀', color: '#5a1a5a' },
   { title: 'TN Originals', emoji: '🤠', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
