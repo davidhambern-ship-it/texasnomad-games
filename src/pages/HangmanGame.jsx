@@ -5,7 +5,6 @@ import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
-import MobileLetterOverlay from '@/components/game/MobileLetterOverlay.jsx';
 import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
@@ -666,7 +665,7 @@ function HangmanViewer({ roomCode, cpuId }) {
 
       ) : (
         /* ── Game Screen ─────────────────────────────────────────────── */
-        <div className="flex-1 flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full pb-64 sm:pb-4">
+        <div className="flex-1 flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full">
 
           {/* 1P: Round info — Host / Guesser / Score */}
           {isSinglePlayer && cpuCharacter && (
@@ -787,7 +786,7 @@ function HangmanViewer({ roomCode, cpuId }) {
 
           {/* Hint */}
           {gs.hint && !gs.hint_revealed && canGuess && (
-            <div className="hidden sm:flex justify-center">
+            <div className="flex justify-center">
               <div className="px-4 py-2 rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/5 text-center text-[7px] text-[#BC13FE]/50 uppercase tracking-widest" style={PS2}>
                 💡 Hint available — press HINT to reveal
               </div>
@@ -812,9 +811,9 @@ function HangmanViewer({ roomCode, cpuId }) {
             </div>
           )}
 
-          {/* Alphabet — desktop only (inline), mobile uses sticky overlay below */}
+          {/* Alphabet — ALL players can guess */}
           {gs.phase === 'playing' && !gs.word_revealed && (
-            <div className="hidden sm:block w-full max-w-lg space-y-3">
+            <div className="w-full max-w-lg space-y-3">
               {isGoRoundMode && alreadyChosen && (
                 <div className="text-center px-4 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/10">
                   <span className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>You chose this round. Waiting for others…</span>
@@ -873,33 +872,7 @@ function HangmanViewer({ roomCode, cpuId }) {
             </div>
           )}
 
-          {/* ── Mobile sticky letter overlay ── */}
-          {gs.phase === 'playing' && !gs.word_revealed && (
-            <MobileLetterOverlay
-              canGuess={canGuess}
-              alphabet={ALPHABET}
-              guessed={guessed}
-              wrong={wrong}
-              onGuessLetter={handleGuessLetter}
-              onGuessWord={handleGuessWord}
-              isListening={isListeningGuess}
-              onToggleVoice={toggleVoiceGuess}
-              transcript={voiceTranscript}
-              onTranscriptChange={setVoiceTranscript}
-              seatNumber={seatNumber}
-              isSinglePlayer={isSinglePlayer}
-              iAmSetter1P={iAmSetter1P}
-              iAmGuesser1P={iAmGuesser1P}
-              cpuCharacter={cpuCharacter}
-              isGoRoundMode={isGoRoundMode}
-              alreadyChosen={alreadyChosen}
-              isSeated={isSeated}
-              hint={gs.hint}
-              hintRevealed={gs.hint_revealed}
-              hintUsed={hintUsed}
-              onUseHint={handleUseHint}
-            />
-          )}
+
 
           {/* Finished state */}
           {gs.phase === 'finished' && (
