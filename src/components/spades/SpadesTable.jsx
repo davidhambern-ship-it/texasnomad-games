@@ -253,8 +253,8 @@ export default function SpadesTable({
 
         {/* Center logo watermark */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c01718b4c_logoimage-3-nobg.png"
-            alt="TN" className="object-contain" style={{ opacity: 0.18, width: 140, height: 140 }} />
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+            alt="TN" className="object-contain" style={{ opacity: 0.33, width: 140, height: 140 }} />
         </div>
 
         {/* ── TOP seat ─────────────────────────────────────────────── */}
