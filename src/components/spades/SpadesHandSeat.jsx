@@ -322,22 +322,61 @@ export default function SpadesHandSeat({
     );
   }
 
-  // ── Left seat ─────────────────────────────────────────────────
+  // ── Left seat (seat 2) — cards rotated 90° CW to face left player ──
   if (position === 'left') {
+    const avail = Math.max(60, (maxHeight || 160) - 32);
+    const { cardW, cardH, overlap } = fitCardsVertical(backCount, avail);
+    const totalH = Math.min(avail, cardH + (backCount - 1) * (cardH - overlap));
+    // Rotate the horizontal fan 90° CW so cards fan upward facing the left player
     return (
       <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4, maxHeight: maxHeight || 160, overflow: 'hidden' }}>
         <InfoStrip compact />
-        <VerticalBacks />
+        <div style={{
+          transform: 'rotate(90deg)',
+          transformOrigin: 'center center',
+          width: totalH,
+          height: cardH,
+          flexShrink: 0,
+          position: 'relative',
+        }}>
+          {Array.from({ length: backCount }).map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: i * (cardH - overlap), top: 0,
+              width: cardH, height: cardW, zIndex: i,
+            }}>
+              <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-sm" style={{ objectFit: 'contain' }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  // ── Right seat ────────────────────────────────────────────────
+  // ── Right seat (seat 4) — cards rotated 90° CCW to face right player ──
   if (position === 'right') {
+    const avail = Math.max(60, (maxHeight || 160) - 32);
+    const { cardW, cardH, overlap } = fitCardsVertical(backCount, avail);
+    const totalH = Math.min(avail, cardH + (backCount - 1) * (cardH - overlap));
     return (
       <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4, maxHeight: maxHeight || 160, overflow: 'hidden' }}>
         <InfoStrip compact />
-        <VerticalBacks />
+        <div style={{
+          transform: 'rotate(-90deg)',
+          transformOrigin: 'center center',
+          width: totalH,
+          height: cardH,
+          flexShrink: 0,
+          position: 'relative',
+        }}>
+          {Array.from({ length: backCount }).map((_, i) => (
+            <div key={i} style={{
+              position: 'absolute', left: i * (cardH - overlap), top: 0,
+              width: cardH, height: cardW, zIndex: i,
+            }}>
+              <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-sm" style={{ objectFit: 'contain' }} />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
