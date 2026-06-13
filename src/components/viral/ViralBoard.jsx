@@ -45,73 +45,82 @@ const getDistrict = (spaceNumber) => {
   return null;
 };
 
-// Grid positions for each letter (row, col) - creates VIRAL shape
-// Each letter is 10 rows tall, spaced 3 cols apart for clarity
+// Grid positions for VIRAL - each letter clearly formed
+// V: 20 spaces (1-20), I: 20 spaces (21-40), R: 40 spaces (41-80), A: 20 spaces (81-100), L: 20 spaces (101-120)
 const getLetterGridPosition = (spaceNumber) => {
   const district = getDistrict(spaceNumber);
   if (!district) return { row: 0, col: 0 };
   
-  // Letter starting columns (spaced apart for clarity)
-  const colOffset = { V: 0, I: 6, R: 12, A: 20, L: 28 };
+  // Letter column offsets (spaced for clarity)
+  const colOffset = { V: 0, I: 8, R: 14, A: 24, L: 32 };
   
   if (district === 'V') {
-    // V shape: 1-10 descends left, 11-20 descends right
+    // V: Two diagonal lines meeting at bottom (spaces 1-20)
+    // Left side: 1-10 going down-right, Right side: 11-20 going down-left
     const pos = spaceNumber - 1;
     if (pos < 10) {
-      return { row: pos + 1, col: colOffset.V + pos }; // descending left diagonal
+      // Left diagonal: starts top-left, goes down-right
+      return { row: pos + 1, col: colOffset.V + pos };
     } else {
+      // Right diagonal: starts top-right, goes down-left, meets at bottom
       const rightPos = pos - 10;
-      return { row: rightPos + 1, col: colOffset.V + 9 - rightPos }; // ascending right diagonal
+      return { row: rightPos + 1, col: colOffset.V + 9 - rightPos };
     }
   }
   
   if (district === 'I') {
-    // I: straight vertical line (21-40)
-    return { row: spaceNumber - 20, col: colOffset.I };
+    // I: Simple vertical line (spaces 21-40)
+    return { row: spaceNumber - 20, col: colOffset.I + 2 };
   }
   
   if (district === 'R') {
-    // R: 41-50 vertical stem, 51-64 top curve, 65-80 diagonal leg
+    // R: 40 spaces - vertical stem, top loop, diagonal leg
     const pos = spaceNumber - 40;
-    if (pos <= 10) {
-      return { row: pos, col: colOffset.R }; // vertical stem
-    } else if (pos <= 18) {
-      // top curve (going right)
-      const curvePos = pos - 10;
-      return { row: curvePos, col: colOffset.R + curvePos };
-    } else if (pos <= 26) {
-      // curve coming back left
-      const curvePos = pos - 18;
-      return { row: 8 + curvePos, col: colOffset.R + 8 - curvePos };
+    if (pos < 12) {
+      // Vertical stem (41-52)
+      return { row: pos + 1, col: colOffset.R };
+    } else if (pos < 20) {
+      // Top curve going right (53-60)
+      const curvePos = pos - 12;
+      return { row: 2 + curvePos, col: colOffset.R + 1 + curvePos };
+    } else if (pos < 28) {
+      // Top curve coming back (61-68)
+      const curvePos = pos - 20;
+      return { row: 8 - curvePos, col: colOffset.R + 5 + curvePos };
     } else {
-      // leg going down-right
-      const legPos = pos - 26;
-      return { row: 8 + legPos, col: colOffset.R + legPos };
+      // Diagonal leg going down-right (69-80)
+      const legPos = pos - 28;
+      return { row: 6 + legPos, col: colOffset.R + 3 + legPos };
     }
   }
   
   if (district === 'A') {
-    // A: pyramid with crossbar (81-100)
+    // A: 20 spaces - two diagonals meeting at top, crossbar
     const pos = spaceNumber - 80;
-    if (pos <= 8) {
-      return { row: pos, col: colOffset.A + pos }; // left diagonal down
-    } else if (pos <= 16) {
+    if (pos < 8) {
+      // Left diagonal going down-right (81-88)
+      return { row: pos + 1, col: colOffset.A + pos };
+    } else if (pos < 16) {
+      // Right diagonal going down-left (89-96)
       const rightPos = pos - 8;
-      return { row: rightPos, col: colOffset.A + 8 - rightPos }; // right diagonal down
+      return { row: rightPos + 1, col: colOffset.A + 7 - rightPos };
     } else {
-      // crossbar (horizontal)
+      // Crossbar horizontal (97-100)
       const barPos = pos - 16;
       return { row: 5, col: colOffset.A + 2 + barPos };
     }
   }
   
   if (district === 'L') {
-    // L: 101-110 vertical, 111-120 horizontal bottom
+    // L: 20 spaces - vertical down, then horizontal right
     const pos = spaceNumber - 100;
-    if (pos <= 10) {
-      return { row: pos, col: colOffset.L }; // vertical
+    if (pos < 12) {
+      // Vertical stem (101-112)
+      return { row: pos + 1, col: colOffset.L + 2 };
     } else {
-      return { row: 10, col: colOffset.L + (pos - 10) }; // horizontal bottom
+      // Horizontal bottom (113-120)
+      const horizPos = pos - 12;
+      return { row: 12, col: colOffset.L + 2 + horizPos };
     }
   }
   
@@ -122,7 +131,7 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll 
   if (!board || !board.length) return null;
 
   // Create grid map
-  const gridSize = { rows: 12, cols: 40 };
+  const gridSize = { rows: 14, cols: 42 };
   const gridMap = {};
   
   board.forEach(space => {
@@ -144,17 +153,17 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll 
         key={space.number}
         className="relative flex items-center justify-center border border-white/20 hover:border-white/60 transition-all cursor-pointer rounded-sm"
         style={{
-          width: 28,
-          height: 28,
-          background: `linear-gradient(135deg, ${bgColor}60, ${bgColor}30)`,
-          boxShadow: isCurrentPlayerSpace ? `0 0 12px ${bgColor}, inset 0 0 8px ${bgColor}40` : '0 0 4px rgba(0,0,0,0.3)',
+          width: 26,
+          height: 26,
+          background: `linear-gradient(135deg, ${bgColor}70, ${bgColor}35)`,
+          boxShadow: isCurrentPlayerSpace ? `0 0 12px ${bgColor}, inset 0 0 8px ${bgColor}40` : '0 0 3px rgba(0,0,0,0.3)',
         }}
         title={`Space ${space.number}: ${space.effect?.description || space.type}`}
       >
         <span className="text-[5px] font-bold text-white" style={PS2}>{label}</span>
         {playerOnSpace && (
           <div
-            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[6px] font-bold"
+            className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[6px] font-bold z-10"
             style={{ 
               background: playerOnSpace.color || '#BC13FE',
               boxShadow: '0 0 8px rgba(0,0,0,0.5)'
@@ -180,7 +189,7 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll 
           rowCells.push(renderSpace(space));
         } else {
           rowCells.push(
-            <div key={`empty-${row}-${col}`} className="w-7 h-7" />
+            <div key={`empty-${row}-${col}`} className="w-6.5 h-6.5" />
           );
         }
       }
