@@ -37,7 +37,7 @@ export default function ViralSetupPanel({ isSinglePlayer, cpuId, onStart, seatNu
 
       {cpuId && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5">
-          <div className="text-[8px] text-[#FF5F1F] uppercase tracking-widest" style={PS2}>VS AI: {aiOpponent || 'dexter'}</div>
+          <div className="text-[8px] text-[#FF5F1F] uppercase tracking-widest" style={PS2}>🤖 VS AI: {selectedAI}</div>
         </div>
       )}
 
