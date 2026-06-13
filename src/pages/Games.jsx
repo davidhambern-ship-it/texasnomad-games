@@ -436,10 +436,12 @@ export default function Games() {
         game_state: { cpu_opponent_id: character.id, single_player: true },
       });
       navigate(`${cpuSelectGame.path}?room=${code}&creator=1&cpu=${character.id}`);
+      // Don't setCpuSelectGame(null) here — navigation unmounts the page anyway,
+      // and calling it before navigation causes the overlay to disappear first.
     } catch (e) {
       console.error('Failed to create CPU room', e);
+      setCpuSelectGame(null);
     }
-    setCpuSelectGame(null);
   };
 
   const toggleMute = () => {
