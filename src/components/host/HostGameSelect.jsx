@@ -37,6 +37,14 @@ export const ALL_GAMES = [
     emoji: '♠️',
     path: '/games/spades',
   },
+  {
+    id: 'word-search',
+    title: 'WORD SEARCH',
+    subtitle: 'HUNT EVERY LETTER',
+    color: '#00c875',
+    emoji: '🔍',
+    path: '/games/word-search',
+  },
 ];
 
 export default function HostGameSelect({ onSelect, currentGame }) {
