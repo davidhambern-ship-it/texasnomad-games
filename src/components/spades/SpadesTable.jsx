@@ -265,7 +265,7 @@ export default function SpadesTable({
 
         {/* Center logo watermark */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none">
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6d606b336_logoimage-3.png"
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c01718b4c_logoimage-3-nobg.png"
             alt="TN" className="object-contain" style={{ opacity: 0.18, width: '30%', minWidth: 80, maxWidth: 160 }} />
         </div>
 
