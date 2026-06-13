@@ -550,7 +550,7 @@ function HangmanViewer({ roomCode, cpuId }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SeatBadge seatNumber={seatNumber} isSeated={isSeated} alreadyChosen={isGoRoundMode && alreadyChosen} />
-            <Link to="/games" className="flex items-center px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-[7px] tracking-widest uppercase" style={PS2}>← LOBBY</Link>
+            <Link to="/games" className="flex items-center justify-center px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all"><span className="text-[7px] tracking-widest uppercase" style={PS2}>← LOBBY</span></Link>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
               className="px-2 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[7px] tracking-widest uppercase" style={PS2}>
