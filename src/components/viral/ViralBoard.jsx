@@ -46,65 +46,72 @@ const getDistrict = (spaceNumber) => {
 };
 
 // Grid positions for each letter (row, col) - creates VIRAL shape
-// Each letter is roughly 8 rows tall, letters spaced apart
+// Each letter is 10 rows tall, spaced 3 cols apart for clarity
 const getLetterGridPosition = (spaceNumber) => {
   const district = getDistrict(spaceNumber);
   if (!district) return { row: 0, col: 0 };
-
-  const letterIndex = spaceNumber;
+  
+  // Letter starting columns (spaced apart for clarity)
+  const colOffset = { V: 0, I: 6, R: 12, A: 20, L: 28 };
   
   if (district === 'V') {
-    // V shape: 1-10 goes down-left, 11-20 goes down-right
+    // V shape: 1-10 descends left, 11-20 descends right
     const pos = spaceNumber - 1;
     if (pos < 10) {
-      return { row: pos + 1, col: pos }; // descending left
+      return { row: pos + 1, col: colOffset.V + pos }; // descending left diagonal
     } else {
-      return { row: pos - 9, col: 18 - pos }; // ascending right
+      const rightPos = pos - 10;
+      return { row: rightPos + 1, col: colOffset.V + 9 - rightPos }; // ascending right diagonal
     }
   }
   
   if (district === 'I') {
-    // I: vertical line (21-40)
-    return { row: spaceNumber - 20, col: 4 };
+    // I: straight vertical line (21-40)
+    return { row: spaceNumber - 20, col: colOffset.I };
   }
   
   if (district === 'R') {
-    // R: 41-50 vertical, 51-64 curve, 65-80 leg
+    // R: 41-50 vertical stem, 51-64 top curve, 65-80 diagonal leg
     const pos = spaceNumber - 40;
     if (pos <= 10) {
-      return { row: pos, col: 8 }; // vertical stem
-    } else if (pos <= 24) {
-      // curve top
+      return { row: pos, col: colOffset.R }; // vertical stem
+    } else if (pos <= 18) {
+      // top curve (going right)
       const curvePos = pos - 10;
-      return { row: Math.min(5, 1 + Math.floor(curvePos / 3)), col: 8 + Math.min(3, Math.ceil(curvePos / 4)) };
+      return { row: curvePos, col: colOffset.R + curvePos };
+    } else if (pos <= 26) {
+      // curve coming back left
+      const curvePos = pos - 18;
+      return { row: 8 + curvePos, col: colOffset.R + 8 - curvePos };
     } else {
-      // leg going down
-      const legPos = pos - 24;
-      return { row: 5 + legPos, col: 10 + Math.floor(legPos / 3) };
+      // leg going down-right
+      const legPos = pos - 26;
+      return { row: 8 + legPos, col: colOffset.R + legPos };
     }
   }
   
   if (district === 'A') {
-    // A: pyramid shape (81-100)
+    // A: pyramid with crossbar (81-100)
     const pos = spaceNumber - 80;
-    if (pos <= 7) {
-      return { row: pos, col: 14 - pos }; // left side
-    } else if (pos <= 14) {
-      return { row: pos - 7, col: 14 + (pos - 7) }; // right side
+    if (pos <= 8) {
+      return { row: pos, col: colOffset.A + pos }; // left diagonal down
+    } else if (pos <= 16) {
+      const rightPos = pos - 8;
+      return { row: rightPos, col: colOffset.A + 8 - rightPos }; // right diagonal down
     } else {
-      // crossbar
-      const barPos = pos - 14;
-      return { row: 4, col: 14 - 3 + barPos };
+      // crossbar (horizontal)
+      const barPos = pos - 16;
+      return { row: 5, col: colOffset.A + 2 + barPos };
     }
   }
   
   if (district === 'L') {
-    // L: 101-110 vertical, 111-120 horizontal
+    // L: 101-110 vertical, 111-120 horizontal bottom
     const pos = spaceNumber - 100;
     if (pos <= 10) {
-      return { row: pos, col: 20 }; // vertical
+      return { row: pos, col: colOffset.L }; // vertical
     } else {
-      return { row: 10, col: 20 + (pos - 10) }; // horizontal bottom
+      return { row: 10, col: colOffset.L + (pos - 10) }; // horizontal bottom
     }
   }
   
@@ -115,7 +122,7 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll 
   if (!board || !board.length) return null;
 
   // Create grid map
-  const gridSize = { rows: 12, cols: 28 };
+  const gridSize = { rows: 12, cols: 40 };
   const gridMap = {};
   
   board.forEach(space => {
