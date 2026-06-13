@@ -299,7 +299,7 @@ const GAMES = [
     id: 'word-search',
     title: 'Word Search',
     tagline: 'Hunt Every Letter',
-    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/23363597f_generated_image.png',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/afea99c64_generated_image.png',
     color: '#00c875',
     color2: '#00a860',
     marqueeText: 'FIND THE WORD • DRAG TO SELECT • SCORE POINTS • BEAT THE CLOCK',
