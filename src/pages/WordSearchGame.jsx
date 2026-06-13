@@ -190,7 +190,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
     const turnId = ++aiTurnIdRef.current;
     const charId = activePlayer.characterId || cpuId || gs.cpu_opponent_id || 'carlos';
 
-    runAITurn(grid, charId).then(async (result) => {
+    runAITurn(grid, charId, gs.words || []).then(async (result) => {
       if (turnId !== aiTurnIdRef.current) return; // stale turn
       if (!gs.running || gs.paused) return;
 
