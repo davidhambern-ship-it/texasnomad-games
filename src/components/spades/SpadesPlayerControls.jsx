@@ -179,6 +179,12 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
 
 
+  const handleRedeal = async () => {
+    const confirmed = window.confirm('Redeal this hand? Scores will be kept, but all cards and bids will be reset.');
+    if (!confirmed) return;
+    await handleShuffleAndDeal();
+  };
+
   const handleReset = async () => {
     const confirmed = window.confirm('Reset the game? This will clear all hands, bids, and scores.');
     if (!confirmed) return;
@@ -284,6 +290,9 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
           )}
           <Btn onClick={() => setShowHandSetup(true)} color="#BC13FE" size="sm">
             🃏 Hand Setup
+          </Btn>
+          <Btn onClick={handleRedeal} color="#FF5F1F" size="sm" disabled={isShuffling || dealingActive}>
+            🔄 Redeal
           </Btn>
           <Btn onClick={handleReset} color="#ef4444" size="sm">
             ↺ Reset
