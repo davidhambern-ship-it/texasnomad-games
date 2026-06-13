@@ -248,25 +248,25 @@ export default function SpadesTable({
         ref={tableRef}
         className="relative w-full rounded-3xl"
         style={{
-          background: 'radial-gradient(ellipse at center, #1a5c2a 0%, #0d3d1a 60%, #071a0c 100%)',
-          border: '4px solid #2d7a40',
-          boxShadow: 'inset 0 0 60px rgba(0,0,0,0.7), inset 0 0 30px rgba(0,100,30,0.2), 0 10px 30px rgba(0,0,0,0.6)',
-          // Fixed aspect ratio: slightly taller than wide to give good space
+          background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
+          backdropFilter: 'blur(12px)',
+          border: '4px solid rgba(255,160,50,0.6)',
+          boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3), 0 0 80px rgba(255,120,0,0.15)',
           aspectRatio: '4/3',
           overflow: 'hidden',
           isolation: 'isolate',
         }}>
 
-        {/* Felt texture */}
+        {/* Glass sheen overlay */}
         <div className="absolute inset-0 rounded-3xl pointer-events-none"
           style={{
-            backgroundImage: 'repeating-linear-gradient(0deg, rgba(255,255,255,0.02) 0px, transparent 1px, transparent 4px), repeating-linear-gradient(90deg, rgba(255,255,255,0.02) 0px, transparent 1px, transparent 4px)',
+            background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)',
           }} />
 
         {/* Center logo watermark */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-0 pointer-events-none">
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png"
-            alt="TN" className="w-12 h-12 object-contain" style={{ opacity: 0.06 }} />
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6d606b336_logoimage-3.png"
+            alt="TN" className="object-contain" style={{ opacity: 0.18, width: '30%', minWidth: 80, maxWidth: 160 }} />
         </div>
 
         {/* ── TOP seat ─────────────────────────────────────────────── */}
