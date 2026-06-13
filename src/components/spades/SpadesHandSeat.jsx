@@ -322,19 +322,21 @@ export default function SpadesHandSeat({
     );
   }
 
-  // ── Left seat (seat 2) — entire content rotated 90° CW to face left player ──
+  // ── Left seat (seat 2) — fan cards horizontally, rotate whole thing 90° CW ──
   if (position === 'left') {
-    const constrainedH = maxHeight || 160;
-    const avail = Math.max(60, constrainedH - 8);
-    const { cardW, cardH, overlap } = fitCardsVertical(backCount, avail - 28); // 28 for name strip
-    const totalH = Math.min(avail - 28, cardH + (backCount - 1) * (cardH - overlap));
-    // The inner content is laid out vertically, then the outer wrapper rotates it 90° CW
+    const fanW = maxHeight || 160; // after rotation this becomes the height
+    const avail = fanW - 8;
+    const { cardW, cardH, overlap } = fitCards(backCount, avail - 28, 30, 43, 16, 0.65);
+    const totalCardW = backCount > 0 ? cardW + (backCount - 1) * (cardW - overlap) : 0;
+    // Inner div is horizontal (name + fan), we rotate it 90° CW so it reads top→bottom for left player
     return (
-      <div style={{ width: constrainedH, height: constrainedH, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: cardH + 28, height: fanW, overflow: 'visible' }}>
         <div style={{
-          transform: 'rotate(90deg)',
+          position: 'absolute',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%) rotate(90deg)',
           transformOrigin: 'center center',
-          width: constrainedH,
+          width: fanW,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -342,9 +344,9 @@ export default function SpadesHandSeat({
           ...borderStyle,
         }}>
           <InfoStrip compact />
-          <div style={{ position: 'relative', width: cardW, height: totalH, flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: totalCardW, height: cardH, flexShrink: 0 }}>
             {Array.from({ length: backCount }).map((_, i) => (
-              <div key={i} style={{ position: 'absolute', top: i * (cardH - overlap), left: 0, width: cardW, height: cardH, zIndex: i }}>
+              <div key={i} style={{ position: 'absolute', left: i * (cardW - overlap), top: 0, width: cardW, height: cardH, zIndex: i }}>
                 <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-sm" style={{ objectFit: 'contain' }} />
               </div>
             ))}
@@ -354,18 +356,20 @@ export default function SpadesHandSeat({
     );
   }
 
-  // ── Right seat (seat 4) — entire content rotated 90° CCW to face right player ──
+  // ── Right seat (seat 4) — fan cards horizontally, rotate whole thing 90° CCW ──
   if (position === 'right') {
-    const constrainedH = maxHeight || 160;
-    const avail = Math.max(60, constrainedH - 8);
-    const { cardW, cardH, overlap } = fitCardsVertical(backCount, avail - 28);
-    const totalH = Math.min(avail - 28, cardH + (backCount - 1) * (cardH - overlap));
+    const fanW = maxHeight || 160;
+    const avail = fanW - 8;
+    const { cardW, cardH, overlap } = fitCards(backCount, avail - 28, 30, 43, 16, 0.65);
+    const totalCardW = backCount > 0 ? cardW + (backCount - 1) * (cardW - overlap) : 0;
     return (
-      <div style={{ width: constrainedH, height: constrainedH, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: cardH + 28, height: fanW, overflow: 'visible' }}>
         <div style={{
-          transform: 'rotate(-90deg)',
+          position: 'absolute',
+          top: '50%', left: '50%',
+          transform: 'translate(-50%, -50%) rotate(-90deg)',
           transformOrigin: 'center center',
-          width: constrainedH,
+          width: fanW,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
@@ -373,9 +377,9 @@ export default function SpadesHandSeat({
           ...borderStyle,
         }}>
           <InfoStrip compact />
-          <div style={{ position: 'relative', width: cardW, height: totalH, flexShrink: 0, overflow: 'hidden' }}>
+          <div style={{ position: 'relative', width: totalCardW, height: cardH, flexShrink: 0 }}>
             {Array.from({ length: backCount }).map((_, i) => (
-              <div key={i} style={{ position: 'absolute', top: i * (cardH - overlap), left: 0, width: cardW, height: cardH, zIndex: i }}>
+              <div key={i} style={{ position: 'absolute', left: i * (cardW - overlap), top: 0, width: cardW, height: cardH, zIndex: i }}>
                 <img src={getCardBack()} alt="Card" className="w-full h-full rounded shadow-sm" style={{ objectFit: 'contain' }} />
               </div>
             ))}
