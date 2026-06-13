@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
@@ -105,6 +105,7 @@ export default function HangmanGame() {
 }
 
 function HangmanViewer({ roomCode, cpuId }) {
+  const navigate = useNavigate();
   const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'hangman', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
@@ -550,7 +551,7 @@ function HangmanViewer({ roomCode, cpuId }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SeatBadge seatNumber={seatNumber} isSeated={isSeated} alreadyChosen={isGoRoundMode && alreadyChosen} />
-            <Link to="/games" className="flex items-center justify-center px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all" style={{ ...PS2, fontSize: 7, lineHeight: 1, letterSpacing: '0.1em' }}>← LOBBY</Link>
+            <button onClick={() => navigate('/games')} className="px-2 py-1 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all" style={{ fontFamily: 'Inter, sans-serif', fontSize: 11, letterSpacing: '0.1em' }}>← LOBBY</button>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
               className="px-2 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[7px] tracking-widest uppercase" style={PS2}>
