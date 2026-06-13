@@ -159,11 +159,11 @@ export default function SpadesHandSeat({
   // ── Vertical card backs stack (left/right seats) ──────────────
   const VerticalBacks = () => {
     if (backCount === 0) return <div className="text-[6px] text-white/20 uppercase" style={PS2}>—</div>;
-    const avail = (maxHeight || 160) - 8;
+    const avail = Math.max(60, (maxHeight || 160) - 32); // leave room for InfoStrip
     const { cardW, cardH, overlap } = fitCardsVertical(backCount, avail);
-    const totalH = cardH + (backCount - 1) * (cardH - overlap);
+    const totalH = Math.min(avail, cardH + (backCount - 1) * (cardH - overlap));
     return (
-      <div style={{ position: 'relative', width: cardW, height: totalH, flexShrink: 0 }}>
+      <div style={{ position: 'relative', width: cardW, height: totalH, flexShrink: 0, overflow: 'hidden' }}>
         {Array.from({ length: backCount }).map((_, i) => (
           <div key={i} style={{
             position: 'absolute', top: i * (cardH - overlap), left: 0,
@@ -325,7 +325,7 @@ export default function SpadesHandSeat({
   // ── Left seat ─────────────────────────────────────────────────
   if (position === 'left') {
     return (
-      <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4, maxHeight: maxHeight || 160, overflow: 'hidden' }}>
         <InfoStrip compact />
         <VerticalBacks />
       </div>
@@ -335,7 +335,7 @@ export default function SpadesHandSeat({
   // ── Right seat ────────────────────────────────────────────────
   if (position === 'right') {
     return (
-      <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      <div style={{ ...borderStyle, flexDirection: 'column', alignItems: 'center', gap: 4, maxHeight: maxHeight || 160, overflow: 'hidden' }}>
         <InfoStrip compact />
         <VerticalBacks />
       </div>
