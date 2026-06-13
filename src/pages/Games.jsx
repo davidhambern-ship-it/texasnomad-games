@@ -326,11 +326,11 @@ const GAMES = [
   {
     id: 'hangman',
     title: 'Hangman',
-    tagline: 'Every Letter Counts',
+    tagline: 'Guess Before It\'s Too Late',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/2c3663fd0_generated_image.png',
     color: '#22d3ee',
     color2: '#0ea5e9',
-    marqueeText: 'GUESS THE WORD • AVOID THE BYE • ONE LETTER AT A TIME',
+    marqueeText: 'GUESS THE WORD • PICK YOUR LETTERS • BEAT THE CLOCK • ONE LETTER AT A TIME',
     screenText: 'WORD DETECTIVE',
     description: 'The classic word-guessing game. Pick letters one at a time to uncover the hidden word before you run out of chances.',
     tags: ['Small Groups', 'Casual', 'Audience'],
