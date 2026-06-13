@@ -5,6 +5,7 @@ import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import MobileLetterOverlay from '@/components/game/MobileLetterOverlay.jsx';
 import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
@@ -127,6 +128,20 @@ function HangmanViewer({ roomCode, cpuId }) {
   const [setterCategory, setSetterCategory] = useState('');
   const [setterHint, setSetterHint] = useState('');
   const [setterError, setSetterError] = useState('');
+
+  // Hint state
+  const [hintUsed, setHintUsed] = useState(false);
+
+  // Reset hint on new round
+  useEffect(() => {
+    if (gs.phase === 'setup' || !gs.secret_word) setHintUsed(false);
+  }, [gs.secret_word, gs.phase]);
+
+  const handleUseHint = async () => {
+    if (hintUsed || !gs.hint) return;
+    setHintUsed(true);
+    await updateState({ hint_revealed: true });
+  };
 
   // Voice guess state
   const [isListeningGuess, setIsListeningGuess] = useState(false);
@@ -551,7 +566,12 @@ function HangmanViewer({ roomCode, cpuId }) {
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <SeatBadge seatNumber={seatNumber} isSeated={isSeated} alreadyChosen={isGoRoundMode && alreadyChosen} />
-            <Link to="/games" className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 transition-all text-xs font-body tracking-wide">← LOBBY</Link>
+            <button
+              onClick={() => navigate('/games')}
+              className="px-3 py-1.5 border border-[#FFD700]/40 text-[#FFD700]/80 rounded hover:bg-[#FFD700]/10 active:bg-[#FFD700]/20 active:scale-95 transition-all text-xs font-body tracking-wide cursor-pointer select-none"
+              style={{ WebkitTapHighlightColor: 'rgba(255,215,0,0.2)', touchAction: 'manipulation' }}>
+              ← LOBBY
+            </button>
             <button
               onClick={() => { if (!document.fullscreenElement) containerRef.current?.requestFullscreen?.(); else document.exitFullscreen?.(); }}
               className="px-2 py-1 bg-[#FF5F1F] text-white rounded hover:bg-[#FF5F1F]/80 transition-all text-[7px] tracking-widest uppercase" style={PS2}>
@@ -646,7 +666,7 @@ function HangmanViewer({ roomCode, cpuId }) {
 
       ) : (
         /* ── Game Screen ─────────────────────────────────────────────── */
-        <div className="flex-1 flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full">
+        <div className="flex-1 flex flex-col items-center p-4 gap-4 max-w-2xl mx-auto w-full pb-64 sm:pb-4">
 
           {/* 1P: Round info — Host / Guesser / Score */}
           {isSinglePlayer && cpuCharacter && (
@@ -766,6 +786,13 @@ function HangmanViewer({ roomCode, cpuId }) {
           </div>
 
           {/* Hint */}
+          {gs.hint && !gs.hint_revealed && canGuess && (
+            <div className="hidden sm:flex justify-center">
+              <div className="px-4 py-2 rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/5 text-center text-[7px] text-[#BC13FE]/50 uppercase tracking-widest" style={PS2}>
+                💡 Hint available — press HINT to reveal
+              </div>
+            </div>
+          )}
           {gs.hint_revealed && gs.hint && (
             <div className="px-6 py-3 border border-[#BC13FE]/40 rounded-xl bg-[#BC13FE]/10 text-center max-w-sm">
               <div className="text-[8px] tracking-widest text-[#BC13FE]/70 uppercase mb-1" style={PS2}>💡 Hint</div>
@@ -785,40 +812,39 @@ function HangmanViewer({ roomCode, cpuId }) {
             </div>
           )}
 
-          {/* Alphabet — ALL players can guess */}
+          {/* Alphabet — desktop only (inline), mobile uses sticky overlay below */}
           {gs.phase === 'playing' && !gs.word_revealed && (
-            <div className="w-full max-w-lg space-y-3">
-              {/* Go-round throttle message */}
+            <div className="hidden sm:block w-full max-w-lg space-y-3">
               {isGoRoundMode && alreadyChosen && (
                 <div className="text-center px-4 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/10">
-                  <span className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>
-                    You chose this round. Waiting for others…
-                  </span>
+                  <span className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>You chose this round. Waiting for others…</span>
                 </div>
               )}
               {!isSeated && (
                 <div className="text-center px-4 py-2 rounded-lg border border-white/10 bg-white/5">
-                  <span className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>
-                    Joining game, please wait…
-                  </span>
+                  <span className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>Joining game, please wait…</span>
                 </div>
               )}
               {isSinglePlayer && iAmSetter1P && (
                 <div className="text-center px-4 py-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5">
-                  <span className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
-                    🔒 You are Host — {cpuCharacter?.name || 'CPU'} is guessing!
-                  </span>
+                  <span className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>🔒 You are Host — {cpuCharacter?.name || 'CPU'} is guessing!</span>
                 </div>
               )}
               {isSinglePlayer && iAmGuesser1P && (
                 <div className="text-center px-4 py-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/5">
-                  <span className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>
-                    🔤 {cpuCharacter?.name || 'CPU'} is Host — Guess their word!
-                  </span>
+                  <span className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🔤 {cpuCharacter?.name || 'CPU'} is Host — Guess their word!</span>
                 </div>
               )}
-
-              {/* Letter grid */}
+              {/* Hint button (desktop) */}
+              {canGuess && gs.hint && !gs.hint_revealed && (
+                <div className="flex justify-center">
+                  <button onClick={handleUseHint} disabled={hintUsed}
+                    className="px-4 py-2 rounded-lg border-2 font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-40"
+                    style={{ borderColor: '#BC13FE80', color: '#BC13FE', background: '#BC13FE10' }}>
+                    💡 {hintUsed ? 'Hint Used' : 'Use Hint'}
+                  </button>
+                </div>
+              )}
               <div className="flex flex-wrap gap-1.5 justify-center">
                 {ALPHABET.map((l) => {
                   const isWrong = wrong.includes(l);
@@ -826,9 +852,7 @@ function HangmanViewer({ roomCode, cpuId }) {
                   const used = isWrong || isCorrect;
                   const active = canGuess && !used;
                   return (
-                    <button key={l}
-                      onClick={() => handleGuessLetter(l)}
-                      disabled={!active}
+                    <button key={l} onClick={() => handleGuessLetter(l)} disabled={!active}
                       className="w-9 h-9 rounded-lg border-2 text-sm tracking-widest transition-all active:scale-90 disabled:cursor-not-allowed"
                       style={{
                         ...PS2,
@@ -843,19 +867,38 @@ function HangmanViewer({ roomCode, cpuId }) {
                   );
                 })}
               </div>
-
-              {/* Guess the full word — voice or text */}
               {canGuess && (
-                <GuessWordPanel
-                  onGuess={handleGuessWord}
-                  isListening={isListeningGuess}
-                  onToggleVoice={toggleVoiceGuess}
-                  transcript={voiceTranscript}
-                  onTranscriptChange={setVoiceTranscript}
-                  seatNumber={seatNumber}
-                />
+                <GuessWordPanel onGuess={handleGuessWord} isListening={isListeningGuess} onToggleVoice={toggleVoiceGuess} transcript={voiceTranscript} onTranscriptChange={setVoiceTranscript} seatNumber={seatNumber} />
               )}
             </div>
+          )}
+
+          {/* ── Mobile sticky letter overlay ── */}
+          {gs.phase === 'playing' && !gs.word_revealed && (
+            <MobileLetterOverlay
+              canGuess={canGuess}
+              alphabet={ALPHABET}
+              guessed={guessed}
+              wrong={wrong}
+              onGuessLetter={handleGuessLetter}
+              onGuessWord={handleGuessWord}
+              isListening={isListeningGuess}
+              onToggleVoice={toggleVoiceGuess}
+              transcript={voiceTranscript}
+              onTranscriptChange={setVoiceTranscript}
+              seatNumber={seatNumber}
+              isSinglePlayer={isSinglePlayer}
+              iAmSetter1P={iAmSetter1P}
+              iAmGuesser1P={iAmGuesser1P}
+              cpuCharacter={cpuCharacter}
+              isGoRoundMode={isGoRoundMode}
+              alreadyChosen={alreadyChosen}
+              isSeated={isSeated}
+              hint={gs.hint}
+              hintRevealed={gs.hint_revealed}
+              hintUsed={hintUsed}
+              onUseHint={handleUseHint}
+            />
           )}
 
           {/* Finished state */}
