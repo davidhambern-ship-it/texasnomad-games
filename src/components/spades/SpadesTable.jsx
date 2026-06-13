@@ -39,6 +39,8 @@ export default function SpadesTable({
   const [dealPhase, setDealPhase] = useState('idle');
   const [localHands, setLocalHands] = useState({});
   const [showHandSetup, setShowHandSetup] = useState(false);
+  // Optimistic hand: immediately remove a played card before server round-trip
+  const [optimisticRemovedId, setOptimisticRemovedId] = useState(null);
   const prevShuffleTs = useRef(gs.shuffle_ts);
   const prevDealTs = useRef(gs.deal_ts);
   const { suitOrder, setSuitOrder, sortHand } = useSuitOrder();
@@ -81,10 +83,28 @@ export default function SpadesTable({
     prevShuffleTs.current = gs.shuffle_ts;
   }, [gs.shuffle_ts]);
 
+  // Clear optimistic removal once the server state has caught up
+  useEffect(() => {
+    if (optimisticRemovedId && myPlayer?.hand && !myPlayer.hand.find(c => c.id === optimisticRemovedId)) {
+      setOptimisticRemovedId(null);
+    }
+  }, [myPlayer?.hand, optimisticRemovedId]);
+
+  // Wrap onPlayCard to immediately remove the card optimistically
+  const handlePlayCardOptimistic = (card) => {
+    setOptimisticRemovedId(card.id);
+    onPlayCard?.(card);
+  };
+
   const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
   const getPlayerAtSeat = (n) => players.find(p => p.seatNumber === n && (p.role === 'player' || p.role === 'hostPlayer'));
   const myPlayer = players.find(p => p.playerId === playerId);
-  const myHand = (isPlayer && myPlayer?.hand) ? sortHand(myPlayer.hand) : [];
+  // Apply optimistic removal so the card disappears immediately on play
+  const rawHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
+  const optimisticHand = optimisticRemovedId
+    ? rawHand.filter(c => c.id !== optimisticRemovedId)
+    : rawHand;
+  const myHand = sortHand(optimisticHand);
   const isDealing = dealPhase !== 'idle';
 
   const viewerSeat = isPlayer ? mySeatNumber : null;
@@ -107,7 +127,9 @@ export default function SpadesTable({
     const isMyTurn = gs.current_turn_seat === seatNumber && (isPlaying || isBidding);
     const cardCount = isDealing
       ? (localHands[seatNumber] || []).length
-      : (player?.hand?.length ?? 0);
+      : isMe
+        ? myHand.length  // use optimistic hand length for the human player
+        : (player?.hand?.length ?? 0);
     const hand = isMe ? myHand : null;
 
     // Pass layout budgets so the hand can fit itself
@@ -127,7 +149,7 @@ export default function SpadesTable({
         isBidding={isBidding}
         cardCount={cardCount}
         hand={hand}
-        onPlayCard={onPlayCard}
+        onPlayCard={isMe ? handlePlayCardOptimistic : onPlayCard}
         isJoinable={canJoinSeat && joinableSeats.includes(seatNumber)}
         onSit={() => onSitInSeat(seatNumber)}
         onTakeOver={() => onTakeOverCPU?.(seatNumber)}
