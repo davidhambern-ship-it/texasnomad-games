@@ -135,6 +135,10 @@ function WordSearchViewer({ roomCode, cpuId }) {
   const [previewCells, setPreviewCells] = useState([]);
   const [isSelecting, setIsSelecting] = useState(false);
 
+  // AI visual state — cells the AI is currently "looking at"
+  const [aiPreviewCells, setAiPreviewCells] = useState([]);
+  const [aiPreviewColor, setAiPreviewColor] = useState('#FF5F1F');
+
   const cpuCharacter = isSinglePlayer
     ? (TEXASNOMAD_CHARACTERS.find(c => c.id === (cpuId || gs.cpu_opponent_id)) || null)
     : null;
@@ -199,6 +203,15 @@ function WordSearchViewer({ roomCode, cpuId }) {
       const active = currentPlayers[activeIdx];
       if (!active?.isAI) return;
 
+      // Show the AI's selection on the board for 900ms before submitting
+      if (result.type === 'submit' && result.cells?.length) {
+        setAiPreviewCells(result.cells);
+        setAiPreviewColor(active.color || '#FF5F1F');
+        await new Promise(r => setTimeout(r, 900));
+        setAiPreviewCells([]);
+        if (turnId !== aiTurnIdRef.current) return; // stale after delay
+      }
+
       if (result.type === 'timeout') {
         // Time expired penalty
         const newScore = (active.score || 0) - 10;
@@ -235,7 +248,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
       }
     });
 
-    return () => { aiTurnIdRef.current++; }; // invalidate on cleanup
+    return () => { aiTurnIdRef.current++; setAiPreviewCells([]); }; // invalidate on cleanup
   }, [gs.running, gs.paused, gs.active, gs.grid, isSinglePlayer]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
@@ -488,6 +501,8 @@ function WordSearchViewer({ roomCode, cpuId }) {
               words={words}
               players={players}
               previewCells={previewCells}
+              aiPreviewCells={aiPreviewCells}
+              aiPreviewColor={aiPreviewColor}
               onCellDown={handleCellDown}
               onCellMove={handleCellMove}
               onCellUp={handleCellUp}
@@ -664,7 +679,7 @@ function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, gr
 }
 
 // ── Word Grid ─────────────────────────────────────────────────────────────────
-function WordGrid({ grid, words, players, previewCells, onCellDown, onCellMove, onCellUp, canInteract }) {
+function WordGrid({ grid, words, players, previewCells, aiPreviewCells = [], aiPreviewColor = '#FF5F1F', onCellDown, onCellMove, onCellUp, canInteract }) {
   const boardRef = useRef(null);
 
   // Build found map: cellId → color
@@ -714,6 +729,7 @@ function WordGrid({ grid, words, players, previewCells, onCellDown, onCellMove, 
             const id = `${y}-${x}`;
             const isFound = !!foundMap[id];
             const isPreview = previewCells.includes(id);
+            const isAIPreview = aiPreviewCells.includes(id);
             return (
               <div
                 key={id}
@@ -734,27 +750,37 @@ function WordGrid({ grid, words, players, previewCells, onCellDown, onCellMove, 
                     ? `${foundMap[id]}25`
                     : isPreview
                     ? 'rgba(255,215,0,0.15)'
+                    : isAIPreview
+                    ? `${aiPreviewColor}30`
                     : 'rgba(188,19,254,0.06)',
                   color: isFound
                     ? foundMap[id]
                     : isPreview
                     ? '#FFD700'
+                    : isAIPreview
+                    ? aiPreviewColor
                     : 'rgba(255,255,255,0.75)',
                   border: isFound
                     ? `1px solid ${foundMap[id]}80`
                     : isPreview
                     ? '2px solid #FFD700'
+                    : isAIPreview
+                    ? `2px solid ${aiPreviewColor}`
                     : '1px solid rgba(188,19,254,0.2)',
                   boxShadow: isFound
                     ? `0 0 8px ${foundMap[id]}60, inset 0 0 6px ${foundMap[id]}20`
                     : isPreview
                     ? '0 0 12px rgba(255,215,0,0.6)'
+                    : isAIPreview
+                    ? `0 0 12px ${aiPreviewColor}80`
                     : 'none',
                   transition: 'background 0.08s, color 0.08s, box-shadow 0.08s',
                   textShadow: isFound
                     ? `0 0 8px ${foundMap[id]}`
                     : isPreview
                     ? '0 0 8px rgba(255,215,0,0.8)'
+                    : isAIPreview
+                    ? `0 0 8px ${aiPreviewColor}`
                     : 'none',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
