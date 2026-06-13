@@ -3,16 +3,25 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   DISTRICTS, 
   SPACE_TYPES, 
-  getDistrict, 
+  SPECIAL_SPACES,
+  BUILDINGS,
+  getDistrict,
   getVIRALPosition,
+  SPACE_POSITIONS,
+  DISTRICT_PATHS,
   PlayerToken,
   GameSpace,
   DistrictHeader 
 } from '@/data/viralBoardConstants.jsx';
 
+// Board dimensions matching prototype
+const BOARD_WIDTH = 1600;
+const BOARD_HEIGHT = 1050;
+
 export default function ViralBoard({ board, players, currentTurnIndex, diceRoll, onSpaceClick }) {
   const [zoom, setZoom] = useState(1);
   const [showAllNumbers, setShowAllNumbers] = useState(false);
+  const [hoveredSpace, setHoveredSpace] = useState(null);
   
   if (!board || !board.length) {
     return (
@@ -24,16 +33,6 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
       </div>
     );
   }
-
-  // Calculate board bounds for proper viewport
-  const allPositions = board.map(s => getVIRALPosition(s.number));
-  const minX = Math.min(...allPositions.map(p => p.x));
-  const maxX = Math.max(...allPositions.map(p => p.x));
-  const minY = Math.min(...allPositions.map(p => p.y));
-  const maxY = Math.max(...allPositions.map(p => p.y));
-  
-  const boardWidth = (maxX - minX + 6) * 32;
-  const boardHeight = (maxY - minY + 4) * 32;
 
   return (
     <div className="w-full overflow-hidden rounded-2xl border-2 border-purple-500/30" 
@@ -92,11 +91,10 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
         <motion.div
           animate={{ scale: zoom }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="relative inline-block"
+          className="relative"
           style={{ 
-            width: boardWidth, 
-            height: boardHeight,
-            transformOrigin: 'top left'
+            width: BOARD_WIDTH, 
+            height: BOARD_HEIGHT,
           }}
         >
           {/* Grid background */}
@@ -104,23 +102,178 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
             className="absolute inset-0 opacity-10"
             style={{
               backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-              backgroundSize: '32px 32px'
+              backgroundSize: '40px 40px'
             }}
           />
+
+          {/* SVG Paths with glow effects */}
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${BOARD_WIDTH} ${BOARD_HEIGHT}`} preserveAspectRatio="none">
+            <defs>
+              <filter id="glow">
+                <feGaussianBlur stdDeviation="4" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+
+            {/* District V path */}
+            <polyline 
+              points="220,150 420,820 610,150" 
+              fill="none" 
+              stroke="#18d45b" 
+              strokeWidth="42" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              opacity=".22"
+            />
+            <polyline 
+              points="220,150 420,820 610,150" 
+              fill="none" 
+              stroke="#18d45b" 
+              strokeWidth="7" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              filter="url(#glow)"
+            />
+
+            {/* District I path */}
+            <line 
+              x1="710" y1="140" 
+              x2="710" y2="820" 
+              stroke="#23aaff" 
+              strokeWidth="42" 
+              strokeLinecap="round" 
+              opacity=".22"
+            />
+            <line 
+              x1="710" y1="140" 
+              x2="710" y2="820" 
+              stroke="#23aaff" 
+              strokeWidth="7" 
+              strokeLinecap="round" 
+              filter="url(#glow)"
+            />
+
+            {/* District R path */}
+            <path 
+              d="M840 820 L840 150 Q1110 135 1120 315 Q1130 500 850 485 L1130 820" 
+              fill="none" 
+              stroke="#ff8a1c" 
+              strokeWidth="42" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              opacity=".22"
+            />
+            <path 
+              d="M840 820 L840 150 Q1110 135 1120 315 Q1130 500 850 485 L1130 820" 
+              fill="none" 
+              stroke="#ff8a1c" 
+              strokeWidth="7" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              filter="url(#glow)"
+            />
+
+            {/* District A path */}
+            <polyline 
+              points="1220,820 1340,150 1460,820" 
+              fill="none" 
+              stroke="#b84cff" 
+              strokeWidth="42" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              opacity=".22"
+            />
+            <polyline 
+              points="1220,820 1340,150 1460,820" 
+              fill="none" 
+              stroke="#b84cff" 
+              strokeWidth="7" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              filter="url(#glow)"
+            />
+            <line 
+              x1="1268" y1="555" 
+              x2="1412" y2="555" 
+              stroke="#b84cff" 
+              strokeWidth="7" 
+              filter="url(#glow)"
+            />
+
+            {/* District L path */}
+            <polyline 
+              points="1510,150 1510,820 1580,820" 
+              fill="none" 
+              stroke="#ffd35a" 
+              strokeWidth="42" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              opacity=".22"
+            />
+            <polyline 
+              points="1510,150 1510,820 1580,820" 
+              fill="none" 
+              stroke="#ffd35a" 
+              strokeWidth="7" 
+              strokeLinecap="round" 
+              strokeLinejoin="round" 
+              filter="url(#glow)"
+            />
+          </svg>
+
+          {/* District labels */}
+          {Object.entries(DISTRICT_PATHS).map(([district, config]) => (
+            <div
+              key={district}
+              className="absolute border-2 rounded-xl px-4 py-3 bg-[#05050e]/84 shadow-lg z-5"
+              style={{
+                left: district === 'V' ? 60 : district === 'I' ? 640 : district === 'R' ? 850 : district === 'A' ? 1210 : 1390,
+                top: 35,
+                borderColor: config.color,
+                color: config.color,
+                boxShadow: `0 0 18px ${config.color}`,
+              }}
+            >
+              <div className="text-xs font-black uppercase tracking-wider">{district} — {DISTRICTS[district].name}</div>
+              <div className="text-[10px] text-white/60 mt-1">Spaces {config.spaceRange[0]}–{config.spaceRange[1]}</div>
+            </div>
+          ))}
+          
+          {/* Building labels */}
+          {BUILDINGS.map((building, idx) => (
+            <div
+              key={idx}
+              className="absolute px-3 py-2.5 rounded-lg z-1"
+              style={{
+                left: building.x,
+                top: building.y,
+                background: 'linear-gradient(180deg, rgba(255,255,255,0.14), rgba(255,255,255,0.03))',
+                border: '1px solid rgba(255,255,255,0.2)',
+                boxShadow: '0 12px 30px rgba(0,0,0,0.4), 0 0 12px rgba(255,255,255,0.08)',
+                minWidth: '120px',
+                textAlign: 'center',
+              }}
+            >
+              <div className="text-[10px] font-black uppercase text-white">{building.name}</div>
+              <div className="text-[8px] text-white/60 mt-1.5">{building.desc}</div>
+            </div>
+          ))}
           
           {/* Render all spaces */}
           {board.map(space => {
-            const pos = getVIRALPosition(space.number);
-            const x = (pos.x - minX + 1) * 32;
-            const y = (pos.y - minY + 1) * 32;
+            const pos = SPACE_POSITIONS[space.number];
+            if (!pos) return null;
             
             return (
               <div
                 key={space.number}
                 className="absolute"
                 style={{
-                  left: x,
-                  top: y,
+                  left: pos.x,
+                  top: pos.y,
                   transform: 'translate(-50%, -50%)',
                 }}
               >
@@ -130,37 +283,11 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
                   currentTurnIndex={currentTurnIndex}
                   onSpaceClick={onSpaceClick}
                   showNumber={showAllNumbers || space.number % 20 === 0 || space.type === 'CREATOR_MANSION'}
+                  districtColor={DISTRICT_PATHS[pos.district]?.color}
                 />
               </div>
             );
           })}
-          
-          {/* Connection lines between spaces */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-20">
-            {board.slice(0, -1).map((space, idx) => {
-              const pos1 = getVIRALPosition(space.number);
-              const pos2 = getVIRALPosition(space.number + 1);
-              const x1 = (pos1.x - minX + 1) * 32;
-              const y1 = (pos1.y - minY + 1) * 32;
-              const x2 = (pos2.x - minX + 1) * 32;
-              const y2 = (pos2.y - minY + 1) * 32;
-              
-              const district = getDistrict(space.number);
-              
-              return (
-                <line
-                  key={`line-${space.number}`}
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke={DISTRICTS[district]?.color || '#fff'}
-                  strokeWidth="2"
-                  strokeDasharray="4 4"
-                />
-              );
-            })}
-          </svg>
         </motion.div>
       </div>
 

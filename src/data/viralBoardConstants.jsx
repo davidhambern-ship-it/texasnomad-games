@@ -1,232 +1,345 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
-// District configurations from master spec
+// District configurations matching prototype
 export const DISTRICTS = {
-  V: { name: 'Neighborhood', spaces: '1-20', color: '#10b981', theme: 'The Beginning', description: 'Community streets, coffee shops, creator supply stores' },
-  I: { name: 'Highway', spaces: '21-40', color: '#3b82f6', theme: 'The Grind', description: 'Billboards, data centers, distribution hubs' },
-  R: { name: 'Shopping', spaces: '41-80', color: '#f97316', theme: 'Creator Investment', description: 'Malls, tech stores, equipment upgrades' },
-  A: { name: 'Business', spaces: '81-100', color: '#a855f7', theme: 'Monetization', description: 'Sponsor towers, talent agencies, podcast studios' },
-  L: { name: 'Downtown', spaces: '101-120', color: '#eab308', theme: 'Creator Legend', description: 'TV studios, award theater, creator boulevard' },
+  V: { name: 'Neighborhood', spaces: '1-20', color: '#18d45b', theme: 'The Beginning', purpose: 'First supporters, early content' },
+  I: { name: 'Highway', spaces: '21-40', color: '#23aaff', theme: 'Consistency', purpose: 'Discipline, skill building' },
+  R: { name: 'Shopping', spaces: '41-80', color: '#ff8a1c', theme: 'Investment', purpose: 'Equipment, upgrades' },
+  A: { name: 'Business', spaces: '81-100', color: '#b84cff', theme: 'Monetization', purpose: 'Sponsorships, deals' },
+  L: { name: 'Downtown', spaces: '101-120', color: '#ffd35a', theme: 'Endgame', purpose: 'Major fame, Creator Mansion' },
 };
 
-// Space type configurations
+// Space types with icons
 export const SPACE_TYPES = {
-  Follower: { icon: '👥', color: '#06b6d4', label: 'FOLLOW' },
-  Sponsorship: { icon: '🤝', color: '#a855f7', label: 'SPON' },
-  Equipment: { icon: '📷', color: '#10b981', label: 'EQUIP' },
-  Viral: { icon: '🔥', color: '#f97316', label: 'VIRAL' },
-  Challenge: { icon: '⚔️', color: '#ef4444', label: 'CHAL' },
-  Collaboration: { icon: '✨', color: '#ec4899', label: 'COLLAB' },
-  Drama: { icon: '💥', color: '#7c3aed', label: 'DRAMA' },
-  Pay: { icon: '💰', color: '#eab308', label: 'PAY' },
-  Play: { icon: '🎮', color: '#3b82f6', label: 'PLAY' },
-  Event: { icon: '🎪', color: '#f43f5e', label: 'EVENT' },
-  SAFE: { icon: '🛡️', color: '#22c55e', label: 'SAFE' },
-  CREATOR_MANSION: { icon: '🏆', color: '#fbbf24', label: 'MANSION' },
+  Followers: { icon: '👥', color: '#18d45b', label: 'Followers' },
+  Challenge: { icon: '⚡', color: '#ff4a3d', label: 'Challenge' },
+  Equipment: { icon: '🎥', color: '#23aaff', label: 'Equipment' },
+  Drama: { icon: '🔥', color: '#ff8a1c', label: 'Drama' },
+  Collab: { icon: '🤝', color: '#b84cff', label: 'Collab' },
+  Sponsorship: { icon: '💼', color: '#ffd35a', label: 'Sponsorship' },
+  Pay: { icon: '💰', color: '#18d45b', label: 'Pay' },
+  Play: { icon: '🎲', color: '#23aaff', label: 'Play' },
+  Viral: { icon: '🚀', color: '#ff8a1c', label: 'Viral' },
+  Event: { icon: '🎤', color: '#b84cff', label: 'Event' },
 };
 
-// Get district for space number
-export const getDistrict = (spaceNumber) => {
+// Special space names
+export const SPECIAL_SPACES = {
+  1: 'START',
+  10: "Creator's Corner",
+  20: 'Exit to Highway',
+  21: 'Merge Lane',
+  30: 'Keep Grinding',
+  40: 'Checkpoint',
+  41: 'Mall Entrance',
+  50: 'Equipment Shop',
+  60: 'Creator Upgrade',
+  70: 'Brand Fit Check',
+  80: 'Exit to Business',
+  81: 'Brand HQ',
+  90: 'VIP Bridge',
+  100: 'Exit to Downtown',
+  101: 'Fame Run',
+  110: 'Victory Lap',
+  115: 'Final Climb',
+  120: 'Creator Mansion',
+};
+
+// Building labels with positions
+export const BUILDINGS = [
+  { name: 'Community Center', x: 80, y: 270, desc: 'First supporters' },
+  { name: 'Coffee Shop', x: 520, y: 735, desc: 'Create and connect' },
+  { name: 'Creator Supply', x: 510, y: 230, desc: 'Early gear' },
+  { name: 'Billboard Row', x: 570, y: 390, desc: 'Stay visible' },
+  { name: 'Data Center', x: 765, y: 320, desc: 'Track growth' },
+  { name: 'Distribution', x: 770, y: 705, desc: 'Share daily' },
+  { name: 'Gaming Store', x: 930, y: 235, desc: 'Creator tools' },
+  { name: 'Tech Hub', x: 1065, y: 520, desc: 'Upgrade setup' },
+  { name: 'Sneaker Spot', x: 970, y: 720, desc: 'Style matters' },
+  { name: 'Sponsor Towers', x: 1240, y: 295, desc: 'Monetize' },
+  { name: 'Talent Agency', x: 1360, y: 385, desc: 'Get discovered' },
+  { name: 'Podcast Studios', x: 1240, y: 645, desc: 'Build voice' },
+  { name: 'TV Studios', x: 1395, y: 235, desc: 'Go bigger' },
+  { name: 'Award Theater', x: 1370, y: 700, desc: 'Recognition' },
+  { name: 'Creator Mansion', x: 1435, y: 855, desc: 'Space 120' },
+];
+
+// Player token colors
+export const PLAYER_COLORS = ['#ff3df2', '#23aaff', '#ff8a1c', '#b84cff', '#ffd35a', '#18d45b', '#ff4a3d', '#ffffff', '#00ffd5', '#ff7ad9', '#7cff00', '#9ca3ff'];
+
+// Path definitions matching the prototype SVG
+export const DISTRICT_PATHS = {
+  V: {
+    points: [[220, 150], [420, 820], [610, 150]],
+    color: '#18d45b',
+    spaceRange: [1, 20],
+  },
+  I: {
+    points: [[710, 140], [710, 820]],
+    color: '#23aaff',
+    spaceRange: [21, 40],
+  },
+  R: {
+    points: [[840, 820], [840, 150], [1000, 145], [1120, 255], [1090, 420], [850, 485], [1130, 820]],
+    color: '#ff8a1c',
+    spaceRange: [41, 80],
+  },
+  A: {
+    points: [[1220, 820], [1340, 150], [1460, 820]],
+    color: '#b84cff',
+    spaceRange: [81, 100],
+  },
+  L: {
+    points: [[1510, 150], [1510, 820], [1580, 820]],
+    color: '#ffd35a',
+    spaceRange: [101, 120],
+  },
+};
+
+// Linear interpolation helper
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+// Calculate points along a path
+function getPointsAlongPath(pathPoints, totalSpaces, startNum) {
+  const spaces = [];
+  const segmentLengths = [];
+  let totalLength = 0;
+
+  for (let i = 0; i < pathPoints.length - 1; i++) {
+    const dx = pathPoints[i + 1][0] - pathPoints[i][0];
+    const dy = pathPoints[i + 1][1] - pathPoints[i][1];
+    const len = Math.hypot(dx, dy);
+    segmentLengths.push(len);
+    totalLength += len;
+  }
+
+  for (let n = 0; n < totalSpaces; n++) {
+    const dist = (n / (totalSpaces - 1)) * totalLength;
+    let acc = 0;
+    let x = pathPoints[0][0], y = pathPoints[0][1];
+
+    for (let s = 0; s < segmentLengths.length; s++) {
+      if (acc + segmentLengths[s] >= dist) {
+        const local = (dist - acc) / segmentLengths[s];
+        x = lerp(pathPoints[s][0], pathPoints[s + 1][0], local);
+        y = lerp(pathPoints[s][1], pathPoints[s + 1][1], local);
+        break;
+      }
+      acc += segmentLengths[s];
+    }
+
+    spaces.push({ num: startNum + n, x, y });
+  }
+
+  return spaces;
+}
+
+// Pre-calculate all space positions
+export const SPACE_POSITIONS = {};
+Object.entries(DISTRICT_PATHS).forEach(([district, config]) => {
+  const spaceCount = config.spaceRange[1] - config.spaceRange[0] + 1;
+  const spacePositions = getPointsAlongPath(config.points, spaceCount, config.spaceRange[0]);
+  
+  spacePositions.forEach(space => {
+    SPACE_POSITIONS[space.num] = {
+      x: space.x,
+      y: space.y,
+      district,
+    };
+  });
+});
+
+// Get position for a space number
+export function getVIRALPosition(spaceNumber) {
+  const pos = SPACE_POSITIONS[spaceNumber];
+  if (pos) return { x: pos.x, y: pos.y };
+  return { x: 220, y: 150 };
+}
+
+// Get district for a space number
+export function getDistrict(spaceNumber) {
   if (spaceNumber >= 1 && spaceNumber <= 20) return 'V';
   if (spaceNumber >= 21 && spaceNumber <= 40) return 'I';
   if (spaceNumber >= 41 && spaceNumber <= 80) return 'R';
   if (spaceNumber >= 81 && spaceNumber <= 100) return 'A';
   if (spaceNumber >= 101 && spaceNumber <= 120) return 'L';
-  return null;
-};
+  return 'V';
+}
 
-// Calculate grid position to spell VIRAL
-export const getVIRALPosition = (spaceNumber) => {
-  const district = getDistrict(spaceNumber);
-  if (!district) return { x: 0, y: 0 };
+// Get space type cycle
+export function getSpaceType(index) {
+  const typeCycle = ['Followers', 'Challenge', 'Equipment', 'Drama', 'Collab', 'Sponsorship', 'Pay', 'Play', 'Viral', 'Event'];
+  return typeCycle[index % typeCycle.length];
+}
 
-  const districtInDistrict = spaceNumber % 20 === 0 ? 20 : spaceNumber % 20;
-  const letterSpacing = 18;
-  const baseX = { V: 0, I: 1, R: 2, A: 3, L: 4 };
-  
-  const letterShapes = {
-    V: () => {
-      if (districtInDistrict <= 10) {
-        return { x: baseX.V * letterSpacing + (10 - districtInDistrict) * 0.8, y: districtInDistrict * 1.2 };
-      } else {
-        const pos = districtInDistrict - 10;
-        return { x: baseX.V * letterSpacing + pos * 0.8, y: (20 - districtInDistrict) * 1.2 + 12 };
-      }
-    },
-    I: () => {
-      return { x: baseX.I * letterSpacing + 2, y: districtInDistrict * 1.2 };
-    },
-    R: () => {
-      if (districtInDistrict <= 12) {
-        return { x: baseX.R * letterSpacing, y: districtInDistrict * 1.2 };
-      } else if (districtInDistrict <= 20) {
-        const loopPos = districtInDistrict - 12;
-        return { x: baseX.R * letterSpacing + 1 + loopPos * 0.6, y: 2 + loopPos * 0.8 };
-      } else if (districtInDistrict <= 28) {
-        const backPos = districtInDistrict - 20;
-        return { x: baseX.R * letterSpacing + 5 - backPos * 0.4, y: 10 - backPos * 0.6 };
-      } else {
-        const legPos = districtInDistrict - 28;
-        return { x: baseX.R * letterSpacing + 2 + legPos * 0.7, y: 8 + legPos * 1.1 };
-      }
-    },
-    A: () => {
-      if (districtInDistrict <= 8) {
-        return { x: baseX.A * letterSpacing + (8 - districtInDistrict) * 0.7, y: districtInDistrict * 1.3 };
-      } else if (districtInDistrict <= 16) {
-        const rightPos = districtInDistrict - 8;
-        return { x: baseX.A * letterSpacing + 5 + rightPos * 0.7, y: (16 - rightPos) * 1.3 + 10.4 };
-      } else {
-        const barPos = districtInDistrict - 16;
-        return { x: baseX.A * letterSpacing + 2 + barPos * 0.8, y: 7.5 };
-      }
-    },
-    L: () => {
-      if (districtInDistrict <= 12) {
-        return { x: baseX.L * letterSpacing + 2, y: districtInDistrict * 1.3 };
-      } else {
-        const horizPos = districtInDistrict - 12;
-        return { x: baseX.L * letterSpacing + 2 + horizPos * 0.9, y: 15.6 };
-      }
-    },
-  };
-
-  return letterShapes[district]();
-};
-
-// Player token colors
-const TOKEN_COLORS = ['#BC13FE', '#FF5F1F', '#FFD700', '#22d3ee', '#f472b6', '#4ade80', '#fbbf24', '#a78bfa'];
-
-// Player Token component
-export function PlayerToken({ player, isCurrentTurn, offset = { x: 0, y: 0 } }) {
-  const color = TOKEN_COLORS[player.seatNumber % TOKEN_COLORS.length];
-  
+// Player Token Component
+export function PlayerToken({ seatNumber, color, isCurrentTurn, offsetX = 0, offsetY = 0 }) {
   return (
     <motion.div
-      initial={{ scale: 0, opacity: 0 }}
-      animate={{ 
-        scale: 1,
-        boxShadow: isCurrentTurn ? `0 0 20px ${color}, 0 0 40px ${color}` : `0 2px 8px ${color}60`
-      }}
-      transition={{ duration: 0.3 }}
-      className="w-5 h-5 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold z-20 cursor-pointer hover:scale-125 transition-transform"
+      className="absolute w-5 h-5 rounded-full border-2 border-white shadow-lg"
       style={{ 
-        background: `linear-gradient(135deg, ${color}, ${color}cc)`,
-        transform: `translate(${offset.x}px, ${offset.y}px)`,
+        background: color || PLAYER_COLORS[seatNumber % PLAYER_COLORS.length],
+        boxShadow: isCurrentTurn ? '0 0 12px rgba(255,255,255,0.9), 0 0 20px currentColor' : '0 0 8px rgba(255,255,255,0.7)',
+        left: `calc(50% + ${offsetX}px)`,
+        top: `calc(50% + ${offsetY}px)`,
+        transform: 'translate(-50%, -50%)',
       }}
-      title={`${player.name} (Seat ${player.seatNumber})`}
-    >
-      {player.seatNumber}
-    </motion.div>
+      initial={{ scale: 0.8, opacity: 0 }}
+      animate={{ 
+        scale: isCurrentTurn ? [1, 1.15, 1] : 1,
+        opacity: 1,
+      }}
+      transition={{ 
+        duration: isCurrentTurn ? 1 : 0.3,
+        repeat: isCurrentTurn ? Infinity : 0,
+        repeatType: 'reverse',
+      }}
+      title={`Player ${seatNumber}`}
+    />
   );
 }
 
-// Game Space component
+// Game Space Component
 export function GameSpace({ space, players, currentTurnIndex, onSpaceClick, showNumber = true }) {
   const [isHovered, setIsHovered] = useState(false);
-  const spaceType = SPACE_TYPES[space.type] || SPACE_TYPES.Follower;
   const district = getDistrict(space.number);
   const districtConfig = DISTRICTS[district];
-  const playersOnSpace = players.filter(p => p.position === space.number);
+  const spaceType = SPACE_TYPES[space.type] || SPACE_TYPES.Followers;
+  const isSpecial = SPECIAL_SPACES[space.number];
+  const isCreatorMansion = space.number === 120;
   
-  const isCreatorMansion = space.type === 'CREATOR_MANSION';
-  
+  const spacePlayers = players.filter(p => p.position === space.number);
+  const isCurrentSpace = players[currentTurnIndex]?.position === space.number;
+
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.8 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ delay: space.number * 0.005 }}
-      className={`relative flex items-center justify-center rounded-lg border-2 cursor-pointer transition-all duration-200 ${
-        isHovered ? 'scale-110 z-10' : 'scale-100'
-      } ${isCreatorMansion ? 'w-12 h-12' : 'w-8 h-8'}`}
+    <div
+      className="absolute w-[58px] h-[58px] rounded-full flex items-center justify-center border-4 cursor-pointer transition-all duration-150 z-10"
       style={{
-        background: isCreatorMansion 
-          ? `linear-gradient(135deg, #fbbf24, #f59e0b)`
-          : `linear-gradient(135deg, ${spaceType.color}30, ${spaceType.color}15)`,
-        borderColor: isHovered ? spaceType.color : `${spaceType.color}60`,
-        boxShadow: isHovered 
-          ? `0 0 20px ${spaceType.color}, inset 0 0 10px ${spaceType.color}30`
-          : `0 2px 8px ${spaceType.color}20`,
+        left: space.x,
+        top: space.y,
+        transform: 'translate(-50%, -50%)',
+        color: districtConfig.color,
+        background: '#fff',
+        borderColor: districtConfig.color,
+        boxShadow: `0 0 12px ${districtConfig.color}, inset 0 0 0 5px rgba(0,0,0,0.12)`,
+        zIndex: isHovered ? 20 : 10,
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onSpaceClick?.(space)}
     >
-      <span className="text-xs select-none">{isHovered ? spaceType.icon : spaceType.label}</span>
+      <AnimatePresence>
+        {showNumber || isSpecial || isCreatorMansion ? (
+          <motion.span
+            className="font-black text-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            {isSpecial ? SPECIAL_SPACES[space.number] || space.number : space.number}
+          </motion.span>
+        ) : null}
+      </AnimatePresence>
       
-      {showNumber && (
-        <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-slate-900 border border-white/30 flex items-center justify-center text-[5px] font-bold text-white/80">
-          {space.number}
+      {/* Type icon badge */}
+      <div
+        className="absolute -top-2 -right-2 w-[22px] h-[22px] rounded-full flex items-center justify-center text-xs border border-current"
+        style={{
+          background: '#0a0a12',
+          color: districtConfig.color,
+        }}
+      >
+        {spaceType.icon}
+      </div>
+      
+      {/* Current player indicator */}
+      {isCurrentSpace && (
+        <motion.div
+          className="absolute inset-0 rounded-full"
+          style={{
+            boxShadow: `0 0 32px ${districtConfig.color}, 0 0 52px ${districtConfig.color}`,
+          }}
+          animate={{ opacity: [0.6, 1, 0.6] }}
+          transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse' }}
+        />
+      )}
+      
+      {/* Player tokens */}
+      {spacePlayers.length > 0 && (
+        <div className="absolute inset-0 pointer-events-none">
+          {spacePlayers.map((player, idx) => (
+            <PlayerToken
+              key={player.seatNumber}
+              seatNumber={player.seatNumber}
+              color={player.color}
+              isCurrentTurn={players[currentTurnIndex]?.seatNumber === player.seatNumber}
+              offsetX={(idx % 3) * 16 - 16}
+              offsetY={Math.floor(idx / 3) * 16 - 8}
+            />
+          ))}
         </div>
       )}
       
-      <div 
-        className="absolute -bottom-1 w-6 h-1 rounded-full opacity-60"
-        style={{ background: districtConfig?.color }}
-      />
-      
-      {playersOnSpace.map((player, idx) => {
-        const offset = playersOnSpace.length > 1 
-          ? { x: (idx - (playersOnSpace.length - 1) / 2) * 8, y: idx % 2 === 0 ? -4 : 4 }
-          : { x: 0, y: 0 };
-        
-        return (
-          <div key={player.seatNumber} className="absolute" style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}>
-            <PlayerToken player={player} isCurrentTurn={player.seatNumber === players[currentTurnIndex]?.seatNumber} />
-          </div>
-        );
-      })}
-      
+      {/* Hover tooltip */}
       <AnimatePresence>
         {isHovered && (
           <motion.div
+            className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 px-4 py-3 rounded-xl shadow-2xl z-50 min-w-[200px]"
+            style={{
+              background: 'rgba(5,5,14,0.95)',
+              border: `2px solid ${districtConfig.color}`,
+              boxShadow: `0 0 20px ${districtConfig.color}60`,
+            }}
             initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
-            className="absolute bottom-full mb-2 px-3 py-2 bg-slate-900 border border-white/20 rounded-lg shadow-xl z-30 min-w-[150px] pointer-events-none"
           >
-            <div className="text-[9px] font-bold text-white mb-1">{spaceType.icon} {space.type}</div>
-            <div className="text-[6px] text-white/70">Space {space.number}</div>
-            <div className="text-[6px] text-white/50 mt-0.5">{districtConfig?.name} District</div>
-            {space.effect?.description && (
-              <div className="text-[5px] text-white/60 mt-1 italic">{space.effect.description}</div>
-            )}
-            {playersOnSpace.length > 0 && (
-              <div className="text-[5px] text-white/80 mt-1 pt-1 border-t border-white/10">
-                {playersOnSpace.map(p => p.name).join(', ')}
+            <div className="text-sm font-bold" style={{ color: districtConfig.color }}>
+              {isSpecial ? SPECIAL_SPACES[space.number] : spaceType.label}
+            </div>
+            <div className="text-xs text-white/80 mt-1">Space {space.number}</div>
+            <div className="text-xs text-white/60 mt-1">{districtConfig.name} District</div>
+            {spacePlayers.length > 0 && (
+              <div className="text-xs text-white/60 mt-2 pt-2 border-t border-white/20">
+                {spacePlayers.length} player{spacePlayers.length > 1 ? 's' : ''} here
               </div>
             )}
           </motion.div>
         )}
       </AnimatePresence>
-    </motion.div>
+    </div>
   );
 }
 
-// District Header component
+// District Header Component
 export function DistrictHeader({ district, isActive }) {
   const config = DISTRICTS[district];
+  
   return (
     <motion.div
-      animate={{ 
-        scale: isActive ? 1.05 : 1,
-        boxShadow: isActive ? `0 0 30px ${config.color}60` : 'none'
-      }}
-      className="flex items-center gap-3 px-4 py-3 rounded-xl border-2"
+      className="px-4 py-3 rounded-xl border-2 text-center"
       style={{
-        background: `linear-gradient(135deg, ${config.color}20, ${config.color}10)`,
-        borderColor: `${config.color}60`,
+        background: isActive ? `${config.color}20` : 'rgba(255,255,255,0.05)',
+        borderColor: config.color,
+        boxShadow: isActive ? `0 0 18px ${config.color}` : 'none',
       }}
+      animate={{
+        scale: isActive ? 1.05 : 1,
+      }}
+      transition={{ duration: 0.2 }}
     >
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold text-white" style={{ background: config.color }}>
+      <div className="text-lg font-black uppercase" style={{ color: config.color }}>
         {district}
       </div>
-      <div>
-        <div className="text-sm font-bold text-white">{config.name} District</div>
-        <div className="text-[9px] text-white/60 uppercase">{config.theme} • Spaces {config.spaces}</div>
-        <div className="text-[8px] text-white/40 mt-0.5">{config.description}</div>
-      </div>
+      <div className="text-[10px] text-white/60 mt-1">{config.name}</div>
+      {isActive && (
+        <div className="text-[8px] text-white/80 mt-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          ACTIVE
+        </div>
+      )}
     </motion.div>
   );
 }
