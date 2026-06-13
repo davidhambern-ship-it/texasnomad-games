@@ -88,7 +88,7 @@ export default function SpadesHandSeat({
   const hasBid = bid != null;
 
   const isHorizontal = position === 'top' || position === 'bottom';
-  const backCount = cardCount > 0 ? Math.min(cardCount, 13) : (player?.hand?.length ?? 0);
+  const backCount = cardCount ?? player?.hand?.length ?? 0;
 
   const glowStyle = isMyTurn
     ? { boxShadow: '0 0 20px rgba(255,215,0,0.5), 0 0 40px rgba(255,215,0,0.2)', borderColor: '#FFD700' }
