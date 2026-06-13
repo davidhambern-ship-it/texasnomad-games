@@ -322,7 +322,7 @@ const GAMES = [
     description: 'Uncover the most popular survey answers. Buzz in, build your Round Bank, and pray nobody steals it from you.',
     tags: ['Groups', 'Family', 'Community'],
     path: '/games/bff',
-    featured: true,
+    featured: false,
   },
   {
     id: 'hangman',
