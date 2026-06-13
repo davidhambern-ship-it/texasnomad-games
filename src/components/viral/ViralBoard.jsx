@@ -34,6 +34,13 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
     );
   }
 
+  // Calculate initial scale to fit board in viewport
+  const containerWidth = typeof window !== 'undefined' ? window.innerWidth * 0.65 : 1000;
+  const containerHeight = typeof window !== 'undefined' ? window.innerHeight * 0.55 : 600;
+  const scaleX = containerWidth / BOARD_WIDTH;
+  const scaleY = containerHeight / BOARD_HEIGHT;
+  const initialScale = Math.min(scaleX, scaleY, 1);
+
   return (
     <div className="w-full overflow-hidden rounded-2xl border-2 border-purple-500/30" 
       style={{ 
@@ -87,14 +94,15 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
       </div>
 
       {/* Board viewport */}
-      <div className="relative overflow-auto p-8" style={{ maxHeight: '65vh' }}>
+      <div className="relative overflow-auto p-8 flex items-center justify-center" style={{ maxHeight: '65vh' }}>
         <motion.div
-          animate={{ scale: zoom }}
+          animate={{ scale: zoom * initialScale }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
           className="relative"
           style={{ 
             width: BOARD_WIDTH, 
             height: BOARD_HEIGHT,
+            transformOrigin: 'top left',
           }}
         >
           {/* Grid background */}
