@@ -282,6 +282,20 @@ function ComingSoonCabinet({ title, emoji, color = '#4a4a6a' }) {
 // ── Main Games Page ──────────────────────────────────────────────────────────
 const GAMES = [
   {
+    id: 'word-search',
+    title: 'Word Search',
+    tagline: 'Hunt Every Letter',
+    image: null,
+    color: '#00c875',
+    color2: '#00a860',
+    marqueeText: 'FIND THE WORD • DRAG TO SELECT • SCORE POINTS • BEAT THE CLOCK',
+    screenText: '🔍 FIND THE WORDS',
+    description: 'Race against the clock to find hidden words in a grid. Drag to select letters, score points for direction and length. Beat your opponents!',
+    tags: ['1-4 Players', 'Word Game', 'Casual'],
+    path: '/games/word-search',
+    featured: false,
+  },
+  {
     id: 'square-biz',
     title: 'Square Biz!',
     tagline: 'Trivia Powered Strategy',
@@ -345,12 +359,12 @@ const COMING_SOON = [
 ];
 
 // Map game ID to gameKey used in character system
-const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades' };
+const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch' };
 
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }

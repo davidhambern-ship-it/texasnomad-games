@@ -11,7 +11,9 @@
       "enum": [
         "bff",
         "square-biz",
-        "hangman"
+        "hangman",
+        "spades",
+        "word-search"
       ],
       "description": "Which game this room is for"
     },
