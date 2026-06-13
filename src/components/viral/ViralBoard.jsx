@@ -1,15 +1,13 @@
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
   DISTRICTS, 
   SPACE_TYPES, 
   SPECIAL_SPACES,
   BUILDINGS,
   getDistrict,
-  getVIRALPosition,
   SPACE_POSITIONS,
   DISTRICT_PATHS,
-  PlayerToken,
   GameSpace,
   DistrictHeader 
 } from '@/data/viralBoardConstants.jsx';
@@ -21,7 +19,6 @@ const BOARD_HEIGHT = 1050;
 export default function ViralBoard({ board, players, currentTurnIndex, diceRoll, onSpaceClick }) {
   const [zoom, setZoom] = useState(1);
   const [showAllNumbers, setShowAllNumbers] = useState(false);
-  const [hoveredSpace, setHoveredSpace] = useState(null);
   
   if (!board || !board.length) {
     return (
@@ -34,7 +31,7 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
     );
   }
 
-  // Calculate initial scale to fit board in viewport
+  // Base scale to fit board in viewport (55% of screen)
   const baseScale = Math.min(0.55, zoom);
 
   return (
@@ -60,7 +57,7 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
           >
             🔍 −
           </button>
-          <span className="text-xs text-white/60 w-12 text-center">{Math.round(zoom * 100)}%</span>
+          <span className="text-xs text-white/60 w-12 text-center">{Math.round(baseScale * 100)}%</span>
           <button
             onClick={() => setZoom(z => Math.min(2, z + 0.1))}
             className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs transition-all"
@@ -286,7 +283,6 @@ export default function ViralBoard({ board, players, currentTurnIndex, diceRoll,
                   currentTurnIndex={currentTurnIndex}
                   onSpaceClick={onSpaceClick}
                   showNumber={showAllNumbers || space.number % 20 === 0 || space.type === 'CREATOR_MANSION'}
-                  districtColor={DISTRICT_PATHS[pos.district]?.color}
                 />
               </div>
             );
