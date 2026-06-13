@@ -6,6 +6,7 @@ import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
+import { WORD_POOL, CATEGORY_MAP } from '@/data/wordSearchPool';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -29,24 +30,21 @@ const DIRS = [
 
 const PLAYER_COLORS = ['#BC13FE', '#FF5F1F', '#FFD700', '#22d3ee'];
 
-const WORD_BANKS = {
-  general:    ['NOMAD','RIVER','CLOUD','BRIDGE','MARKET','CASTLE','PLANET','THUNDER','LANTERN','FREEDOM','JOURNEY','MYSTERY','BALANCE','VICTORY','KINGDOM','COURAGE','HORIZON','TREASURE','MOUNTAIN','CREATIVE','STRATEGY','DISCOVERY','ADVENTURE','CHALLENGE','IMAGINATION'],
-  food:       ['TACO','PIZZA','BURGER','WAFFLE','GUMBO','NOODLES','POPCORN','BRISKET','LASAGNA','JAMBALAYA','SMOOTHIE','CUPCAKE','BISCUIT','BARBECUE','SPAGHETTI','QUESADILLA','ENCHILADA','CHEESECAKE','HONEYBUTTER','STRAWBERRY','PEPPERMINT','WATERMELON','CHOCOLATE','GUACAMOLE','CINNAMONROLL'],
-  gaming:     ['DICE','LEVEL','QUEST','ARCADE','PLAYER','BOSS','LOOT','COMBO','PUZZLE','AVATAR','RESPAWN','POWERUP','JOYSTICK','CHECKPOINT','CONTROLLER','SPEEDRUN','MULTIPLAYER','LEADERBOARD','ACHIEVEMENT','STRATEGY','BATTLEPASS','MINIGAME','COOLDOWN','CRITICAL','VICTORY'],
-  music:      ['BEAT','HOOK','VERSE','CHORUS','MELODY','RHYTHM','STUDIO','MIXTAPE','SINGER','RAPPER','SYNTH','DRUMS','BASSLINE','HARMONY','FREESTYLE','PLAYLIST','MICROPHONE','SOUNDBOARD','HEADPHONES','SPOTLIGHT','AUTOTUNE','SAXOPHONE','VIOLIN','KEYBOARD','PRODUCER'],
-  travel:     ['MAP','ROAD','TRAIN','FLIGHT','HOTEL','PASSPORT','JOURNEY','DESERT','ISLAND','AIRPORT','LUGGAGE','CRUISE','BACKPACK','CAMPFIRE','HIGHWAY','POSTCARD','EXPEDITION','LANDMARK','MOUNTAINS','VACATION','ADVENTURE','TOURIST','NAVIGATION','CHECKPOINT','DESTINATION'],
-  spiritual:  ['FAITH','GRACE','PRAYER','PSALM','SPIRIT','WISDOM','MERCY','BLESSING','COVENANT','PROVERBS','GENESIS','EXODUS','KINGDOM','WORSHIP','DELIVERANCE','RIGHTEOUS','DISCIPLE','SABBATH','ANOINTING','TESTIMONY','SCRIPTURE','REDEMPTION','SANCTUARY','FORGIVENESS','RESURRECTION'],
-  online:     ['POST','LIKE','SHARE','STREAM','VIRAL','FOLLOW','COMMENT','HASHTAG','PROFILE','TRENDING','CREATOR','CONTENT','REACTION','MEME','ALGORITHM','BROADCAST','ENGAGEMENT','SUBSCRIBER','LIVESTREAM','INFLUENCER','NOTIFICATION','COMMUNITY','MODERATOR','ANALYTICS','CLIP'],
-  popculture: ['MOVIE','SERIES','FANDOM','CELEBRITY','PREMIERE','REDCARPET','BLOCKBUSTER','SPOILER','CAMEO','REBOOT','TRAILER','SOUNDTRACK','CHARACTER','FRANCHISE','EPISODE','STREAMING','REALITY','CHALLENGE','AWARD','HEADLINE','TRENDING','INTERVIEW','PAPARAZZI','COLLAB','ICON'],
-};
-
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const rand = (a) => a[Math.floor(Math.random() * a.length)];
 const clean = (w) => w.replace(/[^A-Z]/g, '').toUpperCase();
 
 // ── Puzzle generation ─────────────────────────────────────────────────────────
-function getWordList(cat, count) {
-  const src = cat === 'random' ? Object.values(WORD_BANKS).flat() : (WORD_BANKS[cat] || WORD_BANKS.general);
+function getWordList(cat, difficulty, count) {
+  const poolKey = cat === 'random' ? null : CATEGORY_MAP[cat];
+  let src;
+  if (!poolKey) {
+    // Random: pull from all categories at the matching difficulty tier
+    src = Object.values(WORD_POOL).flatMap(cat => cat[difficulty] || []);
+  } else {
+    const pool = WORD_POOL[poolKey] || WORD_POOL.general;
+    src = pool[difficulty] || pool.simpleton;
+  }
   return [...new Set(src.map(clean))].sort(() => Math.random() - 0.5).slice(0, count);
 }
 
@@ -84,7 +82,7 @@ function buildPuzzle(difficulty, category) {
   const cfg = DIFFICULTIES[difficulty];
   const g = emptyGrid(cfg.size);
   const placed = [];
-  getWordList(category, cfg.words)
+  getWordList(category, difficulty, cfg.words)
     .sort((a, b) => b.length - a.length)
     .forEach(w => { const p = placeWord(g, w, cfg.bonus); if (p) placed.push(p); });
   for (let y = 0; y < g.length; y++)
