@@ -51,8 +51,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Uses common letters, word structure, and player behavior.",
         riskLevel: 60,
         strategyLevel: 80
+      },
+      wordSearch: {
+        style: "adaptive_leader",
+        description: "Balanced board search — adapts risk level based on score gap.",
+        riskLevel: 65,
+        strategyLevel: 80
       }
-      // Future games can be added here (e.g., viral, tournament)
     },
     catchphrases: [
       "Let's get to work.",
@@ -124,8 +129,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Uses vowels, common letters, and word-pattern logic.",
         riskLevel: 20,
         strategyLevel: 95
+      },
+      wordSearch: {
+        style: "logical_scanner",
+        description: "Patient path-walker — prefers longer words and avoids mistakes.",
+        riskLevel: 25,
+        strategyLevel: 90
       }
-      // Future games can be added here
     },
     catchphrases: [
       "Interesting.",
@@ -197,8 +207,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Takes bold letter guesses and may attempt full words early.",
         riskLevel: 90,
         strategyLevel: 60
+      },
+      wordSearch: {
+        style: "flashy_hunter",
+        description: "Goes for long, high-value paths fast — often wrong, sometimes spectacular.",
+        riskLevel: 90,
+        strategyLevel: 60
       }
-      // Future games can be added here
     },
     catchphrases: [
       "SEND IT!",
@@ -270,8 +285,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Guesses letters based on instinct, jokes, and random ideas.",
         riskLevel: 75,
         strategyLevel: 45
+      },
+      wordSearch: {
+        style: "chaotic_explorer",
+        description: "Random board walks — misses a lot, occasionally stumbles onto gold.",
+        riskLevel: 70,
+        strategyLevel: 40
       }
-      // Future games can be added here
     },
     catchphrases: [
       "Now listen...",
@@ -343,8 +363,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Guesses common letters and avoids reckless full-word guesses.",
         riskLevel: 30,
         strategyLevel: 80
+      },
+      wordSearch: {
+        style: "steady_searcher",
+        description: "Consistent, safe board scanning — avoids risky long paths.",
+        riskLevel: 30,
+        strategyLevel: 78
       }
-      // Future games can be added here
     },
     catchphrases: [
       "Stay focused.",
@@ -417,8 +442,13 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Methodical letter selection and rarely guesses randomly.",
         riskLevel: 15,
         strategyLevel: 88
+      },
+      wordSearch: {
+        style: "slow_closer",
+        description: "Deliberate, careful scanning — slow but reliable, rarely wastes a guess.",
+        riskLevel: 20,
+        strategyLevel: 85
       }
-      // Future games can be added here
     },
     catchphrases: [
       "Slow down.",
@@ -455,6 +485,6 @@ export function getRandomCharacter() {
 }
 
 export function getCharactersForGame(gameKey) {
-  // gameKey: 'spades' | 'bff' | 'squareBiz' | 'hangman'
+  // gameKey: 'spades' | 'bff' | 'squareBiz' | 'hangman' | 'wordSearch'
   return TEXASNOMAD_CHARACTERS.filter(c => c.gameProfiles?.[gameKey]);
 }

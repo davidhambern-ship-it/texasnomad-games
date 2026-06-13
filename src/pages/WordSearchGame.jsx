@@ -7,6 +7,7 @@ import SeatBadge from '@/components/game/SeatBadge.jsx';
 import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { WORD_POOL, CATEGORY_MAP } from '@/data/wordSearchPool';
+import { runAITurn, validateAISubmission } from '@/lib/wordSearchAI';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -172,29 +173,68 @@ function WordSearchViewer({ roomCode, cpuId }) {
     return () => clearInterval(timerRef.current);
   }, [gs.running, gs.paused, gs.time_end, gs.active]);
 
-  // ── AI turn ───────────────────────────────────────────────────────────────
+  // ── AI turn (fair play — board search only, no answer-list access) ────────
   const aiTimerRef = useRef(null);
+  const aiTurnIdRef = useRef(0); // prevent stale callbacks
   useEffect(() => {
     clearTimeout(aiTimerRef.current);
     if (!gs.running || gs.paused || !isSinglePlayer) return;
     const players = gs.players || [];
     const activePlayer = players[gs.active || 0];
     if (!activePlayer?.isAI) return;
-    const cfg = DIFFICULTIES[gs.difficulty || 'simpleton'];
-    const delay = (cfg.aiMin + Math.random() * (cfg.aiMax - cfg.aiMin)) * 1000;
-    aiTimerRef.current = setTimeout(async () => {
+    const grid = gs.grid || [];
+    if (!grid.length) return;
+
+    const turnId = ++aiTurnIdRef.current;
+    const charId = activePlayer.characterId || cpuId || gs.cpu_opponent_id || 'carlos';
+
+    runAITurn(grid, charId).then(async (result) => {
+      if (turnId !== aiTurnIdRef.current) return; // stale turn
       if (!gs.running || gs.paused) return;
-      const words = gs.words || [];
-      const unfound = words.find(w => !w.found);
-      if (!unfound) { await handleEnd('All words found.'); return; }
-      if (Math.random() < cfg.aiChance) {
-        await handleAIFoundWord(unfound, activePlayer);
-      } else {
-        await handleAIPenalty(activePlayer);
+
+      const currentPlayers = gs.players || [];
+      const activeIdx = gs.active || 0;
+      const active = currentPlayers[activeIdx];
+      if (!active?.isAI) return;
+
+      if (result.type === 'timeout') {
+        // Time expired penalty
+        const newScore = (active.score || 0) - 10;
+        const updatedPlayers = currentPlayers.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
+        const nextActive = (activeIdx + 1) % Math.max(currentPlayers.length, 1);
+        await updateState({ players: updatedPlayers, active: nextActive, time_end: Date.now() + 60000 });
+        return;
       }
-    }, delay);
-    return () => clearTimeout(aiTimerRef.current);
-  }, [gs.running, gs.paused, gs.active, gs.words, isSinglePlayer]);
+
+      // Validate against answer list (same as human validation)
+      const currentWords = gs.words || [];
+      const matched = validateAISubmission(result.word, result.cells, currentWords);
+
+      if (matched) {
+        // Correct — word found
+        const newScore = (active.score || 0) + matched.points;
+        const updatedWords = currentWords.map(w => w.word === matched.word ? { ...w, found: true, foundBy: active.seatNumber } : w);
+        const updatedPlayers = currentPlayers.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
+        const allFound = updatedWords.every(w => w.found);
+        if (allFound) {
+          const winner = [...updatedPlayers].sort((a, b) => b.score - a.score)[0];
+          await updateState({ words: updatedWords, players: updatedPlayers, running: false, message: `All words found! Winner: ${winner?.name} with ${winner?.score} pts.`, last_action: { word: matched.word, result: 'correct', seatNumber: active.seatNumber, timestamp: Date.now() } });
+          return;
+        }
+        const mode = gs.mode || 'single';
+        const nextActive = mode === 'single' ? activeIdx : (activeIdx + 1) % Math.max(currentPlayers.length, 1);
+        await updateState({ words: updatedWords, players: updatedPlayers, active: nextActive, time_end: Date.now() + (mode === 'single' ? 300000 : 60000), last_action: { word: matched.word, result: 'correct', seatNumber: active.seatNumber, timestamp: Date.now() } });
+      } else {
+        // Wrong guess penalty
+        const newScore = (active.score || 0) - 20;
+        const updatedPlayers = currentPlayers.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
+        const nextActive = (activeIdx + 1) % Math.max(currentPlayers.length, 1);
+        await updateState({ players: updatedPlayers, active: nextActive, time_end: Date.now() + 60000, last_action: { word: result.word, result: 'wrong', seatNumber: active.seatNumber, timestamp: Date.now() } });
+      }
+    });
+
+    return () => { aiTurnIdRef.current++; }; // invalidate on cleanup
+  }, [gs.running, gs.paused, gs.active, gs.grid, isSinglePlayer]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   const handleTimeExpired = useCallback(async () => {
@@ -218,33 +258,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
     }
   }, [gs, updateState]);
 
-  const handleAIFoundWord = async (word, aiPlayer) => {
-    const players = gs.players || [];
-    const activeIdx = gs.active || 0;
-    const newScore = (aiPlayer.score || 0) + word.points;
-    const updatedWords = (gs.words || []).map(w => w.word === word.word ? { ...w, found: true, foundBy: aiPlayer.seatNumber } : w);
-    const updatedPlayers = players.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
-    const allFound = updatedWords.every(w => w.found);
-    if (allFound) {
-      const winner = [...updatedPlayers].sort((a, b) => b.score - a.score)[0];
-      await updateState({ words: updatedWords, players: updatedPlayers, running: false, message: `All words found! Winner: ${winner?.name} with ${winner?.score} pts.` });
-      return;
-    }
-    const mode = gs.mode || 'single';
-    const nextActive = mode === 'single' ? activeIdx : (activeIdx + 1) % Math.max(players.length, 1);
-    const timeEnd = Date.now() + (mode === 'single' ? 300000 : 60000);
-    await updateState({ words: updatedWords, players: updatedPlayers, active: nextActive, time_end: timeEnd, last_action: { word: word.word, result: 'correct', seatNumber: aiPlayer.seatNumber, timestamp: Date.now() } });
-  };
 
-  const handleAIPenalty = async (aiPlayer) => {
-    const players = gs.players || [];
-    const activeIdx = gs.active || 0;
-    const newScore = (aiPlayer.score || 0) - 20;
-    const updatedPlayers = players.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
-    const nextActive = (activeIdx + 1) % Math.max(players.length, 1);
-    const timeEnd = Date.now() + 60000;
-    await updateState({ players: updatedPlayers, active: nextActive, time_end: timeEnd });
-  };
 
   const handleEnd = async (msg) => {
     const players = gs.players || [];
@@ -320,7 +334,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
     if (isSinglePlayer) {
       players.push({ seatNumber, name: 'You', isAI: false, score: 0, color: PLAYER_COLORS[0] });
       if (cpuCharacter) {
-        players.push({ seatNumber: 'AI', name: cpuCharacter.name, isAI: true, score: 0, color: PLAYER_COLORS[1] });
+        players.push({ seatNumber: 'AI', name: cpuCharacter.name, isAI: true, characterId: cpuCharacter.id, score: 0, color: PLAYER_COLORS[1] });
       }
     } else if (mode === 'single') {
       players.push({ seatNumber, name: `Seat ${seatNumber}`, isAI: false, score: 0, color: PLAYER_COLORS[0] });

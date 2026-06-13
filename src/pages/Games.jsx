@@ -211,7 +211,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
               color: '#FFD700aa',
             }}
           >
-            🤖 VS CPU — Single Player
+            🤖 {game.id === 'word-search' ? 'VS AI — Single Player' : 'VS CPU — Single Player'}
           </button>
 
           <div className="flex gap-2">
