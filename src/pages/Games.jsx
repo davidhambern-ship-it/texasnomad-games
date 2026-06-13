@@ -332,7 +332,7 @@ const GAMES = [
     color2: '#0ea5e9',
     marqueeText: 'GUESS THE WORD • AVOID THE BYE • ONE LETTER AT A TIME',
     screenText: 'WORD DETECTIVE',
-    description: 'Guess the hidden word before the BYE system completes. Every wrong letter brings you closer to defeat.',
+    description: 'The classic word-guessing game. Pick letters one at a time to uncover the hidden word before you run out of chances.',
     tags: ['Small Groups', 'Casual', 'Audience'],
     path: '/games/hangman',
     featured: false,
