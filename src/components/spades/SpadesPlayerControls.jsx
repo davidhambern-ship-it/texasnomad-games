@@ -100,12 +100,15 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       tricks_played: 0,
       bid1: null, bid2: null,
       books1: 0, books2: 0,
+      round_scored: false,
+      spades_broken: false,
     });
 
     const ANIM_DURATION = dealSequence.length * DEAL_INTERVAL_MS + 600;
     await new Promise(resolve => setTimeout(resolve, ANIM_DURATION));
 
-    const handNumber = currentGs.hand_number || 0;
+    // Read hand_number from the LATEST gs (via ref) after the animation — avoids stale closure
+    const handNumber = gsRef.current.hand_number || 0;
     const isFirstHand = handNumber === 0;
     const finalPlayers = currentPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
