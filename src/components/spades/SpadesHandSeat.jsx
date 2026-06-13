@@ -73,6 +73,8 @@ export default function SpadesHandSeat({
   // layout constraints passed from SpadesTable
   maxWidth,   // px — available horizontal space for bottom/top hands
   maxHeight,  // px — available vertical space for left/right hands
+  infoOnly,   // render only the info strip (no cards)
+  cardsOnly,  // render only the cards (no info strip)
 }) {
   const [hoveredIdx, setHoveredIdx] = useState(null);
   const [previewCard, setPreviewCard] = useState(null);
@@ -282,6 +284,23 @@ export default function SpadesHandSeat({
 
   // ── Bottom (human, face-up) ───────────────────────────────────
   if (position === 'bottom' && isMe) {
+    if (infoOnly) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, justifyContent: 'center', padding: '4px 8px' }}>
+          <InfoStrip />
+          {isMyTurn && (
+            <div className="text-[5px] text-[#FFD700] uppercase tracking-widest animate-pulse" style={PS2}>▶ TAP A CARD</div>
+          )}
+        </div>
+      );
+    }
+    if (cardsOnly) {
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '6px 8px', width: '100%' }}>
+          <MyCards />
+        </div>
+      );
+    }
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, width: '100%', ...borderStyle, padding: '6px 8px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', justifyContent: 'center' }}>

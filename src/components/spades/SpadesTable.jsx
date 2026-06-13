@@ -308,11 +308,76 @@ export default function SpadesTable({
           )}
         </div>
 
-        {/* ── BOTTOM seat ───────────────────────────────────────────── */}
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
-          {renderHandSeat(seatAtPos('bottom'))}
-        </div>
+        {/* ── BOTTOM seat (opponent back-cards only when not me) ─────── */}
+        {!isPlayer && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
+            {renderHandSeat(seatAtPos('bottom'))}
+          </div>
+        )}
+        {isPlayer && (
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
+            {/* Show info strip only — cards rendered below the table */}
+            {(() => {
+              const seatNum = seatAtPos('bottom');
+              const player = getPlayerAtSeat(seatNum);
+              const isMe = mySeatNumber === seatNum;
+              if (!player) return null;
+              return (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <SpadesHandSeat
+                    key={`bottom-info-${seatNum}`}
+                    position="bottom"
+                    player={player}
+                    seatNumber={seatNum}
+                    isMe={isMe}
+                    isMyTurn={gs.current_turn_seat === seatNum && (isPlaying || isBidding)}
+                    isBidding={isBidding}
+                    cardCount={isMe ? myHand.length : (player?.hand?.length ?? 0)}
+                    hand={null}
+                    onPlayCard={null}
+                    isJoinable={false}
+                    onSit={null}
+                    onTakeOver={null}
+                    gs={gs}
+                    maxWidth={myHandBudgetW}
+                    infoOnly={true}
+                  />
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
+
+      {/* ── My cards rendered OUTSIDE table to avoid overflow:hidden clipping ── */}
+      {isPlayer && (() => {
+        const seatNum = seatAtPos('bottom');
+        const player = getPlayerAtSeat(seatNum);
+        const isMe = mySeatNumber === seatNum;
+        if (!isMe || !player) return null;
+        return (
+          <div className="w-full flex justify-center" style={{ marginTop: -8 }}>
+            <SpadesHandSeat
+              key={`bottom-cards-${seatNum}`}
+              position="bottom"
+              player={player}
+              seatNumber={seatNum}
+              isMe={true}
+              isMyTurn={gs.current_turn_seat === seatNum && (isPlaying || isBidding)}
+              isBidding={isBidding}
+              cardCount={myHand.length}
+              hand={myHand}
+              onPlayCard={handlePlayCardOptimistic}
+              isJoinable={false}
+              onSit={null}
+              onTakeOver={null}
+              gs={gs}
+              maxWidth={myHandBudgetW}
+              cardsOnly={true}
+            />
+          </div>
+        );
+      })()}
 
       {/* ── Player controls ───────────────────────────────────────── */}
       {isPlayer && myPlayer && mySeatNumber && (
