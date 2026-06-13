@@ -126,6 +126,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
+  const [tick, setTick] = useState(0);
   const notifTimerRef = useRef(null);
   const containerRef = useRef(null);
 
@@ -162,6 +163,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
     clearInterval(timerRef.current);
     if (!gs.running || gs.paused || !gs.time_end) return;
     timerRef.current = setInterval(() => {
+      setTick(t => t + 1); // force re-render every second
       const remaining = Math.max(0, Math.floor((gs.time_end - Date.now()) / 1000));
       if (remaining <= 0) {
         clearInterval(timerRef.current);
@@ -169,7 +171,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
           handleTimeExpired();
         }
       }
-    }, 500);
+    }, 1000);
     return () => clearInterval(timerRef.current);
   }, [gs.running, gs.paused, gs.time_end, gs.active]);
 
