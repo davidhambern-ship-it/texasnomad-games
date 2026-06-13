@@ -83,6 +83,16 @@ export default function SpadesTable({
     prevShuffleTs.current = gs.shuffle_ts;
   }, [gs.shuffle_ts]);
 
+  const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
+  const getPlayerAtSeat = (n) => players.find(p => p.seatNumber === n && (p.role === 'player' || p.role === 'hostPlayer'));
+  const myPlayer = players.find(p => p.playerId === playerId);
+  // Apply optimistic removal so the card disappears immediately on play
+  const rawHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
+  const optimisticHand = optimisticRemovedId
+    ? rawHand.filter(c => c.id !== optimisticRemovedId)
+    : rawHand;
+  const myHand = sortHand(optimisticHand);
+
   // Clear optimistic removal once the server state has caught up
   useEffect(() => {
     if (optimisticRemovedId && myPlayer?.hand && !myPlayer.hand.find(c => c.id === optimisticRemovedId)) {
@@ -95,16 +105,6 @@ export default function SpadesTable({
     setOptimisticRemovedId(card.id);
     onPlayCard?.(card);
   };
-
-  const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
-  const getPlayerAtSeat = (n) => players.find(p => p.seatNumber === n && (p.role === 'player' || p.role === 'hostPlayer'));
-  const myPlayer = players.find(p => p.playerId === playerId);
-  // Apply optimistic removal so the card disappears immediately on play
-  const rawHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
-  const optimisticHand = optimisticRemovedId
-    ? rawHand.filter(c => c.id !== optimisticRemovedId)
-    : rawHand;
-  const myHand = sortHand(optimisticHand);
   const isDealing = dealPhase !== 'idle';
 
   const viewerSeat = isPlayer ? mySeatNumber : null;
