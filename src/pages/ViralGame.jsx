@@ -35,6 +35,7 @@ function ViralGameViewer({ roomCode, cpuId }) {
   const [notification, setNotification] = useState(null);
   const [cardModal, setCardModal] = useState(null); // { card, type, playerId }
   const [diceRoll, setDiceRoll] = useState(null);
+  const [aiOpponent, setAiOpponent] = useState(cpuId || 'dexter');
   const containerRef = useRef(null);
 
   const gs = room?.game_state || {};
@@ -70,8 +71,9 @@ function ViralGameViewer({ roomCode, cpuId }) {
         activeEffects: [],
       });
       
-      if (cpuId) {
-        const aiChar = getAICharacter(cpuId);
+      const selectedAI = aiOpponent || cpuId;
+      if (isSinglePlayer && selectedAI) {
+        const aiChar = getAICharacter(selectedAI);
         players.push({
           seatNumber: 2,
           playerCode: `AI-${aiChar.id}`,
@@ -338,7 +340,7 @@ function ViralGameViewer({ roomCode, cpuId }) {
     );
   }
 
-  const showSetup = !gs.running && !gs.status === 'active' && !gs.winner;
+  const showSetup = !gs.running && gs.status !== 'active' && !gs.winner;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">
@@ -380,7 +382,7 @@ function ViralGameViewer({ roomCode, cpuId }) {
         {/* Left: Player Panels */}
         <aside className="lg:w-80 shrink-0 space-y-3">
           {showSetup ? (
-            <ViralSetupPanel isSinglePlayer={isSinglePlayer} cpuId={cpuId} onStart={handleStartGame} seatNumber={seatNumber} />
+            <ViralSetupPanel isSinglePlayer={isSinglePlayer} cpuId={cpuId} onStart={handleStartGame} seatNumber={seatNumber} aiOpponent={aiOpponent} setAiOpponent={setAiOpponent} />
           ) : gs.winner ? (
             <div className="p-6 rounded-xl text-center" style={{ background: 'linear-gradient(135deg,#0d2b0d,#0a1a1a)', border: '2px solid #4ade80', boxShadow: '0 0 30px rgba(74,222,128,0.3)' }}>
               <div className="text-5xl mb-3">🏆</div>

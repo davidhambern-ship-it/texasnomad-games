@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-export default function ViralSetupPanel({ isSinglePlayer, cpuCharacter, onStart, seatNumber }) {
+export default function ViralSetupPanel({ isSinglePlayer, cpuId, onStart, seatNumber, aiOpponent, setAiOpponent }) {
   const [mode, setMode] = useState(isSinglePlayer ? 'ai' : 'single');
-  const [aiOpponent, setAiOpponent] = useState('dexter');
+  const selectedAI = aiOpponent || 'dexter';
 
   const modeOptions = isSinglePlayer
     ? [{ value: 'ai', label: 'Player vs AI' }]
@@ -15,10 +15,10 @@ export default function ViralSetupPanel({ isSinglePlayer, cpuCharacter, onStart,
       ];
 
   const aiOptions = [
-    { value: 'dexter', label: 'Dexter - The Professor' },
-    { value: 'lemonade', label: 'Lemonade - The Hustler' },
-    { value: 'carlos', label: 'Carlos - The Menace' },
-    { value: 'skie', label: 'Skie - The Ghost' },
+    { value: 'dexter', label: '🎓 Dexter - The Professor' },
+    { value: 'lemonade', label: '🍋 Lemonade - The Hustler' },
+    { value: 'carlos', label: '😈 Carlos - The Menace' },
+    { value: 'skie', label: '👻 Skie - The Ghost' },
   ];
 
   return (
@@ -35,13 +35,9 @@ export default function ViralSetupPanel({ isSinglePlayer, cpuCharacter, onStart,
         <h2 className="text-[9px] tracking-[0.2em] text-[#BC13FE] uppercase" style={PS2}>Game Setup</h2>
       </div>
 
-      {cpuCharacter && (
+      {cpuId && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5">
-          <img src={cpuCharacter.avatar} alt={cpuCharacter.name} className="w-8 h-8 rounded-lg object-cover border border-[#FF5F1F]/30" />
-          <div>
-            <div className="text-[6px] text-[#FF5F1F]/60 uppercase tracking-widest" style={PS2}>vs</div>
-            <div className="font-heading text-sm text-white tracking-widest uppercase">{cpuCharacter.name}</div>
-          </div>
+          <div className="text-[8px] text-[#FF5F1F] uppercase tracking-widest" style={PS2}>VS AI: {aiOpponent || 'dexter'}</div>
         </div>
       )}
 
@@ -59,12 +55,12 @@ export default function ViralSetupPanel({ isSinglePlayer, cpuCharacter, onStart,
         </div>
       )}
 
-      {mode === 'ai' && !cpuCharacter && (
+      {mode === 'ai' && !cpuId && (
         <div className="space-y-1">
           <label className="block text-[7px] tracking-widest text-white/40 uppercase" style={PS2}>AI Opponent</label>
           <select
-            value={aiOpponent}
-            onChange={e => setAiOpponent(e.target.value)}
+            value={selectedAI}
+            onChange={e => setAiOpponent?.(e.target.value)}
             className="w-full px-3 py-2 rounded-lg text-white text-xs font-body focus:outline-none"
             style={{ background: '#07040d', border: '1px solid rgba(188,19,254,0.3)', color: '#fff' }}
           >
@@ -74,7 +70,7 @@ export default function ViralSetupPanel({ isSinglePlayer, cpuCharacter, onStart,
       )}
 
       <button
-        onClick={() => onStart({ mode, aiOpponent })}
+        onClick={() => onStart({ mode, aiOpponent: selectedAI })}
         className="w-full py-3 rounded-xl font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
         style={{
           background: 'linear-gradient(135deg, #BC13FE40, #BC13FE20)',
