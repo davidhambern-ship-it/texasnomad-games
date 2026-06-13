@@ -117,6 +117,36 @@ function HangmanViewer({ roomCode, cpuId }) {
     if (isSeated && playerId) registerPlayer(playerId);
   }, [isSeated, playerId, registerPlayer]);
 
+  // Host panel connected = host_connected is true, and NOT single player mode
+  const hostPanelConnected = !!(room?.host_connected && !isSinglePlayer);
+
+  // Auto-reset board when host panel connects
+  const prevHostConnected = useRef(false);
+  useEffect(() => {
+    if (!room) return;
+    const nowConnected = !!(room.host_connected && !isSinglePlayer);
+    if (nowConnected && !prevHostConnected.current) {
+      // Host just connected — reset board and give host control
+      updateState({
+        phase: 'setup',
+        secret_word: '',
+        category: '',
+        hint: '',
+        hint_revealed: false,
+        word_revealed: false,
+        guessed_letters: [],
+        wrong_letters: [],
+        current_go_round: 1,
+        seats_that_chose: [],
+        last_action: null,
+        winner_seat: null,
+        winner_player_id: null,
+        host_panel_control: true,
+      });
+    }
+    prevHostConnected.current = nowConnected;
+  }, [room?.host_connected, isSinglePlayer]);
+
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);
   const notifTimerRef = useRef(null);
@@ -314,6 +344,7 @@ function HangmanViewer({ roomCode, cpuId }) {
     gs.phase === 'playing' &&
     !gs.word_revealed &&
     !allRevealed &&
+    !hostPanelConnected &&  // host panel takes over letter selection
     (isSinglePlayer ? iAmGuesser1P : (isGoRoundMode ? !alreadyChosen : true));
 
   // Show the setter panel: in 1P only when human is host; in multiplayer when amWordSetter
@@ -661,7 +692,7 @@ function HangmanViewer({ roomCode, cpuId }) {
 
       ) : (!gs.phase || gs.phase === 'setup' || gs.phase === 'word_set') && !gs.secret_word ? (
         /* ── Waiting screen (non-setter or waiting for host) ───────────── */
-        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer && !!gs.single_player} cpuCharacter={cpuCharacter} hostIsHuman={hostIsHuman} />
+        <WaitingScreen isSeated={isSeated} seatNumber={seatNumber} players={players} isSinglePlayer={isSinglePlayer && !!gs.single_player} cpuCharacter={cpuCharacter} hostIsHuman={hostIsHuman} hostPanelConnected={hostPanelConnected} />
 
       ) : (
         /* ── Game Screen ─────────────────────────────────────────────── */
@@ -811,30 +842,36 @@ function HangmanViewer({ roomCode, cpuId }) {
             </div>
           )}
 
-          {/* Alphabet — ALL players can guess */}
+          {/* Alphabet */}
           {gs.phase === 'playing' && !gs.word_revealed && (
             <div className="w-full max-w-lg space-y-3">
-              {isGoRoundMode && alreadyChosen && (
+              {/* Host panel locked banner */}
+              {hostPanelConnected && (
+                <div className="text-center px-4 py-3 rounded-lg border border-[#BC13FE]/40 bg-[#BC13FE]/10">
+                  <span className="text-[8px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>🎙 Call out letters — the Host will select them</span>
+                </div>
+              )}
+              {!hostPanelConnected && isGoRoundMode && alreadyChosen && (
                 <div className="text-center px-4 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/10">
                   <span className="text-[8px] tracking-widest text-[#FF5F1F] uppercase" style={PS2}>You chose this round. Waiting for others…</span>
                 </div>
               )}
-              {!isSeated && (
+              {!hostPanelConnected && !isSeated && (
                 <div className="text-center px-4 py-2 rounded-lg border border-white/10 bg-white/5">
                   <span className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>Joining game, please wait…</span>
                 </div>
               )}
-              {isSinglePlayer && iAmSetter1P && (
+              {!hostPanelConnected && isSinglePlayer && iAmSetter1P && (
                 <div className="text-center px-4 py-3 rounded-lg border border-[#FFD700]/30 bg-[#FFD700]/5">
                   <span className="text-[8px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>🔒 You are Host — {cpuCharacter?.name || 'CPU'} is guessing!</span>
                 </div>
               )}
-              {isSinglePlayer && iAmGuesser1P && (
+              {!hostPanelConnected && isSinglePlayer && iAmGuesser1P && (
                 <div className="text-center px-4 py-3 rounded-lg border border-[#4ade80]/30 bg-[#4ade80]/5">
                   <span className="text-[8px] tracking-widest text-[#4ade80]/70 uppercase" style={PS2}>🔤 {cpuCharacter?.name || 'CPU'} is Host — Guess their word!</span>
                 </div>
               )}
-              {/* Hint button (desktop) */}
+              {/* Hint button — only available if host panel is NOT controlling */}
               {canGuess && gs.hint && !gs.hint_revealed && (
                 <div className="flex justify-center">
                   <button onClick={handleUseHint} disabled={hintUsed}
@@ -851,15 +888,16 @@ function HangmanViewer({ roomCode, cpuId }) {
                   const used = isWrong || isCorrect;
                   const active = canGuess && !used;
                   return (
-                    <button key={l} onClick={() => handleGuessLetter(l)} disabled={!active}
+                    <button key={l} onClick={() => active && handleGuessLetter(l)} disabled={!active}
                       className="w-9 h-9 rounded-lg border-2 text-sm tracking-widest transition-all active:scale-90 disabled:cursor-not-allowed"
                       style={{
                         ...PS2,
                         borderColor: isWrong ? '#ef4444' : isCorrect ? '#4ade80' : active ? '#FFD700' : '#ffffff20',
                         color: isWrong ? '#ef4444' : isCorrect ? '#4ade80' : active ? '#FFD700' : '#ffffff25',
                         background: isWrong ? '#ef444415' : isCorrect ? '#4ade8015' : 'transparent',
-                        opacity: !active && !used ? 0.35 : 1,
+                        opacity: hostPanelConnected ? (used ? 0.5 : 0.25) : (!active && !used ? 0.35 : 1),
                         textDecoration: isWrong ? 'line-through' : 'none',
+                        cursor: hostPanelConnected ? 'default' : (active ? 'pointer' : 'not-allowed'),
                       }}>
                       {l}
                     </button>
@@ -1008,15 +1046,19 @@ function FinishedPanel({ gs, isSinglePlayer, seatNumber, onNextRound, cpuCharact
 }
 
 // ── Waiting Screen ────────────────────────────────────────────────────────────
-function WaitingScreen({ isSeated, seatNumber, players, isSinglePlayer, cpuCharacter, hostIsHuman }) {
+function WaitingScreen({ isSeated, seatNumber, players, isSinglePlayer, cpuCharacter, hostIsHuman, hostPanelConnected }) {
   const PS2loc = { fontFamily: "'Press Start 2P', monospace" };
   const cpuIsGenerating = isSinglePlayer && !hostIsHuman;
   return (
     <div className="flex-1 flex items-center justify-center text-center px-4">
       <div className="space-y-5">
-        <div className="text-6xl">{cpuIsGenerating ? '🤖' : '🔤'}</div>
+        <div className="text-6xl">{hostPanelConnected ? '🎙' : cpuIsGenerating ? '🤖' : '🔤'}</div>
         <div className="text-lg tracking-widest text-white/40 uppercase" style={PS2loc}>
-          {cpuIsGenerating ? `${cpuCharacter?.name || 'CPU'} is picking a word…` : isSinglePlayer ? 'Setting up…' : 'Waiting for Host…'}
+          {hostPanelConnected
+            ? 'Host connected. Waiting for Host to set the board.'
+            : cpuIsGenerating
+            ? `${cpuCharacter?.name || 'CPU'} is picking a word…`
+            : isSinglePlayer ? 'Setting up…' : 'Waiting for Host…'}
         </div>
         {cpuIsGenerating && (
           <div className="flex justify-center gap-2">
