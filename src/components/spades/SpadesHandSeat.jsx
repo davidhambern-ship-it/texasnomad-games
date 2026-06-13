@@ -12,25 +12,26 @@ const CHAR_COLORS = {
  * Compute card width + overlap so the whole fan fits within maxWidth pixels.
  * Returns { cardW, cardH, overlap }
  */
-function fitCards(count, maxWidth, baseW = 54, baseH = 76, minW = 28, maxOverlapFrac = 0.65) {
+function fitCards(count, maxWidth, baseW = 54, baseH = 76, minW = 28, maxOverlapFrac = 0.45) {
   if (count <= 1) return { cardW: baseW, cardH: baseH, overlap: 0 };
   // Total width = cardW + (count-1) * (cardW - overlap)
-  // Solve for cardW given fixed overlap fraction
+  // Try progressively more overlap until it fits, then shrink card size if needed
   let cardW = baseW;
   let overlap = 0;
   for (let w = baseW; w >= minW; w--) {
-    const h = Math.round(w * (baseH / baseW));
-    const ov = Math.round(w * maxOverlapFrac);
-    const total = w + (count - 1) * (w - ov);
-    if (total <= maxWidth) {
-      cardW = w;
-      overlap = ov;
-      break;
+    // Try increasing overlap fractions at this card size
+    for (let frac = 0.3; frac <= maxOverlapFrac; frac += 0.05) {
+      const ov = Math.round(w * frac);
+      const total = w + (count - 1) * (w - ov);
+      if (total <= maxWidth) {
+        cardW = w;
+        overlap = ov;
+        return { cardW, cardH: Math.round(cardW * (baseH / baseW)), overlap };
+      }
     }
-    // keep trying smaller
     if (w === minW) {
-      // at minimum size, force overlap to fit
-      const ov2 = Math.ceil((w * count - maxWidth) / (count - 1));
+      // Force fit at minimum size
+      const ov2 = Math.ceil((w * count - maxWidth) / Math.max(count - 1, 1));
       cardW = w;
       overlap = Math.min(Math.floor(w * maxOverlapFrac), Math.max(0, ov2));
     }

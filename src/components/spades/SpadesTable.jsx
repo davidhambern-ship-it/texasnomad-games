@@ -94,7 +94,7 @@ export default function SpadesTable({
   // Space budgets for each position
   // Side seats get a vertical budget = tableH * ~0.4
   // Top/bottom seats get horizontal budget = tableW * ~0.65
-  const sideBudgetH = tableH > 0 ? Math.floor(tableH * 0.38) : 140;
+  const sideBudgetH = tableH > 0 ? Math.floor(tableH * 0.50) : 140;
   const topBotBudgetW = tableW > 0 ? Math.floor(tableW * 0.62) : 200;
   // Human hand at bottom gets almost full table width minus padding
   const myHandBudgetW = tableW > 0 ? Math.floor(tableW - 24) : 300;
@@ -252,12 +252,13 @@ export default function SpadesTable({
         </div>
 
         {/* ── LEFT seat ────────────────────────────────────────────── */}
-        <div className="absolute left-2 top-1/2 -translate-y-1/2 z-30" style={{ maxWidth: '22%' }}>
+        {/* top:20%/bottom:28% keeps the side hands in the middle band, away from bottom hand */}
+        <div className="absolute left-2 z-30" style={{ top: '20%', bottom: '28%', maxWidth: '22%', display: 'flex', alignItems: 'center' }}>
           {renderHandSeat(seatAtPos('left'))}
         </div>
 
         {/* ── RIGHT seat ───────────────────────────────────────────── */}
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 z-30" style={{ maxWidth: '22%' }}>
+        <div className="absolute right-2 z-30" style={{ top: '20%', bottom: '28%', maxWidth: '22%', display: 'flex', alignItems: 'center' }}>
           {renderHandSeat(seatAtPos('right'))}
         </div>
 
