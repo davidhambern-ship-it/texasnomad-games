@@ -86,6 +86,9 @@ export default function SpadesHandSeat({
   const bid = player?.bid;
   const books = player?.tricksWon ?? 0;
   const hasBid = bid != null;
+  // Team indicator: seats 1&3 are partners, 2&4 are partners
+  const teamNumber = seatNumber === 1 || seatNumber === 3 ? 1 : 2;
+  const teamColor = teamNumber === 1 ? '#BC13FE' : '#FF5F1F';
 
   const isHorizontal = position === 'top' || position === 'bottom';
   const backCount = cardCount ?? player?.hand?.length ?? 0;
@@ -114,12 +117,18 @@ export default function SpadesHandSeat({
         <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: charColor }} />
       )}
       <div className="flex flex-col leading-none gap-0.5 min-w-0">
-        <div className="text-[6px] tracking-widest uppercase truncate font-heading" style={{ color: charColor, maxWidth: 70 }}>
-          {isMe ? 'YOU' : (playerName || `S${seatNumber}`)}
+        <div className="flex items-center gap-1">
+          <div className="text-[6px] tracking-widest uppercase truncate font-heading" style={{ color: charColor, maxWidth: 70 }}>
+            {isMe ? 'YOU' : (playerName || `S${seatNumber}`)}
+          </div>
+          {/* Team indicator badge */}
+          <div className="px-1 py-0.5 rounded text-[4px] tracking-widest uppercase" style={{ background: `${teamColor}30`, color: teamColor, border: `1px solid ${teamColor}50` }}>
+            T{teamNumber}
+          </div>
         </div>
         {!compact && (
           <div className="flex gap-1.5">
-            <span className="text-[5px] text-white/40 uppercase" style={PS2}>{hasBid ? `B:${bid}` : '—'}</span>
+            <span className={`text-[5px] uppercase font-bold ${hasBid ? 'text-[#FFD700]' : 'text-white/40'}`} style={PS2}>{hasBid ? `📋 ${bid}` : '—'}</span>
             <span className="text-[5px] text-white/40 uppercase" style={PS2}>📚{books}</span>
           </div>
         )}

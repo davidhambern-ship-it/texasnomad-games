@@ -153,11 +153,13 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
 
 
 
-  const handleSetBidValue = async (bid) => {
-    if (bid == null || bid < 0 || bid > 13) return;
+  const handleSetBidValue = async (bidValue) => {
+    if (bidValue == null || bidValue < 0 || bidValue > 13) return;
 
-    const updated = (gs.players || []).map(p => p.playerId === player.playerId ? { ...p, bid } : p);
-    const seated = updated.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
+    // Read latest players from gs to avoid stale closure
+    const currentPlayers = gs.players || [];
+    const updated = currentPlayers.map(p => p.playerId === player.playerId ? { ...p, bid: bidValue } : p);
+    const seated = updated.filter(p => (p.role === 'player' || p.role === 'hostPlayer') && p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === player.playerId);
     const nextBidder = seated[(bidderIdx + 1) % seated.length];
     const allBid = seated.every(p => p.bid != null);
@@ -170,9 +172,10 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       await updateState({
         players: updated, phase: 'playing', bid1: t1, bid2: t2,
         current_turn_seat: firstSeat || seated[0]?.seatNumber, current_bidder_seat: null,
+        hand_number: (gs.hand_number || 0), // preserve hand number
       });
     } else {
-      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber });
+      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber, hand_number: (gs.hand_number || 0) });
     }
     setBidInput('');
   };

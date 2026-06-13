@@ -40,6 +40,7 @@ export default function SpadesTable({
   const [localHands, setLocalHands] = useState({});
   const [showHandSetup, setShowHandSetup] = useState(false);
   const [optimisticRemovedId, setOptimisticRemovedId] = useState(null);
+  const [optimisticPlayedCards, setOptimisticPlayedCards] = useState({}); // { seatNumber: [cardIds] }
   const prevShuffleTs = useRef(gs.shuffle_ts);
   const prevDealTs = useRef(gs.deal_ts);
   const { suitOrder, setSuitOrder, sortHand } = useSuitOrder();
@@ -89,15 +90,42 @@ export default function SpadesTable({
     ? rawHand.filter(c => c.id !== optimisticRemovedId)
     : rawHand;
   const myHand = sortHand(optimisticHand);
+  
+  // Calculate adjusted card counts for other players based on cards played in current trick
+  const getAdjustedCardCount = (seatNumber) => {
+    const player = getPlayerAtSeat(seatNumber);
+    if (!player) return 0;
+    const baseCount = player.hand?.length || 0;
+    // Subtract cards this seat has played in the current trick
+    const cardsPlayedInTrick = (gs.current_trick || []).filter(t => t.seatNumber === seatNumber).length;
+    return Math.max(0, baseCount - cardsPlayedInTrick);
+  };
 
   useEffect(() => {
     if (optimisticRemovedId && myPlayer?.hand && !myPlayer.hand.find(c => c.id === optimisticRemovedId)) {
       setOptimisticRemovedId(null);
     }
   }, [myPlayer?.hand, optimisticRemovedId]);
+  
+  // Clear optimistic played cards when trick completes
+  useEffect(() => {
+    const trickKey = `${gs.tricks_played || 0}`;
+    if (optimisticPlayedCards[trickKey] && gs.current_trick?.length === 0) {
+      setOptimisticPlayedCards(prev => {
+        const next = { ...prev };
+        delete next[trickKey];
+        return next;
+      });
+    }
+  }, [gs.current_trick, gs.tricks_played]);
 
   const handlePlayCardOptimistic = (card) => {
     setOptimisticRemovedId(card.id);
+    // Track which seats have played cards this trick for visual updates
+    setOptimisticPlayedCards(prev => {
+      const trickKey = `${gs.tricks_played || 0}`;
+      return { ...prev, [trickKey]: [...(prev[trickKey] || []), { seatNumber: mySeatNumber, cardId: card.id }] };
+    });
     onPlayCard?.(card);
   };
   const isDealing = dealPhase !== 'idle';
@@ -119,7 +147,7 @@ export default function SpadesTable({
       ? (localHands[seatNumber] || []).length
       : isMe
         ? myHand.length
-        : (player?.hand?.length ?? 0);
+        : getAdjustedCardCount(seatNumber);
     const hand = isMe ? myHand : null;
 
     const maxWidth = (position === 'bottom' && isMe) ? myHandBudgetW
@@ -191,21 +219,27 @@ export default function SpadesTable({
         );
       })()}
 
-      {/* ── Score row ────────────────────────────────────────────── */}
+      {/* ── Score row with team indicators ────────────────────────────────────────────── */}
       <div className="w-full grid grid-cols-2 gap-2">
         {[
-          { name: gs.team1Name || 'Team 1', score: gs.score1 || 0, bid: gs.bid1, books: gs.books1, color: '#BC13FE' },
-          { name: gs.team2Name || 'Team 2', score: gs.score2 || 0, bid: gs.bid2, books: gs.books2, color: '#FF5F1F' },
-        ].map((t, idx) => (
-          <div key={idx} className="p-2 border-2 rounded-xl text-center"
-            style={{ borderColor: `${t.color}30`, background: `${t.color}08` }}>
-            <div className="font-heading text-xs tracking-widest text-white uppercase truncate">{t.name}</div>
-            <div className="font-heading text-xl" style={{ color: t.color }}>{t.score}</div>
-            <div className="text-[6px] text-white/30" style={PS2}>
-              B:{t.bid ?? '-'} 📚{t.books ?? '-'}
+          { name: gs.team1Name || 'Team 1', score: gs.score1 || 0, bid: gs.bid1, books: gs.books1, color: '#BC13FE', seats: '1 & 3' },
+          { name: gs.team2Name || 'Team 2', score: gs.score2 || 0, bid: gs.bid2, books: gs.books2, color: '#FF5F1F', seats: '2 & 4' },
+        ].map((t, idx) => {
+          const isMyTeam = isPlayer && ((t.seats.includes('1 & 3') && mySeatNumber === 1) || (t.seats.includes('1 & 3') && mySeatNumber === 3) || (t.seats.includes('2 & 4') && mySeatNumber === 2) || (t.seats.includes('2 & 4') && mySeatNumber === 4));
+          return (
+            <div key={idx} className={`p-2 border-2 rounded-xl text-center ${isMyTeam ? 'ring-2 ring-[#FFD700]' : ''}`}
+              style={{ borderColor: `${t.color}30`, background: `${t.color}08` }}>
+              <div className="font-heading text-xs tracking-widest text-white uppercase truncate">{t.name}</div>
+              <div className="font-heading text-xl" style={{ color: t.color }}>{t.score}</div>
+              <div className="text-[5px] text-white/40 uppercase mt-0.5" style={PS2}>
+                Seats {t.seats}
+              </div>
+              <div className="text-[5px] text-white/30 mt-0.5" style={PS2}>
+                B:{t.bid ?? '-'} 📚{t.books ?? '-'}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* ── Trick info ───────────────────────────────────────────── */}

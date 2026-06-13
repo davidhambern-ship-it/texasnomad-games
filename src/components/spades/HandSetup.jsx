@@ -36,6 +36,11 @@ export default function HandSetup({ suitOrder, onSuitOrderChange, onClose }) {
     setCustomOrder(newOrder);
     onSuitOrderChange(newOrder);
   };
+  
+  // Auto-close after applying changes - parent will re-sort immediately
+  const handleDone = () => {
+    onClose();
+  };
 
   // Drag & drop for custom order
   const handleDragStart = (e, idx) => {
@@ -67,7 +72,7 @@ export default function HandSetup({ suitOrder, onSuitOrderChange, onClose }) {
         
         <div className="flex items-center justify-between mb-4">
           <div className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>🃏 Hand Setup</div>
-          <button onClick={onClose} className="text-white/40 hover:text-white text-lg transition-colors">✕</button>
+          <button onClick={handleDone} className="px-3 py-1 rounded-lg border border-[#4ade80]/40 text-[#4ade80] text-[6px] tracking-widest uppercase hover:bg-[#4ade80]/10 transition-all" style={PS2}>✓ DONE</button>
         </div>
 
         <div className="text-[6px] text-white/40 uppercase mb-3 tracking-widest" style={PS2}>
@@ -133,10 +138,10 @@ export default function HandSetup({ suitOrder, onSuitOrderChange, onClose }) {
               </div>
             ))}
           </div>
-          <button onClick={onClose}
-            className="px-3 py-1.5 rounded-lg border-2 border-[#BC13FE] text-[#BC13FE] text-[6px] tracking-widest uppercase hover:bg-[#BC13FE]/20 transition-all"
+          <button onClick={() => { onSuitOrderChange(customOrder); onClose(); }}
+            className="px-3 py-1.5 rounded-lg border-2 border-[#4ade80] text-[#4ade80] text-[6px] tracking-widest uppercase hover:bg-[#4ade80]/20 transition-all"
             style={PS2}>
-            Done
+            ✓ Done
           </button>
         </div>
       </div>
