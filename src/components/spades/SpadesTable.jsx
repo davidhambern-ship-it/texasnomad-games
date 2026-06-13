@@ -39,13 +39,11 @@ export default function SpadesTable({
   const [dealPhase, setDealPhase] = useState('idle');
   const [localHands, setLocalHands] = useState({});
   const [showHandSetup, setShowHandSetup] = useState(false);
-  // Optimistic hand: immediately remove a played card before server round-trip
   const [optimisticRemovedId, setOptimisticRemovedId] = useState(null);
   const prevShuffleTs = useRef(gs.shuffle_ts);
   const prevDealTs = useRef(gs.deal_ts);
   const { suitOrder, setSuitOrder, sortHand } = useSuitOrder();
 
-  // Measure the table container so we can pass exact pixel budgets to SpadesHandSeat
   const tableRef = useRef(null);
   const [tableW, setTableW] = useState(0);
   const [tableH, setTableH] = useState(0);
@@ -86,21 +84,18 @@ export default function SpadesTable({
   const canJoinSeat = !isPlayer && (isSpectator || myRole === null) && joinableSeats.length > 0;
   const getPlayerAtSeat = (n) => players.find(p => p.seatNumber === n && (p.role === 'player' || p.role === 'hostPlayer'));
   const myPlayer = players.find(p => p.playerId === playerId);
-  // Apply optimistic removal so the card disappears immediately on play
   const rawHand = (isPlayer && myPlayer?.hand) ? myPlayer.hand : [];
   const optimisticHand = optimisticRemovedId
     ? rawHand.filter(c => c.id !== optimisticRemovedId)
     : rawHand;
   const myHand = sortHand(optimisticHand);
 
-  // Clear optimistic removal once the server state has caught up
   useEffect(() => {
     if (optimisticRemovedId && myPlayer?.hand && !myPlayer.hand.find(c => c.id === optimisticRemovedId)) {
       setOptimisticRemovedId(null);
     }
   }, [myPlayer?.hand, optimisticRemovedId]);
 
-  // Wrap onPlayCard to immediately remove the card optimistically
   const handlePlayCardOptimistic = (card) => {
     setOptimisticRemovedId(card.id);
     onPlayCard?.(card);
@@ -111,13 +106,8 @@ export default function SpadesTable({
   const seatAtPos = (pos) =>
     [1, 2, 3, 4].find(n => getRelativePosition(n, viewerSeat) === pos) ?? FALLBACK_BY_POS[pos];
 
-  // Space budgets for each position
-  // Side seats get a vertical budget = tableH * ~0.4
-  // Top/bottom seats get horizontal budget = tableW * ~0.65
-  // Side seats occupy top:20% to bottom:28% of the table = 52% of tableH
   const sideBudgetH = tableH > 0 ? Math.floor(tableH * 0.52) : 140;
   const topBotBudgetW = tableW > 0 ? Math.floor(tableW * 0.62) : 200;
-  // Human hand at bottom gets almost full table width minus padding
   const myHandBudgetW = tableW > 0 ? Math.floor(tableW - 24) : 300;
 
   const renderHandSeat = (seatNumber) => {
@@ -128,11 +118,10 @@ export default function SpadesTable({
     const cardCount = isDealing
       ? (localHands[seatNumber] || []).length
       : isMe
-        ? myHand.length  // use optimistic hand length for the human player
+        ? myHand.length
         : (player?.hand?.length ?? 0);
     const hand = isMe ? myHand : null;
 
-    // Pass layout budgets so the hand can fit itself
     const maxWidth = (position === 'bottom' && isMe) ? myHandBudgetW
       : (position === 'top' || position === 'bottom') ? topBotBudgetW
       : undefined;
@@ -161,7 +150,6 @@ export default function SpadesTable({
   };
 
   return (
-    // overflow-hidden on outermost wrapper prevents any horizontal bleed
     <div className="flex flex-col w-full max-w-2xl mx-auto px-2 gap-2" style={{ overflowX: 'hidden' }}>
       {showHandSetup && (
         <HandSetup suitOrder={suitOrder} onSuitOrderChange={setSuitOrder} onClose={() => setShowHandSetup(false)} />
@@ -241,8 +229,8 @@ export default function SpadesTable({
       )}
 
       {/* ═══════════════════════════════════════════════════════════
-          THE TABLE — green felt
-          overflow:hidden so seats never bleed outside
+          THE TABLE — orange glass felt
+          overflow: visible so bottom hand cards are not clipped
           ═══════════════════════════════════════════════════════════ */}
       <div
         ref={tableRef}
@@ -253,7 +241,7 @@ export default function SpadesTable({
           border: '4px solid rgba(255,160,50,0.6)',
           boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3), 0 0 80px rgba(255,120,0,0.15)',
           aspectRatio: '4/3',
-          overflow: 'hidden',
+          overflow: 'visible',
           isolation: 'isolate',
         }}>
 
@@ -275,7 +263,6 @@ export default function SpadesTable({
         </div>
 
         {/* ── LEFT seat ────────────────────────────────────────────── */}
-        {/* Clamped to center band — never touches top or bottom hands */}
         <div className="absolute left-2 z-30" style={{ top: '20%', bottom: '28%', maxWidth: '22%', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           {renderHandSeat(seatAtPos('left'))}
         </div>
@@ -308,76 +295,11 @@ export default function SpadesTable({
           )}
         </div>
 
-        {/* ── BOTTOM seat (opponent back-cards only when not me) ─────── */}
-        {!isPlayer && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
-            {renderHandSeat(seatAtPos('bottom'))}
-          </div>
-        )}
-        {isPlayer && (
-          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
-            {/* Show info strip only — cards rendered below the table */}
-            {(() => {
-              const seatNum = seatAtPos('bottom');
-              const player = getPlayerAtSeat(seatNum);
-              const isMe = mySeatNumber === seatNum;
-              if (!player) return null;
-              return (
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                  <SpadesHandSeat
-                    key={`bottom-info-${seatNum}`}
-                    position="bottom"
-                    player={player}
-                    seatNumber={seatNum}
-                    isMe={isMe}
-                    isMyTurn={gs.current_turn_seat === seatNum && (isPlaying || isBidding)}
-                    isBidding={isBidding}
-                    cardCount={isMe ? myHand.length : (player?.hand?.length ?? 0)}
-                    hand={null}
-                    onPlayCard={null}
-                    isJoinable={false}
-                    onSit={null}
-                    onTakeOver={null}
-                    gs={gs}
-                    maxWidth={myHandBudgetW}
-                    infoOnly={true}
-                  />
-                </div>
-              );
-            })()}
-          </div>
-        )}
+        {/* ── BOTTOM seat ───────────────────────────────────────────── */}
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-30" style={{ width: '92%', maxWidth: '92%' }}>
+          {renderHandSeat(seatAtPos('bottom'))}
+        </div>
       </div>
-
-      {/* ── My cards rendered OUTSIDE table to avoid overflow:hidden clipping ── */}
-      {isPlayer && (() => {
-        const seatNum = seatAtPos('bottom');
-        const player = getPlayerAtSeat(seatNum);
-        const isMe = mySeatNumber === seatNum;
-        if (!isMe || !player) return null;
-        return (
-          <div className="w-full flex justify-center" style={{ marginTop: -8 }}>
-            <SpadesHandSeat
-              key={`bottom-cards-${seatNum}`}
-              position="bottom"
-              player={player}
-              seatNumber={seatNum}
-              isMe={true}
-              isMyTurn={gs.current_turn_seat === seatNum && (isPlaying || isBidding)}
-              isBidding={isBidding}
-              cardCount={myHand.length}
-              hand={myHand}
-              onPlayCard={handlePlayCardOptimistic}
-              isJoinable={false}
-              onSit={null}
-              onTakeOver={null}
-              gs={gs}
-              maxWidth={myHandBudgetW}
-              cardsOnly={true}
-            />
-          </div>
-        );
-      })()}
 
       {/* ── Player controls ───────────────────────────────────────── */}
       {isPlayer && myPlayer && mySeatNumber && (
