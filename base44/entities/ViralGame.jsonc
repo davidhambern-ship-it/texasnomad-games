@@ -1,0 +1,173 @@
+{
+  "name": "ViralGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. VIR817)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "paused",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "screen_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "players": {
+      "type": "array",
+      "description": "Array of player objects with seat, name, stats",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seatNumber": {
+            "type": "number"
+          },
+          "playerCode": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "controller": {
+            "type": "string",
+            "enum": [
+              "human",
+              "ai"
+            ]
+          },
+          "aiCharacterId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "left",
+              "ai_controlled",
+              "replaced",
+              "eliminated",
+              "winner"
+            ]
+          },
+          "position": {
+            "type": "number",
+            "default": 0
+          },
+          "level": {
+            "type": "number",
+            "default": 1
+          },
+          "followers": {
+            "type": "number",
+            "default": 0
+          },
+          "money": {
+            "type": "number",
+            "default": 0
+          },
+          "ssp": {
+            "type": "number",
+            "default": 0
+          },
+          "equipment": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "slot": {
+                  "type": "string"
+                },
+                "tier": {
+                  "type": "string",
+                  "enum": [
+                    "BS",
+                    "Playing",
+                    "Serious"
+                  ]
+                },
+                "copiesCollected": {
+                  "type": "number",
+                  "default": 1
+                }
+              }
+            }
+          },
+          "sponsors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "activeEffects": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        }
+      }
+    },
+    "currentTurnIndex": {
+      "type": "number",
+      "default": 0
+    },
+    "round": {
+      "type": "number",
+      "default": 1
+    },
+    "gameState": {
+      "type": "object",
+      "description": "Current game state (dice roll, active player, etc.)"
+    },
+    "board": {
+      "type": "object",
+      "description": "Board configuration (120 spaces)"
+    },
+    "decks": {
+      "type": "object",
+      "description": "Card decks state"
+    },
+    "settings": {
+      "type": "object",
+      "properties": {
+        "maxPlayers": {
+          "type": "number",
+          "default": 12
+        },
+        "aiTakeoverEnabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "everySpaceTriggersEffect": {
+          "type": "boolean",
+          "default": true
+        }
+      }
+    },
+    "turnLog": {
+      "type": "array",
+      "description": "Log of all turns",
+      "items": {
+        "type": "object"
+      }
+    },
+    "winner": {
+      "type": "object",
+      "description": "Winner info when game ends"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}

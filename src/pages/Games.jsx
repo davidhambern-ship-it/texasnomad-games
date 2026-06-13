@@ -211,7 +211,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
               color: '#FFD700aa',
             }}
           >
-            🤖 {game.id === 'word-search' ? 'VS AI — Single Player' : 'VS CPU — Single Player'}
+            🤖 {game.id === 'word-search' || game.id === 'viral' ? 'VS AI — Single Player' : 'VS CPU — Single Player'}
           </button>
 
           <div className="flex gap-2">
@@ -281,6 +281,20 @@ function ComingSoonCabinet({ title, emoji, color = '#4a4a6a' }) {
 
 // ── Main Games Page ──────────────────────────────────────────────────────────
 const GAMES = [
+  {
+    id: 'viral',
+    title: 'VIRAL!',
+    tagline: 'Become An Influencer',
+    image: null,
+    color: '#BC13FE',
+    color2: '#7700cc',
+    marqueeText: 'ROLL DICE • COLLECT EQUIPMENT • GO VIRAL • GET SPONSORED',
+    screenText: '🎲 BOARD GAME',
+    description: 'Race around the 120-space board to become a viral sensation! Collect equipment, gain followers, land sponsorships, and be the first to reach Creator Mansion!',
+    tags: ['1-12 Players', 'Board Game', 'Strategy'],
+    path: '/games/viral',
+    featured: true,
+  },
   {
     id: 'word-search',
     title: 'Word Search',
@@ -359,12 +373,12 @@ const COMING_SOON = [
 ];
 
 // Map game ID to gameKey used in character system
-const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch' };
+const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral' };
 
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }

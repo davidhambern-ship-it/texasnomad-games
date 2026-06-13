@@ -6,6 +6,7 @@ import SquareBizHostPanel from '@/components/host/panels/SquareBizHostPanel';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
 import SpadesHostPanel from '@/components/host/panels/SpadesHostPanel.jsx';
 import WordSearchHostPanel from '@/components/host/panels/WordSearchHostPanel.jsx';
+import ViralHostPanel from '@/components/host/panels/ViralHostPanel';
 
 export default function HostConsole({ game, roomCode, onDisconnect }) {
   const { room, loading, error, updateState, sendCommand, updateRoomStatus } = useGameRoom(roomCode, game.id, 'host');
@@ -63,6 +64,9 @@ export default function HostConsole({ game, roomCode, onDisconnect }) {
         )}
         {game.id === 'word-search' && (
           <WordSearchHostPanel gs={gs} updateState={updateState} />
+        )}
+        {game.id === 'viral' && (
+          <ViralHostPanel gs={gs} updateState={updateState} />
         )}
       </div>
     </div>

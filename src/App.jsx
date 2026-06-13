@@ -18,6 +18,7 @@ import PlaceholderPage from '@/pages/PlaceholderPage';
 import HostPanel from '@/pages/HostPanel';
 import Games from '@/pages/Games';
 import WordSearchGame from '@/pages/WordSearchGame';
+import ViralGame from '@/pages/ViralGame';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -63,6 +64,7 @@ const AuthenticatedApp = () => {
       <Route path="/about" element={<PlaceholderPage />} />
       <Route path="/contact" element={<PlaceholderPage />} />
       <Route path="/games/word-search" element={<WordSearchGame />} />
+      <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
