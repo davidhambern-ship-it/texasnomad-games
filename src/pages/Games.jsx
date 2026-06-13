@@ -293,7 +293,7 @@ const GAMES = [
     description: 'Race around the 120-space board to become a viral sensation! Collect equipment, gain followers, land sponsorships, and be the first to reach Creator Mansion!',
     tags: ['1-12 Players', 'Board Game', 'Strategy'],
     path: '/games/viral',
-    featured: true,
+    featured: false,
   },
   {
     id: 'word-search',
@@ -307,7 +307,7 @@ const GAMES = [
     description: 'Race against the clock to find hidden words in a grid. Drag to select letters, score points for direction and length. Beat your opponents!',
     tags: ['1-4 Players', 'Word Game', 'Casual'],
     path: '/games/word-search',
-    featured: false,
+    featured: true,
   },
   {
     id: 'square-biz',
