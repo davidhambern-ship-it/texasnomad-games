@@ -275,11 +275,6 @@ export default function SpadesHandSeat({
   }
 
   const borderStyle = {
-    border: `1px solid ${isMyTurn ? '#FFD70050' : charColor + '25'}`,
-    borderRadius: 10,
-    padding: '4px 6px',
-    ...glowStyle,
-    transition: 'all 0.3s ease',
     display: 'flex',
     alignItems: 'center',
     gap: 4,
