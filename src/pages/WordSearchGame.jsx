@@ -435,21 +435,29 @@ function WordSearchViewer({ roomCode, cpuId }) {
         {/* ── Center: Board ─────────────────────────────────────────────────── */}
         <main className="flex-1 flex flex-col items-center gap-4">
           {gs.message && !gs.running && (
-            <div className="w-full px-6 py-4 rounded-xl border-2 border-[#FFD700]/50 bg-[#FFD700]/5 text-center">
-              <div className="font-heading text-xl tracking-widest text-[#FFD700] uppercase">{gs.message}</div>
+            <div className="w-full px-6 py-5 rounded-xl text-center"
+              style={{ background: 'linear-gradient(135deg,#07040d,#1a0730)', border: '2px solid rgba(255,215,0,0.5)', boxShadow: '0 0 30px rgba(255,215,0,0.15)' }}>
+              <div className="text-3xl mb-2">🏆</div>
+              <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase text-glow-gold">{gs.message}</div>
               <button onClick={handleReset}
-                className="mt-3 px-6 py-2 rounded-lg border-2 border-[#BC13FE] text-[#BC13FE] font-heading text-sm tracking-widest uppercase hover:bg-[#BC13FE]/20 transition-all active:scale-95">
+                className="mt-4 px-8 py-2.5 rounded-lg font-heading text-sm tracking-widest uppercase transition-all hover:scale-105 active:scale-95"
+                style={{ background: 'rgba(188,19,254,0.15)', border: '2px solid #BC13FE', color: '#BC13FE', boxShadow: '0 0 16px rgba(188,19,254,0.3)' }}>
                 ↺ Play Again
               </button>
             </div>
           )}
 
           {gs.running && (
-            <div className="w-full flex items-center justify-between px-2">
-              <div className="text-[8px] tracking-widest uppercase" style={{ ...PS2, color: isMyTurn ? '#4ade80' : '#FF5F1F' }}>
-                {isMyTurn ? '▶ YOUR TURN' : `${activePlayer?.name || '?'}'S TURN`}
+            <div className="w-full flex items-center justify-between px-3 py-2 rounded-lg"
+              style={{ background: 'rgba(188,19,254,0.06)', border: '1px solid rgba(188,19,254,0.2)' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: isMyTurn ? '#4ade80' : '#FF5F1F' }} />
+                <span className="text-[8px] tracking-widest uppercase" style={{ ...PS2, color: isMyTurn ? '#4ade80' : '#FF5F1F' }}>
+                  {isMyTurn ? 'YOUR TURN' : `${activePlayer?.name || '?'}'S TURN`}
+                </span>
               </div>
-              <div className="font-heading text-xl" style={{ color: timeRemaining <= 10 ? '#ef4444' : '#FFD700' }}>
+              <div className="font-heading text-2xl tracking-widest"
+                style={{ color: timeRemaining <= 10 ? '#ef4444' : '#FFD700', textShadow: `0 0 12px ${timeRemaining <= 10 ? '#ef4444' : '#FFD700'}` }}>
                 {mins}:{secs}
               </div>
               {gs.paused && (
@@ -472,11 +480,13 @@ function WordSearchViewer({ roomCode, cpuId }) {
           )}
 
           {!gs.running && !gs.message && grid.length === 0 && (
-            <div className="flex-1 flex items-center justify-center text-center">
-              <div className="space-y-4">
-                <div className="text-6xl">🔍</div>
-                <div className="font-heading text-2xl tracking-widest text-[#BC13FE] uppercase">Nomadic Word Search</div>
-                <div className="text-[8px] tracking-widest text-white/30 uppercase" style={PS2}>Configure and start the game on the left</div>
+            <div className="flex-1 flex items-center justify-center text-center px-8 py-12">
+              <div className="space-y-5">
+                <div className="text-7xl">🔍</div>
+                <div className="font-heading text-4xl tracking-widest text-[#BC13FE] uppercase text-glow-purple">Nomadic</div>
+                <div className="font-heading text-3xl tracking-widest text-[#FFD700] uppercase text-glow-gold">Word Search</div>
+                <div className="w-24 h-0.5 mx-auto" style={{ background: 'linear-gradient(90deg,transparent,#BC13FE,transparent)' }} />
+                <div className="text-[7px] tracking-[0.25em] text-white/30 uppercase" style={PS2}>Configure & start on the left</div>
               </div>
             </div>
           )}
@@ -539,8 +549,12 @@ function SetupPanel({ isSinglePlayer, cpuCharacter, onStart, seatNumber }) {
   );
 
   return (
-    <div className="p-4 rounded-xl border border-[#BC13FE]/30 bg-black/60 space-y-4">
-      <h2 className="text-[9px] tracking-[0.2em] text-[#BC13FE] uppercase" style={PS2}>⚙ Game Setup</h2>
+    <div className="p-4 rounded-xl space-y-4"
+      style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(188,19,254,0.4)', boxShadow: '0 0 20px rgba(188,19,254,0.1)' }}>
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-1 h-5 rounded-full" style={{ background: '#BC13FE', boxShadow: '0 0 8px #BC13FE' }} />
+        <h2 className="text-[9px] tracking-[0.2em] text-[#BC13FE] uppercase" style={PS2}>Game Setup</h2>
+      </div>
 
       {cpuCharacter && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5">
@@ -581,15 +595,17 @@ function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, gr
           { label: 'Board', value: gridSize ? `${gridSize}×${gridSize}` : '--', color: '#FF5F1F' },
           { label: 'Status', value: paused ? 'PAUSED' : running ? 'LIVE' : 'OVER', color: running && !paused ? '#4ade80' : '#FF5F1F' },
         ].map(s => (
-          <div key={s.label} className="p-3 rounded-xl border border-white/10 bg-black/60 text-center">
+          <div key={s.label} className="p-3 rounded-xl text-center"
+            style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `0 0 12px ${s.color}15` }}>
             <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>{s.label}</div>
-            <div className="font-heading text-lg" style={{ color: s.color }}>{s.value}</div>
+            <div className="font-heading text-lg" style={{ color: s.color, textShadow: `0 0 10px ${s.color}80` }}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Players */}
-      <div className="p-4 rounded-xl border border-[#FFD700]/20 bg-black/60 space-y-2">
+      <div className="p-4 rounded-xl space-y-2"
+        style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(255,215,0,0.2)' }}>
         <h3 className="text-[8px] tracking-[0.2em] text-[#FFD700]/70 uppercase" style={PS2}>Players</h3>
         {players.length === 0 && <div className="text-[7px] text-white/20 uppercase" style={PS2}>No players yet</div>}
         {players.map((p, i) => (
@@ -655,8 +671,14 @@ function WordGrid({ grid, words, players, previewCells, onCellDown, onCellMove, 
   return (
     <div
       ref={boardRef}
-      className="overflow-auto rounded-xl p-3"
-      style={{ background: 'rgba(7,4,13,0.8)', border: '2px solid rgba(0,200,117,0.4)', touchAction: 'none', userSelect: 'none' }}
+      className="overflow-auto rounded-xl p-3 scanline-overlay relative"
+      style={{
+        background: 'linear-gradient(135deg, #07040d 0%, #0d0620 100%)',
+        border: '2px solid rgba(188,19,254,0.5)',
+        boxShadow: '0 0 30px rgba(188,19,254,0.2), inset 0 0 40px rgba(188,19,254,0.05)',
+        touchAction: 'none',
+        userSelect: 'none',
+      }}
       onMouseLeave={() => { if (boardRef.current) onCellUp && null; }}
     >
       <div
@@ -687,20 +709,37 @@ function WordGrid({ grid, words, players, previewCells, onCellDown, onCellMove, 
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  borderRadius: 5,
-                  fontSize: Math.max(10, cellSize * 0.5),
-                  fontWeight: 900,
+                  borderRadius: 4,
+                  fontSize: Math.max(9, cellSize * 0.48),
+                  fontWeight: 700,
+                  fontFamily: "'Press Start 2P', monospace",
                   cursor: canInteract ? 'pointer' : 'default',
                   background: isFound
+                    ? `${foundMap[id]}25`
+                    : isPreview
+                    ? 'rgba(255,215,0,0.15)'
+                    : 'rgba(188,19,254,0.06)',
+                  color: isFound
                     ? foundMap[id]
                     : isPreview
-                    ? '#fff0c8'
-                    : '#ffffff',
-                  color: isFound ? '#fff' : '#12071f',
-                  border: isFound ? `2px solid ${foundMap[id]}` : isPreview ? '3px solid #BC13FE' : '2px solid #00c875',
-                  boxShadow: isFound ? `0 0 8px ${foundMap[id]}80` : isPreview ? '0 0 10px rgba(188,19,254,0.5)' : 'inset 0 -2px 0 rgba(0,0,0,0.15)',
-                  transition: 'background 0.1s, border 0.1s',
-                  textShadow: isFound ? '0 1px 2px #000' : 'none',
+                    ? '#FFD700'
+                    : 'rgba(255,255,255,0.75)',
+                  border: isFound
+                    ? `1px solid ${foundMap[id]}80`
+                    : isPreview
+                    ? '2px solid #FFD700'
+                    : '1px solid rgba(188,19,254,0.2)',
+                  boxShadow: isFound
+                    ? `0 0 8px ${foundMap[id]}60, inset 0 0 6px ${foundMap[id]}20`
+                    : isPreview
+                    ? '0 0 12px rgba(255,215,0,0.6)'
+                    : 'none',
+                  transition: 'background 0.08s, color 0.08s, box-shadow 0.08s',
+                  textShadow: isFound
+                    ? `0 0 8px ${foundMap[id]}`
+                    : isPreview
+                    ? '0 0 8px rgba(255,215,0,0.8)'
+                    : 'none',
                   userSelect: 'none',
                   WebkitUserSelect: 'none',
                 }}
@@ -729,23 +768,35 @@ function WordList({ words, players }) {
   const unfound = words.filter(w => !w.found);
 
   return (
-    <div className="p-4 rounded-xl border border-[#BC13FE]/20 bg-black/60 space-y-3">
-      <h3 className="text-[8px] tracking-[0.2em] text-[#BC13FE]/70 uppercase" style={PS2}>Words ({found.length}/{words.length})</h3>
+    <div className="p-4 rounded-xl space-y-3"
+      style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(188,19,254,0.3)', boxShadow: '0 0 20px rgba(188,19,254,0.1)' }}>
+      <div className="flex items-center justify-between">
+        <h3 className="text-[8px] tracking-[0.2em] text-[#BC13FE] uppercase" style={PS2}>Words</h3>
+        <span className="text-[7px] tracking-widest" style={{ ...PS2, color: '#FFD700' }}>{found.length}<span className="text-white/30">/{words.length}</span></span>
+      </div>
+      {/* Progress bar */}
+      <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: words.length ? `${(found.length / words.length) * 100}%` : '0%', background: 'linear-gradient(90deg,#BC13FE,#FFD700)' }} />
+      </div>
       <div className="grid grid-cols-2 gap-1.5">
         {words.map(w => {
           const finder = players.find(p => p.seatNumber === w.foundBy);
           return (
             <div
               key={w.word}
-              className="px-2 py-1.5 rounded-lg text-center text-[7px] font-bold tracking-wider transition-all"
+              className="px-2 py-1.5 rounded text-center transition-all"
               style={{
-                ...PS2,
-                background: w.found ? `${finder?.color || '#555'}20` : 'rgba(255,255,255,0.04)',
-                border: w.found ? `1px solid ${finder?.color || '#555'}60` : '1px solid rgba(255,255,255,0.1)',
-                color: w.found ? (finder?.color || '#9bffcf') : 'rgba(255,255,255,0.3)',
+                fontFamily: "'Press Start 2P', monospace",
+                fontSize: 6,
+                letterSpacing: '0.05em',
+                background: w.found ? `${finder?.color || '#BC13FE'}18` : 'rgba(255,255,255,0.03)',
+                border: w.found ? `1px solid ${finder?.color || '#BC13FE'}60` : '1px solid rgba(255,255,255,0.08)',
+                color: w.found ? (finder?.color || '#BC13FE') : 'rgba(255,255,255,0.35)',
                 textDecoration: w.found ? 'line-through' : 'none',
+                textShadow: w.found ? `0 0 8px ${finder?.color || '#BC13FE'}` : 'none',
               }}>
-              {w.found ? w.word : '•'.repeat(Math.min(w.word.length, 8))}
+              {w.word}
             </div>
           );
         })}
