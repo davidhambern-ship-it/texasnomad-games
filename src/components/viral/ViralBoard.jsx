@@ -2,101 +2,145 @@ import React from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-const SPACE_COLORS = {
-  Equipment: '#00c875',
-  Challenge: '#BC13FE',
-  Viral: '#FF5F1F',
-  Pay: '#FFD700',
-  Play: '#22d3ee',
-  Event: '#f472b6',
-  Sponsor: '#a78bfa',
-  SAFE: '#4ade80',
-  CREATOR_MANSION: '#FFD700',
+// District images mapping to board sections
+const DISTRICT_IMAGES = {
+  V: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9eb63b4f0_boardletters-V.png',
+  I: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1241d498d_boardletters-I.png',
+  R: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/8bd90f93d_boardletters-R.png',
+  A: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9e1e3159e_boardletters-A.png',
+  L: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/6cf49806a_boardletters-L.png',
 };
 
-const SPACE_LABELS = {
-  Equipment: 'EQ',
-  Challenge: 'CH',
-  Viral: 'VR',
-  Pay: '$',
-  Play: 'PL',
-  Event: 'EV',
-  Sponsor: 'SP',
-  SAFE: 'SAFE',
-  CREATOR_MANSION: 'FIN',
+// Space ranges for each district
+const DISTRICT_RANGES = {
+  V: { start: 1, end: 20, label: "Creator's Corner" },
+  I: { start: 21, end: 40, label: 'Shopping District' },
+  R: { start: 41, end: 60, label: 'The Mall' },
+  A: { start: 81, end: 100, label: 'Business District' },
+  L: { start: 101, end: 120, label: 'Downtown District' },
 };
+
+const PLAYER_COLORS = ['#BC13FE', '#FF5F1F', '#FFD700', '#22d3ee'];
 
 export default function ViralBoard({ board, players, currentTurnIndex, diceRoll }) {
   if (!board || !board.length) return null;
 
-  // Group spaces by level for visual layout
-  const level1 = board.filter(s => s.level === 1);
-  const level2 = board.filter(s => s.level === 2);
-  const level3 = board.filter(s => s.level === 3);
+  const getPlayerAtPosition = (position) => {
+    return players.find(p => p.position === position);
+  };
 
-  const renderSpace = (space) => {
-    const playerOnSpace = players.find(p => p.position === space.number);
-    const bgColor = SPACE_COLORS[space.type] || '#666';
-    const label = SPACE_LABELS[space.type] || space.number;
-    const isCurrentPlayerSpace = playerOnSpace && players.indexOf(playerOnSpace) === currentTurnIndex;
-
+  const renderDistrict = (districtKey, districtData) => {
+    const imageUrl = DISTRICT_IMAGES[districtKey];
+    const spacesInRange = board.filter(s => s.number >= districtData.start && s.number <= districtData.end);
+    
     return (
-      <div
-        key={space.number}
-        className="relative flex items-center justify-center border border-white/20 hover:border-white/60 transition-all cursor-pointer"
-        style={{
-          width: 28,
-          height: 28,
-          background: `linear-gradient(135deg, ${bgColor}40, ${bgColor}20)`,
-          boxShadow: isCurrentPlayerSpace ? `0 0 10px ${bgColor}` : 'none',
-        }}
-        title={`Space ${space.number}: ${space.effect?.description || space.type}`}
-      >
-        <span className="text-[6px] font-bold text-white/90" style={PS2}>{label}</span>
-        {playerOnSpace && (
-          <div
-            className="absolute -top-1 -right-1 w-3 h-3 rounded-full border border-white"
-            style={{ background: playerOnSpace.color || '#BC13FE' }}
-            title={playerOnSpace.name}
-          />
-        )}
-        {space.number % 20 === 0 && (
-          <div className="absolute -bottom-3 text-[4px] text-white/40" style={PS2}>{space.number}</div>
-        )}
+      <div key={districtKey} className="relative">
+        {/* District header */}
+        <div className="flex items-center gap-2 mb-2 px-2">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center text-xl font-bold text-white"
+            style={{ 
+              background: 'linear-gradient(135deg, #BC13FE, #7700cc)',
+              boxShadow: '0 0 15px rgba(188,19,254,0.5)'
+            }}>
+            {districtKey}
+          </div>
+          <div>
+            <div className="text-[9px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>{districtData.label}</div>
+            <div className="text-[7px] text-white/40">Spaces {districtData.start}-{districtData.end}</div>
+          </div>
+        </div>
+        
+        {/* District image */}
+        <div className="relative rounded-xl overflow-hidden border-2 border-[#BC13FE]/30"
+          style={{ boxShadow: '0 0 20px rgba(188,19,254,0.2)' }}>
+          <img src={imageUrl} alt={districtData.label} className="w-full h-auto" />
+          
+          {/* Player markers overlay */}
+          <div className="absolute inset-0 pointer-events-none">
+            {spacesInRange.map(space => {
+              const player = getPlayerAtPosition(space.number);
+              if (!player) return null;
+              
+              const playerIndex = players.indexOf(player);
+              const color = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
+              
+              // Calculate approximate position based on space number
+              const totalSpaces = districtData.end - districtData.start + 1;
+              const positionInDistrict = space.number - districtData.start;
+              const percentage = (positionInDistrict / totalSpaces) * 100;
+              
+              return (
+                <div
+                  key={player.playerCode}
+                  className="absolute w-6 h-6 rounded-full border-2 border-white flex items-center justify-center text-[8px] font-bold text-white"
+                  style={{
+                    background: color,
+                    boxShadow: `0 0 10px ${color}`,
+                    left: `${Math.min(90, Math.max(5, percentage))}%`,
+                    top: `${20 + (playerIndex * 15)}%`,
+                    transform: 'translate(-50%, -50%)',
+                    pointerEvents: 'auto',
+                  }}
+                  title={`${player.name} - Space ${space.number}`}
+                >
+                  {player.name?.charAt(0) || 'P'}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="space-y-3 p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(188,19,254,0.3)' }}>
-      {/* Level indicators */}
-      <div className="flex items-center justify-between text-[6px] text-white/40 uppercase" style={PS2}>
-        <span>Level 1: The Grind (1-40)</span>
-        <span>Level 2: Growth Mode (41-80)</span>
-        <span>Level 3: Influencer Status (81-120)</span>
+    <div className="space-y-6 p-4 rounded-xl overflow-auto max-h-[70vh]" 
+      style={{ 
+        background: 'linear-gradient(135deg, #07040d, #0d0620)', 
+        border: '1px solid rgba(188,19,254,0.3)',
+        boxShadow: '0 0 30px rgba(188,19,254,0.1)'
+      }}>
+      
+      {/* VIRAL Header */}
+      <div className="flex items-center justify-center gap-2 pb-4 border-b border-[#BC13FE]/20">
+        {['V', 'I', 'R', 'A', 'L'].map((letter, i) => (
+          <div key={letter} className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl font-bold text-white"
+            style={{ 
+              background: 'linear-gradient(135deg, #BC13FE, #7700cc)',
+              boxShadow: '0 0 20px rgba(188,19,254,0.6)',
+              transform: i === 2 ? 'scale(1.1)' : 'scale(1)',
+            }}>
+            {letter}
+          </div>
+        ))}
       </div>
 
-      {/* Board visualization - simplified as 3 rows */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-0.5 flex-wrap">
-          {level1.map(renderSpace)}
-        </div>
-        <div className="flex items-center gap-0.5 flex-wrap">
-          {level2.map(renderSpace)}
-        </div>
-        <div className="flex items-center gap-0.5 flex-wrap">
-          {level3.map(renderSpace)}
-        </div>
+      {/* Districts arranged to spell VIRAL */}
+      <div className="space-y-6">
+        {renderDistrict('V', DISTRICT_RANGES.V)}
+        {renderDistrict('I', DISTRICT_RANGES.I)}
+        {renderDistrict('R', DISTRICT_RANGES.R)}
+        {renderDistrict('A', DISTRICT_RANGES.A)}
+        {renderDistrict('L', DISTRICT_RANGES.L)}
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-2 pt-2 border-t border-white/10">
-        {Object.entries(SPACE_COLORS).map(([type, color]) => (
-          <div key={type} className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded" style={{ background: color }} />
-            <span className="text-[5px] text-white/60 uppercase" style={PS2}>{type}</span>
-          </div>
-        ))}
+      <div className="pt-4 border-t border-[#BC13FE]/20">
+        <div className="text-[7px] tracking-widest text-white/40 uppercase mb-2" style={PS2}>Players</div>
+        <div className="flex flex-wrap gap-3">
+          {players.map((player, index) => (
+            <div key={player.playerCode} className="flex items-center gap-2">
+              <div 
+                className="w-3 h-3 rounded-full border border-white"
+                style={{ background: PLAYER_COLORS[index % PLAYER_COLORS.length] }}
+              />
+              <span className="text-[7px] text-white/80" style={PS2}>{player.name}</span>
+              {index === currentTurnIndex && (
+                <span className="text-[6px] text-[#4ade80] uppercase" style={PS2}>• TURN</span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
