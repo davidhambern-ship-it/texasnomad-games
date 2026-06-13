@@ -283,18 +283,16 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
         )}
 
         <div className="flex flex-wrap gap-2 justify-center">
-          {isDealer && (
-            <Btn onClick={handleShuffleAndDeal} color="#FFD700" size="sm" disabled={!isSetup || isShuffling || dealingActive || seatedPlayers.length < 2}>
-              {isShuffling ? '🔀 Shuffling...' : dealingActive ? '🃏 Dealing...' : '🔀 Shuffle & Deal'}
-            </Btn>
-          )}
+          <Btn onClick={handleShuffleAndDeal} color="#FFD700" size="sm" disabled={!isDealer || !isSetup || isShuffling || dealingActive || seatedPlayers.length < 2}>
+            {isShuffling ? '🔀 Shuffling...' : dealingActive ? '🃏 Dealing...' : '🔀 Shuffle & Deal'}
+          </Btn>
           <Btn onClick={() => setShowHandSetup(true)} color="#BC13FE" size="sm">
             🃏 Hand Setup
           </Btn>
-          <Btn onClick={handleRedeal} color="#FF5F1F" size="sm" disabled={isShuffling || dealingActive}>
+          <Btn onClick={handleRedeal} color="#FF5F1F" size="sm" disabled={!isDealer || isShuffling || dealingActive}>
             🔄 Redeal
           </Btn>
-          <Btn onClick={handleReset} color="#ef4444" size="sm">
+          <Btn onClick={handleReset} color="#ef4444" size="sm" disabled={!isDealer}>
             ↺ Reset
           </Btn>
           <Btn onClick={handleStandUp} color="#9ca3af" size="sm" disabled={!canStandUp}>
