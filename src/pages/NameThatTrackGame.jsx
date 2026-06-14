@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
+import { base44 } from '@/api/base44Client';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import RoleSelector from '@/components/game/RoleSelector.jsx';
 import HostPanel from '@/components/nameThatTrack/HostPanel.jsx';
@@ -75,12 +76,14 @@ function NameThatTrackViewer({ roomCode }) {
           <div className="w-10 h-10 border-4 border-[#8a22ff] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : !displayMode ? (
-        <WaitingForHost />
+        <WaitingForHost onStartVsAI={handleStartVsAI} />
       ) : displayMode === 'host' ? (
         <HostPanel gs={gs} updateState={updateState} />
       ) : (
         <GameScreen gs={gs} updateState={updateState} playerId={playerId} />
       )}
+
+
     </div>
   );
 
@@ -89,13 +92,69 @@ function NameThatTrackViewer({ roomCode }) {
     setChosenRole(role);
     setTimeout(() => setRoleLoading(false), 1000);
   }
+
+  async function handleStartVsAI() {
+    setRoleLoading(true);
+    try {
+      // Get random question from all available songs
+      const res = await base44.functions.invoke('nameThatTrack', {
+        action: 'getRandomQuestion',
+        playlistIds: [],
+        categories: [],
+      });
+      
+      if (!res.data.question) {
+        alert('No songs available! Please import a playlist first.');
+        return;
+      }
+
+      // Initialize game state for vs AI mode
+      await updateState({
+        display_mode: 'game',
+        phase: 'intro',
+        vs_ai: true,
+        ai_team_size: 4,
+        selectedPlaylists: [],
+        selectedCategories: [],
+        players: [{
+          playerId: playerId || 'player-1',
+          seatNumber: 1,
+          playerName: 'Player 1',
+          score: 0,
+          correctAnswers: 0,
+          status: 'active',
+        }],
+      });
+
+      // Start first round after brief intro
+      setTimeout(async () => {
+        await updateState({
+          phase: 'guessing',
+          currentQuestion: res.data.question,
+          currentRound: 1,
+          totalRounds: 10,
+        });
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to start vs AI:', err);
+      alert('Failed to start game. Please try again.');
+    }
+    setRoleLoading(false);
+  }
 }
 
-function WaitingForHost() {
+function WaitingForHost({ onPlayVsAI }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
       <div className="w-16 h-16 border-4 border-[#8a22ff]/40 border-t-[#8a22ff] rounded-full animate-spin" />
       <div className="font-heading text-2xl tracking-widest text-white/40 uppercase">Waiting for Host…</div>
+      <button
+        onClick={onPlayVsAI}
+        className="px-8 py-4 bg-[#BC13FE] text-white rounded-xl font-heading text-lg tracking-widest uppercase hover:bg-[#BC13FE]/90 transition-all"
+        style={{ boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}
+      >
+        🤖 PLAY VS AI TEAM
+      </button>
     </div>
   );
 }
