@@ -208,15 +208,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
       <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
         {song && (
           <div className="w-full max-w-3xl aspect-video rounded-2xl overflow-hidden border-2 border-[#BC13FE]/50" style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3)' }}>
-            <iframe
-              ref={playerRef}
-              src={videoUrl}
-              title="Music preview"
-              className="w-full h-full"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-              loading="lazy"
-            />
+            <iframe ref={playerRef} src={videoUrl} title="Music preview" className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
           </div>
         )}
 
