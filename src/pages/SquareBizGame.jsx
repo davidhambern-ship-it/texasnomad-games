@@ -326,8 +326,9 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
-      // Use local board variable
-      const idx = cpuPickSquare(board, 'O', 'X');
+      // Read board from gs to avoid stale closure
+      const currentBoard = gs.board || Array(9).fill('');
+      const idx = cpuPickSquare(currentBoard, 'O', 'X');
       if (idx == null || cancelled || winner) {
         setCpuThinking(false);
         setCpuQuestion(null);
@@ -359,13 +360,14 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         if (cancelled) return;
         await new Promise(r => setTimeout(r, 1500));
         if (!cancelled) {
-          // Place marker directly
-          const newBoard = [...board];
+          // Place marker directly - read fresh board from gs
+          const freshBoard = gs.board || Array(9).fill('');
+          const newBoard = [...freshBoard];
           newBoard[idx] = 'O';
           const w = checkWinner(newBoard);
           const isDraw = !w && newBoard.every(c => c !== '');
-          const newScores = w ? { X: scores.X, O: scores.O + 1 } : { X: scores.X, O: scores.O };
-          if (w) setScores(newScores);
+          const newScores = w ? { X: 0, O: 1 } : { X: 0, O: 0 };
+          if (w) setScores(prev => ({ ...prev, O: prev.O + 1 }));
           cpuTurnProcessedRef.current = false;
           await updateState({
             board: newBoard,
@@ -373,8 +375,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
             winner: w || (isDraw ? 'draw' : null),
             phase: w || isDraw ? '1p_game_over' : '1p_waiting',
             selected_square: null,
-            score_x: newScores.X,
-            score_o: newScores.O,
+            score_x: gs.score_x || 0,
+            score_o: (gs.score_o || 0) + (w ? 1 : 0),
           });
           if (w) showCPULine('winning');
           // Clear state after marker placed
@@ -402,7 +404,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     
     runCPUTurn();
     return () => { cancelled = true; };
-  }, [phase, winner, cpuCharacter, board]);
+  }, [phase, winner, cpuCharacter]);
 
   // New game
   const handleNewGame = async () => {
