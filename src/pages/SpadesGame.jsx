@@ -265,7 +265,15 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (!room || !gs.cpu_enabled || gs.phase !== 'playing') return;
     const trick = gs.current_trick || [];
     const seatedPlayers = (gs.players || []).filter(p => p.seatNumber != null);
+    if (seatedPlayers.length === 0) return;
     if (trick.length !== seatedPlayers.length) return;
+    
+    // Prevent re-processing the same trick by using a unique key per trick number
+    const currentTrickNum = gs.tricks_played || 0;
+    const trickKey = `hand${gs.hand_number || 0}-trick${currentTrickNum}`;
+    const lastProcessedTrick = sessionStorage.getItem(`spades_last_trick_${roomCode}`);
+    if (lastProcessedTrick === trickKey) return;
+    
     const activeSuit = getActiveSuit(trick);
     const winner = determineTrickWinner(trick, activeSuit);
     if (!winner) return;
@@ -277,21 +285,24 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         const winningSeat = winner.seatNumber;
         const winningTeam = getTeamFromSeat(winningSeat);
         const updatedPlayers = players.map(p => p.seatNumber === winningSeat ? { ...p, tricksWon: (p.tricksWon || 0) + 1 } : p);
+        const newTricksPlayed = (gs.tricks_played || 0) + 1;
         await updateState({
           players: updatedPlayers,
           current_trick: [],
           current_turn_seat: winningSeat,
-          tricks_played: (gs.tricks_played || 0) + 1,
+          tricks_played: newTricksPlayed,
           books1: winningTeam === 1 ? (gs.books1 || 0) + 1 : gs.books1 || 0,
           books2: winningTeam === 2 ? (gs.books2 || 0) + 1 : gs.books2 || 0,
           spades_broken: gs.spades_broken || trick.some(t => t.card.suit === '♠'),
         });
+        // Mark this trick as processed AFTER successful update
+        sessionStorage.setItem(`spades_last_trick_${roomCode}`, trickKey);
       } finally {
         setTimeout(() => { isUpdatingRef.current = false; }, 1000);
       }
     }, 2000);
     return () => clearTimeout(timer);
-  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players]);
+  }, [gs.current_trick, gs.phase, gs.cpu_enabled, gs.players, gs.tricks_played, gs.hand_number]);
 
   // ── AI bidding handler ────────────────────────────────────────────────────
   useEffect(() => {
@@ -337,10 +348,13 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // ── Round end: detect all 13 tricks played → score & show summary ─────────
   useEffect(() => {
     if (!room || !gs.cpu_enabled) return;
-    if (gs.phase !== 'playing') return;
+    // Allow phase to be 'playing' or 'round_over' (transition state)
+    if (gs.phase !== 'playing' && gs.phase !== 'round_over') return;
     const seatedCount = (gs.players || []).filter(p => p.seatNumber != null).length;
+    if (seatedCount === 0) return;
     const totalTricks = 52 / seatedCount; // 13 tricks for 4 players
-    if ((gs.tricks_played || 0) < totalTricks) return;
+    const tricksPlayed = gs.tricks_played || 0;
+    if (tricksPlayed < totalTricks) return;
     if (gs.round_scored) return; // prevent double-scoring
 
     const timer = setTimeout(async () => {
@@ -391,7 +405,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       }
     }, 2500);
     return () => clearTimeout(timer);
-  }, [gs.tricks_played, gs.phase, gs.cpu_enabled, gs.round_scored]);
+  }, [gs.tricks_played, gs.phase, gs.cpu_enabled, gs.round_scored, gs.books1, gs.books2, gs.bid1, gs.bid2, gs.score1, gs.score2, gs.hand_number, gs.dealer_seat, gs.players]);
 
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
