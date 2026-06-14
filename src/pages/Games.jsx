@@ -470,7 +470,11 @@ export default function Games() {
     }
     // Other games use character picker
     const gameKey = GAME_ID_TO_KEY[game.id];
-    if (!gameKey) return;
+    if (!gameKey) {
+      console.error('No gameKey found for game:', game.id);
+      return;
+    }
+    console.log('Setting CPU select game:', { id: game.id, title: game.title, gameKey, path: game.path });
     setCpuSelectGame({ id: game.id, title: game.title, gameKey, path: game.path });
   };
 

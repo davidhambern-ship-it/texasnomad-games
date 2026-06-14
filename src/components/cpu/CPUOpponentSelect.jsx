@@ -7,7 +7,7 @@ const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 /**
  * CPU Opponent Selection Screen
  * Props:
- *   gameKey: 'bff' | 'squareBiz' | 'hangman' | 'spades'
+ *   gameKey: 'bff' | 'squareBiz' | 'hangman' | 'spades' | 'wordSearch' | 'nameThatTrack'
  *   gameName: string (display name)
  *   onSelect: (character) => void
  *   onBack: () => void

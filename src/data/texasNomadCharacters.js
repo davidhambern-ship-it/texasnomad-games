@@ -57,6 +57,12 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Balanced board search — adapts risk level based on score gap.",
         riskLevel: 65,
         strategyLevel: 80
+      },
+      nameThatTrack: {
+        style: "music_expert",
+        description: "Knows classic hits and popular artists across decades.",
+        riskLevel: 60,
+        strategyLevel: 80
       }
     },
     catchphrases: [
@@ -134,6 +140,12 @@ export const TEXASNOMAD_CHARACTERS = [
         style: "logical_scanner",
         description: "Patient path-walker — prefers longer words and avoids mistakes.",
         riskLevel: 25,
+        strategyLevel: 90
+      },
+      nameThatTrack: {
+        style: "catalog_master",
+        description: "Systematic knowledge of artists and song titles.",
+        riskLevel: 30,
         strategyLevel: 90
       }
     },
@@ -213,6 +225,12 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Goes for long, high-value paths fast — often wrong, sometimes spectacular.",
         riskLevel: 90,
         strategyLevel: 60
+      },
+      nameThatTrack: {
+        style: "hit_hunter",
+        description: "Goes for popular hits and chart-toppers, sometimes misses deep cuts.",
+        riskLevel: 85,
+        strategyLevel: 65
       }
     },
     catchphrases: [
@@ -291,6 +309,12 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Random board walks — misses a lot, occasionally stumbles onto gold.",
         riskLevel: 70,
         strategyLevel: 40
+      },
+      nameThatTrack: {
+        style: "mood_guesser",
+        description: "Guesses based on vibes and random music memories.",
+        riskLevel: 75,
+        strategyLevel: 50
       }
     },
     catchphrases: [
@@ -369,6 +393,12 @@ export const TEXASNOMAD_CHARACTERS = [
         description: "Consistent, safe board scanning — avoids risky long paths.",
         riskLevel: 30,
         strategyLevel: 78
+      },
+      nameThatTrack: {
+        style: "genre_specialist",
+        description: "Strong knowledge of specific genres and eras.",
+        riskLevel: 40,
+        strategyLevel: 75
       }
     },
     catchphrases: [
@@ -447,6 +477,12 @@ export const TEXASNOMAD_CHARACTERS = [
         style: "slow_closer",
         description: "Deliberate, careful scanning — slow but reliable, rarely wastes a guess.",
         riskLevel: 20,
+        strategyLevel: 85
+      },
+      nameThatTrack: {
+        style: "deep_catalog",
+        description: "Methodical knowledge of artists' full discographies.",
+        riskLevel: 25,
         strategyLevel: 85
       }
     },
