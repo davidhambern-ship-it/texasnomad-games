@@ -188,6 +188,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const [gameMessage, setGameMessage] = useState('');
   const [usedQuestionIds, setUsedQuestionIds] = useState([]);
   const [scores, setScores] = useState({ X: 0, O: 0 });
+  const [cpuQuestion, setCpuQuestion] = useState(null);
+  const [cpuSelectedAnswer, setCpuSelectedAnswer] = useState(null);
   const cpuTurnProcessedRef = useRef(false);
 
   const isHumanTurn = currentTurn === 'X'; // human is always X
@@ -308,6 +310,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     
     const runCPUTurn = async () => {
       setCpuThinking(true);
+      setCpuQuestion(null);
+      setCpuSelectedAnswer(null);
       showCPULine('gameStart');
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
@@ -321,8 +325,13 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       // Load question for CPU
       const q = await loadQuestion();
       if (cancelled || winner) return;
+      setCpuQuestion(q);
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
+      // Simulate CPU selecting an answer
+      const letters = ['A', 'B', 'C', 'D'];
+      const cpuChoice = correct ? q.correct_answer : letters.filter(l => l !== q.correct_answer)[Math.floor(Math.random() * 3)];
+      setCpuSelectedAnswer(cpuChoice);
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       if (cancelled || winner) return;
@@ -356,6 +365,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setAnswerResult(null);
     setGameMessage('');
     setCpuDialogue('');
+    setCpuQuestion(null);
+    setCpuSelectedAnswer(null);
     cpuTurnProcessedRef.current = false;
     await updateState({
       board: Array(9).fill(''),
@@ -566,8 +577,47 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
           </div>
         )}
 
+        {/* CPU question display */}
+        {cpuQuestion && (
+          <div className="px-4 py-4 rounded-xl border-2 border-[#FF5F1F]/40 bg-[#FF5F1F]/5 space-y-3">
+            <div className="text-[7px] text-[#FF5F1F]/60 uppercase tracking-widest" style={sty}>📋 CPU Question</div>
+            <div className="font-heading text-sm text-white leading-snug">{cpuQuestion.question}</div>
+            {cpuQuestion.category && (
+              <div className="text-[6px] text-white/30 uppercase tracking-widest" style={sty}>{cpuQuestion.category}</div>
+            )}
+            {/* Answer choices */}
+            <div className="space-y-1.5 mt-3">
+              {['A','B','C','D'].map(letter => {
+                const text = cpuQuestion[`answer_${letter.toLowerCase()}`];
+                if (!text) return null;
+                const isSelected = cpuSelectedAnswer === letter;
+                const isCorrect = letter === cpuQuestion.correct_answer;
+                const showResult = cpuSelectedAnswer != null;
+                let bg = 'bg-white/5 border-white/10';
+                if (showResult && isSelected && isCorrect) bg = 'bg-[#4ade80]/20 border-[#4ade80]';
+                else if (showResult && isSelected && !isCorrect) bg = 'bg-[#ef4444]/20 border-[#ef4444]';
+                else if (showResult && isCorrect) bg = 'bg-[#4ade80]/10 border-[#4ade80]/40';
+                else if (isSelected) bg = 'bg-[#FFD700]/20 border-[#FFD700]';
+                return (
+                  <div key={letter} className={`px-3 py-2 rounded-lg border text-[7px] tracking-wide ${bg}`} style={sty}>
+                    <span className="text-[#FF5F1F] mr-1.5">{letter}.</span>{text}
+                    {showResult && isSelected && isCorrect && <span className="ml-2 text-[#4ade80]">✓</span>}
+                    {showResult && isSelected && !isCorrect && <span className="ml-2 text-[#ef4444]">✗</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Show correct answer when wrong */}
+            {cpuSelectedAnswer && cpuSelectedAnswer !== cpuQuestion.correct_answer && (
+              <div className="mt-2 px-3 py-2 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 text-[7px] text-[#4ade80] tracking-wide" style={sty}>
+                <span className="font-bold">Correct: {cpuQuestion.correct_answer}</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* CPU thinking dots */}
-        {(phase === '1p_cpu_choosing' || phase === '1p_cpu_answering') && (
+        {cpuThinking && !cpuQuestion && (
           <div className="flex justify-center gap-2 py-2">
             {[0,1,2].map(i => (
               <div key={i} className="w-2 h-2 rounded-full bg-[#FF5F1F] animate-bounce"
