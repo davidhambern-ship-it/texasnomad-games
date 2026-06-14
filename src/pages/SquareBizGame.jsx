@@ -281,15 +281,18 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     const isDraw = !w && newBoard.every(c => c !== '');
     const newScores = w ? { ...scores, [w]: (scores[w] || 0) + 1 } : scores;
     if (w) setScores(newScores);
+    // Clear trivia state
     setTriviaQuestion(null);
     setSelectedAnswer(null);
     setAnswerResult(null);
     setGameMessage('');
+    // Determine next phase based on who just played
+    const nextPhase = w || isDraw ? '1p_game_over' : (mark === 'O' ? '1p_waiting' : '1p_cpu_choosing');
     await updateState({
       board: newBoard,
       current_turn: w || isDraw ? currentTurn : nextTurn,
       winner: w || (isDraw ? 'draw' : null),
-      phase: w || isDraw ? '1p_game_over' : (nextTurn === 'O' ? '1p_cpu_choosing' : '1p_waiting'),
+      phase: nextPhase,
       selected_square: null,
       score_x: newScores.X,
       score_o: newScores.O,
@@ -308,6 +311,9 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       // Load question for CPU
       const q = await loadQuestion();
+      if (q) {
+        setTriviaQuestion({ ...q, targetIdx: idx, isCPU: true });
+      }
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
       await new Promise(r => setTimeout(r, 1200));
@@ -320,13 +326,14 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 1400));
         setGameMessage('');
+        setTriviaQuestion(null);
         await updateState({ phase: '1p_waiting', selected_square: null });
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [phase]);
+  }, [phase, board, winner]);
 
   // New game
   const handleNewGame = async () => {
@@ -435,13 +442,43 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         )}
 
         {/* CPU thinking */}
-        {(phase === '1p_cpu_choosing' || phase === '1p_cpu_answering') && !winner && (
+        {(phase === '1p_cpu_choosing' || phase === '1p_cpu_answering') && !winner && !triviaQuestion && (
           <div className="px-4 py-4 rounded-xl border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 text-center">
             <div className="flex items-center justify-center gap-2">
               <div className="w-3 h-3 border-2 border-[#FF5F1F] border-t-transparent rounded-full animate-spin" />
               <div className="text-[8px] text-[#FF5F1F]/70 uppercase tracking-widest" style={sty}>
                 {cpuCharacter?.name || 'CPU'} is {phase === '1p_cpu_answering' ? 'answering…' : 'thinking…'}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* CPU trivia question display (visible to player) */}
+        {triviaQuestion && triviaQuestion.isCPU && phase === '1p_cpu_answering' && (
+          <div className="flex flex-col gap-3">
+            <div className="px-5 py-4 rounded-xl border-2 border-[#FF5F1F]/40 bg-[#FF5F1F]/5">
+              <div className="text-[8px] text-[#FF5F1F]/60 uppercase tracking-widest mb-2" style={sty}>📋 {cpuCharacter?.name || 'CPU'} is answering…</div>
+              <div className="font-heading text-lg text-white leading-snug">{triviaQuestion.question}</div>
+              {triviaQuestion.category && (
+                <div className="text-[7px] text-white/30 uppercase mt-1 tracking-widest" style={sty}>{triviaQuestion.category}</div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              {['A','B','C','D'].map(letter => {
+                const text = triviaQuestion[`answer_${letter.toLowerCase()}`];
+                if (!text) return null;
+                const isCorrect = letter === triviaQuestion.correct_answer;
+                return (
+                  <div key={letter}
+                    className={`px-3 py-2 rounded-xl border-2 font-heading text-[9px] tracking-wide transition-all ${
+                      isCorrect && answerResult !== null
+                        ? 'border-[#4ade80] bg-[#4ade80]/15 text-[#4ade80]'
+                        : 'border-[#FF5F1F]/30 bg-[#FF5F1F]/5 text-white/60'
+                    }`}>
+                    <span className="text-[#FF5F1F] mr-1">{letter}.</span>{text}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
