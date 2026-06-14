@@ -82,48 +82,60 @@ function NameThatTrackViewer({ roomCode }) {
     try {
       console.log('Starting vs AI game...');
       
-      // Default YouTube playlist for solo play
-      const youtubePlaylistUrl = 'https://youtube.com/playlist?list=PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM&si=jOzGupVsv7BRXrdN';
-      const youtubePlaylistId = 'PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM';
-      
-      // First, import the playlist if it doesn't exist
-      console.log('Importing default playlist...');
-      const importRes = await base44.functions.invoke('nameThatTrack', {
-        action: 'importPlaylist',
-        playlistUrl: youtubePlaylistUrl,
-        categoryName: 'Solo Play Default',
-      });
-      
-      console.log('Import result:', importRes.data);
-      
-      // Get playlists to find the entity ID
+      // Get available playlists
       const playlistsRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
-      const playlist = playlistsRes.data.playlists?.find(p => p.playlistId === youtubePlaylistId);
+      const playlists = playlistsRes.data.playlists || [];
       
-      if (!playlist) {
-        alert('Failed to import playlist. Please try again.');
-        return;
+      // Find the default playlist or use any available
+      const youtubePlaylistId = 'PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM';
+      let defaultPlaylistId = null;
+      
+      // Try to find the specific playlist
+      const targetPlaylist = playlists.find(p => p.playlistId === youtubePlaylistId);
+      if (targetPlaylist) {
+        defaultPlaylistId = targetPlaylist.id;
+      } else if (playlists.length > 0) {
+        // Fallback to first available playlist
+        defaultPlaylistId = playlists[0].id;
       }
       
-      const defaultPlaylistId = playlist.id;
-      console.log('Using playlist entity ID:', defaultPlaylistId);
+      if (!defaultPlaylistId) {
+        // No playlists available - import the default one
+        try {
+          const importRes = await base44.functions.invoke('nameThatTrack', {
+            action: 'importPlaylist',
+            playlistUrl: 'https://youtube.com/playlist?list=PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM&si=jOzGupVsv7BRXrdN',
+            categoryName: 'Solo Play Default',
+          });
+          
+          const refreshRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+          const playlist = refreshRes.data.playlists?.find(p => p.playlistId === youtubePlaylistId);
+          if (playlist) {
+            defaultPlaylistId = playlist.id;
+          }
+        } catch (importErr) {
+          console.error('Failed to import playlist:', importErr);
+        }
+      }
+      
+      if (!defaultPlaylistId) {
+        alert('No songs available. Please import a playlist from the Host Panel first.');
+        return;
+      }
 
-      // Get random question from the default playlist
+      // Get random question from the playlist
       const res = await base44.functions.invoke('nameThatTrack', {
         action: 'getRandomQuestion',
         playlistIds: [defaultPlaylistId],
         categories: [],
       });
       
-      console.log('Question result:', res.data);
-      
       if (!res.data.question) {
         alert('No songs available! Please try again.');
         return;
       }
 
-      // Initialize game state for vs AI mode
-      console.log('Setting initial game state...');
+      // Initialize game state
       await updateState({
         display_mode: 'game',
         phase: 'intro',
@@ -141,9 +153,8 @@ function NameThatTrackViewer({ roomCode }) {
         }],
       });
 
-      // Start first round after brief intro
+      // Start first round
       setTimeout(async () => {
-        console.log('Starting first round...');
         await updateState({
           phase: 'guessing',
           currentQuestion: res.data.question,
