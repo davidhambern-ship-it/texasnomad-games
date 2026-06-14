@@ -152,7 +152,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }
   }
 
-  const videoUrl = song ? `https://www.youtube-nocookie.com/embed/${song.youtubeVideoId}` : null;
+  const videoUrl = song ? `https://www.youtube.com/embed/${song.youtubeVideoId}?start=30&end=45&mute=${muted ? 1 : 0}` : null;
 
   // Game over check
   if (phase === 'game_over') {
@@ -208,7 +208,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
       <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
         {song && (
           <div className="w-full max-w-3xl aspect-video rounded-2xl overflow-hidden border-2 border-[#BC13FE]/50" style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3)' }}>
-            <iframe ref={playerRef} src={videoUrl} title="Music preview" className="w-full h-full" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            <iframe ref={playerRef} src={videoUrl} title="Music preview" className="w-full h-full" allow="autoplay; encrypted-media" allowFullScreen />
           </div>
         )}
 
