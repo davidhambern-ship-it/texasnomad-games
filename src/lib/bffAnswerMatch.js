@@ -4,6 +4,50 @@
  */
 
 // ── Synonym map (bidirectional) ─────────────────────────────────────────────
+// Cross-concept groups: words that aren't synonyms but are conceptually related
+const CROSS_CONCEPT_GROUPS = [
+  // Food ↔ Cooking relationship
+  ['food', 'meal', 'dish', 'grub', 'eats', 'cook', 'cooking', 'cooked', 'kitchen', 'chef', 'recipe', 'ingredients'],
+  // Sleep ↔ Dreams
+  ['sleep', 'rest', 'nap', 'snooze', 'slumber', 'dream', 'dreams', 'nightmare', 'bed'],
+  // Money ↔ Work
+  ['money', 'cash', 'currency', 'funds', 'dough', 'bread', 'job', 'work', 'occupation', 'career', 'salary', 'pay', 'income'],
+  // Love ↔ Relationship
+  ['love', 'affection', 'adore', 'care', 'devotion', 'relationship', 'dating', 'romance', 'partner', 'crush'],
+  // Fear ↔ Scared
+  ['fear', 'scared', 'afraid', 'phobia', 'terrified', 'worried', 'anxious', 'nervous', 'panic'],
+  // Anger ↔ Fight
+  ['angry', 'mad', 'furious', 'upset', 'irate', 'livid', 'fight', 'argue', 'quarrel', 'bicker', 'conflict'],
+  // Sad ↔ Cry
+  ['sad', 'unhappy', 'depressed', 'upset', 'down', 'miserable', 'gloomy', 'cry', 'crying', 'tears'],
+  // Happy ↔ Smile
+  ['happy', 'joyful', 'glad', 'pleased', 'cheerful', 'content', 'elated', 'smile', 'smiling', 'laugh'],
+  // Tired ↔ Sleep
+  ['tired', 'exhausted', 'sleepy', 'weary', 'fatigued', 'sleep', 'rest', 'nap'],
+  // Doctor ↔ Hospital
+  ['doctor', 'physician', 'medical doctor', 'doc', 'md', 'hospital', 'clinic', 'medical center', 'nurse'],
+  // School ↔ Learning
+  ['school', 'class', 'classroom', 'education', 'learn', 'learning', 'study', 'student', 'teacher'],
+  // Car ↔ Drive
+  ['car', 'vehicle', 'automobile', 'auto', 'drive', 'driving', 'road', 'street'],
+  // Phone ↔ Call
+  ['phone', 'cell phone', 'cellphone', 'mobile', 'telephone', 'call', 'calling', 'text'],
+  // Music ↔ Song
+  ['music', 'song', 'tune', 'melody', 'track', 'sing', 'singing', 'dance'],
+  // Book ↔ Read
+  ['book', 'novel', 'story', 'read', 'reading', 'library', 'author'],
+  // Movie ↔ Watch
+  ['movie', 'film', 'flick', 'picture', 'watch', 'watching', 'cinema', 'theater'],
+  // Pet ↔ Animal
+  ['dog', 'puppy', 'pup', 'canine', 'cat', 'kitty', 'kitten', 'feline', 'pet', 'animal'],
+  // Family ↔ Home
+  ['family', 'relatives', 'kin', 'folks', 'house', 'home', 'residence', 'household'],
+  // Time ↔ Clock
+  ['time', 'moment', 'period', 'hour', 'second', 'minute', 'clock', 'watch', 'schedule'],
+  // Place ↔ Location
+  ['place', 'location', 'spot', 'area', 'venue', 'site', 'where', 'destination'],
+];
+
 const SYNONYM_GROUPS = [
   ['sickness', 'illness', 'disease', 'ailment', 'condition'],
   ['doctor', 'physician', 'medical doctor', 'doc', 'md'],
@@ -15,7 +59,7 @@ const SYNONYM_GROUPS = [
   ['money', 'cash', 'currency', 'funds', 'dough', 'bread'],
   ['house', 'home', 'residence', 'dwelling', 'household'],
   ['school', 'class', 'classroom', 'education'],
-  ['food', 'meal', 'dish', 'grub', 'eats'],
+  ['food', 'meal', 'dish', 'grub', 'eats', 'cooking', 'cook'],
   ['bathroom', 'restroom', 'toilet', 'lavatory', 'washroom', 'powder room', 'wc'],
   ['phone', 'cell phone', 'cellphone', 'mobile', 'telephone', 'cell', 'mobile phone'],
   ['tv', 'television', 'telly', 'tube'],
@@ -48,7 +92,7 @@ const SYNONYM_GROUPS = [
   ['church', 'chapel', 'temple', 'place of worship', 'worship'],
   ['store', 'shop', 'market', 'mall', 'supermarket'],
   ['sleep', 'rest', 'nap', 'snooze', 'slumber'],
-  ['cook', 'prepare food', 'make food', 'bake', 'fry', 'grill'],
+  ['cook', 'prepare food', 'make food', 'bake', 'fry', 'grill', 'cooking', 'cooked'],
   ['fight', 'argue', 'quarrel', 'bicker', 'disagree', 'conflict'],
   ['love', 'affection', 'adore', 'care', 'devotion'],
   ['hate', 'dislike', 'despise', 'loathe', 'detest'],
@@ -118,7 +162,7 @@ const SYNONYM_GROUPS = [
   ['nightmare', 'bad dream', 'terrifying', 'horror'],
   ['memory', 'memories', 'remember', 'recall', 'nostalgia'],
   ['favorite', 'favourite', 'best', 'top', 'preferred', 'most liked'],
-  ['first time', 'first', '初次', 'debut', 'maiden'],
+  ['first time', 'first', 'debut', 'maiden'],
   ['last time', 'last', 'most recent', 'final'],
   ['childhood', 'child', 'kid', 'young', 'growing up'],
   ['adult', 'grown up', 'mature', 'older'],
@@ -134,6 +178,8 @@ const SYNONYM_GROUPS = [
   ['prank', 'practical joke', 'joke', 'trick', 'hoax'],
   ['addiction', 'addicted', 'dependence', 'hooked', 'obsession'],
   ['phobia', 'fear', 'panic', 'terror'],
+  ['what', 'which', 'who', 'when', 'where', 'why', 'how'],
+  ['cooks', 'cook', 'cooking', 'cooked', 'prepare', 'makes', 'make'],
 ];
 
 // Build flat synonym lookup: word → group index
