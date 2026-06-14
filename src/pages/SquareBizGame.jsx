@@ -288,8 +288,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setSelectedAnswer(null);
     setAnswerResult(null);
     setGameMessage('');
-    // Reset CPU turn flag when human places marker
-    if (mark === 'X') cpuTurnProcessedRef.current = false;
+    // Reset CPU turn flag when placing marker
+    cpuTurnProcessedRef.current = false;
     await updateState({
       board: newBoard,
       current_turn: w || isDraw ? currentTurn : nextTurn,
@@ -312,15 +312,22 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       setCpuThinking(true);
       setCpuQuestion(null);
       setCpuSelectedAnswer(null);
+      setGameMessage('');
       showCPULine('gameStart');
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
       const idx = cpuPickSquare(board, 'O', 'X');
-      if (idx == null || cancelled || winner) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
+      if (idx == null || cancelled || winner) {
+        setCpuThinking(false);
+        setCpuQuestion(null);
+        setCpuSelectedAnswer(null);
+        cpuTurnProcessedRef.current = false;
+        return;
+      }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       if (cancelled) return;
-      await new Promise(r => setTimeout(r, 600));
+      await new Promise(r => setTimeout(r, 500));
       
       // Load question for CPU
       const q = await loadQuestion();
@@ -333,30 +340,37 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       const cpuChoice = correct ? q.correct_answer : letters.filter(l => l !== q.correct_answer)[Math.floor(Math.random() * 3)];
       setCpuSelectedAnswer(cpuChoice);
       if (cancelled) return;
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 600));
       if (cancelled || winner) return;
-      setCpuThinking(false);
+      
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
         if (cancelled) return;
-        await new Promise(r => setTimeout(r, 800));
-        if (!cancelled) await placeMarker(idx, 'O');
+        await new Promise(r => setTimeout(r, 1000));
+        if (!cancelled) {
+          setCpuThinking(false);
+          await placeMarker(idx, 'O');
+        }
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
         if (cancelled) return;
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
         if (!cancelled) {
+          setCpuThinking(false);
+          setCpuQuestion(null);
+          setCpuSelectedAnswer(null);
           setGameMessage('');
           await updateState({ phase: '1p_waiting', selected_square: null });
+          cpuTurnProcessedRef.current = false;
         }
       }
     };
     
     runCPUTurn();
     return () => { cancelled = true; };
-  }, [phase]);
+  }, [phase, board, winner, cpuCharacter]);
 
   // New game
   const handleNewGame = async () => {
@@ -578,7 +592,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         )}
 
         {/* CPU question display */}
-        {cpuQuestion && (
+        {cpuQuestion && cpuSelectedAnswer && (
           <div className="px-4 py-4 rounded-xl border-2 border-[#FF5F1F]/40 bg-[#FF5F1F]/5 space-y-3">
             <div className="text-[7px] text-[#FF5F1F]/60 uppercase tracking-widest" style={sty}>📋 CPU Question</div>
             <div className="font-heading text-sm text-white leading-snug">{cpuQuestion.question}</div>
@@ -592,17 +606,16 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
                 if (!text) return null;
                 const isSelected = cpuSelectedAnswer === letter;
                 const isCorrect = letter === cpuQuestion.correct_answer;
-                const showResult = cpuSelectedAnswer != null;
                 let bg = 'bg-white/5 border-white/10';
-                if (showResult && isSelected && isCorrect) bg = 'bg-[#4ade80]/20 border-[#4ade80]';
-                else if (showResult && isSelected && !isCorrect) bg = 'bg-[#ef4444]/20 border-[#ef4444]';
-                else if (showResult && isCorrect) bg = 'bg-[#4ade80]/10 border-[#4ade80]/40';
+                if (isSelected && isCorrect) bg = 'bg-[#4ade80]/20 border-[#4ade80]';
+                else if (isSelected && !isCorrect) bg = 'bg-[#ef4444]/20 border-[#ef4444]';
+                else if (isCorrect) bg = 'bg-[#4ade80]/10 border-[#4ade80]/40';
                 else if (isSelected) bg = 'bg-[#FFD700]/20 border-[#FFD700]';
                 return (
                   <div key={letter} className={`px-3 py-2 rounded-lg border text-[7px] tracking-wide ${bg}`} style={sty}>
                     <span className="text-[#FF5F1F] mr-1.5">{letter}.</span>{text}
-                    {showResult && isSelected && isCorrect && <span className="ml-2 text-[#4ade80]">✓</span>}
-                    {showResult && isSelected && !isCorrect && <span className="ml-2 text-[#ef4444]">✗</span>}
+                    {isSelected && isCorrect && <span className="ml-2 text-[#4ade80]">✓</span>}
+                    {isSelected && !isCorrect && <span className="ml-2 text-[#ef4444]">✗</span>}
                   </div>
                 );
               })}
@@ -617,7 +630,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         )}
 
         {/* CPU thinking dots */}
-        {cpuThinking && !cpuQuestion && (
+        {cpuThinking && !cpuSelectedAnswer && (
           <div className="flex justify-center gap-2 py-2">
             {[0,1,2].map(i => (
               <div key={i} className="w-2 h-2 rounded-full bg-[#FF5F1F] animate-bounce"
