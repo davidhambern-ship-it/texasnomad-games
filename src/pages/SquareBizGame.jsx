@@ -261,7 +261,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       await new Promise(r => setTimeout(r, 1200));
       await placeMarker(triviaQuestion.targetIdx, 'X');
     } else {
-      setGameMessage('❌ Wrong! CPU gets a free move.');
+      setGameMessage('❌ Wrong! Your turn lost.');
       showCPULine('winning');
       await new Promise(r => setTimeout(r, 1400));
       setTriviaQuestion(null);
