@@ -10,7 +10,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
   const phase = gs.phase || 'waiting';
   const currentQuestion = gs.currentQuestion;
   const question = currentQuestion?.question || currentQuestion;
-  const song = currentQuestion?.song || currentQuestion;
+  const song = currentQuestion?.song;
   const players = gs.players || [];
   const vsAI = gs.vs_ai;
   const aiTeamSize = gs.ai_team_size || 4;
@@ -20,6 +20,8 @@ export default function GameScreen({ gs, updateState, playerId }) {
   const [aiGuesses, setAIGuesses] = useState([]);
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const playerRef = useRef(null);
+  
+  console.log('GameScreen render - phase:', phase, 'song:', song, 'question:', question);
 
   useEffect(() => {
     setGuess('');
@@ -152,9 +154,9 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }
   }
 
-  const videoUrl = song?.youtubeVideoId ? `https://www.youtube.com/embed/${song.youtubeVideoId}?autoplay=0&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1` : null;
+  const videoUrl = song?.youtubeVideoId ? `https://www.youtube.com/embed/${song.youtubeVideoId}?autoplay=0&mute=${muted ? 1 : 0}&controls=1&rel=0&modestbranding=1&enablejsapi=1` : null;
   
-  console.log('Video URL:', videoUrl, 'Song:', song);
+  console.log('Video URL:', videoUrl, 'Song:', song, 'youtubeVideoId:', song?.youtubeVideoId);
 
   // Game over check
   if (phase === 'game_over') {
@@ -208,9 +210,21 @@ export default function GameScreen({ gs, updateState, playerId }) {
   return (
     <div className="flex-1 flex flex-col">
       <div className="flex-1 flex flex-col items-center justify-center p-4 gap-6">
-        {song && (
+        {song && videoUrl ? (
           <div className="w-full max-w-3xl aspect-video rounded-2xl overflow-hidden border-2 border-[#BC13FE]/50" style={{ boxShadow: '0 0 40px rgba(188,19,254,0.3)' }}>
-            <iframe ref={playerRef} src={videoUrl} title="Music preview" className="w-full h-full" allow="autoplay; encrypted-media" allowFullScreen />
+            <iframe
+              ref={playerRef}
+              src={videoUrl}
+              title="Music preview"
+              className="w-full h-full"
+              allow="autoplay; encrypted-media; fullscreen"
+              allowFullScreen
+              loading="lazy"
+            />
+          </div>
+        ) : (
+          <div className="w-full max-w-3xl aspect-video rounded-2xl overflow-hidden border-2 border-[#BC13FE]/50 bg-black/30 flex items-center justify-center">
+            <div className="text-white/40 text-sm" style={PS2}>No video available</div>
           </div>
         )}
 
