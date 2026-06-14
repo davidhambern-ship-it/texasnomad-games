@@ -1,0 +1,43 @@
+{
+  "name": "MusicTrack",
+  "type": "object",
+  "properties": {
+    "youtube_id": {
+      "type": "string",
+      "description": "YouTube video ID"
+    },
+    "title": {
+      "type": "string",
+      "description": "Song/video title"
+    },
+    "artist": {
+      "type": "string",
+      "description": "Artist or channel name"
+    },
+    "thumbnail": {
+      "type": "string",
+      "description": "Thumbnail URL"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Duration in ISO 8601 format (e.g., PT3M45S)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Music category or genre"
+    },
+    "game_id": {
+      "type": "string",
+      "description": "Which game this track is associated with"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this track is available for use"
+    }
+  },
+  "required": [
+    "youtube_id",
+    "title"
+  ]
+}
