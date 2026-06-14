@@ -300,6 +300,28 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     if (w) showCPULine(w === 'X' ? 'losing' : 'winning');
   };
 
+  // CPU places marker directly (avoids stale closure)
+  const placeCPUMarker = async (idx) => {
+    const currentBoard = gs.board || Array(9).fill('');
+    const newBoard = [...currentBoard];
+    newBoard[idx] = 'O';
+    const w = checkWinner(newBoard);
+    const isDraw = !w && newBoard.every(c => c !== '');
+    const newScoreO = w === 'O' ? ((gs.score_o || 0) + 1) : (gs.score_o || 0);
+    if (w === 'O') setScores(prev => ({ ...prev, O: newScoreO }));
+    setTriviaQuestion(null);
+    setGameMessage('');
+    await updateState({
+      board: newBoard,
+      current_turn: w || isDraw ? currentTurn : 'X',
+      winner: w || (isDraw ? 'draw' : null),
+      phase: w || isDraw ? '1p_game_over' : '1p_waiting',
+      selected_square: null,
+      score_o: newScoreO,
+    });
+    if (w) showCPULine('winning');
+  };
+
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
     if (phase !== '1p_cpu_choosing' || winner) return;
@@ -351,7 +373,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     };
     
     runCPUTurn();
-  }, [phase]);
+  }, [phase, winner, gs.board, gs.score_o]);
 
   // New game
   const handleNewGame = async () => {
