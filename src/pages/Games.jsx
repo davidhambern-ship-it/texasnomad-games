@@ -352,6 +352,20 @@ const GAMES = [
     path: '/games/spades',
     featured: false,
   },
+  {
+    id: 'name-that-track',
+    title: 'Name That Track',
+    tagline: 'YouTube Music Trivia',
+    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
+    color: '#BC13FE',
+    color2: '#FF5F1F',
+    marqueeText: 'GUESS THE SONG • NAME THE ARTIST • WIN POINTS • MUSIC TRIVIA',
+    screenText: '🎵 NAME THAT TRACK',
+    description: 'Listen to YouTube music clips and guess the song title or artist. Import your own playlists, compete with friends, and prove your music knowledge!',
+    tags: ['Music', 'Trivia', 'YouTube'],
+    path: '/games/name-that-track',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [
@@ -361,12 +375,12 @@ const COMING_SOON = [
 ];
 
 // Map game ID to gameKey used in character system
-const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral' };
+const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral', 'name-that-track': 'nameThatTrack' };
 
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }

@@ -1,0 +1,111 @@
+{
+  "name": "NameThatTrackGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. NTT817)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "screen_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "players": {
+      "type": "array",
+      "description": "Array of player objects",
+      "items": {
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string"
+          },
+          "seatNumber": {
+            "type": "number"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "default": 0
+          },
+          "correctAnswers": {
+            "type": "number",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "left",
+              "winner"
+            ]
+          }
+        }
+      }
+    },
+    "selectedPlaylists": {
+      "type": "array",
+      "description": "Array of selected playlist IDs for this game",
+      "items": {
+        "type": "string"
+      }
+    },
+    "selectedCategories": {
+      "type": "array",
+      "description": "Array of selected categories for this game",
+      "items": {
+        "type": "string"
+      }
+    },
+    "currentRound": {
+      "type": "number",
+      "default": 1
+    },
+    "totalRounds": {
+      "type": "number",
+      "default": 10
+    },
+    "currentQuestion": {
+      "type": "object",
+      "description": "Current question being played"
+    },
+    "gameState": {
+      "type": "object",
+      "description": "Current game state (phase, timer, etc.)"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "intro",
+        "playing",
+        "guessing",
+        "revealing",
+        "round_over",
+        "game_over"
+      ],
+      "default": "waiting"
+    },
+    "winner": {
+      "type": "object",
+      "description": "Winner info when game ends"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}

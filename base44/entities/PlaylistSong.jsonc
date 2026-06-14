@@ -1,0 +1,23 @@
+{
+  "name": "PlaylistSong",
+  "type": "object",
+  "properties": {
+    "playlistId": {
+      "type": "string",
+      "description": "Reference to Playlist entity ID"
+    },
+    "songId": {
+      "type": "string",
+      "description": "Reference to Song entity ID"
+    },
+    "position": {
+      "type": "number",
+      "default": 0,
+      "description": "Position in playlist"
+    }
+  },
+  "required": [
+    "playlistId",
+    "songId"
+  ]
+}

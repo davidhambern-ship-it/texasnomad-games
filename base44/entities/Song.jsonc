@@ -1,0 +1,47 @@
+{
+  "name": "Song",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "Song title (can be edited by host)"
+    },
+    "artist": {
+      "type": "string",
+      "description": "Artist name (can be edited by host)"
+    },
+    "youtubeVideoId": {
+      "type": "string",
+      "description": "YouTube video ID"
+    },
+    "thumbnail": {
+      "type": "string",
+      "description": "Thumbnail URL"
+    },
+    "channelTitle": {
+      "type": "string",
+      "description": "YouTube channel name"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Duration in ISO 8601 format"
+    },
+    "originalTitle": {
+      "type": "string",
+      "description": "Original title from YouTube (for reference)"
+    },
+    "originalArtist": {
+      "type": "string",
+      "description": "Original artist from YouTube (for reference)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this song is available for use"
+    }
+  },
+  "required": [
+    "title",
+    "youtubeVideoId"
+  ]
+}

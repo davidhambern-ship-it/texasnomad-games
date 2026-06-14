@@ -1,0 +1,67 @@
+{
+  "name": "GameQuestion",
+  "type": "object",
+  "properties": {
+    "songId": {
+      "type": "string",
+      "description": "Reference to Song entity ID"
+    },
+    "questionType": {
+      "type": "string",
+      "enum": [
+        "title",
+        "artist",
+        "both"
+      ],
+      "description": "What players need to guess"
+    },
+    "correctTitle": {
+      "type": "string",
+      "description": "Correct song title"
+    },
+    "correctArtist": {
+      "type": "string",
+      "description": "Correct artist name"
+    },
+    "acceptableTitles": {
+      "type": "array",
+      "description": "Alternative acceptable titles (synonyms, abbreviations)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "acceptableArtists": {
+      "type": "array",
+      "description": "Alternative acceptable artist names",
+      "items": {
+        "type": "string"
+      }
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard"
+      ],
+      "default": "medium",
+      "description": "Question difficulty level"
+    },
+    "points": {
+      "type": "number",
+      "default": 100,
+      "description": "Points for correct answer"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this question is available for use"
+    }
+  },
+  "required": [
+    "songId",
+    "questionType",
+    "correctTitle",
+    "correctArtist"
+  ]
+}

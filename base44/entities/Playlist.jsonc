@@ -1,0 +1,35 @@
+{
+  "name": "Playlist",
+  "type": "object",
+  "properties": {
+    "playlistId": {
+      "type": "string",
+      "description": "YouTube playlist ID"
+    },
+    "playlistName": {
+      "type": "string",
+      "description": "Name of the playlist"
+    },
+    "category": {
+      "type": "string",
+      "description": "Music category or genre"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "Original YouTube playlist URL"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether this playlist is available for use"
+    },
+    "created_by_user_id": {
+      "type": "string",
+      "description": "User who imported this playlist"
+    }
+  },
+  "required": [
+    "playlistId",
+    "playlistName"
+  ]
+}
