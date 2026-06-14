@@ -310,8 +310,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (gs.first_hand_no_bid) return;
     const currentBidderSeat = gs.current_bidder_seat;
     if (!currentBidderSeat) return;
-    const bidder = players.find(p => p.seatNumber === currentBidderSeat);
+    const bidder = (gs.players || []).find(p => p.seatNumber === currentBidderSeat);
     if (!bidder || bidder.playerType !== 'cpu' || bidder.bid != null) return;
+    if (!bidder.hand || bidder.hand.length === 0) return; // Wait for hands to be dealt
 
     const character = bidder.characterId ? TEXASNOMAD_CHARACTERS.find(c => c.id === bidder.characterId) : null;
     const hand = bidder.hand || [];
@@ -322,12 +323,12 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (character) {
       const base = Math.round(spadeCount * 0.8);
       const personality = {
-        dexter:   () => Math.min(13, Math.max(1, base)),        // careful/logical
-        tank:     () => Math.min(13, Math.max(1, base - 1)),    // conservative
-        violet:   () => Math.min(13, Math.max(2, base)),        // balanced
-        berna:    () => Math.min(13, Math.max(2, base + (Math.random() < 0.3 ? 1 : 0))), // competitive
-        lemonade: () => Math.min(13, Math.max(2, base + 1 + (Math.random() < 0.4 ? 1 : 0))), // risky
-        carlos:   () => Math.min(13, Math.max(1, base + (Math.random() < 0.5 ? 1 : -1))),    // unpredictable
+        dexter:   () => Math.min(13, Math.max(1, base)),
+        tank:     () => Math.min(13, Math.max(1, base - 1)),
+        violet:   () => Math.min(13, Math.max(2, base)),
+        berna:    () => Math.min(13, Math.max(2, base + (Math.random() < 0.3 ? 1 : 0))),
+        lemonade: () => Math.min(13, Math.max(2, base + 1 + (Math.random() < 0.4 ? 1 : 0))),
+        carlos:   () => Math.min(13, Math.max(1, base + (Math.random() < 0.5 ? 1 : -1))),
       };
       bid = (personality[character.id] || (() => base))();
     }
@@ -337,13 +338,13 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
       if (isUpdatingRef.current) return;
       isUpdatingRef.current = true;
       try {
-        await advanceBid(bidder, bid, players);
+        await advanceBid(bidder, bid, gs.players);
       } finally {
         setTimeout(() => { isUpdatingRef.current = false; }, 500);
       }
     }, delay);
     return () => clearTimeout(timer);
-  }, [gs.current_bidder_seat, gs.phase, gs.cpu_enabled, players]);
+  }, [gs.current_bidder_seat, gs.phase, gs.cpu_enabled, gs.players, gs.first_hand_no_bid]);
 
   // ── Round end: detect all 13 tricks played → score & show summary ─────────
   useEffect(() => {
@@ -410,11 +411,10 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // ─── Handlers ──────────────────────────────────────────────────────────────
 
   // Advance bid for a player (human or AI)
-  // currentPlayers must be the LATEST players array (not from stale closure)
   const advanceBid = async (bidder, bid, currentPlayers) => {
     const basePlayers = currentPlayers || gs.players || [];
     const updatedPlayers = basePlayers.map(p => p.playerId === bidder.playerId ? { ...p, bid } : p);
-    const seated = updatedPlayers.filter(p => p.role === 'player' || p.role === 'hostPlayer').sort((a, b) => a.seatNumber - b.seatNumber);
+    const seated = updatedPlayers.filter(p => (p.role === 'player' || p.role === 'hostPlayer') && p.seatNumber != null).sort((a, b) => a.seatNumber - b.seatNumber);
     const bidderIdx = seated.findIndex(p => p.playerId === bidder.playerId);
     const nextBidder = seated[(bidderIdx + 1) % seated.length];
     const allBid = seated.every(p => p.bid != null);
@@ -429,18 +429,19 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         bid1: t1, bid2: t2,
         current_turn_seat: firstSeat || seated[0]?.seatNumber,
         current_bidder_seat: null,
+        hand_number: gs.hand_number || 0,
       });
     } else {
-      await updateState({ players: updatedPlayers, current_bidder_seat: nextBidder?.seatNumber });
+      await updateState({ players: updatedPlayers, current_bidder_seat: nextBidder?.seatNumber, hand_number: gs.hand_number || 0 });
     }
   };
 
   // Bid timeout handler (human or AI auto-bid 3)
   const handleBidTimeout = async (seatNum) => {
     if (!seatNum) return;
-    const bidder = players.find(p => p.seatNumber === seatNum);
+    const bidder = (gs.players || []).find(p => p.seatNumber === seatNum);
     if (!bidder || bidder.bid != null) return;
-    await advanceBid(bidder, 3, players);
+    await advanceBid(bidder, 3, gs.players);
   };
 
   const handleAutoDeal = async (shuffledDeck, knownHandNumber = null) => {

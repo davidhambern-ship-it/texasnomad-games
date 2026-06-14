@@ -172,10 +172,10 @@ export default function SpadesPlayerControls({ seatNumber, player, gs, updateSta
       await updateState({
         players: updated, phase: 'playing', bid1: t1, bid2: t2,
         current_turn_seat: firstSeat || seated[0]?.seatNumber, current_bidder_seat: null,
-        hand_number: (gs.hand_number || 0), // preserve hand number
+        hand_number: gs.hand_number || 0,
       });
     } else {
-      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber, hand_number: (gs.hand_number || 0) });
+      await updateState({ players: updated, current_bidder_seat: nextBidder?.seatNumber, hand_number: gs.hand_number || 0 });
     }
     setBidInput('');
   };
