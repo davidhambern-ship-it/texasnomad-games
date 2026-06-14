@@ -158,7 +158,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
   useEffect(() => {
     if (!enabled || !gs.answering_ai || gs.faceoff_phase !== 'second_answer') return;
 
-    const key = `fo2_r${gs.round_number || 0}_${gs.ai_member_idx || 0}_${JSON.stringify(gs.faceoff_first_answer)}`;
+    const key = `fo2_r${gs.round_number || 0}_${gs.ai_member_idx || 0}`;
     if (processedRef.current === key) return;
     processedRef.current = key;
 
@@ -215,7 +215,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     }, randomBetween(1200, 2500));
 
     return () => clearTimeout(aiTimerRef.current);
-  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.ai_member_idx, gs.faceoff_first_answer]);
+  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.ai_member_idx, gs.round_number]);
 
   // ── Normal AI survey play ─────────────────────────────────────────────────
   useEffect(() => {
