@@ -192,6 +192,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const [cpuSelectedAnswer, setCpuSelectedAnswer] = useState(null);
   const cpuTurnProcessedRef = useRef(false);
 
+  const scoreX = gs.score_x || 0;
+  const scoreO = gs.score_o || 0;
   const isHumanTurn = currentTurn === 'X'; // human is always X
   const isCPUTurn = currentTurn === 'O';
 
@@ -362,7 +364,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
           newBoard[idx] = 'O';
           const w = checkWinner(newBoard);
           const isDraw = !w && newBoard.every(c => c !== '');
-          const newScores = w ? { X: scoreX, O: scoreO + 1 } : { X: scoreX, O: scoreO };
+          const newScores = w ? { X: scores.X, O: scores.O + 1 } : { X: scores.X, O: scores.O };
           if (w) setScores(newScores);
           cpuTurnProcessedRef.current = false;
           await updateState({
@@ -400,7 +402,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     
     runCPUTurn();
     return () => { cancelled = true; };
-  }, [phase, winner, cpuCharacter, board, scoreX, scoreO]);
+  }, [phase, winner, cpuCharacter, board]);
 
   // New game
   const handleNewGame = async () => {
@@ -422,9 +424,6 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       score_o: gs.score_o || 0,
     });
   };
-
-  const scoreX = gs.score_x || 0;
-  const scoreO = gs.score_o || 0;
 
   const cellStyle = (v, idx) => {
     const isSelected = gs.selected_square === idx;
