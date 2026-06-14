@@ -3,9 +3,9 @@ import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import { base44 } from '@/api/base44Client';
-import SeatBadge from '@/components/game/SeatBadge.jsx';
-import HostPanel from '@/components/nameThatTrack/HostPanel.jsx';
-import GameScreen from '@/components/nameThatTrack/GameScreen.jsx';
+import SeatBadge from '@/components/game/SeatBadge';
+import HostPanel from '@/components/nameThatTrack/HostPanel';
+import GameScreen from '@/components/nameThatTrack/GameScreen';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
