@@ -48,6 +48,11 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
   const aiTimerRef = useRef(null);
   const buzzerTimersRef = useRef([]);
   const processedRef = useRef(null);
+  
+  // Reset processed ref when round changes
+  useEffect(() => {
+    processedRef.current = null;
+  }, [gs.round_number]);
 
   // ── board_shown → buzzer_active ──────────────────────────────────────────
   useEffect(() => {
