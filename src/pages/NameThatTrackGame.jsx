@@ -96,6 +96,18 @@ function NameThatTrackViewer({ roomCode }) {
   async function handleStartVsAI() {
     setRoleLoading(true);
     try {
+      console.log('Starting vs AI game...');
+      
+      // First check if we have any songs
+      const playlistsRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+      console.log('Playlists:', playlistsRes.data);
+      
+      if (!playlistsRes.data.playlists || playlistsRes.data.playlists.length === 0) {
+        alert('No playlists imported yet! Please import a YouTube playlist first, or wait for a host to connect.');
+        setRoleLoading(false);
+        return;
+      }
+
       // Get random question from all available songs
       const res = await base44.functions.invoke('nameThatTrack', {
         action: 'getRandomQuestion',
@@ -103,12 +115,16 @@ function NameThatTrackViewer({ roomCode }) {
         categories: [],
       });
       
+      console.log('Question result:', res.data);
+      
       if (!res.data.question) {
         alert('No songs available! Please import a playlist first.');
+        setRoleLoading(false);
         return;
       }
 
       // Initialize game state for vs AI mode
+      console.log('Setting initial game state...');
       await updateState({
         display_mode: 'game',
         phase: 'intro',
@@ -128,6 +144,7 @@ function NameThatTrackViewer({ roomCode }) {
 
       // Start first round after brief intro
       setTimeout(async () => {
+        console.log('Starting first round...');
         await updateState({
           phase: 'guessing',
           currentQuestion: res.data.question,
@@ -137,21 +154,24 @@ function NameThatTrackViewer({ roomCode }) {
       }, 2000);
     } catch (err) {
       console.error('Failed to start vs AI:', err);
-      alert('Failed to start game. Please try again.');
+      alert('Failed to start game: ' + err.message);
     }
     setRoleLoading(false);
   }
 }
 
-function WaitingForHost({ onPlayVsAI }) {
+function WaitingForHost({ onStartVsAI }) {
   return (
     <div className="flex-1 flex flex-col items-center justify-center gap-6 text-center p-8">
       <div className="w-16 h-16 border-4 border-[#8a22ff]/40 border-t-[#8a22ff] rounded-full animate-spin" />
       <div className="font-heading text-2xl tracking-widest text-white/40 uppercase">Waiting for Host…</div>
+      <div className="text-white/30 text-sm max-w-md">
+        No host connected. You can play solo against the AI Team!
+      </div>
       <button
-        onClick={onPlayVsAI}
+        onClick={onStartVsAI}
         className="px-8 py-4 bg-[#BC13FE] text-white rounded-xl font-heading text-lg tracking-widest uppercase hover:bg-[#BC13FE]/90 transition-all"
-        style={{ boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}
+        style={{ ...PS2, boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}
       >
         🤖 PLAY VS AI TEAM
       </button>
