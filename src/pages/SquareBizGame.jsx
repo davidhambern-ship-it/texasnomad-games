@@ -302,44 +302,51 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
 
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
-    if (phase !== '1p_cpu_choosing' || winner) return;
-    if (cpuTurnProcessedRef.current) return;
+    if (phase !== '1p_cpu_choosing' || winner || cpuTurnProcessedRef.current) return;
     cpuTurnProcessedRef.current = true;
+    let cancelled = false;
     
     const runCPUTurn = async () => {
       setCpuThinking(true);
       showCPULine('gameStart');
+      if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
       const idx = cpuPickSquare(board, 'O', 'X');
-      if (idx == null || winner) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
+      if (idx == null || cancelled || winner) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
+      if (cancelled) return;
       await new Promise(r => setTimeout(r, 600));
       
       // Load question for CPU
       const q = await loadQuestion();
-      if (winner) return;
+      if (cancelled || winner) return;
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
+      if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
-      if (winner) return;
+      if (cancelled || winner) return;
       setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
+        if (cancelled) return;
         await new Promise(r => setTimeout(r, 800));
-        await placeMarker(idx, 'O');
+        if (!cancelled) await placeMarker(idx, 'O');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
+        if (cancelled) return;
         await new Promise(r => setTimeout(r, 800));
-        setGameMessage('');
-        await updateState({ phase: '1p_waiting', selected_square: null });
+        if (!cancelled) {
+          setGameMessage('');
+          await updateState({ phase: '1p_waiting', selected_square: null });
+        }
       }
     };
     
     runCPUTurn();
-    return () => {};
+    return () => { cancelled = true; };
   }, [phase]);
 
   // New game
