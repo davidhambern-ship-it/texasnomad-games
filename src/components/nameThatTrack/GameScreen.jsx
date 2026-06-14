@@ -9,7 +9,8 @@ import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 export default function GameScreen({ gs, updateState, playerId }) {
   const phase = gs.phase || 'waiting';
   const currentQuestion = gs.currentQuestion;
-  const song = currentQuestion?.song;
+  const question = currentQuestion?.question || currentQuestion;
+  const song = currentQuestion?.song || currentQuestion;
   const players = gs.players || [];
   const vsAI = gs.vs_ai;
   const aiTeamSize = gs.ai_team_size || 4;
@@ -32,8 +33,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
     const aiDelay = 3000 + Math.random() * 4000; // AI guesses between 3-7 seconds
     const timer = setTimeout(() => {
       const aiCharacters = TEXASNOMAD_CHARACTERS.slice(0, aiTeamSize);
-      const song = currentQuestion?.song;
-      const questionType = currentQuestion?.question?.questionType;
+      const questionType = question?.questionType;
       
       const aiGuessResults = aiCharacters.map((char, idx) => {
         const accuracy = 0.3 + (char.traits.intelligence / 100) * 0.5; // 30-80% accuracy
@@ -68,15 +68,14 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }, aiDelay);
     
     return () => clearTimeout(timer);
-  }, [vsAI, phase, submitted, currentQuestion]);
+  }, [vsAI, phase, submitted, question, song]);
 
   const handleGuess = async () => {
     if (!guess.trim() || submitted) return;
     setSubmitted(true);
     
     // Check if player's guess is correct
-    const song = currentQuestion?.song;
-    const questionType = currentQuestion?.question?.questionType;
+    const questionType = question?.questionType;
     const isCorrect = song && (
       questionType === 'artist' 
         ? guess.toLowerCase().includes(song.artist.toLowerCase())
@@ -89,7 +88,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
           ...p,
           lastGuess: guess.trim(),
           guessSubmitted: true,
-          score: isCorrect ? (p.score || 0) + (currentQuestion.question.points || 100) : p.score,
+          score: isCorrect ? (p.score || 0) + (question?.points || 100) : p.score,
           correctAnswers: isCorrect ? (p.correctAnswers || 0) + 1 : p.correctAnswers,
         } : p
       ),
@@ -99,7 +98,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
   async function processRoundResults(aiGuessResults) {
     // Update AI team score
     const aiCorrectCount = aiGuessResults.filter(ai => ai.isCorrect).length;
-    const aiPoints = aiCorrectCount * (currentQuestion?.question.points || 100);
+    const aiPoints = aiCorrectCount * (question?.points || 100);
     
     await updateState({
       aiTeamScore: (gs.aiTeamScore || 0) + aiPoints,
@@ -206,14 +205,14 @@ export default function GameScreen({ gs, updateState, playerId }) {
           </div>
         )}
 
-        {currentQuestion && (
+        {question && (
           <div className="text-center">
             <div className="font-heading text-2xl tracking-widest text-[#FFD700] uppercase mb-2" style={{ ...PS2, textShadow: '0 0 20px rgba(255,215,0,0.5)' }}>
-              {currentQuestion.question.questionType === 'title' ? '🎵 NAME THAT TRACK' :
-               currentQuestion.question.questionType === 'artist' ? '🎤 NAME THAT ARTIST' :
+              {question.questionType === 'title' ? '🎵 NAME THAT TRACK' :
+               question.questionType === 'artist' ? '🎤 NAME THAT ARTIST' :
                '🎵 NAME THAT TRACK & ARTIST'}
             </div>
-            <div className="text-white/40 text-sm">{currentQuestion.question.points} points • {currentQuestion.question.difficulty.toUpperCase()}</div>
+            <div className="text-white/40 text-sm">{question.points} points • {question.difficulty?.toUpperCase()}</div>
           </div>
         )}
 
