@@ -4,7 +4,6 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import { base44 } from '@/api/base44Client';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
-import RoleSelector from '@/components/game/RoleSelector.jsx';
 import HostPanel from '@/components/nameThatTrack/HostPanel.jsx';
 import GameScreen from '@/components/nameThatTrack/GameScreen.jsx';
 
@@ -21,9 +20,7 @@ function NameThatTrackViewer({ roomCode }) {
   const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'name-that-track', 'viewer');
   const gs = room?.game_state || {};
   
-  const [chosenRole, setChosenRole] = useState(null);
-  const [roleLoading, setRoleLoading] = useState(false);
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'name-that-track', updateState, false, chosenRole);
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'name-that-track', updateState, false, null);
 
   useEffect(() => {
     if (isSeated && playerId) registerPlayer(playerId);
@@ -42,10 +39,6 @@ function NameThatTrackViewer({ roomCode }) {
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col relative">
-      {!chosenRole && isSeated && displayMode === 'game' && !loading && (
-        <RoleSelector seatNumber={seatNumber} isSeated={isSeated} onChooseRole={handleChooseRole} loading={roleLoading} />
-      )}
-
       <header className="sticky top-0 z-40 border-b border-[#8a22ff]/30 bg-[#05030b]/90 backdrop-blur-xl">
         <div className="max-w-screen-2xl mx-auto px-4 h-12 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -82,19 +75,10 @@ function NameThatTrackViewer({ roomCode }) {
       ) : (
         <GameScreen gs={gs} updateState={updateState} playerId={playerId} />
       )}
-
-
     </div>
   );
 
-  function handleChooseRole(role) {
-    setRoleLoading(true);
-    setChosenRole(role);
-    setTimeout(() => setRoleLoading(false), 1000);
-  }
-
   async function handleStartVsAI() {
-    setRoleLoading(true);
     try {
       console.log('Starting vs AI game...');
       
@@ -112,7 +96,6 @@ function NameThatTrackViewer({ roomCode }) {
       
       if (!res.data.question) {
         alert('No songs available! Please try again.');
-        setRoleLoading(false);
         return;
       }
 
@@ -149,7 +132,6 @@ function NameThatTrackViewer({ roomCode }) {
       console.error('Failed to start vs AI:', err);
       alert('Failed to start game: ' + err.message);
     }
-    setRoleLoading(false);
   }
 }
 
