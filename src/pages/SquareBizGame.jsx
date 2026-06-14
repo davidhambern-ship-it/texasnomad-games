@@ -300,6 +300,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
     if (phase !== '1p_cpu_choosing' || winner) return;
+    let cancelled = false;
     setCpuThinking(true);
     showCPULine('gameStart');
     const timer = setTimeout(async () => {
@@ -308,25 +309,29 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       // Load question for CPU
       const q = await loadQuestion();
+      if (cancelled) return;
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
       await new Promise(r => setTimeout(r, 1200));
+      if (cancelled) { setCpuThinking(false); return; }
       setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
         await new Promise(r => setTimeout(r, 1000));
-        await placeMarker(idx, 'O');
+        if (!cancelled) await placeMarker(idx, 'O');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
         await new Promise(r => setTimeout(r, 1200));
-        setGameMessage('');
-        await updateState({ phase: '1p_waiting', selected_square: null });
+        if (!cancelled) {
+          setGameMessage('');
+          await updateState({ phase: '1p_waiting', selected_square: null });
+        }
       }
     }, 1200);
-    return () => clearTimeout(timer);
-  }, [phase]);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [phase, board, winner]);
 
   // New game
   const handleNewGame = async () => {
