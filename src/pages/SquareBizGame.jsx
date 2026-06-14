@@ -191,9 +191,17 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const [cpuQuestion, setCpuQuestion] = useState(null);
   const [cpuSelectedAnswer, setCpuSelectedAnswer] = useState(null);
   const cpuTurnProcessedRef = useRef(false);
+  const boardRef = useRef(gs.board || Array(9).fill(''));
+  const scoreRef = useRef({ X: gs.score_x || 0, O: gs.score_o || 0 });
 
-  const scoreX = gs.score_x || 0;
-  const scoreO = gs.score_o || 0;
+  // Keep refs in sync with latest state
+  useEffect(() => {
+    boardRef.current = gs.board || Array(9).fill('');
+    scoreRef.current = { X: gs.score_x || 0, O: gs.score_o || 0 };
+  }, [gs.board, gs.score_x, gs.score_o]);
+
+  const scoreX = scoreRef.current.X;
+  const scoreO = scoreRef.current.O;
   const isHumanTurn = currentTurn === 'X'; // human is always X
   const isCPUTurn = currentTurn === 'O';
 
@@ -326,8 +334,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
-      // Read board from gs to avoid stale closure
-      const currentBoard = gs.board || Array(9).fill('');
+      // Use ref for latest board state
+      const currentBoard = boardRef.current;
       const idx = cpuPickSquare(currentBoard, 'O', 'X');
       if (idx == null || cancelled || winner) {
         setCpuThinking(false);
@@ -360,14 +368,15 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         if (cancelled) return;
         await new Promise(r => setTimeout(r, 1500));
         if (!cancelled) {
-          // Place marker directly - read fresh board from gs
-          const freshBoard = gs.board || Array(9).fill('');
-          const newBoard = [...freshBoard];
+          // Place marker directly - use ref for latest board
+          const latestBoard = boardRef.current;
+          const newBoard = [...latestBoard];
           newBoard[idx] = 'O';
           const w = checkWinner(newBoard);
           const isDraw = !w && newBoard.every(c => c !== '');
-          const newScores = w ? { X: 0, O: 1 } : { X: 0, O: 0 };
-          if (w) setScores(prev => ({ ...prev, O: prev.O + 1 }));
+          const currentScores = scoreRef.current;
+          const newScores = w ? { X: currentScores.X, O: currentScores.O + 1 } : { X: currentScores.X, O: currentScores.O };
+          if (w) setScores(newScores);
           cpuTurnProcessedRef.current = false;
           await updateState({
             board: newBoard,
@@ -375,8 +384,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
             winner: w || (isDraw ? 'draw' : null),
             phase: w || isDraw ? '1p_game_over' : '1p_waiting',
             selected_square: null,
-            score_x: gs.score_x || 0,
-            score_o: (gs.score_o || 0) + (w ? 1 : 0),
+            score_x: newScores.X,
+            score_o: newScores.O,
           });
           if (w) showCPULine('winning');
           // Clear state after marker placed
