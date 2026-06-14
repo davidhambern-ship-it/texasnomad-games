@@ -302,6 +302,13 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     if (w) showCPULine(w === 'X' ? 'losing' : 'winning');
   };
 
+  // Reset CPU turn flag when phase changes to cpu_choosing
+  useEffect(() => {
+    if (phase === '1p_cpu_choosing') {
+      cpuTurnProcessedRef.current = false;
+    }
+  }, [phase]);
+
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
     if (phase !== '1p_cpu_choosing' || winner || cpuTurnProcessedRef.current) return;
@@ -317,8 +324,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
-      const currentBoard = gs.board || Array(9).fill('');
-      const idx = cpuPickSquare(currentBoard, 'O', 'X');
+      // Use local board variable
+      const idx = cpuPickSquare(board, 'O', 'X');
       if (idx == null || cancelled || winner) {
         setCpuThinking(false);
         setCpuQuestion(null);
@@ -350,12 +357,12 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         if (cancelled) return;
         await new Promise(r => setTimeout(r, 1500));
         if (!cancelled) {
-          // Place marker directly without calling placeMarker to avoid stale closure
-          const newBoard = [...currentBoard];
+          // Place marker directly
+          const newBoard = [...board];
           newBoard[idx] = 'O';
           const w = checkWinner(newBoard);
           const isDraw = !w && newBoard.every(c => c !== '');
-          const newScores = w ? { X: gs.score_x || 0, O: (gs.score_o || 0) + 1 } : { X: gs.score_x || 0, O: gs.score_o || 0 };
+          const newScores = w ? { X: scoreX, O: scoreO + 1 } : { X: scoreX, O: scoreO };
           if (w) setScores(newScores);
           cpuTurnProcessedRef.current = false;
           await updateState({
@@ -368,7 +375,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
             score_o: newScores.O,
           });
           if (w) showCPULine('winning');
-          // Clear question after marker placed
+          // Clear state after marker placed
           setCpuThinking(false);
           setCpuQuestion(null);
           setCpuSelectedAnswer(null);
@@ -382,7 +389,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         if (!cancelled) {
           cpuTurnProcessedRef.current = false;
           await updateState({ phase: '1p_waiting', selected_square: null });
-          // Clear question after phase update
+          // Clear state after phase update
           setCpuThinking(false);
           setCpuQuestion(null);
           setCpuSelectedAnswer(null);
@@ -393,7 +400,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     
     runCPUTurn();
     return () => { cancelled = true; };
-  }, [phase, winner, cpuCharacter]);
+  }, [phase, winner, cpuCharacter, board, scoreX, scoreO]);
 
   // New game
   const handleNewGame = async () => {
