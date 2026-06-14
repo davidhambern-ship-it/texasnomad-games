@@ -101,7 +101,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
   useEffect(() => {
     if (!enabled || !gs.answering_ai || gs.faceoff_phase !== 'first_answer') return;
 
-    const key = `fo1_${gs.ai_member_idx}`;
+    const key = `fo1_r${gs.round_number || 0}_${gs.ai_member_idx || 0}`;
     if (processedRef.current === key) return;
     processedRef.current = key;
 
@@ -158,7 +158,7 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
   useEffect(() => {
     if (!enabled || !gs.answering_ai || gs.faceoff_phase !== 'second_answer') return;
 
-    const key = `fo2_${gs.ai_member_idx}_${gs.faceoff_first_answer?.text}`;
+    const key = `fo2_r${gs.round_number || 0}_${gs.ai_member_idx || 0}_${JSON.stringify(gs.faceoff_first_answer)}`;
     if (processedRef.current === key) return;
     processedRef.current = key;
 
@@ -215,14 +215,14 @@ export function useBFFVsAI({ gs, updateState, playerId, humanPlayers, enabled })
     }, randomBetween(1200, 2500));
 
     return () => clearTimeout(aiTimerRef.current);
-  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.ai_member_idx, gs.faceoff_first_answer?.text]);
+  }, [enabled, gs.answering_ai, gs.faceoff_phase, gs.ai_member_idx, gs.faceoff_first_answer]);
 
   // ── Normal AI survey play ─────────────────────────────────────────────────
   useEffect(() => {
     if (!enabled || !gs.answering_ai || gs.faceoff_phase) return;
     if (gs.phase !== 'playing') return;
 
-    const stateKey = `play_${gs.ai_member_idx}_${gs.round_bank}_${(gs.answers || []).filter(a => a.revealed).length}`;
+    const stateKey = `play_r${gs.round_number || 0}_${gs.ai_member_idx}_${gs.round_bank}_${(gs.answers || []).filter(a => a.revealed).length}`;
     if (processedRef.current === stateKey) return;
     processedRef.current = stateKey;
 
