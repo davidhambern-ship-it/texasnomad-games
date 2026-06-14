@@ -157,7 +157,7 @@ function NameThatTrackViewer({ roomCode }) {
       setTimeout(async () => {
         await updateState({
           phase: 'guessing',
-          currentQuestion: res.data.question,
+          currentQuestion: res.data, // Store entire response with both question and song
           currentRound: 1,
           totalRounds: 10,
         });

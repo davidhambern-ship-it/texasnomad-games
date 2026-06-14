@@ -144,13 +144,13 @@ export default function GameScreen({ gs, updateState, playerId }) {
       if (res.data.question) {
         await updateState({
           phase: 'guessing',
-          currentQuestion: res.data.question,
+          currentQuestion: res.data, // Store entire response
         });
         setSubmitted(false);
         setAIGuesses([]);
       }
     } catch (err) {
-      console.error('Failed to load next question:', err);
+      console.error('Failed to load next round:', err);
     }
   }
 
