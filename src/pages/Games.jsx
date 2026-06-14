@@ -352,23 +352,10 @@ const GAMES = [
     path: '/games/spades',
     featured: false,
   },
-  {
-    id: 'name-that-track',
-    title: 'Name That Track',
-    tagline: 'YouTube Music Trivia',
-    image: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=800&q=80',
-    color: '#BC13FE',
-    color2: '#FF5F1F',
-    marqueeText: 'GUESS THE SONG • NAME THE ARTIST • WIN POINTS • MUSIC TRIVIA',
-    screenText: '🎵 NAME THAT TRACK',
-    description: 'Listen to YouTube music clips and guess the song title or artist. Import your own playlists, compete with friends, and prove your music knowledge!',
-    tags: ['Music', 'Trivia', 'YouTube'],
-    path: '/games/name-that-track',
-    featured: false,
-  },
 ];
 
 const COMING_SOON = [
+  { title: 'Name That Track', emoji: '🎵', color: '#5a1a5a' },
   { title: 'VIRAL!', emoji: '🚀', color: '#5a1a5a' },
   { title: 'TN Originals', emoji: '🤠', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
