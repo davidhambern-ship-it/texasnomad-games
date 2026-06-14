@@ -302,19 +302,23 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
 
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
-    if (phase !== '1p_cpu_choosing' || winner || cpuTurnProcessedRef.current) return;
+    if (phase !== '1p_cpu_choosing' || winner) return;
+    if (cpuTurnProcessedRef.current) return;
     cpuTurnProcessedRef.current = true;
+    
     setCpuThinking(true);
     showCPULine('gameStart');
     const timer = setTimeout(async () => {
       const idx = cpuPickSquare(board, 'O', 'X');
-      if (idx == null) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
+      if (idx == null || winner) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       // Load question for CPU
       const q = await loadQuestion();
+      if (winner) return;
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
       await new Promise(r => setTimeout(r, 1200));
+      if (winner) return;
       setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
@@ -330,7 +334,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       }
     }, 1200);
     return () => clearTimeout(timer);
-  }, [phase]);
+  }, [phase, board, cpuCharacter]);
 
   // New game
   const handleNewGame = async () => {
