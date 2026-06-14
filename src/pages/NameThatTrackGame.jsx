@@ -83,7 +83,7 @@ function NameThatTrackViewer({ roomCode }) {
       console.log('Starting vs AI game...');
       
       // Use the default solo play playlist
-      const defaultPlaylistId = '6a2e4b91954a3f8cbc4cb852';
+      const defaultPlaylistId = 'PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM';
 
       // Get random question from the default playlist
       const res = await base44.functions.invoke('nameThatTrack', {
