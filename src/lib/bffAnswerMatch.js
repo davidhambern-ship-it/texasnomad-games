@@ -95,6 +95,45 @@ const SYNONYM_GROUPS = [
   ['shoes', 'sneakers', 'footwear', 'boots', 'heels'],
   ['hair', 'haircut', 'hairstyle', 'hairdo'],
   ['money', 'finances', 'budget', 'savings', 'income'],
+  ['lie', 'lies', 'lying', 'dishonest', 'untruthful', 'deceive', 'deception'],
+  ['secret', 'secrets', 'hidden', 'conceal', 'private'],
+  ['fear', 'scared', 'afraid', 'phobia', 'terrified', 'worried', 'anxious'],
+  ['embarrassing', 'embarrassed', 'shameful', 'shame', 'humiliating', 'awkward'],
+  ['regret', 'regrets', 'sorry', 'remorse', 'wish'],
+  ['crush', 'infatuation', 'attraction', 'like', 'love interest'],
+  ['weird', 'strange', 'odd', 'bizarre', 'unusual', 'creepy'],
+  ['gross', 'disgusting', 'revolting', 'nasty', 'vile'],
+  ['awesome', 'amazing', 'cool', 'great', 'excellent', 'fantastic', 'wonderful'],
+  ['terrible', 'awful', 'horrible', 'bad', 'worst', 'dreadful'],
+  ['nervous', 'anxious', 'uneasy', 'apprehensive', 'jittery', 'worried'],
+  ['guilty', 'guilt', 'blame', 'responsible', 'at fault'],
+  ['jealous', 'jealousy', 'envious', 'envy', 'possessive'],
+  ['lonely', 'loneliness', 'isolated', 'alone', 'solitary'],
+  ['confident', 'confidence', 'self assured', 'bold', 'certain'],
+  ['insecure', 'insecurity', 'uncertain', 'doubtful', 'unsure'],
+  ['pet peeve', 'annoyance', 'irritation', 'bother', 'hate'],
+  ['habit', 'habits', 'routine', 'custom', 'practice', 'addiction'],
+  ['talent', 'talents', 'skill', 'ability', 'gift', 'strength'],
+  ['dream', 'dreams', 'goal', 'aspiration', 'wish', 'ambition'],
+  ['nightmare', 'bad dream', 'terrifying', 'horror'],
+  ['memory', 'memories', 'remember', 'recall', 'nostalgia'],
+  ['favorite', 'favourite', 'best', 'top', 'preferred', 'most liked'],
+  ['first time', 'first', '初次', 'debut', 'maiden'],
+  ['last time', 'last', 'most recent', 'final'],
+  ['childhood', 'child', 'kid', 'young', 'growing up'],
+  ['adult', 'grown up', 'mature', 'older'],
+  ['relationship', 'relationships', 'dating', 'romance', 'partner'],
+  ['breakup', 'break up', 'split', 'separation', 'divorce'],
+  ['trust', 'trusts', 'believe', 'faith', 'rely'],
+  ['betray', 'betrayal', 'backstab', 'deceive', 'cheat'],
+  ['forgive', 'forgiveness', 'pardon', 'excuse', 'let go'],
+  ['apologize', 'apology', 'say sorry', 'apologetic', 'regret'],
+  ['compliment', 'praise', 'flattery', 'kind words'],
+  ['insult', 'offense', 'rude', 'disrespect', 'mean'],
+  ['revenge', 'vengeance', 'payback', 'retaliation'],
+  ['prank', 'practical joke', 'joke', 'trick', 'hoax'],
+  ['addiction', 'addicted', 'dependence', 'hooked', 'obsession'],
+  ['phobia', 'fear', 'panic', 'terror'],
 ];
 
 // Build flat synonym lookup: word → group index
@@ -205,6 +244,17 @@ export function matchAnswer(playerGuess, answerObj) {
       }
     }
   }
+  
+  // Check if any guess word is a synonym of any answer word (partial match)
+  for (const gw of guessWords) {
+    if (gw.length >= 3) {
+      for (const aw of ansWords) {
+        if (aw.length >= 3 && areSynonyms(gw, aw)) {
+          return { match: true, type: 'synonym', normGuess, normAns };
+        }
+      }
+    }
+  }
 
   // 3. Custom synonyms on the answer object
   const customSynonyms = answerObj.synonyms || [];
@@ -214,37 +264,44 @@ export function matchAnswer(playerGuess, answerObj) {
     }
   }
 
-  // 4. Phrase contains (main keyword) — only for words 4+ chars
-  if (normAns.length >= 4 && normGuess.includes(normAns)) {
+  // 4. Phrase contains (main keyword) — more lenient
+  if (normAns.length >= 3 && normGuess.includes(normAns)) {
     return { match: true, type: 'phrase', normGuess, normAns };
   }
-  if (normGuess.length >= 4 && normAns.includes(normGuess)) {
+  if (normGuess.length >= 3 && normAns.includes(normGuess)) {
     return { match: true, type: 'phrase', normGuess, normAns };
+  }
+  
+  // Check if answer contains the key word from guess (and vice versa)
+  if (ansWords.length > 1 && guessWords.length > 0) {
+    for (const gw of guessWords) {
+      if (gw.length >= 3 && ansWords.some(aw => aw === gw || aw.includes(gw) || gw.includes(aw))) {
+        return { match: true, type: 'phrase', normGuess, normAns };
+      }
+    }
   }
 
   // 5. Fuzzy match — Levenshtein similarity
-  // Threshold: stricter for short words, looser for longer
+  // Threshold: more lenient for human players
   const sim = similarity(normGuess, normAns);
   const isShort = normAns.length < 4 || normGuess.length < 4;
-  const threshold = isShort ? 1.0 : 0.82;
+  const threshold = isShort ? 0.85 : 0.75;
 
   if (sim >= threshold) {
     return { match: true, type: 'fuzzy', normGuess, normAns, sim };
   }
 
   // Also try fuzzy on individual words against the full answer
-  if (!isShort) {
-    for (const gw of guessWords) {
-      if (gw.length >= 4) {
-        const ws = similarity(gw, normAns);
-        if (ws >= 0.85) return { match: true, type: 'fuzzy', normGuess, normAns, sim: ws };
-      }
+  for (const gw of guessWords) {
+    if (gw.length >= 3) {
+      const ws = similarity(gw, normAns);
+      if (ws >= 0.80) return { match: true, type: 'fuzzy', normGuess, normAns, sim: ws };
     }
-    for (const aw of ansWords) {
-      if (aw.length >= 4) {
-        const ws = similarity(normGuess, aw);
-        if (ws >= 0.85) return { match: true, type: 'fuzzy', normGuess, normAns, sim: ws };
-      }
+  }
+  for (const aw of ansWords) {
+    if (aw.length >= 3) {
+      const ws = similarity(normGuess, aw);
+      if (ws >= 0.80) return { match: true, type: 'fuzzy', normGuess, normAns, sim: ws };
     }
   }
 
