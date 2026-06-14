@@ -98,27 +98,20 @@ function NameThatTrackViewer({ roomCode }) {
     try {
       console.log('Starting vs AI game...');
       
-      // First check if we have any songs
-      const playlistsRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
-      console.log('Playlists:', playlistsRes.data);
-      
-      if (!playlistsRes.data.playlists || playlistsRes.data.playlists.length === 0) {
-        alert('No playlists imported yet! Please import a YouTube playlist first, or wait for a host to connect.');
-        setRoleLoading(false);
-        return;
-      }
+      // Use the default solo play playlist
+      const defaultPlaylistId = '6a2e4b91954a3f8cbc4cb852';
 
-      // Get random question from all available songs
+      // Get random question from the default playlist
       const res = await base44.functions.invoke('nameThatTrack', {
         action: 'getRandomQuestion',
-        playlistIds: [],
+        playlistIds: [defaultPlaylistId],
         categories: [],
       });
       
       console.log('Question result:', res.data);
       
       if (!res.data.question) {
-        alert('No songs available! Please import a playlist first.');
+        alert('No songs available! Please try again.');
         setRoleLoading(false);
         return;
       }
@@ -130,7 +123,7 @@ function NameThatTrackViewer({ roomCode }) {
         phase: 'intro',
         vs_ai: true,
         ai_team_size: 4,
-        selectedPlaylists: [],
+        selectedPlaylists: [defaultPlaylistId],
         selectedCategories: [],
         players: [{
           playerId: playerId || 'player-1',

@@ -8,7 +8,8 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { action } = await req.json();
+    const body = await req.json();
+    const { action } = body;
 
     // Extract playlist ID from URL
     function extractPlaylistId(url) {
@@ -20,7 +21,7 @@ Deno.serve(async (req) => {
 
     // Import videos from a YouTube playlist
     if (action === 'importPlaylist') {
-      const { playlistUrl, categoryName } = await req.json();
+      const { playlistUrl, categoryName } = body;
       if (!playlistUrl) return Response.json({ error: 'Playlist URL required' }, { status: 400 });
 
       const playlistId = extractPlaylistId(playlistUrl);
@@ -139,7 +140,7 @@ Deno.serve(async (req) => {
 
     // Update song title/artist
     if (action === 'updateSong') {
-      const { songId, title, artist } = await req.json();
+      const { songId, title, artist } = body;
       if (!songId) return Response.json({ error: 'Song ID required' }, { status: 400 });
 
       const updates = {};
@@ -176,7 +177,7 @@ Deno.serve(async (req) => {
 
     // Get songs in a playlist
     if (action === 'getPlaylistSongs') {
-      const { playlistId } = await req.json();
+      const { playlistId } = body;
       if (!playlistId) return Response.json({ error: 'Playlist ID required' }, { status: 400 });
 
       const links = await base44.entities.PlaylistSong.filter({ playlistId }, 'position');
@@ -190,7 +191,7 @@ Deno.serve(async (req) => {
 
     // Get random question for gameplay
     if (action === 'getRandomQuestion') {
-      const { selectedPlaylists, selectedCategories } = await req.json();
+      const { selectedPlaylists, selectedCategories } = body;
       
       let allQuestions = await base44.entities.GameQuestion.filter({ active: true });
       
@@ -243,7 +244,7 @@ Deno.serve(async (req) => {
 
     // Delete song and associated data
     if (action === 'deleteSong') {
-      const { songId } = await req.json();
+      const { songId } = body;
       if (!songId) return Response.json({ error: 'Song ID required' }, { status: 400 });
 
       // Delete playlist links
