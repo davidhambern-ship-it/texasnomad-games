@@ -18,17 +18,19 @@ export default function GameScreen({ gs, updateState, playerId }) {
   const [submitted, setSubmitted] = useState(false);
   const [muted, setMuted] = useState(false);
   const [aiGuesses, setAIGuesses] = useState([]);
+  const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const playerRef = useRef(null);
 
   useEffect(() => {
     setGuess('');
     setSubmitted(false);
     setAIGuesses([]);
+    setIsPlayerTurn(true);
   }, [currentQuestion]);
 
-  // AI guessing logic
+  // AI guessing logic - only runs on AI's turn
   useEffect(() => {
-    if (!vsAI || phase !== 'guessing' || submitted) return;
+    if (!vsAI || phase !== 'guessing' || isPlayerTurn || submitted) return;
     
     const aiDelay = 3000 + Math.random() * 4000; // AI guesses between 3-7 seconds
     const timer = setTimeout(() => {
@@ -68,7 +70,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }, aiDelay);
     
     return () => clearTimeout(timer);
-  }, [vsAI, phase, submitted, question, song]);
+  }, [vsAI, phase, isPlayerTurn, submitted, question, song]);
 
   const handleGuess = async () => {
     if (!guess.trim() || submitted) return;
@@ -93,6 +95,9 @@ export default function GameScreen({ gs, updateState, playerId }) {
         } : p
       ),
     });
+    
+    // Switch to AI's turn after player guesses
+    setIsPlayerTurn(false);
   };
 
   async function processRoundResults(aiGuessResults) {
@@ -118,6 +123,8 @@ export default function GameScreen({ gs, updateState, playerId }) {
         phase: 'round_over',
         currentRound: currentRound + 1,
       });
+      // Reset turn flag for next round
+      setIsPlayerTurn(true);
       // Start next round after 3 seconds
       setTimeout(startNextRound, 3000);
     }
@@ -145,7 +152,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }
   }
 
-  const videoUrl = song ? `https://www.youtube.com/embed/${song.youtubeVideoId}?autoplay=1&start=30&end=45&mute=${muted ? 1 : 0}` : null;
+  const videoUrl = song ? `https://www.youtube.com/embed/${song.youtubeVideoId}?start=30&end=45&mute=${muted ? 1 : 0}&enablejsapi=1` : null;
 
   // Game over check
   if (phase === 'game_over') {
