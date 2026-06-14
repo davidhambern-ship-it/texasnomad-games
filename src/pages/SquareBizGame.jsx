@@ -317,7 +317,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       if (cancelled) return;
       await new Promise(r => setTimeout(r, 800));
       
-      const idx = cpuPickSquare(board, 'O', 'X');
+      const currentBoard = gs.board || Array(9).fill('');
+      const idx = cpuPickSquare(currentBoard, 'O', 'X');
       if (idx == null || cancelled || winner) {
         setCpuThinking(false);
         setCpuQuestion(null);
@@ -350,7 +351,27 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         await new Promise(r => setTimeout(r, 1000));
         if (!cancelled) {
           setCpuThinking(false);
-          await placeMarker(idx, 'O');
+          setCpuQuestion(null);
+          setCpuSelectedAnswer(null);
+          setGameMessage('');
+          // Place marker directly without calling placeMarker to avoid stale closure
+          const newBoard = [...currentBoard];
+          newBoard[idx] = 'O';
+          const w = checkWinner(newBoard);
+          const isDraw = !w && newBoard.every(c => c !== '');
+          const newScores = w ? { X: gs.score_x || 0, O: (gs.score_o || 0) + 1 } : { X: gs.score_x || 0, O: gs.score_o || 0 };
+          if (w) setScores(newScores);
+          cpuTurnProcessedRef.current = false;
+          await updateState({
+            board: newBoard,
+            current_turn: w || isDraw ? 'O' : 'X',
+            winner: w || (isDraw ? 'draw' : null),
+            phase: w || isDraw ? '1p_game_over' : '1p_waiting',
+            selected_square: null,
+            score_x: newScores.X,
+            score_o: newScores.O,
+          });
+          if (w) showCPULine('winning');
         }
       } else {
         showCPULine('mistake');
@@ -362,15 +383,15 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
           setCpuQuestion(null);
           setCpuSelectedAnswer(null);
           setGameMessage('');
-          await updateState({ phase: '1p_waiting', selected_square: null });
           cpuTurnProcessedRef.current = false;
+          await updateState({ phase: '1p_waiting', selected_square: null });
         }
       }
     };
     
     runCPUTurn();
     return () => { cancelled = true; };
-  }, [phase, board, winner, cpuCharacter]);
+  }, [phase, winner, cpuCharacter, gs.board, gs.score_x, gs.score_o]);
 
   // New game
   const handleNewGame = async () => {
