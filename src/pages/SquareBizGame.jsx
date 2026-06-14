@@ -303,10 +303,12 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
     if (phase !== '1p_cpu_choosing' || winner) return;
-    setCpuThinking(true);
-    showCPULine('gameStart');
-    const timer = setTimeout(async () => {
-      const idx = cpuPickSquare(board, 'O', 'X');
+    
+    const runCPUTurn = async () => {
+      setCpuThinking(true);
+      showCPULine('gameStart');
+      const currentBoard = gs.board || Array(9).fill('');
+      const idx = cpuPickSquare(currentBoard, 'O', 'X');
       if (idx == null) { setCpuThinking(false); return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       // Load question for CPU
@@ -322,7 +324,22 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
         await new Promise(r => setTimeout(r, 1000));
-        await placeMarker(idx, 'O');
+        // Directly update state without calling placeMarker to avoid stale closure
+        const newBoard = [...currentBoard];
+        newBoard[idx] = 'O';
+        const w = checkWinner(newBoard);
+        const isDraw = !w && newBoard.every(c => c !== '');
+        setTriviaQuestion(null);
+        setGameMessage('');
+        await updateState({
+          board: newBoard,
+          current_turn: w || isDraw ? 'O' : 'X',
+          winner: w || (isDraw ? 'draw' : null),
+          phase: w || isDraw ? '1p_game_over' : '1p_waiting',
+          selected_square: null,
+          score_o: w ? (gs.score_o || 0) + 1 : (gs.score_o || 0),
+        });
+        if (w) showCPULine('winning');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
@@ -331,9 +348,10 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
         setTriviaQuestion(null);
         await updateState({ phase: '1p_waiting', selected_square: null });
       }
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [phase, board, winner]);
+    };
+    
+    runCPUTurn();
+  }, [phase]);
 
   // New game
   const handleNewGame = async () => {
