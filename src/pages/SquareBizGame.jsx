@@ -188,6 +188,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const [gameMessage, setGameMessage] = useState('');
   const [usedQuestionIds, setUsedQuestionIds] = useState([]);
   const [scores, setScores] = useState({ X: 0, O: 0 });
+  const cpuTurnProcessedRef = useRef(false);
 
   const isHumanTurn = currentTurn === 'X'; // human is always X
   const isCPUTurn = currentTurn === 'O';
@@ -285,6 +286,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setSelectedAnswer(null);
     setAnswerResult(null);
     setGameMessage('');
+    // Reset CPU turn flag when human places marker
+    if (mark === 'X') cpuTurnProcessedRef.current = false;
     await updateState({
       board: newBoard,
       current_turn: w || isDraw ? currentTurn : nextTurn,
@@ -299,39 +302,35 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
 
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
-    if (phase !== '1p_cpu_choosing' || winner) return;
-    let cancelled = false;
+    if (phase !== '1p_cpu_choosing' || winner || cpuTurnProcessedRef.current) return;
+    cpuTurnProcessedRef.current = true;
     setCpuThinking(true);
     showCPULine('gameStart');
     const timer = setTimeout(async () => {
       const idx = cpuPickSquare(board, 'O', 'X');
-      if (idx == null) { setCpuThinking(false); return; }
+      if (idx == null) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
       // Load question for CPU
       const q = await loadQuestion();
-      if (cancelled) return;
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
       await new Promise(r => setTimeout(r, 1200));
-      if (cancelled) { setCpuThinking(false); return; }
       setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
         await new Promise(r => setTimeout(r, 1000));
-        if (!cancelled) await placeMarker(idx, 'O');
+        await placeMarker(idx, 'O');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
         await new Promise(r => setTimeout(r, 1200));
-        if (!cancelled) {
-          setGameMessage('');
-          await updateState({ phase: '1p_waiting', selected_square: null });
-        }
+        setGameMessage('');
+        await updateState({ phase: '1p_waiting', selected_square: null });
       }
     }, 1200);
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [phase, board, winner]);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   // New game
   const handleNewGame = async () => {
@@ -340,6 +339,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setAnswerResult(null);
     setGameMessage('');
     setCpuDialogue('');
+    cpuTurnProcessedRef.current = false;
     await updateState({
       board: Array(9).fill(''),
       current_turn: 'X',
