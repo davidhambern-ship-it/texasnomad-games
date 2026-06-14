@@ -82,8 +82,31 @@ function NameThatTrackViewer({ roomCode }) {
     try {
       console.log('Starting vs AI game...');
       
-      // Use the default solo play playlist
-      const defaultPlaylistId = 'PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM';
+      // Default YouTube playlist for solo play
+      const youtubePlaylistUrl = 'https://youtube.com/playlist?list=PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM&si=jOzGupVsv7BRXrdN';
+      const youtubePlaylistId = 'PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM';
+      
+      // First, import the playlist if it doesn't exist
+      console.log('Importing default playlist...');
+      const importRes = await base44.functions.invoke('nameThatTrack', {
+        action: 'importPlaylist',
+        playlistUrl: youtubePlaylistUrl,
+        categoryName: 'Solo Play Default',
+      });
+      
+      console.log('Import result:', importRes.data);
+      
+      // Get playlists to find the entity ID
+      const playlistsRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+      const playlist = playlistsRes.data.playlists?.find(p => p.playlistId === youtubePlaylistId);
+      
+      if (!playlist) {
+        alert('Failed to import playlist. Please try again.');
+        return;
+      }
+      
+      const defaultPlaylistId = playlist.id;
+      console.log('Using playlist entity ID:', defaultPlaylistId);
 
       // Get random question from the default playlist
       const res = await base44.functions.invoke('nameThatTrack', {
