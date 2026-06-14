@@ -188,20 +188,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const [gameMessage, setGameMessage] = useState('');
   const [usedQuestionIds, setUsedQuestionIds] = useState([]);
   const [scores, setScores] = useState({ X: 0, O: 0 });
-  const [cpuQuestion, setCpuQuestion] = useState(null);
-  const [cpuSelectedAnswer, setCpuSelectedAnswer] = useState(null);
-  const cpuTurnProcessedRef = useRef(false);
-  const boardRef = useRef(gs.board || Array(9).fill(''));
-  const scoreRef = useRef({ X: gs.score_x || 0, O: gs.score_o || 0 });
 
-  // Keep refs in sync with latest state
-  useEffect(() => {
-    boardRef.current = gs.board || Array(9).fill('');
-    scoreRef.current = { X: gs.score_x || 0, O: gs.score_o || 0 };
-  }, [gs.board, gs.score_x, gs.score_o]);
-
-  const scoreX = scoreRef.current.X;
-  const scoreO = scoreRef.current.O;
   const isHumanTurn = currentTurn === 'X'; // human is always X
   const isCPUTurn = currentTurn === 'O';
 
@@ -298,8 +285,6 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setSelectedAnswer(null);
     setAnswerResult(null);
     setGameMessage('');
-    // Reset CPU turn flag when placing marker
-    cpuTurnProcessedRef.current = false;
     await updateState({
       board: newBoard,
       current_turn: w || isDraw ? currentTurn : nextTurn,
@@ -312,108 +297,36 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     if (w) showCPULine(w === 'X' ? 'losing' : 'winning');
   };
 
-  // Reset CPU turn flag when phase changes to cpu_choosing
-  useEffect(() => {
-    if (phase === '1p_cpu_choosing') {
-      cpuTurnProcessedRef.current = false;
-    }
-  }, [phase]);
-
   // CPU turn: pick square → load question → auto-answer → maybe place
   useEffect(() => {
-    if (phase !== '1p_cpu_choosing' || winner || cpuTurnProcessedRef.current) return;
-    cpuTurnProcessedRef.current = true;
-    let cancelled = false;
-    
-    const runCPUTurn = async () => {
-      setCpuThinking(true);
-      setCpuQuestion(null);
-      setCpuSelectedAnswer(null);
-      setGameMessage('');
-      showCPULine('gameStart');
-      if (cancelled) return;
-      await new Promise(r => setTimeout(r, 800));
-      
-      // Use ref for latest board state
-      const currentBoard = boardRef.current;
-      const idx = cpuPickSquare(currentBoard, 'O', 'X');
-      if (idx == null || cancelled || winner) {
-        setCpuThinking(false);
-        setCpuQuestion(null);
-        setCpuSelectedAnswer(null);
-        cpuTurnProcessedRef.current = false;
-        return;
-      }
+    if (phase !== '1p_cpu_choosing' || winner) return;
+    setCpuThinking(true);
+    showCPULine('gameStart');
+    const timer = setTimeout(async () => {
+      const idx = cpuPickSquare(board, 'O', 'X');
+      if (idx == null) { setCpuThinking(false); return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
-      if (cancelled) return;
-      await new Promise(r => setTimeout(r, 500));
-      
       // Load question for CPU
       const q = await loadQuestion();
-      if (cancelled || winner) return;
-      setCpuQuestion(q);
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
-      // Simulate CPU selecting an answer
-      const letters = ['A', 'B', 'C', 'D'];
-      const cpuChoice = correct ? q.correct_answer : letters.filter(l => l !== q.correct_answer)[Math.floor(Math.random() * 3)];
-      setCpuSelectedAnswer(cpuChoice);
-      if (cancelled) return;
-      await new Promise(r => setTimeout(r, 600));
-      if (cancelled || winner) return;
-      
+      await new Promise(r => setTimeout(r, 1200));
+      setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
-        if (cancelled) return;
-        await new Promise(r => setTimeout(r, 1500));
-        if (!cancelled) {
-          // Place marker directly - use ref for latest board
-          const latestBoard = boardRef.current;
-          const newBoard = [...latestBoard];
-          newBoard[idx] = 'O';
-          const w = checkWinner(newBoard);
-          const isDraw = !w && newBoard.every(c => c !== '');
-          const currentScores = scoreRef.current;
-          const newScores = w ? { X: currentScores.X, O: currentScores.O + 1 } : { X: currentScores.X, O: currentScores.O };
-          if (w) setScores(newScores);
-          cpuTurnProcessedRef.current = false;
-          await updateState({
-            board: newBoard,
-            current_turn: w || isDraw ? 'O' : 'X',
-            winner: w || (isDraw ? 'draw' : null),
-            phase: w || isDraw ? '1p_game_over' : '1p_waiting',
-            selected_square: null,
-            score_x: newScores.X,
-            score_o: newScores.O,
-          });
-          if (w) showCPULine('winning');
-          // Clear state after marker placed
-          setCpuThinking(false);
-          setCpuQuestion(null);
-          setCpuSelectedAnswer(null);
-          setGameMessage('');
-        }
+        await new Promise(r => setTimeout(r, 1000));
+        await placeMarker(idx, 'O');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
-        if (cancelled) return;
-        await new Promise(r => setTimeout(r, 1500));
-        if (!cancelled) {
-          cpuTurnProcessedRef.current = false;
-          await updateState({ phase: '1p_waiting', selected_square: null });
-          // Clear state after phase update
-          setCpuThinking(false);
-          setCpuQuestion(null);
-          setCpuSelectedAnswer(null);
-          setGameMessage('');
-        }
+        await new Promise(r => setTimeout(r, 1200));
+        setGameMessage('');
+        await updateState({ phase: '1p_waiting', selected_square: null });
       }
-    };
-    
-    runCPUTurn();
-    return () => { cancelled = true; };
-  }, [phase, winner, cpuCharacter]);
+    }, 1200);
+    return () => clearTimeout(timer);
+  }, [phase]);
 
   // New game
   const handleNewGame = async () => {
@@ -422,9 +335,6 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setAnswerResult(null);
     setGameMessage('');
     setCpuDialogue('');
-    setCpuQuestion(null);
-    setCpuSelectedAnswer(null);
-    cpuTurnProcessedRef.current = false;
     await updateState({
       board: Array(9).fill(''),
       current_turn: 'X',
@@ -435,6 +345,9 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
       score_o: gs.score_o || 0,
     });
   };
+
+  const scoreX = gs.score_x || 0;
+  const scoreO = gs.score_o || 0;
 
   const cellStyle = (v, idx) => {
     const isSelected = gs.selected_square === idx;
@@ -631,47 +544,8 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
           </div>
         )}
 
-        {/* CPU question display */}
-        {cpuQuestion && (
-          <div className="px-4 py-4 rounded-xl border-2 border-[#FF5F1F]/40 bg-[#FF5F1F]/5 space-y-3">
-            <div className="text-[7px] text-[#FF5F1F]/60 uppercase tracking-widest" style={sty}>📋 CPU Question</div>
-            <div className="font-heading text-sm text-white leading-snug">{cpuQuestion.question}</div>
-            {cpuQuestion.category && (
-              <div className="text-[6px] text-white/30 uppercase tracking-widest" style={sty}>{cpuQuestion.category}</div>
-            )}
-            {/* Answer choices */}
-            <div className="space-y-1.5 mt-3">
-              {['A','B','C','D'].map(letter => {
-                const text = cpuQuestion[`answer_${letter.toLowerCase()}`];
-                if (!text) return null;
-                const isSelected = cpuSelectedAnswer === letter;
-                const isCorrect = letter === cpuQuestion.correct_answer;
-                const showResult = !!cpuSelectedAnswer;
-                let bg = 'bg-white/5 border-white/10';
-                if (showResult && isSelected && isCorrect) bg = 'bg-[#4ade80]/20 border-[#4ade80]';
-                else if (showResult && isSelected && !isCorrect) bg = 'bg-[#ef4444]/20 border-[#ef4444]';
-                else if (showResult && isCorrect) bg = 'bg-[#4ade80]/10 border-[#4ade80]/40';
-                else if (isSelected) bg = 'bg-[#FFD700]/20 border-[#FFD700]';
-                return (
-                  <div key={letter} className={`px-3 py-2 rounded-lg border text-[7px] tracking-wide ${bg}`} style={sty}>
-                    <span className="text-[#FF5F1F] mr-1.5">{letter}.</span>{text}
-                    {showResult && isSelected && isCorrect && <span className="ml-2 text-[#4ade80]">✓</span>}
-                    {showResult && isSelected && !isCorrect && <span className="ml-2 text-[#ef4444]">✗</span>}
-                  </div>
-                );
-              })}
-            </div>
-            {/* Show correct answer when wrong */}
-            {cpuSelectedAnswer && cpuSelectedAnswer !== cpuQuestion.correct_answer && (
-              <div className="mt-2 px-3 py-2 rounded-lg border border-[#4ade80]/40 bg-[#4ade80]/10 text-[7px] text-[#4ade80] tracking-wide" style={sty}>
-                <span className="font-bold">Correct: {cpuQuestion.correct_answer}</span>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* CPU thinking dots */}
-        {cpuThinking && !cpuQuestion && (
+        {(phase === '1p_cpu_choosing' || phase === '1p_cpu_answering') && (
           <div className="flex justify-center gap-2 py-2">
             {[0,1,2].map(i => (
               <div key={i} className="w-2 h-2 rounded-full bg-[#FF5F1F] animate-bounce"
