@@ -306,35 +306,41 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     if (cpuTurnProcessedRef.current) return;
     cpuTurnProcessedRef.current = true;
     
-    setCpuThinking(true);
-    showCPULine('gameStart');
-    const timer = setTimeout(async () => {
+    const runCPUTurn = async () => {
+      setCpuThinking(true);
+      showCPULine('gameStart');
+      await new Promise(r => setTimeout(r, 800));
+      
       const idx = cpuPickSquare(board, 'O', 'X');
       if (idx == null || winner) { setCpuThinking(false); cpuTurnProcessedRef.current = false; return; }
       await updateState({ selected_square: idx, phase: '1p_cpu_answering' });
+      await new Promise(r => setTimeout(r, 600));
+      
       // Load question for CPU
       const q = await loadQuestion();
       if (winner) return;
       const difficulty = cpuCharacter?.difficulty || 5;
       const correct = q ? cpuShouldAnswerCorrectly(difficulty) : true;
-      await new Promise(r => setTimeout(r, 1200));
+      await new Promise(r => setTimeout(r, 800));
       if (winner) return;
       setCpuThinking(false);
       if (correct) {
         showCPULine('winning');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} answered correctly!`);
-        await new Promise(r => setTimeout(r, 1000));
+        await new Promise(r => setTimeout(r, 800));
         await placeMarker(idx, 'O');
       } else {
         showCPULine('mistake');
         setGameMessage(`${cpuCharacter?.name || 'CPU'} got it wrong! Your turn.`);
-        await new Promise(r => setTimeout(r, 1200));
+        await new Promise(r => setTimeout(r, 800));
         setGameMessage('');
         await updateState({ phase: '1p_waiting', selected_square: null });
       }
-    }, 1200);
-    return () => clearTimeout(timer);
-  }, [phase, board, cpuCharacter]);
+    };
+    
+    runCPUTurn();
+    return () => {};
+  }, [phase]);
 
   // New game
   const handleNewGame = async () => {
