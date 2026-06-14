@@ -452,13 +452,13 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const { dealSequence, handsBySeatNumber, dealStartSeat } = dealFromShuffledDeck(deckToDeal, seated, dealerSeat);
     const dealerIdx = seated.findIndex(s => s.seatNumber === dealerSeat);
     const firstBidder = seated[(dealerIdx + 1) % seated.length]?.seatNumber;
-    const currentPlayers = gs.players || [];
 
     // Use explicitly passed hand number if available (avoids stale closure issues)
     const currentHandNumber = knownHandNumber !== null ? knownHandNumber : (gs.hand_number || 0);
     const isFirstHand = currentHandNumber === 0;
 
-    const clearedPlayers = currentPlayers.map(p =>
+    // Clear hands and bids for all seated players
+    const clearedPlayers = (gs.players || []).map(p =>
       p.seatNumber != null ? { ...p, hand: [], bid: null, tricksWon: 0 } : p
     );
     await updateState({
@@ -475,7 +475,9 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     const DEAL_INTERVAL_MS = 130;
     await new Promise(resolve => setTimeout(resolve, dealSequence.length * DEAL_INTERVAL_MS + 600));
 
-    const finalPlayers = currentPlayers.map(p => {
+    // Assign hands to seated players - use the LATEST gs.players to ensure we don't lose data
+    const latestPlayers = (gs.players || []);
+    const finalPlayers = latestPlayers.map(p => {
       const hand = handsBySeatNumber.get(p.seatNumber);
       if (hand) return { ...p, hand, bid: null, tricksWon: 0 };
       return p;
