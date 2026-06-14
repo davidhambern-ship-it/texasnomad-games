@@ -152,7 +152,7 @@ export default function GameScreen({ gs, updateState, playerId }) {
     }
   }
 
-  const videoUrl = song ? `https://www.youtube.com/embed/${song.youtubeVideoId}?autoplay=0&mute=0&controls=1&rel=0` : null;
+  const videoUrl = song ? `https://www.youtube.com/embed/${song.youtubeVideoId}?start=30&mute=${muted ? 1 : 0}&controls=1` : null;
 
   // Game over check
   if (phase === 'game_over') {
