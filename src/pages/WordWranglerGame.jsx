@@ -65,9 +65,68 @@ export default function WordWranglerGame() {
         if (rooms.length === 0) {
           // Create new room
           const newGame = await createNewGame();
-          setGame(newGame);
+          // Auto-join for vsAI mode
+          if (vsAI) {
+            const user = await base44.auth.me();
+            const pid = user?.id || `player_${Date.now()}`;
+            const gameWithPlayer = {
+              ...newGame,
+              players: [{
+                playerId: pid,
+                seatNumber: 1,
+                playerName: 'Player 1',
+                score: 0,
+                wordsFound: [],
+                status: 'active',
+                isAI: false,
+              }],
+              status: 'active',
+              gameState: {
+                ...newGame.gameState,
+                phase: 'playing',
+              }
+            };
+            await base44.entities.WordWranglerGame.update(newGame.id, gameWithPlayer);
+            setGame(gameWithPlayer);
+            setPlayerId(pid);
+            setPlayerName('Player 1');
+            setGamePhase('playing');
+            setTimeRemaining(timerLength);
+          } else {
+            setGame(newGame);
+          }
         } else {
-          setGame(rooms[0]);
+          const existingGame = rooms[0];
+          // Auto-join if vsAI and not already joined
+          if (vsAI && existingGame.players?.length === 0) {
+            const user = await base44.auth.me();
+            const pid = user?.id || `player_${Date.now()}`;
+            const updatedGame = {
+              ...existingGame,
+              players: [{
+                playerId: pid,
+                seatNumber: 1,
+                playerName: 'Player 1',
+                score: 0,
+                wordsFound: [],
+                status: 'active',
+                isAI: false,
+              }],
+              status: 'active',
+              gameState: {
+                ...existingGame.gameState,
+                phase: 'playing',
+              }
+            };
+            await base44.entities.WordWranglerGame.update(existingGame.id, updatedGame);
+            setGame(updatedGame);
+            setPlayerId(pid);
+            setPlayerName('Player 1');
+            setGamePhase('playing');
+            setTimeRemaining(timerLength);
+          } else {
+            setGame(existingGame);
+          }
         }
         
         setLoading(false);
@@ -95,7 +154,7 @@ export default function WordWranglerGame() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [roomCode]);
+  }, [roomCode, vsAI]);
 
   // Timer
   useEffect(() => {
@@ -172,12 +231,15 @@ export default function WordWranglerGame() {
         }
       };
 
+      console.log('Joining game, updating with player:', playerId, name);
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
+      console.log('Game updated, setting local state');
       setPlayerId(playerId);
       setPlayerName(name);
       setGame(updatedGame);
       setGamePhase('playing');
       setTimeRemaining(timerLength);
+      console.log('Join complete, playerId:', playerId, 'gamePhase:', gamePhase);
     } catch (err) {
       console.error('Failed to join game:', err);
       setError('Failed to join game');
@@ -214,8 +276,13 @@ export default function WordWranglerGame() {
   }, [gamePhase, game?.boardSize]);
 
   const submitWord = async () => {
-    if (selectedCells.length < 3 || !gameRef.current) {
-      console.log('Submit blocked:', { selectedCells: selectedCells.length, hasGame: !!gameRef.current });
+    if (selectedCells.length < 3) {
+      console.log('Submit blocked: not enough cells', selectedCells.length);
+      return;
+    }
+    
+    if (!gameRef.current || !gameRef.current.letterBoard) {
+      console.log('Submit blocked: no game or letterBoard');
       return;
     }
 
@@ -230,27 +297,40 @@ export default function WordWranglerGame() {
       return;
     }
 
-    // Check if already found
-    if (wordsFound.includes(word)) {
+    // Check if already found by this player
+    const currentPlayer = currentGame.players?.find(p => p.playerId === playerId);
+    if (currentPlayer?.wordsFound?.includes(word)) {
       console.log('Word already found:', word);
       return;
     }
 
     // Calculate score
     const score = calculateScore(word.length, selectedCells, currentGame.letterBoard);
+    console.log('Score calculated:', score);
     
-    // Update game state
+    // Update game state - find player index and update
+    const playerIndex = currentGame.players?.findIndex(p => p.playerId === playerId);
+    if (playerIndex === undefined || playerIndex === -1) {
+      console.error('Player not found in game:', playerId);
+      return;
+    }
+
+    const updatedPlayers = [...currentGame.players];
+    updatedPlayers[playerIndex] = {
+      ...updatedPlayers[playerIndex],
+      score: updatedPlayers[playerIndex].score + score,
+      wordsFound: [...(updatedPlayers[playerIndex].wordsFound || []), word]
+    };
+
     const updatedGame = {
       ...currentGame,
-      players: currentGame.players.map(p => 
-        p.playerId === playerId 
-          ? { ...p, score: p.score + score, wordsFound: [...p.wordsFound, word] }
-          : p
-      ),
+      players: updatedPlayers,
     };
 
     try {
+      console.log('Updating game with new score...');
       await base44.entities.WordWranglerGame.update(currentGame.id, updatedGame);
+      console.log('Game updated successfully');
       
       setWordsFound(prev => [...prev, word]);
       setCurrentScore(prev => prev + score);
@@ -328,6 +408,8 @@ export default function WordWranglerGame() {
       </div>
     );
   }
+
+
 
   // Show name input for new players
   if (!playerId && gamePhase === 'setup' && !vsAI) {
