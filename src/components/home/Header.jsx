@@ -53,10 +53,11 @@ export default function Header() {
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 text-white hover:text-outlaw-gold transition-colors"
+          className="md:hidden px-3 py-1.5 border-2 border-white/60 rounded text-white hover:text-outlaw-gold hover:border-outlaw-gold transition-colors active:scale-95"
+          style={{ fontFamily: "'Press Start 2P', monospace", fontSize: 9, letterSpacing: '0.15em' }}
           aria-label="Toggle menu"
         >
-          {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          {mobileMenuOpen ? '✕ CLOSE' : '▶ MENU'}
         </button>
 
         {/* Social Icons - Desktop */}
