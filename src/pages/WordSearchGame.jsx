@@ -117,12 +117,11 @@ export default function WordSearchGame() {
 
 function WordSearchViewer({ roomCode, cpuId }) {
   const navigate = useNavigate();
-  const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'word-search', 'viewer');
+  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'word-search', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
 
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'word-search', updateState);
-  useEffect(() => { if (isSeated && playerId) registerPlayer(playerId); }, [isSeated, playerId]);
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'word-search', updateState, false, null, registerUser);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [notification, setNotification] = useState(null);

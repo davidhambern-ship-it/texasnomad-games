@@ -106,16 +106,11 @@ export default function HangmanGame() {
 
 function HangmanViewer({ roomCode, cpuId }) {
   const navigate = useNavigate();
-  const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'hangman', 'viewer');
+  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'hangman', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
 
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'hangman', updateState);
-
-  // Register player for auto-cleanup when seated
-  useEffect(() => {
-    if (isSeated && playerId) registerPlayer(playerId);
-  }, [isSeated, playerId, registerPlayer]);
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'hangman', updateState, false, null, registerUser);
 
   // Host panel connected = host_connected is true, and NOT single player mode
   const hostPanelConnected = !!(room?.host_connected && !isSinglePlayer);

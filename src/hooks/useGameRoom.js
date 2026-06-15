@@ -6,11 +6,16 @@ import { getDefaultGameState } from '@/lib/roomUtils';
  * Shared hook for both Host Panel and Public Game Screen.
  * role = 'host' | 'viewer'
  *
- * Presence model:
- *   game_state.connectedUsers = [{ playerId, role, connectedAt, lastSeen }]
- *   game_state.players = seated gameplay users (role: 'player' | 'hostPlayer')
+ * Presence model (all stored in game_state):
+ *   connectedUsers = [{ uid, type: 'host'|'player'|'spectator', seatNumber, status, joinedAt, lastSeen }]
  *
- * Host joining NEVER modifies game_state.players — only sets host_connected.
+ * Rules:
+ *   - Host is ALWAYS seat 1. Host never appears in connectedUsers as a player.
+ *   - Active players have seatNumber >= 2 (since seat 1 is reserved for host).
+ *   - Spectators have seatNumber = null, but are tracked with a uid.
+ *   - On disconnect/tab-close: user is marked status='disconnected', not deleted.
+ *   - On reconnect: existing uid is matched and status restored to 'connected'.
+ *   - players_connected on the room record reflects all currently connected humans.
  */
 export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const [room, setRoom] = useState(null);
@@ -19,8 +24,8 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
   const roomRef = useRef(null);
   const unsubscribeRef = useRef(null);
   const pollRef = useRef(null);
-  const heartbeatRef = useRef(null);
-  const playerIdRef = useRef(null); // set by registerPlayer, used for auto-cleanup
+  const uidRef = useRef(null); // this user's uid for cleanup
+  const cleanupRef = useRef(null);
 
   useEffect(() => {
     if (!roomCode || !gameId) return;
@@ -29,7 +34,6 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
       setLoading(true);
       setError(null);
       try {
-        // Find existing room
         const rooms = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
         let r;
         if (rooms.length > 0) {
@@ -49,24 +53,20 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
             last_command: null,
           });
         } else {
-          // Viewer: room doesn't exist yet — poll will pick it up
           setLoading(false);
           return;
         }
 
-        // Mark connection — host only sets host_connected, never touches players or game_state
         if (role === 'host') {
           r = await base44.entities.GameRoom.update(r.id, { host_connected: true });
         }
         roomRef.current = r;
         setRoom({ ...r });
 
-        // Fetch fresh state to be sure
         const freshRoom = await base44.entities.GameRoom.get(r.id);
         roomRef.current = freshRoom;
         setRoom({ ...freshRoom });
 
-        // Subscribe to real-time changes
         unsubscribeRef.current = base44.entities.GameRoom.subscribe((event) => {
           if ((event.type === 'update' || event.type === 'create') && event.data) {
             const updated = event.data;
@@ -78,7 +78,6 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
           }
         });
 
-        // Poll every 3s as fallback — checks ALL fields including host_connected
         pollRef.current = setInterval(async () => {
           try {
             const fresh = await base44.entities.GameRoom.filter({ room_code: roomCode.toUpperCase(), game_id: gameId });
@@ -89,7 +88,6 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
                 setRoom({ ...fr });
                 return;
               }
-              // Compare broadly — include host_connected
               const changed =
                 JSON.stringify(fr.game_state) !== JSON.stringify(roomRef.current?.game_state) ||
                 fr.host_connected !== roomRef.current?.host_connected ||
@@ -115,80 +113,135 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     return () => {
       if (unsubscribeRef.current) unsubscribeRef.current();
       if (pollRef.current) clearInterval(pollRef.current);
-      if (heartbeatRef.current) clearInterval(heartbeatRef.current);
-      // Remove beforeunload / visibilitychange listeners
-      if (playerIdRef._cleanup) { playerIdRef._cleanup(); playerIdRef._cleanup = null; }
-      // Disconnect: only host_connected flag — never touch game_state or players
+      if (cleanupRef.current) { cleanupRef.current(); cleanupRef.current = null; }
       if (roomRef.current && role === 'host') {
         base44.entities.GameRoom.update(roomRef.current.id, { host_connected: false }).catch(() => {});
       }
-      // Auto-remove player from game_state on unmount (tab close / navigation)
-      if (roomRef.current && playerIdRef.current) {
-        removePlayerFromRoom(roomRef.current, playerIdRef.current);
+      if (roomRef.current && uidRef.current) {
+        markUserDisconnected(roomRef.current, uidRef.current);
       }
     };
   }, [roomCode, gameId, role]);
 
-  // Synchronously remove a player from the room's game_state.players
-  function removePlayerFromRoom(currentRoom, pid) {
+  // Mark a user as disconnected (keep record, just update status + lastSeen)
+  function markUserDisconnected(currentRoom, uid) {
     const gs = currentRoom.game_state || {};
-    const players = gs.players || [];
-    const updatedPlayers = players.filter(p => p.playerId !== pid);
-    if (updatedPlayers.length === players.length) return; // player wasn't there
-    const newConnected = Math.max(0, (currentRoom.players_connected || 1) - 1);
+    const users = gs.connectedUsers || [];
+    const idx = users.findIndex(u => u.uid === uid);
+    if (idx === -1) return;
+    const updated = users.map(u =>
+      u.uid === uid ? { ...u, status: 'disconnected', lastSeen: Date.now() } : u
+    );
+    const connected = updated.filter(u => u.status === 'connected').length;
     base44.entities.GameRoom.update(currentRoom.id, {
-      game_state: { ...gs, players: updatedPlayers },
-      players_connected: newConnected,
+      game_state: { ...gs, connectedUsers: updated },
+      players_connected: connected,
     }).catch(() => {});
   }
 
-  const ensureRoom = async (gameId, roomCode) => {
-    if (roomRef.current) return roomRef.current;
-    // Room doesn't exist yet — create it now
-    const r = await base44.entities.GameRoom.create({
-      room_code: roomCode.toUpperCase(),
-      game_id: gameId,
-      status: 'active',
-      host_connected: false,
-      screen_connected: false,
-      players_connected: 1,
-      created_from_host_panel: false,
-      game_state: {},
-      last_command: null,
+  /**
+   * Register a user (player or spectator) into the room's connectedUsers.
+   * Called by useRoomPresence after determining uid + type.
+   * Returns the final seatNumber assigned (or null for spectators).
+   */
+  const registerUser = useCallback(async (uid, type, preferredSeat = null) => {
+    if (!uid || !roomRef.current) return null;
+    uidRef.current = uid;
+
+    const currentRoom = roomRef.current;
+    const gs = currentRoom.game_state || {};
+    const users = gs.connectedUsers || [];
+
+    // Check if this uid already exists (reconnect)
+    const existing = users.find(u => u.uid === uid);
+    if (existing) {
+      const updated = users.map(u =>
+        u.uid === uid ? { ...u, status: 'connected', lastSeen: Date.now() } : u
+      );
+      const connected = updated.filter(u => u.status === 'connected').length;
+      const r = await base44.entities.GameRoom.update(currentRoom.id, {
+        game_state: { ...gs, connectedUsers: updated },
+        players_connected: connected,
+      });
+      roomRef.current = r;
+      setRoom({ ...r });
+      return existing.seatNumber;
+    }
+
+    // New user — assign seat if player
+    let seatNumber = null;
+    if (type === 'player') {
+      // Seat 1 is always reserved for host — players start at seat 2
+      const usedSeats = new Set(
+        users.filter(u => u.type === 'player' && u.status !== 'disconnected').map(u => u.seatNumber)
+      );
+      usedSeats.add(1); // always reserve seat 1 for host
+      if (preferredSeat && !usedSeats.has(preferredSeat)) {
+        seatNumber = preferredSeat;
+      } else {
+        seatNumber = 2;
+        while (usedSeats.has(seatNumber)) seatNumber++;
+      }
+    }
+
+    const newUser = {
+      uid,
+      type, // 'player' | 'spectator'
+      seatNumber,
+      status: 'connected',
+      queuedToPlay: type === 'spectator' ? false : null,
+      joinedAt: Date.now(),
+      lastSeen: Date.now(),
+    };
+
+    const updatedUsers = [...users, newUser];
+    const connected = updatedUsers.filter(u => u.status === 'connected').length;
+
+    const r = await base44.entities.GameRoom.update(currentRoom.id, {
+      game_state: { ...gs, connectedUsers: updatedUsers },
+      players_connected: connected,
     });
     roomRef.current = r;
     setRoom({ ...r });
-    return r;
-  };
 
-  // Call this once you know the playerId (e.g. after sitting in a seat).
-  // It registers the player for auto-cleanup on tab close / navigation.
-  const registerPlayer = useCallback((pid) => {
-    if (!pid || playerIdRef.current === pid) return;
-    playerIdRef.current = pid;
-
-    // beforeunload: fires when tab is closed or page is refreshed
-    const handleBeforeUnload = () => {
-      if (roomRef.current && playerIdRef.current) {
-        removePlayerFromRoom(roomRef.current, playerIdRef.current);
-      }
+    // Register lifecycle cleanup
+    const handleUnload = () => {
+      if (roomRef.current && uidRef.current) markUserDisconnected(roomRef.current, uidRef.current);
     };
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    // visibilitychange: fires when tab is hidden (mobile background, switch tabs)
     const handleVisibility = () => {
-      if (document.visibilityState === 'hidden' && roomRef.current && playerIdRef.current) {
-        removePlayerFromRoom(roomRef.current, playerIdRef.current);
-      }
+      if (document.visibilityState === 'hidden' && roomRef.current && uidRef.current)
+        markUserDisconnected(roomRef.current, uidRef.current);
     };
+    window.addEventListener('beforeunload', handleUnload);
     document.addEventListener('visibilitychange', handleVisibility);
-
-    // Store cleanup on the ref so it can be called on unmount too
-    playerIdRef._cleanup = () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
+    cleanupRef.current = () => {
+      window.removeEventListener('beforeunload', handleUnload);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
+
+    return seatNumber;
   }, []);
+
+  /**
+   * Update a spectator's queue status (wants to play vs stay watching).
+   */
+  const setSpectatorQueue = useCallback(async (uid, queuedToPlay) => {
+    if (!roomRef.current) return;
+    const gs = roomRef.current.game_state || {};
+    const users = (gs.connectedUsers || []).map(u =>
+      u.uid === uid ? { ...u, queuedToPlay, lastSeen: Date.now() } : u
+    );
+    const r = await base44.entities.GameRoom.update(roomRef.current.id, {
+      game_state: { ...gs, connectedUsers: users },
+    });
+    roomRef.current = r;
+    setRoom({ ...r });
+  }, []);
+
+  // Legacy: kept for backward compat — components that still call registerPlayer(pid)
+  const registerPlayer = useCallback((pid) => {
+    registerUser(pid, 'player');
+  }, [registerUser]);
 
   const updateState = async (newState) => {
     if (!roomRef.current) return;
@@ -215,5 +268,23 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     setRoom({ ...updated });
   };
 
-  return { room, loading, error, updateState, sendCommand, updateRoomStatus, ensureRoom, registerPlayer };
+  const ensureRoom = async (gameId, roomCode) => {
+    if (roomRef.current) return roomRef.current;
+    const r = await base44.entities.GameRoom.create({
+      room_code: roomCode.toUpperCase(),
+      game_id: gameId,
+      status: 'active',
+      host_connected: false,
+      screen_connected: false,
+      players_connected: 1,
+      created_from_host_panel: false,
+      game_state: {},
+      last_command: null,
+    });
+    roomRef.current = r;
+    setRoom({ ...r });
+    return r;
+  };
+
+  return { room, loading, error, updateState, sendCommand, updateRoomStatus, ensureRoom, registerPlayer, registerUser, setSpectatorQueue };
 }

@@ -51,7 +51,7 @@ function emptySeatsIn(players) {
 // ─── Main viewer component ────────────────────────────────────────────────────
 
 function SpadesViewer({ roomCode, isCreator, cpuId }) {
-  const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'spades', 'viewer');
+  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'spades', 'viewer');
   const isSinglePlayer = !!(cpuId);
   const cpuCharacter = isSinglePlayer
     ? TEXASNOMAD_CHARACTERS.find(c => c.id === cpuId) || null
@@ -141,10 +141,11 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // Keep myRoleRef in sync so the effect below can read current value
   useEffect(() => { myRoleRef.current = myRole; }, [myRole]);
 
-  // Register player for auto-cleanup when they become a seated player
+  // Register player for presence tracking when they become a seated player
   useEffect(() => {
-    if (myRole === 'player' && playerId) registerPlayer(playerId);
-  }, [myRole, playerId, registerPlayer]);
+    if (myRole === 'player' && playerId) registerUser(playerId, 'player', mySeatNumber);
+    else if (myRole === 'spectator' && playerId) registerUser(playerId, 'spectator');
+  }, [myRole, playerId, mySeatNumber, registerUser]);
 
   // ── Auto-fill CPU seats when creator skips partner picker ──
   useEffect(() => {

@@ -17,14 +17,10 @@ export default function NameThatTrackGame() {
 }
 
 function NameThatTrackViewer({ roomCode }) {
-  const { room, loading, updateState, registerPlayer } = useGameRoom(roomCode, 'name-that-track', 'viewer');
+  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'name-that-track', 'viewer');
   const gs = room?.game_state || {};
   
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'name-that-track', updateState, false, null);
-
-  useEffect(() => {
-    if (isSeated && playerId) registerPlayer(playerId);
-  }, [isSeated, playerId, registerPlayer]);
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'name-that-track', updateState, false, null, registerUser);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
