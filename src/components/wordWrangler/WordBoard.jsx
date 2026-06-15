@@ -16,7 +16,6 @@ export default function WordBoard({
   boardSize, 
   selectedCells, 
   onCellSelect, 
-  onCellDeselect,
   disabled = false 
 }) {
   const [isTouching, setIsTouching] = useState(false);
@@ -28,13 +27,8 @@ export default function WordBoard({
 
   const handleMouseDown = useCallback((row, col) => {
     if (disabled) return;
-    const selected = isSelected(row, col);
-    if (selected) {
-      onCellDeselect(row, col);
-    } else {
-      onCellSelect(row, col);
-    }
-  }, [disabled, isSelected, onCellSelect, onCellDeselect]);
+    onCellSelect(row, col);
+  }, [disabled, onCellSelect]);
 
   const handleMouseEnter = useCallback((row, col) => {
     if (disabled || !isTouching) return;
