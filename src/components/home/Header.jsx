@@ -23,7 +23,7 @@ export default function Header() {
 <span className="tracking-widest text-white uppercase text-xs sm:text-base" style={{ fontFamily: "'Rye', serif" }}>
   TEXASNOMAD
 </span>
-            <span className="text-[6px] sm:text-[8px] tracking-[0.2em] text-kinetic-orange uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>PRODUCTIONS</span>
+            <span className="text-[6px] sm:text-[8px] tracking-[0.2em] text-kinetic-orange uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>GAMES</span>
           </div>
         </Link>
 
