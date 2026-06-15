@@ -10,7 +10,7 @@ export default function Hero({ heroBg, crownLogo }) {
           alt="US map background" 
           className="w-full h-full object-cover"
           style={{ 
-            opacity: 0.6,
+            opacity: 0.35,
             filter: 'hue-rotate(250deg) saturate(1.5) brightness(0.9)',
           }} 
         />
