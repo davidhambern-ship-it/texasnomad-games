@@ -77,17 +77,19 @@ export default function WordBoard({
 
   return (
     <div 
-      className="relative"
+      className="relative touch-none"
       onMouseLeave={handleTouchEnd}
       onMouseUp={handleMouseUp}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      style={{ touchAction: 'none' }}
     >
       <div 
-        className="grid gap-1 md:gap-1.5 mx-auto"
+        className="grid gap-1 md:gap-1.5 mx-auto touch-none"
         style={{ 
           gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`,
           maxWidth: boardSize <= 6 ? '280px' : boardSize <= 8 ? '360px' : '420px',
+          touchAction: 'none',
         }}
       >
         {board.map((row, rowIndex) =>
@@ -104,6 +106,7 @@ export default function WordBoard({
                 data-row={rowIndex}
                 data-col={colIndex}
                 onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
+                onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
                 onTouchStart={(e) => handleTouchStart(rowIndex, colIndex, e)}
                 className={`
                   aspect-square rounded-lg md:rounded-xl flex items-center justify-center

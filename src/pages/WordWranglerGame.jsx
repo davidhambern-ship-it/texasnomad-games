@@ -169,7 +169,8 @@ export default function WordWranglerGame() {
         setLoading(false);
       } catch (err) {
         console.error('Failed to initialize game:', err);
-        setError('Failed to load game');
+        console.error('Error details:', err.message, err.stack);
+        setError('Failed to load game: ' + (err.message || 'Unknown error'));
         setLoading(false);
       }
     }
@@ -303,47 +304,40 @@ export default function WordWranglerGame() {
         return [...prev, { row, col }];
       }
     });
-  }, [gamePhase, game?.boardSize, selectedCells.length]);
+  }, [gamePhase, game?.boardSize, game?.letterBoard, selectedCells.length]);
 
-  const submitWord = async () => {
+  const submitWord = async (autoSubmit = false) => {
     if (selectedCells.length < 3) {
-      console.log('Submit blocked: not enough cells', selectedCells.length);
-      return;
+      return false;
     }
     
     if (!gameRef.current || !gameRef.current.letterBoard) {
-      console.log('Submit blocked: no game or letterBoard');
-      return;
+      return false;
     }
 
     const currentGame = gameRef.current;
     const word = selectedCells.map(c => currentGame.letterBoard[c.row][c.col].letter).join('');
     
-    console.log('Submitting word:', word, 'from cells:', selectedCells);
-
     // Validate word
     if (!validateWord(word)) {
-      console.log('Invalid word:', word);
-      soundManager.playWrong();
-      return;
+      if (!autoSubmit) soundManager.playWrong();
+      return false;
     }
 
     // Check if already found by this player
     const currentPlayer = currentGame.players?.find(p => p.playerId === playerId);
     if (!currentPlayer) {
-      console.error('Player not found in game:', playerId, 'players:', currentGame.players?.map(p => p.playerId));
-      return;
+      console.error('Player not found in game:', playerId);
+      return false;
     }
     if (currentPlayer.wordsFound?.includes(word)) {
-      console.log('Word already found:', word);
-      return;
+      return false;
     }
 
     // Calculate score
     const score = calculateScore(word.length, selectedCells, currentGame.letterBoard);
-    console.log('Score calculated:', score);
     
-    // Play whiplash sound
+    // Play sounds
     soundManager.playWhiplash();
     
     // Cascade tiles
@@ -385,10 +379,30 @@ export default function WordWranglerGame() {
         setShowWordModal(false);
         setLastWordScore(null);
       }, 2000);
+      
+      return true;
     } catch (err) {
       console.error('Failed to submit word:', err);
+      return false;
     }
   };
+
+  // Auto-submit when a valid word of 3+ letters is formed
+  useEffect(() => {
+    if (selectedCells.length >= 3 && gamePhase === 'playing' && game?.letterBoard) {
+      const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
+      if (validateWord(word)) {
+        const currentPlayer = game.players?.find(p => p.playerId === playerId);
+        if (currentPlayer && !currentPlayer.wordsFound?.includes(word)) {
+          // Auto-submit after short delay
+          const timer = setTimeout(() => {
+            submitWord(true);
+          }, 300);
+          return () => clearTimeout(timer);
+        }
+      }
+    }
+  }, [selectedCells, gamePhase, game?.letterBoard, playerId]);
 
   const clearSelection = () => {
     setSelectedCells([]);
