@@ -288,9 +288,11 @@ export default function WordWranglerGame() {
       const isSelected = prev.some(c => `${c.row}-${c.col}` === cellKey);
 
       if (isSelected) {
+        // Deselect this cell and all after it
         const index = prev.findIndex(c => `${c.row}-${c.col}` === cellKey);
         return prev.slice(0, index);
       } else {
+        // Check adjacency if not first cell
         if (prev.length > 0) {
           const last = prev[prev.length - 1];
           const adjacent = getAdjacentCells(last.row, last.col, game.boardSize || 8);
@@ -298,61 +300,68 @@ export default function WordWranglerGame() {
             return prev;
           }
         }
+        // Check if already selected
         if (prev.some(c => c.row === row && c.col === col)) {
           return prev;
         }
         return [...prev, { row, col }];
       }
     });
-  }, [gamePhase, game?.boardSize, game?.letterBoard, selectedCells.length]);
+  }, [gamePhase, game?.boardSize, game?.letterBoard]);
 
   const submitWord = async (autoSubmit = false) => {
     if (selectedCells.length < 3) {
+      console.log('[submitWord] Not enough cells:', selectedCells.length);
       return false;
     }
     
-    if (!gameRef.current || !gameRef.current.letterBoard) {
+    // Use current game state directly, not ref (ref may be stale after cascade)
+    if (!game || !game.letterBoard) {
+      console.log('[submitWord] No game or letterBoard');
       return false;
     }
 
-    const currentGame = gameRef.current;
-    const word = selectedCells.map(c => currentGame.letterBoard[c.row][c.col].letter).join('');
+    const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
+    console.log('[submitWord] Submitting word:', word);
     
     // Validate word
     if (!validateWord(word)) {
+      console.log('[submitWord] Invalid word:', word);
       if (!autoSubmit) soundManager.playWrong();
       return false;
     }
 
     // Check if already found by this player
-    const currentPlayer = currentGame.players?.find(p => p.playerId === playerId);
+    const currentPlayer = game.players?.find(p => p.playerId === playerId);
     if (!currentPlayer) {
-      console.error('Player not found in game:', playerId);
+      console.error('[submitWord] Player not found:', playerId, 'players:', game.players?.map(p => p.playerId));
       return false;
     }
     if (currentPlayer.wordsFound?.includes(word)) {
+      console.log('[submitWord] Word already found:', word);
       return false;
     }
 
     // Calculate score
-    const score = calculateScore(word.length, selectedCells, currentGame.letterBoard);
+    const score = calculateScore(word.length, selectedCells, game.letterBoard);
+    console.log('[submitWord] Score:', score);
     
     // Play sounds
     soundManager.playWhiplash();
     
     // Cascade tiles
-    const newBoard = removeTilesAndCascade(currentGame.letterBoard, selectedCells, currentGame.boardSize || 8);
+    const newBoard = removeTilesAndCascade(game.letterBoard, selectedCells, game.boardSize || 8);
     setAnimatingCells(selectedCells);
     setTimeout(() => setAnimatingCells([]), 500);
     
     // Check outlaw danger
-    const danger = checkOutlawDanger(newBoard, currentGame.boardSize || 8);
+    const danger = checkOutlawDanger(newBoard, game.boardSize || 8);
     setOutlawDanger(danger);
     if (danger) soundManager.playRattlesnake();
     
     // Update game state
-    const playerIndex = currentGame.players.findIndex(p => p.playerId === playerId);
-    const updatedPlayers = [...currentGame.players];
+    const playerIndex = game.players.findIndex(p => p.playerId === playerId);
+    const updatedPlayers = [...game.players];
     updatedPlayers[playerIndex] = {
       ...updatedPlayers[playerIndex],
       score: updatedPlayers[playerIndex].score + score,
@@ -360,13 +369,15 @@ export default function WordWranglerGame() {
     };
 
     const updatedGame = {
-      ...currentGame,
+      ...game,
       players: updatedPlayers,
       letterBoard: newBoard,
     };
 
     try {
-      await base44.entities.WordWranglerGame.update(currentGame.id, updatedGame);
+      console.log('[submitWord] Updating game in database...');
+      await base44.entities.WordWranglerGame.update(game.id, updatedGame);
+      console.log('[submitWord] Game updated successfully');
       
       setWordsFound(prev => [...prev, word]);
       setCurrentScore(prev => prev + score);
@@ -382,27 +393,10 @@ export default function WordWranglerGame() {
       
       return true;
     } catch (err) {
-      console.error('Failed to submit word:', err);
+      console.error('[submitWord] Failed to update game:', err);
       return false;
     }
   };
-
-  // Auto-submit when a valid word of 3+ letters is formed
-  useEffect(() => {
-    if (selectedCells.length >= 3 && gamePhase === 'playing' && game?.letterBoard) {
-      const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
-      if (validateWord(word)) {
-        const currentPlayer = game.players?.find(p => p.playerId === playerId);
-        if (currentPlayer && !currentPlayer.wordsFound?.includes(word)) {
-          // Auto-submit after short delay
-          const timer = setTimeout(() => {
-            submitWord(true);
-          }, 300);
-          return () => clearTimeout(timer);
-        }
-      }
-    }
-  }, [selectedCells, gamePhase, game?.letterBoard, playerId]);
 
   const clearSelection = () => {
     setSelectedCells([]);
