@@ -54,6 +54,38 @@ export default function WordWranglerGame() {
     gameRef.current = game;
   }, [game]);
 
+  const createNewGame = async () => {
+    const boardSize = difficulty === 'simpleton' ? 6 : difficulty === 'reader' ? 8 : 10;
+    const letterBoard = generateLetterBoard(boardSize, specialTilesEnabled);
+    
+    const gameData = {
+      room_code: roomCode,
+      status: 'waiting',
+      host_connected: isCreator,
+      screen_connected: false,
+      players: [],
+      gameMode: vsAI ? 'vs-ai' : 'single-player',
+      difficulty,
+      boardSize,
+      letterBoard,
+      gameState: {
+        phase: 'setup',
+        currentPlayerIndex: 0,
+        timeRemaining: timerLength,
+        roundNumber: 1,
+        totalRounds: 3,
+        selectedCells: [],
+        currentWord: '',
+        specialTilesEnabled,
+        timerLength,
+      },
+      created_by_user_id: isCreator ? (await base44.auth.me())?.id : null,
+    };
+
+    const created = await base44.entities.WordWranglerGame.create(gameData);
+    return created;
+  };
+
   // Initialize or load game
   useEffect(() => {
     if (!roomCode) {
@@ -202,38 +234,6 @@ export default function WordWranglerGame() {
 
     return () => clearInterval(outlawTimerRef.current);
   }, [gamePhase, game?.letterBoard, game?.boardSize]);
-
-  const createNewGame = async () => {
-    const boardSize = difficulty === 'simpleton' ? 6 : difficulty === 'reader' ? 8 : 10;
-    const letterBoard = generateLetterBoard(boardSize, specialTilesEnabled);
-    
-    const gameData = {
-      room_code: roomCode,
-      status: 'waiting',
-      host_connected: isCreator,
-      screen_connected: false,
-      players: [],
-      gameMode: vsAI ? 'vs-ai' : 'single-player',
-      difficulty,
-      boardSize,
-      letterBoard,
-      gameState: {
-        phase: 'setup',
-        currentPlayerIndex: 0,
-        timeRemaining: timerLength,
-        roundNumber: 1,
-        totalRounds: 3,
-        selectedCells: [],
-        currentWord: '',
-        specialTilesEnabled,
-        timerLength,
-      },
-      created_by_user_id: isCreator ? (await base44.auth.me())?.id : null,
-    };
-
-    const created = await base44.entities.WordWranglerGame.create(gameData);
-    return created;
-  };
 
   const joinGame = async (name) => {
     try {
