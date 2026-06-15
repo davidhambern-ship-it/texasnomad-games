@@ -243,7 +243,7 @@ export default function SeeThatGame() {
   const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#FF5F1F' : '#4ade80';
 
   return (
-    <div style={{ height: '100vh', background: '#05030b', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
+    <div style={{ minHeight: '100vh', background: '#05030b', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Rye&family=Press+Start+2P&display=swap');
         @keyframes rippleOut { 0% { transform: translate(-50%,-50%) scale(0.3); opacity:1; } 100% { transform: translate(-50%,-50%) scale(1.8); opacity:0; } }
@@ -282,7 +282,7 @@ export default function SeeThatGame() {
       </div>
 
       {/* Main layout */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 12px 8px', maxWidth: 1280, margin: '0 auto', width: '100%', minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 12px 8px', maxWidth: 1280, margin: '0 auto', width: '100%' }}>
 
         {/* HUD */}
         {phase === 'playing' && (
@@ -306,7 +306,7 @@ export default function SeeThatGame() {
         )}
 
         {/* Scene row */}
-        <div style={{ display: 'flex', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
 
           {/* Target list */}
           {phase === 'playing' && (
@@ -324,12 +324,13 @@ export default function SeeThatGame() {
             </div>
           )}
 
-          {/* Scene */}
+          {/* Scene — fixed 900:600 aspect ratio, scrollable on small screens */}
           <div
             ref={sceneRef}
             onClick={handleSceneClick}
             style={{
-              flex: 1, minHeight: 0, position: 'relative', borderRadius: 12, overflow: 'hidden',
+              flex: 1, position: 'relative', borderRadius: 12, overflow: 'hidden',
+              aspectRatio: '900 / 600', minWidth: 0, minHeight: 320,
               border: wrongFlash ? '3px solid #ef4444' : phase === 'playing' ? '2px solid rgba(188,19,254,0.5)' : '2px solid rgba(188,19,254,0.2)',
               cursor: phase === 'playing' ? 'crosshair' : 'default',
               boxShadow: wrongFlash ? '0 0 40px rgba(239,68,68,0.5), inset 0 0 40px rgba(239,68,68,0.1)' : '0 0 30px rgba(188,19,254,0.2)',
