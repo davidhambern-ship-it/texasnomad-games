@@ -459,7 +459,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
       <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-[1400px] mx-auto w-full">
 
         {/* ── Left: Setup / Stats ───────────────────────────────────────────── */}
-        <aside className="lg:w-72 shrink-0 space-y-3">
+        <aside className="lg:w-72 shrink-0 space-y-3 order-2 lg:order-1">
           {showSetup ? (
             <SetupPanel isSinglePlayer={isSinglePlayer} cpuCharacter={cpuCharacter} onStart={handleStartGame} seatNumber={seatNumber} />
           ) : (
@@ -471,7 +471,6 @@ function WordSearchViewer({ roomCode, cpuId }) {
               running={gs.running}
               paused={gs.paused}
               words={words}
-              gridSize={grid.length}
               mode={gs.mode}
               isMyTurn={isMyTurn}
               isSinglePlayer={isSinglePlayer}
@@ -483,7 +482,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
         </aside>
 
         {/* ── Center: Board ─────────────────────────────────────────────────── */}
-        <main className="flex-1 flex flex-col items-center gap-4">
+        <main className="flex-1 flex flex-col items-center gap-4 order-1 lg:order-2">
           {gs.message && !gs.running && (
             <div className="w-full px-6 py-5 rounded-xl text-center"
               style={{ background: 'linear-gradient(135deg,#07040d,#1a0730)', border: '2px solid rgba(255,215,0,0.5)', boxShadow: '0 0 30px rgba(255,215,0,0.15)' }}>
@@ -635,7 +634,7 @@ function SetupPanel({ isSinglePlayer, cpuCharacter, onStart, seatNumber }) {
 }
 
 // ── Stats Panel ───────────────────────────────────────────────────────────────
-function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, gridSize, mode, isMyTurn, isSinglePlayer, onReset, updateState, gs }) {
+function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, mode, isMyTurn, isSinglePlayer, onReset, updateState, gs }) {
   const wordsFound = words.filter(w => w.found).length;
   const wordsLeft = words.length - wordsFound;
 
@@ -646,7 +645,6 @@ function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, gr
         {[
           { label: 'Time', value: running ? `${mins}:${secs}` : '--', color: '#FFD700' },
           { label: 'Words Left', value: words.length ? wordsLeft : '--', color: '#BC13FE' },
-          { label: 'Board', value: gridSize ? `${gridSize}×${gridSize}` : '--', color: '#FF5F1F' },
           { label: 'Status', value: paused ? 'PAUSED' : running ? 'LIVE' : 'OVER', color: running && !paused ? '#4ade80' : '#FF5F1F' },
         ].map(s => (
           <div key={s.label} className="p-3 rounded-xl text-center"
