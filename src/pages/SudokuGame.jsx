@@ -114,10 +114,12 @@ function CellNumpadPopup({ onNumber, onErase, onToggleNotes, notesMode, onClose,
 }
 
 function SudokuViewer({ roomCode }) {
-  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'sudoku', 'viewer');
+  // If this page is opened as the creator (host panel iframe), skip player seat registration
+  const isHostView = new URLSearchParams(window.location.search).get('creator') === '1';
+  const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'sudoku', isHostView ? 'host' : 'viewer');
   const gs = room?.game_state || {};
 
-  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'sudoku', updateState, false, null, registerUser);
+  const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'sudoku', updateState, isHostView, null, isHostView ? null : registerUser);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef(null);
