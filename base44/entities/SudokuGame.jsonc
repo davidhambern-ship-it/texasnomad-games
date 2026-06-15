@@ -1,0 +1,126 @@
+{
+  "name": "SudokuGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. SDK817)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "screen_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "players": {
+      "type": "array",
+      "description": "Array of player objects with puzzle state",
+      "items": {
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string"
+          },
+          "seatNumber": {
+            "type": "number"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "puzzle": {
+            "type": "array",
+            "description": "81-cell flat array (0 = empty)"
+          },
+          "solution": {
+            "type": "array",
+            "description": "81-cell flat array with solution"
+          },
+          "userGrid": {
+            "type": "array",
+            "description": "81-cell flat array with user's current entries"
+          },
+          "notes": {
+            "type": "object",
+            "description": "Map of cell index to array of pencil marks"
+          },
+          "mistakes": {
+            "type": "number",
+            "default": 0
+          },
+          "completed": {
+            "type": "boolean",
+            "default": false
+          },
+          "completedAt": {
+            "type": "number"
+          },
+          "eliminated": {
+            "type": "boolean",
+            "default": false
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "completed",
+              "eliminated",
+              "left"
+            ],
+            "default": "active"
+          }
+        }
+      }
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "expert"
+      ],
+      "default": "medium"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "countdown",
+        "playing",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "time_start": {
+      "type": "number",
+      "description": "Unix ms when game started"
+    },
+    "time_limit": {
+      "type": "number",
+      "default": 180,
+      "description": "Time limit in seconds"
+    },
+    "winner": {
+      "type": "object",
+      "description": "Winner info"
+    },
+    "game_state": {
+      "type": "object",
+      "description": "Additional game state"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}

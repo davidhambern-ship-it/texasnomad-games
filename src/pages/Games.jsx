@@ -352,6 +352,19 @@ const GAMES = [
     path: '/games/spades',
     featured: false,
   },
+  {
+    id: 'sudoku',
+    title: 'Sudoku TN',
+    tagline: 'Race to Fill the Grid',
+    color: '#22d3ee',
+    color2: '#0ea5e9',
+    marqueeText: 'FILL THE GRID • BEAT THE CLOCK • UNIQUE PUZZLES • FIRST TO FINISH WINS',
+    screenText: '🔢 RACE THE GRID',
+    description: 'Competitive multiplayer Sudoku! Each player gets a unique puzzle. 3 minutes on the clock — first to complete wins. 3 mistakes and you\'re out.',
+    tags: ['Multiplayer', 'Puzzle', 'Race'],
+    path: '/games/sudoku',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [
@@ -362,12 +375,12 @@ const COMING_SOON = [
 ];
 
 // Map game ID to gameKey used in character system
-const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral', 'name-that-track': 'nameThatTrack' };
+const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral', 'name-that-track': 'nameThatTrack', sudoku: 'sudoku' };
 
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
@@ -409,6 +422,29 @@ export default function Games() {
   };
 
   const handleSinglePlayer = async (game) => {
+    // Sudoku solo — no CPU picker, just create a room and go
+    if (game.id === 'sudoku') {
+      setCreating('sudoku');
+      try {
+        const code = generateRoomCode();
+        await base44.entities.GameRoom.create({
+          room_code: code,
+          game_id: 'sudoku',
+          status: 'waiting',
+          host_connected: false,
+          screen_connected: false,
+          players_connected: 0,
+          created_from_host_panel: false,
+          game_state: { single_player: true },
+        });
+        navigate(`/games/sudoku?room=${code}&creator=1`);
+      } catch (e) {
+        console.error('Failed to create Sudoku room', e);
+      } finally {
+        setCreating(null);
+      }
+      return;
+    }
     // BFF has a special "vs AI Team" mode — skip character picker and go directly
     if (game.id === 'bff') {
       setCreating('bff');

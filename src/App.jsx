@@ -20,6 +20,7 @@ import Games from '@/pages/Games';
 import WordSearchGame from '@/pages/WordSearchGame';
 import ViralGame from '@/pages/ViralGame';
 import NameThatTrackGame from '@/pages/NameThatTrackGame';
+import SudokuGame from '@/pages/SudokuGame';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -67,6 +68,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/games/name-that-track" element={<NameThatTrackGame />} />
+      <Route path="/games/sudoku" element={<SudokuGame />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
