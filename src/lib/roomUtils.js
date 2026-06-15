@@ -64,6 +64,19 @@ export function getDefaultGameState(gameId) {
         seats_that_chose: [],
         last_action: null,
       };
+    case 'sudoku':
+      return {
+        phase: 'waiting',
+        players: [],
+        difficulty: 'medium',
+      };
+    case 'see-that':
+      return {
+        phase: 'lobby',
+        score: 0,
+        foundCount: 0,
+        timeLeft: 60,
+      };
     default:
       return {};
   }

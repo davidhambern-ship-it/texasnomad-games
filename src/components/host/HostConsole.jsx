@@ -7,6 +7,8 @@ import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
 import SpadesHostPanel from '@/components/host/panels/SpadesHostPanel.jsx';
 import WordSearchHostPanel from '@/components/host/panels/WordSearchHostPanel.jsx';
 import ViralHostPanel from '@/components/host/panels/ViralHostPanel';
+import SudokuHostPanel from '@/components/host/panels/SudokuHostPanel';
+import SeeThatHostPanel from '@/components/host/panels/SeeThatHostPanel';
 
 export default function HostConsole({ game, roomCode, onDisconnect }) {
   const { room, loading, error, updateState, sendCommand, updateRoomStatus } = useGameRoom(roomCode, game.id, 'host');
@@ -67,6 +69,12 @@ export default function HostConsole({ game, roomCode, onDisconnect }) {
         )}
         {game.id === 'viral' && (
           <ViralHostPanel gs={gs} updateState={updateState} />
+        )}
+        {game.id === 'sudoku' && (
+          <SudokuHostPanel gs={gs} updateState={updateState} sendCommand={sendCommand} roomCode={roomCode} />
+        )}
+        {game.id === 'see-that' && (
+          <SeeThatHostPanel gs={gs} roomCode={roomCode} />
         )}
       </div>
     </div>

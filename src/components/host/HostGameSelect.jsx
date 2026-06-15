@@ -45,6 +45,22 @@ export const ALL_GAMES = [
     emoji: '🔍',
     path: '/games/word-search',
   },
+  {
+    id: 'sudoku',
+    title: 'SUDOKU TN',
+    subtitle: 'RACE THE GRID',
+    color: '#22d3ee',
+    emoji: '🔢',
+    path: '/games/sudoku',
+  },
+  {
+    id: 'see-that',
+    title: 'SEE THAT!',
+    subtitle: 'HIDDEN OBJECT',
+    color: '#4ade80',
+    emoji: '👁',
+    path: '/games/see-that',
+  },
 ];
 
 export default function HostGameSelect({ onSelect, currentGame }) {
