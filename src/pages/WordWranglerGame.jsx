@@ -42,6 +42,12 @@ export default function WordWranglerGame() {
 
   const timerRef = useRef(null);
   const boardRef = useRef(null);
+  const gameRef = useRef(null);
+
+  // Keep ref in sync with latest game state
+  useEffect(() => {
+    gameRef.current = game;
+  }, [game]);
 
   // Initialize or load game
   useEffect(() => {
@@ -208,46 +214,57 @@ export default function WordWranglerGame() {
   }, [gamePhase, game?.boardSize]);
 
   const submitWord = async () => {
-    if (selectedCells.length < 3) return;
+    if (selectedCells.length < 3 || !gameRef.current) {
+      console.log('Submit blocked:', { selectedCells: selectedCells.length, hasGame: !!gameRef.current });
+      return;
+    }
 
-    const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
+    const currentGame = gameRef.current;
+    const word = selectedCells.map(c => currentGame.letterBoard[c.row][c.col].letter).join('');
     
+    console.log('Submitting word:', word, 'from cells:', selectedCells);
+
     // Validate word
     if (!validateWord(word)) {
-      // Show invalid word feedback
+      console.log('Invalid word:', word);
       return;
     }
 
     // Check if already found
     if (wordsFound.includes(word)) {
+      console.log('Word already found:', word);
       return;
     }
 
     // Calculate score
-    const score = calculateScore(word.length, selectedCells, game.letterBoard);
+    const score = calculateScore(word.length, selectedCells, currentGame.letterBoard);
     
     // Update game state
     const updatedGame = {
-      ...game,
-      players: game.players.map(p => 
+      ...currentGame,
+      players: currentGame.players.map(p => 
         p.playerId === playerId 
           ? { ...p, score: p.score + score, wordsFound: [...p.wordsFound, word] }
           : p
       ),
     };
 
-    await base44.entities.WordWranglerGame.update(game.id, updatedGame);
-    
-    setWordsFound([...wordsFound, word]);
-    setCurrentScore(prev => prev + score);
-    setLastWordScore({ word, score });
-    setShowWordModal(true);
-    setSelectedCells([]);
+    try {
+      await base44.entities.WordWranglerGame.update(currentGame.id, updatedGame);
+      
+      setWordsFound(prev => [...prev, word]);
+      setCurrentScore(prev => prev + score);
+      setLastWordScore({ word, score });
+      setShowWordModal(true);
+      setSelectedCells([]);
 
-    setTimeout(() => {
-      setShowWordModal(false);
-      setLastWordScore(null);
-    }, 2000);
+      setTimeout(() => {
+        setShowWordModal(false);
+        setLastWordScore(null);
+      }, 2000);
+    } catch (err) {
+      console.error('Failed to submit word:', err);
+    }
   };
 
   const clearSelection = () => {
