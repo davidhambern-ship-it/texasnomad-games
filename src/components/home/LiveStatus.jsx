@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 
@@ -15,9 +15,6 @@ const GAME_SUBTITLE = {
 
 export default function LiveStatus() {
   const [rooms, setRooms] = useState([]);
-  const [page, setPage] = useState(0);
-  const [fade, setFade] = useState(true);
-  const cycleRef = useRef(null);
 
   useEffect(() => {
     async function fetchLive() {
@@ -25,27 +22,9 @@ export default function LiveStatus() {
       setRooms(all);
     }
     fetchLive();
-    const dataInterval = setInterval(fetchLive, 15000);
-    return () => clearInterval(dataInterval);
+    const interval = setInterval(fetchLive, 15000);
+    return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    if (rooms.length <= 2) return;
-    cycleRef.current = setInterval(() => {
-      setFade(false);
-      setTimeout(() => {
-        setPage(p => {
-          const maxPage = Math.ceil(rooms.length / 2) - 1;
-          return p >= maxPage ? 0 : p + 1;
-        });
-        setFade(true);
-      }, 300);
-    }, 10000);
-    return () => clearInterval(cycleRef.current);
-  }, [rooms.length]);
-
-  const displayed = rooms.slice(page * 2, page * 2 + 2);
-  const totalPages = Math.ceil(rooms.length / 2);
 
   return (
     <section className="px-4 sm:px-6">
@@ -54,16 +33,16 @@ export default function LiveStatus() {
           <div className="flex items-center justify-between mb-5">
             <h3 className="font-heading text-2xl md:text-3xl tracking-[0.15em] text-outlaw-gold uppercase">★ LIVE ROOMS ★</h3>
             <span className="text-[7px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-              {rooms.length} ROOM{rooms.length !== 1 ? 'S' : ''}
+              {rooms.length} ROOM{rooms.length !== 1 ? 'S' : ''} · LIVE
             </span>
           </div>
 
-          <div style={{ transition: 'opacity 0.3s', opacity: fade ? 1 : 0 }} className="space-y-3 min-h-[120px]">
-            {displayed.length === 0 ? (
+          <div className="space-y-3">
+            {rooms.length === 0 ? (
               <div className="flex items-center justify-center h-24 text-white/20 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
                 No active rooms
               </div>
-            ) : displayed.map((room) => {
+            ) : rooms.map((room) => {
               const isLive = room.status === 'active';
               const players = room.players_connected || 0;
               return (
@@ -90,16 +69,6 @@ export default function LiveStatus() {
               );
             })}
           </div>
-
-          {/* Page dots */}
-          {totalPages > 1 && (
-            <div className="flex justify-center gap-1.5 mt-3">
-              {Array.from({ length: totalPages }).map((_, i) => (
-                <div key={i} className="w-1.5 h-1.5 rounded-full transition-all"
-                  style={{ background: i === page ? '#FFD700' : 'rgba(255,255,255,0.15)' }} />
-              ))}
-            </div>
-          )}
 
           <div className="mt-5 text-center">
             <Link to="/live-status" className="inline-block px-6 py-2 border-2 border-outlaw-gold/60 text-outlaw-gold font-heading text-sm tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black hover:shadow-[0_0_20px_rgba(255,215,0,0.5)] transition-all duration-300">
