@@ -7,7 +7,8 @@ import PlayerPanel from '@/components/wordWrangler/PlayerPanel';
 import GameControls from '@/components/wordWrangler/GameControls';
 import WordList from '@/components/wordWrangler/WordList';
 import GameInstructions from '@/components/game/GameInstructions';
-import { generateLetterBoard, validateWord, calculateScore, getAdjacentCells } from '@/lib/wordWranglerUtils';
+import { generateLetterBoard, validateWord, calculateScore, getAdjacentCells, removeTilesAndCascade, checkOutlawDanger } from '@/lib/wordWranglerUtils';
+import { soundManager } from '@/lib/wordWranglerSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const HEADING = { fontFamily: "'Teko', sans-serif" };
@@ -39,10 +40,14 @@ export default function WordWranglerGame() {
   const [gamePhase, setGamePhase] = useState('setup');
   const [showWordModal, setShowWordModal] = useState(false);
   const [lastWordScore, setLastWordScore] = useState(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [outlawDanger, setOutlawDanger] = useState(false);
+  const [animatingCells, setAnimatingCells] = useState([]);
 
   const timerRef = useRef(null);
   const boardRef = useRef(null);
   const gameRef = useRef(null);
+  const outlawTimerRef = useRef(null);
 
   // Keep ref in sync with latest game state
   useEffect(() => {
@@ -181,6 +186,23 @@ export default function WordWranglerGame() {
     return () => clearInterval(timerRef.current);
   }, [gamePhase, timeRemaining]);
 
+  // Outlaw tile movement timer (every 10 seconds)
+  useEffect(() => {
+    if (gamePhase === 'playing' && game?.letterBoard) {
+      outlawTimerRef.current = setInterval(() => {
+        const danger = checkOutlawDanger(game.letterBoard, game.boardSize || 8);
+        if (danger) {
+          setOutlawDanger(true);
+          soundManager.playRattlesnake();
+        } else {
+          setOutlawDanger(false);
+        }
+      }, 10000);
+    }
+
+    return () => clearInterval(outlawTimerRef.current);
+  }, [gamePhase, game?.letterBoard, game?.boardSize]);
+
   const createNewGame = async () => {
     const boardSize = difficulty === 'simpleton' ? 6 : difficulty === 'reader' ? 8 : 10;
     const letterBoard = generateLetterBoard(boardSize, specialTilesEnabled);
@@ -257,31 +279,31 @@ export default function WordWranglerGame() {
   const handleCellSelect = useCallback((row, col) => {
     if (gamePhase !== 'playing' || !game?.letterBoard) return;
 
+    // Play spurs sound on selection
+    if (selectedCells.length < 10) soundManager.playSpurs();
+
     setSelectedCells(prev => {
       const cellKey = `${row}-${col}`;
       const isSelected = prev.some(c => `${c.row}-${c.col}` === cellKey);
 
       if (isSelected) {
-        // Deselect from this cell onwards
         const index = prev.findIndex(c => `${c.row}-${c.col}` === cellKey);
         return prev.slice(0, index);
       } else {
-        // Check if adjacent to last selected
         if (prev.length > 0) {
           const last = prev[prev.length - 1];
           const adjacent = getAdjacentCells(last.row, last.col, game.boardSize || 8);
           if (!adjacent.some(c => c.row === row && c.col === col)) {
-            return prev; // Not adjacent, return unchanged
+            return prev;
           }
         }
-        // Prevent duplicate cells in selection
         if (prev.some(c => c.row === row && c.col === col)) {
           return prev;
         }
         return [...prev, { row, col }];
       }
     });
-  }, [gamePhase, game?.boardSize]);
+  }, [gamePhase, game?.boardSize, selectedCells.length]);
 
   const submitWord = async () => {
     if (selectedCells.length < 3) {
@@ -302,6 +324,7 @@ export default function WordWranglerGame() {
     // Validate word
     if (!validateWord(word)) {
       console.log('Invalid word:', word);
+      soundManager.playWrong();
       return;
     }
 
@@ -320,9 +343,21 @@ export default function WordWranglerGame() {
     const score = calculateScore(word.length, selectedCells, currentGame.letterBoard);
     console.log('Score calculated:', score);
     
-    // Update game state - find player index and update
+    // Play whiplash sound
+    soundManager.playWhiplash();
+    
+    // Cascade tiles
+    const newBoard = removeTilesAndCascade(currentGame.letterBoard, selectedCells, currentGame.boardSize || 8);
+    setAnimatingCells(selectedCells);
+    setTimeout(() => setAnimatingCells([]), 500);
+    
+    // Check outlaw danger
+    const danger = checkOutlawDanger(newBoard, currentGame.boardSize || 8);
+    setOutlawDanger(danger);
+    if (danger) soundManager.playRattlesnake();
+    
+    // Update game state
     const playerIndex = currentGame.players.findIndex(p => p.playerId === playerId);
-
     const updatedPlayers = [...currentGame.players];
     updatedPlayers[playerIndex] = {
       ...updatedPlayers[playerIndex],
@@ -333,18 +368,18 @@ export default function WordWranglerGame() {
     const updatedGame = {
       ...currentGame,
       players: updatedPlayers,
+      letterBoard: newBoard,
     };
 
     try {
-      console.log('Updating game with new score...');
       await base44.entities.WordWranglerGame.update(currentGame.id, updatedGame);
-      console.log('Game updated successfully');
       
       setWordsFound(prev => [...prev, word]);
       setCurrentScore(prev => prev + score);
       setLastWordScore({ word, score });
       setShowWordModal(true);
       setSelectedCells([]);
+      soundManager.playCupFill();
 
       setTimeout(() => {
         setShowWordModal(false);
@@ -493,7 +528,26 @@ export default function WordWranglerGame() {
             </div>
             
             {/* Controls */}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* Outlaw Danger Indicator */}
+              {outlawDanger && (
+                <div className="px-3 py-1 rounded bg-red-600/80 border border-red-400 animate-pulse" style={PS2}>
+                  <span className="text-[10px] text-white">⚠️ OUTLAW!</span>
+                </div>
+              )}
+              
+              {/* Mute Toggle */}
+              <button 
+                onClick={() => {
+                  setIsMuted(!isMuted);
+                  soundManager.setMute(!isMuted);
+                }} 
+                className="p-2 rounded hover:bg-white/10 transition-all" 
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted ? '🔇' : '🔊'}
+              </button>
+              
               <button onClick={() => setShowInstructions(true)} className="p-2 rounded hover:bg-white/10 transition-all" title="How to Play">
                 📖
               </button>
@@ -526,6 +580,7 @@ export default function WordWranglerGame() {
                 onCellSelect={handleCellSelect}
                 boardSize={game?.boardSize || 8}
                 disabled={gamePhase !== 'playing'}
+                animatingCells={animatingCells}
               />
               
               {/* Current Word Display */}
@@ -561,6 +616,7 @@ export default function WordWranglerGame() {
               wordsFound={wordsFound}
               currentScore={currentScore}
               lastWordScore={lastWordScore}
+              outlawDanger={outlawDanger}
             />
           </div>
         </div>

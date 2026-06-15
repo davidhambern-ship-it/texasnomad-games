@@ -9,6 +9,7 @@ const SPECIAL_TILES = {
   'frog': { icon: '🐸', bg: 'bg-gradient-to-br from-green-600 to-emerald-400', border: 'border-emerald-400', glow: 'shadow-[0_0_15px_rgba(0,255,100,0.6)]', event: true },
   'microphone': { icon: '🎤', bg: 'bg-gradient-to-br from-pink-600 to-purple-500', border: 'border-purple-400', glow: 'shadow-[0_0_15px_rgba(255,0,255,0.6)]', double: true },
   'texas-flag': { icon: '🤠', bg: 'bg-gradient-to-br from-blue-700 to-blue-500', border: 'border-blue-300', glow: 'shadow-[0_0_15px_rgba(0,100,255,0.6)]', team: true },
+  'outlaw': { icon: '💀', bg: 'bg-gradient-to-br from-red-900 to-red-700', border: 'border-red-500', glow: 'shadow-[0_0_15px_rgba(255,0,0,0.8)]', danger: true },
 };
 
 export default function WordBoard({ 
@@ -16,7 +17,8 @@ export default function WordBoard({
   boardSize, 
   selectedCells, 
   onCellSelect, 
-  disabled = false 
+  disabled = false,
+  animatingCells = []
 }) {
   const [isTouching, setIsTouching] = useState(false);
   const touchStartRef = useRef(null);
@@ -24,6 +26,10 @@ export default function WordBoard({
   const isSelected = useCallback((row, col) => {
     return selectedCells.some(c => c.row === row && c.col === col);
   }, [selectedCells]);
+
+  const isAnimating = useCallback((row, col) => {
+    return animatingCells.some(c => c.row === row && c.col === col);
+  }, [animatingCells]);
 
   const handleMouseDown = useCallback((row, col) => {
     if (disabled) return;
@@ -87,7 +93,10 @@ export default function WordBoard({
         {board.map((row, rowIndex) =>
           row.map((cell, colIndex) => {
             const selected = isSelected(rowIndex, colIndex);
+            const animating = isAnimating(rowIndex, colIndex);
             const specialTile = cell.specialType ? SPECIAL_TILES[cell.specialType] : null;
+            const isOutlaw = cell.isOutlaw ? SPECIAL_TILES.outlaw : null;
+            const activeSpecial = specialTile || isOutlaw;
             
             return (
               <div
@@ -102,20 +111,21 @@ export default function WordBoard({
                   transition-all duration-150
                   ${selected 
                     ? 'bg-gradient-to-br from-outlaw-gold to-yellow-400 text-black scale-105 z-10' 
-                    : specialTile 
-                      ? `${specialTile.bg} ${specialTile.border} border-2 ${specialTile.glow} text-white`
+                    : activeSpecial
+                      ? `${activeSpecial.bg} ${activeSpecial.border} border-2 ${activeSpecial.glow} text-white`
                       : 'bg-gradient-to-br from-cyber-purple/80 to-cyber-purple/40 border border-cyber-purple/50 text-white hover:border-outlaw-gold/60'
                   }
                   ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:scale-105 active:scale-95'}
+                  ${animating ? 'animate-pulse' : ''}
                 `}
                 style={{
-                  boxShadow: selected ? '0 0 20px rgba(255, 215, 0, 0.8)' : undefined,
+                  boxShadow: selected ? '0 0 20px rgba(255, 215, 0, 0.8)' : (isOutlaw ? '0 0 20px rgba(255, 0, 0, 0.8)' : undefined),
                   textShadow: selected ? 'none' : '0 0 5px rgba(255,255,255,0.5)',
                 }}
               >
-                {specialTile ? (
+                {activeSpecial ? (
                   <div className="flex flex-col items-center">
-                    <span className="text-sm md:text-base">{specialTile.icon}</span>
+                    <span className="text-sm md:text-base">{activeSpecial.icon}</span>
                     <span className="text-base md:text-xl font-bold">{cell.letter}</span>
                   </div>
                 ) : (
