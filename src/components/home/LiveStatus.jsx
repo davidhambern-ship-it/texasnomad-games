@@ -21,7 +21,7 @@ export default function LiveStatus() {
 
   useEffect(() => {
     async function fetchLive() {
-      const all = await base44.entities.GameRoom.list('-updated_date', 50);
+      const all = await base44.entities.GameRoom.list('-updated_date', 20);
       setRooms(all);
     }
     fetchLive();
