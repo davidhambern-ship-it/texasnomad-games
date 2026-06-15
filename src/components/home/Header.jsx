@@ -18,7 +18,7 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
         {/* Logo / Branding */}
         <Link to="/" className="flex items-center gap-2 shrink-0">
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TexasNomad Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png" alt="TexasNomad Logo" className="w-8 h-8 sm:w-10 sm:h-10 object-contain" />
           <div className="flex flex-col leading-tight">
 <span className="tracking-widest text-white uppercase text-xs sm:text-base" style={{ fontFamily: "'Rye', serif" }}>
   TEXASNOMAD

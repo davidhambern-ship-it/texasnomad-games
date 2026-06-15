@@ -392,7 +392,7 @@ function SudokuViewer({ roomCode }) {
         <div className="max-w-screen-xl mx-auto px-3 h-12 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <Link to="/">
-              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" className="w-7 h-7 object-contain" />
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png" alt="TN" className="w-7 h-7 object-contain" />
             </Link>
             <span style={{ ...PS2, fontSize: 9, color: '#BC13FE' }} className="hidden sm:inline">SUDOKU TN</span>
             <div className="flex items-center gap-1.5">

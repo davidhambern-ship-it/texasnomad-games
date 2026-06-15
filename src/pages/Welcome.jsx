@@ -71,7 +71,7 @@ export default function Welcome() {
 
         <div className="relative z-10 max-w-2xl mx-auto space-y-4">
           <img
-            src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png"
+            src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
             alt="TexasNomad"
             className="w-20 h-20 object-contain mx-auto mb-2"
             style={{ filter: 'drop-shadow(0 0 20px rgba(188,19,254,0.6))' }}
