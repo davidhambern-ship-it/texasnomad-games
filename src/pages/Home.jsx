@@ -127,64 +127,94 @@ function JoinGameInline() {
   );
 }
 
-const GAME_DEFS_INLINE = [
-  { id: 'bff',         name: 'BFF',         subtitle: 'BIGO FAMILY FEUD'  },
-  { id: 'square-biz',  name: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS'  },
-  { id: 'spades',      name: 'SPADES',      subtitle: 'TEXASNOMAD DECK'   },
-];
+const GAME_NAME_MAP = {
+  'bff': 'BFF', 'square-biz': 'SQUARE BIZ!', 'spades': 'SPADES',
+  'word-search': 'WORD SEARCH', 'sudoku': 'SUDOKU', 'hangman': 'HANGMAN',
+  'viral': 'VIRAL', 'name-that-track': 'NAME THAT TRACK',
+};
+const GAME_SUB_MAP = {
+  'bff': 'FAMILY FEUD', 'square-biz': 'TRIVIA', 'spades': 'CARD GAME',
+  'word-search': 'WORD HUNT', 'sudoku': 'PUZZLE', 'hangman': 'WORD GUESS',
+  'viral': 'BOARD GAME', 'name-that-track': 'MUSIC',
+};
 
 function LiveStatusInline() {
-  const [playerCounts, setPlayerCounts] = React.useState({});
+  const [rooms, setRooms] = React.useState([]);
+  const [page, setPage] = React.useState(0);
+  const [fade, setFade] = React.useState(true);
 
   React.useEffect(() => {
     async function fetchLive() {
-      const rooms = await base44.entities.GameRoom.filter({ status: 'active' });
-      const counts = {};
-      GAME_DEFS_INLINE.forEach(g => { counts[g.id] = 0; });
-      rooms.forEach(r => {
-        if (counts[r.game_id] !== undefined) counts[r.game_id] += r.players_connected || 0;
-      });
-      setPlayerCounts(counts);
+      const all = await base44.entities.GameRoom.list('-updated_date', 50);
+      setRooms(all);
     }
     fetchLive();
-    const interval = setInterval(fetchLive, 15000);
-    return () => clearInterval(interval);
+    const dataInterval = setInterval(fetchLive, 15000);
+    return () => clearInterval(dataInterval);
   }, []);
 
+  React.useEffect(() => {
+    if (rooms.length <= 2) return;
+    const cycleInterval = setInterval(() => {
+      setFade(false);
+      setTimeout(() => {
+        setPage(p => {
+          const maxPage = Math.ceil(rooms.length / 2) - 1;
+          return p >= maxPage ? 0 : p + 1;
+        });
+        setFade(true);
+      }, 300);
+    }, 10000);
+    return () => clearInterval(cycleInterval);
+  }, [rooms.length]);
+
+  const displayed = rooms.slice(page * 2, page * 2 + 2);
+  const totalPages = Math.ceil(rooms.length / 2);
+
   return (
-    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
-      <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
-        LIVE STATUS
-      </h3>
-      <div className="space-y-2">
-        {GAME_DEFS_INLINE.map((game) => {
-          const players = playerCounts[game.id] ?? 0;
-          const isLive = players > 0;
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>LIVE ROOMS</h3>
+        <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{rooms.length} TOTAL</span>
+      </div>
+      <div className="flex-1 space-y-2" style={{ transition: 'opacity 0.3s', opacity: fade ? 1 : 0, minHeight: 80 }}>
+        {displayed.length === 0 ? (
+          <div className="flex items-center justify-center h-16 text-white/20 text-[6px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>No active rooms</div>
+        ) : displayed.map((room) => {
+          const isLive = room.status === 'active';
+          const players = room.players_connected || 0;
           return (
-            <div key={game.id} className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50">
+            <div key={room.id} className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50">
               <div className="flex items-center gap-2">
-                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-white/20'}`} />
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-white/10'}`} />
                 <div>
-                  <span className="text-[9px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.name}</span>
-                  <span className="block text-[7px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
+                  <span className="text-[8px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{GAME_NAME_MAP[room.game_id] || room.game_id}</span>
+                  <span className="block text-[6px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{GAME_SUB_MAP[room.game_id] || ''} · {room.room_code}</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <div className="text-right">
-                  <span className="text-lg text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{players}</span>
-                  <span className="block text-[6px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLAYERS</span>
+                  <span className="text-base text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{players}</span>
+                  <span className="block text-[5px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLR</span>
                 </div>
-                <span className={`px-1.5 py-0.5 rounded text-[7px] tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
-                  {isLive ? 'LIVE' : 'IDLE'}
+                <span className={`px-1.5 py-0.5 rounded text-[6px] tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                  {isLive ? 'LIVE' : room.status.toUpperCase()}
                 </span>
               </div>
             </div>
           );
         })}
       </div>
-      <div className="mt-4 text-center">
-        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[7px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          VIEW ALL LIVE GAMES
+      {totalPages > 1 && (
+        <div className="flex justify-center gap-1 mt-2">
+          {Array.from({ length: totalPages }).map((_, i) => (
+            <div key={i} className="w-1 h-1 rounded-full transition-all" style={{ background: i === page ? '#FFD700' : 'rgba(255,255,255,0.15)' }} />
+          ))}
+        </div>
+      )}
+      <div className="mt-3 text-center">
+        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[6px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          VIEW ALL →
         </a>
       </div>
     </div>
