@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-export default function SudokuTimer({ timeStart, timeLimit, phase, onExpire }) {
+export default function SudokuTimer({ timeStart, timeLimit, phase, onExpire, compact = false }) {
   const [remaining, setRemaining] = useState(timeLimit);
 
   useEffect(() => {
@@ -26,6 +26,20 @@ export default function SudokuTimer({ timeStart, timeLimit, phase, onExpire }) {
   const pct = remaining / timeLimit;
   const isUrgent = remaining <= 30;
   const isCritical = remaining <= 10;
+
+  if (compact) {
+    return (
+      <div style={{
+        fontFamily: "'Press Start 2P', monospace",
+        fontSize: 20,
+        color: isCritical ? '#ef4444' : isUrgent ? '#FF5F1F' : '#FFD700',
+        textShadow: `0 0 12px ${isCritical ? '#ef4444' : isUrgent ? '#FF5F1F' : '#FFD700'}`,
+        animation: isCritical ? 'pulse 0.5s ease-in-out infinite' : 'none',
+      }}>
+        {mins}:{secs}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col items-center gap-1">
