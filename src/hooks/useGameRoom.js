@@ -10,8 +10,9 @@ import { getDefaultGameState } from '@/lib/roomUtils';
  *   connectedUsers = [{ uid, type: 'host'|'player'|'spectator', seatNumber, status, joinedAt, lastSeen }]
  *
  * Rules:
- *   - Host is ALWAYS seat 1. Host never appears in connectedUsers as a player.
- *   - Active players have seatNumber >= 2 (since seat 1 is reserved for host).
+ *   - Host is ALWAYS seat 1. This is a CRITICAL platform rule — never override it.
+ *   - Human players can NEVER be in seat 1. They always start at seat 2 or higher.
+ *   - Seat 1 is exclusively for the Host Panel or AI-controlled characters.
  *   - Spectators have seatNumber = null, but are tracked with a uid.
  *   - On disconnect/tab-close: user is marked status='disconnected', not deleted.
  *   - On reconnect: existing uid is matched and status restored to 'connected'.
@@ -58,7 +59,22 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
         }
 
         if (role === 'host') {
-          r = await base44.entities.GameRoom.update(r.id, { host_connected: true });
+          // Register host as seat 1 and evict any human player who somehow took seat 1
+          const gs = r.game_state || {};
+          const connectedUsers = (gs.connectedUsers || []).map(u =>
+            // If a human player is in seat 1, bump them to seat 2+
+            (u.type === 'player' && u.seatNumber === 1)
+              ? { ...u, seatNumber: 2 + Math.floor(Math.random() * 90) } // will be corrected on reconnect
+              : u
+          );
+          r = await base44.entities.GameRoom.update(r.id, {
+            host_connected: true,
+            game_state: {
+              ...gs,
+              connectedUsers,
+              host_seat: 1, // explicit marker that host = seat 1
+            },
+          });
         }
         roomRef.current = r;
         setRoom({ ...r });
@@ -169,17 +185,20 @@ export function useGameRoom(roomCode, gameId, role = 'viewer') {
     }
 
     // New user — assign seat if player
+    // CRITICAL RULE: Seat 1 is ALWAYS and EXCLUSIVELY reserved for the Host/Host Panel or AI.
+    // Human players can NEVER occupy seat 1 under any circumstances.
     let seatNumber = null;
     if (type === 'player') {
-      // Seat 1 is always reserved for host — players start at seat 2
       const usedSeats = new Set(
         users.filter(u => u.type === 'player' && u.status !== 'disconnected').map(u => u.seatNumber)
       );
-      usedSeats.add(1); // always reserve seat 1 for host
-      if (preferredSeat && !usedSeats.has(preferredSeat)) {
-        seatNumber = preferredSeat;
+      usedSeats.add(1); // hard-block seat 1 — host/AI only
+      // Also block seat 1 if a preferred seat of 1 is requested — redirect to seat 2+
+      const safePreferred = preferredSeat && preferredSeat !== 1 ? preferredSeat : null;
+      if (safePreferred && !usedSeats.has(safePreferred)) {
+        seatNumber = safePreferred;
       } else {
-        seatNumber = 2;
+        seatNumber = 2; // humans always start at 2
         while (usedSeats.has(seatNumber)) seatNumber++;
       }
     }

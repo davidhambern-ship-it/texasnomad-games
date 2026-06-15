@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react';
  * Universal Player Seat Hook
  *
  * Rules:
- *  - Seat 1 is ALWAYS reserved for the host — players start at seat 2.
+ *  - Seat 1 is ALWAYS and EXCLUSIVELY reserved for the Host Panel or AI characters.
+ *    Human players can NEVER occupy seat 1 under any circumstances — they start at seat 2+.
  *  - Each human gets a stable uid per-room stored in localStorage.
  *  - On first visit: registers via registerUser (from useGameRoom) to get a seat.
  *  - On refresh/reconnect: reads uid from localStorage, re-registers (server marks reconnected).
@@ -96,10 +97,10 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
       if (registeredRef.current) return;
       registeredRef.current = true;
 
-      // Seat 1 reserved for host — players start at 2
+      // CRITICAL: Seat 1 is ALWAYS reserved for Host/AI — human players start at seat 2
       const usedSeats = new Set(players.map(p => p.seatNumber));
-      usedSeats.add(1);
-      let nextSeat = 2;
+      usedSeats.add(1); // hard-block seat 1
+      let nextSeat = 2; // humans always start at 2, never 1
       while (usedSeats.has(nextSeat)) nextSeat++;
 
       setSeatNumber(nextSeat);
