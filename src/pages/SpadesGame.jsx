@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesRoundSummary from '@/components/spades/SpadesRoundSummary';
@@ -51,6 +52,8 @@ function emptySeatsIn(players) {
 // ─── Main viewer component ────────────────────────────────────────────────────
 
 function SpadesViewer({ roomCode, isCreator, cpuId }) {
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_spades_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_spades_${roomCode}`, '1'); setShowInstructions(false); };
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'spades', 'viewer');
   const isSinglePlayer = !!(cpuId);
   const cpuCharacter = isSinglePlayer
@@ -789,6 +792,8 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const showCPUChoice = false;
   // Play/Spectate dialog: shown to new visitors
   const showJoinChoice = joinFlow === 'choose' && !loading && room;
+
+  if (showInstructions) return <GameInstructions gameId="spades" onDismiss={dismissInstructions} />;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col" style={{ overflowX: 'hidden' }}>

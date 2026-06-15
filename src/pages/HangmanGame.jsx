@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
@@ -108,6 +109,8 @@ function HangmanViewer({ roomCode, cpuId }) {
   const navigate = useNavigate();
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'hangman', 'viewer');
   const gs = room?.game_state || {};
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_hangman_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_hangman_${roomCode}`, '1'); setShowInstructions(false); };
   const isSinglePlayer = !!(cpuId || gs.single_player);
 
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'hangman', updateState, false, null, registerUser);
@@ -561,6 +564,8 @@ function HangmanViewer({ roomCode, cpuId }) {
     <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
     <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
   ];
+
+  if (showInstructions) return <GameInstructions gameId="hangman" onDismiss={dismissInstructions} />;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">

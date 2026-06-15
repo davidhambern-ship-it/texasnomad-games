@@ -11,6 +11,7 @@ import BFFVsAISetup from '@/components/bff/BFFVsAISetup.jsx';
 import BFFTeamRoster from '@/components/bff/BFFTeamRoster.jsx';
 import BFFBuzzer from '@/components/bff/BFFBuzzer.jsx';
 import { useBFFVsAI } from '@/hooks/useBFFVsAI.js';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const TN_TEAM = TEXASNOMAD_CHARACTERS;
@@ -27,6 +28,8 @@ export default function BFFGame() {
 function BFFViewer({ roomCode, isVsAI }) {
   const { room, loading, updateState, ensureRoom, registerUser } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_bff_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_bff_${roomCode}`, '1'); setShowInstructions(false); };
 
   // Stable playerId
   const [playerId] = useState(() => {
@@ -470,6 +473,8 @@ function BFFViewer({ roomCode, isVsAI }) {
   const isAIThinking = gs.answering_ai && !stealMode;
   const buzzWinner = gs.buzz_winner || null;
   const canBuzz = isVsAI && (buzzerPhase === 'buzzer_active') && !buzzWinner;
+
+  if (showInstructions) return <GameInstructions gameId="bff" onDismiss={dismissInstructions} />;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#070311] text-white flex flex-col">

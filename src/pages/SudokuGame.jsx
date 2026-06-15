@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { Link } from 'react-router-dom';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
@@ -114,6 +115,8 @@ function CellNumpadPopup({ onNumber, onErase, onToggleNotes, notesMode, onClose,
 }
 
 function SudokuViewer({ roomCode }) {
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_sudoku_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_sudoku_${roomCode}`, '1'); setShowInstructions(false); };
   // If opened inside the Host Panel iframe, skip player seat registration
   const isHostView = window.self !== window.top;
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'sudoku', 'viewer');
@@ -349,6 +352,8 @@ function SudokuViewer({ roomCode }) {
   const players = gs.players || [];
   const winner = gs.winner;
   const mistakesLeft = 3 - mistakes;
+
+  if (showInstructions) return <GameInstructions gameId="sudoku" onDismiss={dismissInstructions} />;
 
   if (loading) {
     return (

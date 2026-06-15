@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
@@ -58,6 +59,8 @@ export default function SquareBizGame() {
 function SquareBizViewer({ roomCode, cpuId }) {
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'square-biz', 'viewer');
   const gs = room?.game_state || {};
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_square-biz_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_square-biz_${roomCode}`, '1'); setShowInstructions(false); };
   const isSinglePlayer = !!(cpuId || gs.single_player);
   const cpuCharacter = isSinglePlayer
     ? TEXASNOMAD_CHARACTERS.find(c => c.id === (cpuId || gs.cpu_opponent_id)) || TEXASNOMAD_CHARACTERS[0]
@@ -107,6 +110,10 @@ function SquareBizViewer({ roomCode, cpuId }) {
   };
 
   const displayMode = gs.display_mode;
+
+  if (showInstructions) return <GameInstructions gameId="square-biz" onDismiss={dismissInstructions} />;
+
+  if (showInstructions) return <GameInstructions gameId="square-biz" onDismiss={dismissInstructions} />;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col relative">

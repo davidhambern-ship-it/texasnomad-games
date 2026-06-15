@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import { base44 } from '@/api/base44Client';
@@ -17,6 +18,8 @@ export default function NameThatTrackGame() {
 }
 
 function NameThatTrackViewer({ roomCode }) {
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_ntt_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_ntt_${roomCode}`, '1'); setShowInstructions(false); };
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'name-that-track', 'viewer');
   const gs = room?.game_state || {};
   
@@ -32,6 +35,8 @@ function NameThatTrackViewer({ roomCode }) {
   }, []);
 
   const displayMode = gs.display_mode;
+
+  if (showInstructions) return <GameInstructions gameId="name-that-track" onDismiss={dismissInstructions} />;
 
   return (
     <div ref={containerRef} className="min-h-screen bg-[#05030b] text-white flex flex-col relative">

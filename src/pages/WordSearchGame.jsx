@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
@@ -117,6 +118,8 @@ export default function WordSearchGame() {
 
 function WordSearchViewer({ roomCode, cpuId }) {
   const navigate = useNavigate();
+  const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_word-search_${roomCode}`));
+  const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_word-search_${roomCode}`, '1'); setShowInstructions(false); };
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'word-search', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
@@ -412,6 +415,8 @@ function WordSearchViewer({ roomCode, cpuId }) {
   const timeRemaining = gs.time_end ? Math.max(0, Math.floor((gs.time_end - Date.now()) / 1000)) : 0;
   const mins = Math.floor(timeRemaining / 60);
   const secs = String(timeRemaining % 60).padStart(2, '0');
+
+  if (showInstructions) return <GameInstructions gameId="word-search" onDismiss={dismissInstructions} />;
 
   if (loading) {
     return (
