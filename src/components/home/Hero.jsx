@@ -5,7 +5,15 @@ export default function Hero({ heroBg, crownLogo }) {
     <section className="relative w-full min-h-[70vh] flex flex-col items-center justify-center overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0">
-        <img src={heroBg} alt="US map background" className="w-full h-full object-cover opacity-60" />
+        <img 
+          src={heroBg} 
+          alt="US map background" 
+          className="w-full h-full object-cover"
+          style={{ 
+            opacity: 0.35,
+            filter: 'hue-rotate(250deg) saturate(1.5) brightness(0.9)',
+          }} 
+        />
         <div className="absolute inset-0 bg-gradient-to-b from-midnight-void/30 via-midnight-void/10 to-midnight-void" />
       </div>
 
