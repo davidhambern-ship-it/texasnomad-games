@@ -382,7 +382,7 @@ const GAMES = [
     id: 'word-wrangler',
     title: 'Word Wrangler',
     tagline: 'Connect & Conquer',
-    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/c270ce064_generated_c7b46bf7.png',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/37cb5bd26_generated_image.png',
     color: '#BC13FE',
     color2: '#FF5F1F',
     marqueeText: 'CONNECT LETTERS • FORM WORDS • SCORE POINTS • BEAT OPPONENTS',
