@@ -40,41 +40,40 @@ export default function WordBoard({
     e.preventDefault();
     setIsTouching(true);
     touchStartRef.current = { row, col };
-    const selected = isSelected(row, col);
-    if (!selected) {
-      onCellSelect(row, col);
-    }
-  }, [disabled, isSelected, onCellSelect]);
+    onCellSelect(row, col);
+  }, [disabled, onCellSelect]);
 
   const handleTouchMove = useCallback((e) => {
     if (disabled || !isTouching) return;
+    e.preventDefault();
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (element) {
+    if (element && element.dataset.row && element.dataset.col) {
       const row = parseInt(element.dataset.row);
       const col = parseInt(element.dataset.col);
       if (!isNaN(row) && !isNaN(col)) {
         const selected = isSelected(row, col);
-        if (!selected && touchStartRef.current) {
-          const lastSelected = selectedCells[selectedCells.length - 1];
-          if (!lastSelected || (lastSelected.row === row && lastSelected.col === col)) {
-            return;
-          }
+        if (!selected) {
           onCellSelect(row, col);
         }
       }
     }
-  }, [disabled, isTouching, isSelected, selectedCells, onCellSelect]);
+  }, [disabled, isTouching, isSelected, onCellSelect]);
 
   const handleTouchEnd = useCallback(() => {
     setIsTouching(false);
     touchStartRef.current = null;
   }, []);
 
+  const handleMouseUp = useCallback(() => {
+    setIsTouching(false);
+  }, []);
+
   return (
     <div 
       className="relative"
       onMouseLeave={handleTouchEnd}
+      onMouseUp={handleMouseUp}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >

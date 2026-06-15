@@ -198,10 +198,14 @@ export default function WordWranglerGame() {
             return prev; // Not adjacent, return unchanged
           }
         }
+        // Prevent duplicate cells in selection
+        if (prev.some(c => c.row === row && c.col === col)) {
+          return prev;
+        }
         return [...prev, { row, col }];
       }
     });
-  }, [gamePhase, game?.boardSize, game?.letterBoard]);
+  }, [gamePhase, game?.boardSize]);
 
   const submitWord = async () => {
     if (selectedCells.length < 3) return;
