@@ -11,10 +11,10 @@ export default function Hero({ heroBg, crownLogo }) {
           className="w-full h-full object-cover"
           style={{ 
             opacity: 0.6,
-            filter: 'hue-rotate(260deg) saturate(2) brightness(0.7)',
+            filter: 'hue-rotate(250deg) saturate(1.5) brightness(0.9)',
           }} 
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-midnight-void/40 via-midnight-void/20 to-midnight-void" />
+        <div className="absolute inset-0 bg-gradient-to-b from-midnight-void/30 via-midnight-void/10 to-midnight-void" />
       </div>
 
       {/* Content */}
