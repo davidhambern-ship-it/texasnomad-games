@@ -108,25 +108,24 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
 
   return (
     <div
-      className="relative flex flex-col select-none transition-all duration-300"
+      className="relative flex flex-col select-none transition-all duration-300 w-full sm:w-auto"
       style={{
-        transform: hovered ? 'scale(1.03) translateY(-6px)' : 'scale(1)',
+        transform: hovered ? 'scale(1.02) translateY(-4px)' : 'scale(1)',
         filter: hovered ? `drop-shadow(0 0 30px ${glowColor}80)` : `drop-shadow(0 0 8px ${glowColor}30)`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-
       {/* Cabinet Body */}
-      <div className="relative rounded-t-3xl rounded-b-xl overflow-hidden border-2 scanline-overlay"
-      style={{
-        borderColor: hovered ? glowColor : `${glowColor}50`,
-        background: `linear-gradient(180deg, #050208 0%, #020106 100%)`,
+      <div
+        className="relative rounded-t-3xl rounded-b-xl overflow-hidden border-2 scanline-overlay w-full"
+        style={{
+          borderColor: hovered ? glowColor : `${glowColor}50`,
+          background: `linear-gradient(180deg, #050208 0%, #020106 100%)`,
           boxShadow: hovered
             ? `0 0 40px ${glowColor}60, inset 0 0 30px ${glowColor}10`
             : `0 0 15px ${glowColor}20, inset 0 0 10px ${glowColor}05`,
-          minWidth: featured ? 320 : 280,
-          maxWidth: featured ? 380 : 320,
+          maxWidth: featured ? 420 : 340,
         }}
       >
         {/* Cabinet Top Marquee */}
@@ -134,11 +133,11 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
           style={{ background: `linear-gradient(135deg, ${glowColor}30, ${glowColor2}30)`, borderBottom: `2px solid ${glowColor}50` }}>
           <div className="absolute inset-0 opacity-30"
             style={{ background: `repeating-linear-gradient(90deg, transparent, transparent 8px, ${glowColor}20 8px, ${glowColor}20 9px)` }} />
-          <div className="relative tracking-[0.1em] uppercase text-outlaw-gold"
-            style={{ fontSize: featured ? '1.6rem' : '1.3rem', fontFamily: "'Rye', serif", textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
+          <div className="relative tracking-[0.08em] uppercase text-outlaw-gold truncate px-2"
+            style={{ fontSize: featured ? '1.5rem' : '1.25rem', fontFamily: "'Rye', serif", textShadow: `0 0 15px #FFD700, 0 0 30px #FFD70060` }}>
             {game.title}
           </div>
-          <div className="text-[7px] tracking-[0.3em] uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace", color: `${glowColor}cc` }}>
+          <div className="text-[6px] tracking-[0.2em] uppercase mt-0.5 truncate px-2" style={{ fontFamily: "'Press Start 2P', monospace", color: `${glowColor}cc` }}>
             {game.tagline}
           </div>
         </div>
@@ -148,7 +147,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
 
         {/* Screen */}
         <div className="mx-3 my-3 rounded-xl overflow-hidden relative"
-        style={{ border: `2px solid ${glowColor}40`, minHeight: featured ? 160 : 130, background: '#020106' }}>
+          style={{ border: `2px solid ${glowColor}40`, aspectRatio: '16/9', background: '#020106' }}>
           {/* Scanlines */}
           <div className="absolute inset-0 pointer-events-none z-10"
             style={{ background: 'repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px)' }} />
@@ -176,7 +175,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
           <p className="text-white/50 text-xs leading-relaxed font-body text-center">{game.description}</p>
           <div className="flex flex-wrap gap-1 justify-center mt-2">
             {game.tags.map(tag => (
-              <span key={tag} className="px-2 py-0.5 rounded text-[7px] tracking-widest uppercase"
+              <span key={tag} className="px-2 py-0.5 rounded text-[6px] tracking-widest uppercase"
                 style={{ fontFamily: "'Press Start 2P', monospace", background: `${glowColor}15`, color: `${glowColor}cc`, border: `1px solid ${glowColor}40` }}>
                 {tag}
               </span>
@@ -189,12 +188,11 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
           <button
             onClick={() => onCreateRoom(game.id)}
             disabled={creating === game.id}
-            className="w-full py-2.5 rounded-lg font-heading text-sm tracking-[0.2em] uppercase transition-all duration-200 hover:scale-105 active:scale-95 disabled:opacity-50"
+            className="w-full py-3 rounded-lg font-heading text-sm tracking-[0.15em] uppercase transition-all duration-200 active:scale-95 disabled:opacity-50"
             style={{
               background: `linear-gradient(135deg, ${glowColor}30, ${glowColor2}20)`,
               border: `2px solid ${glowColor}`,
               color: glowColor,
-              boxShadow: hovered ? `0 0 15px ${glowColor}50` : 'none',
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
@@ -204,7 +202,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
           {/* VS CPU — Single Player */}
           <button
             onClick={() => onSinglePlayer?.(game)}
-            className="w-full py-2 rounded-lg font-heading text-xs tracking-[0.15em] uppercase transition-all duration-200 hover:scale-105 active:scale-95"
+            className="w-full py-2.5 rounded-lg font-heading text-xs tracking-[0.1em] uppercase transition-all duration-200 active:scale-95"
             style={{
               background: 'transparent',
               border: `1px solid #FFD70040`,
@@ -216,8 +214,8 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
 
           <div className="flex gap-2">
             <input
-              className="flex-1 px-3 py-2 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
-              style={{ background: '#0a0510', border: `1px solid ${glowColor}30` }}
+              className="flex-1 px-3 py-2.5 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
+              style={{ background: '#0a0510', border: `1px solid ${glowColor}30`, minWidth: 0 }}
               placeholder="ROOM CODE"
               value={roomCode}
               onChange={e => setRoomCode(e.target.value.toUpperCase())}
@@ -227,7 +225,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
             <button
               onClick={handleJoin}
               disabled={!String(roomCode || '').trim() || joining}
-              className="px-3 py-2 rounded-lg font-heading text-xs tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-30"
+              className="px-4 py-2.5 rounded-lg font-heading text-xs tracking-widest uppercase transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
               style={{ background: `${glowColor2}20`, border: `1px solid ${glowColor2}60`, color: glowColor2 }}
             >
               {joining ? '…' : 'JOIN'}
@@ -253,8 +251,8 @@ function ComingSoonCabinet({ title, emoji, color = '#4a4a6a' }) {
     <div className="relative transition-all duration-300 opacity-60 hover:opacity-80"
       style={{ transform: hovered ? 'scale(1.02)' : 'scale(1)' }}
       onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
-      <div className="rounded-t-2xl rounded-b-xl overflow-hidden border-2 border-white/10"
-        style={{ background: '#080808', minWidth: 200, maxWidth: 240, boxShadow: '0 0 10px rgba(255,255,255,0.03)' }}>
+      <div className="rounded-t-2xl rounded-b-xl overflow-hidden border-2 border-white/10 w-full"
+        style={{ background: '#080808', boxShadow: '0 0 10px rgba(255,255,255,0.03)' }}>
         <div className="py-3 text-center" style={{ background: '#111118', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
           <div className="font-heading text-lg tracking-widest text-white/30 uppercase">{title}</div>
         </div>
@@ -579,7 +577,7 @@ export default function Games() {
 
       <div className="relative z-10">
         {/* Hero Banner */}
-        <div className="relative text-center py-16 px-4 overflow-hidden">
+        <div className="relative text-center py-10 sm:py-16 px-4 overflow-hidden">
           <div className="absolute inset-0 overflow-hidden pointer-events-none">
             <div className="absolute top-4 left-8 opacity-40"><NeonSign text="PLAY" color="#BC13FE" size="sm" /></div>
             <div className="absolute top-8 right-12 opacity-40"><NeonSign text="WIN" color="#FF5F1F" size="sm" /></div>
@@ -592,7 +590,7 @@ export default function Games() {
               style={{ fontFamily: "'Press Start 2P', monospace", textShadow: '0 0 15px #BC13FE' }}>
               ✦ TEXASNOMAD ARCADE ✦
             </div>
-            <h1 className="text-6xl sm:text-8xl md:text-9xl tracking-wider uppercase leading-none text-glow-gold"
+            <h1 className="text-5xl sm:text-7xl md:text-9xl tracking-wider uppercase leading-none text-glow-gold"
               style={{ color: '#FFD700', fontFamily: "'Monoton', cursive" }}>
               THE GAMES
             </h1>
@@ -618,7 +616,7 @@ export default function Games() {
                   <span className="text-outlaw-gold text-lg">⭐</span>
                 </div>
               </div>
-              <div className="flex justify-center">
+              <div className="flex justify-center px-2">
                 <ArcadeCabinet
                   game={featuredGame}
                   featured={true}
@@ -642,7 +640,7 @@ export default function Games() {
                 — ALL GAMES —
               </div>
             </div>
-            <div className="flex flex-wrap justify-center gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center">
               {otherGames.map(game => (
                 <ArcadeCabinet
                   key={game.id}
@@ -680,7 +678,7 @@ export default function Games() {
                 More cabinets arriving soon
               </p>
             </div>
-            <div className="flex flex-wrap justify-center gap-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {COMING_SOON.map(c => (
                 <ComingSoonCabinet key={c.title} title={c.title} emoji={c.emoji} color={c.color} />
               ))}
