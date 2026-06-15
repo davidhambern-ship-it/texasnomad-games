@@ -20,7 +20,7 @@ export default function WordBoard({
   disabled = false,
   animatingCells = []
 }) {
-  const [isTouching, setIsTouching] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const touchStartRef = useRef(null);
 
   const isSelected = useCallback((row, col) => {
@@ -33,24 +33,25 @@ export default function WordBoard({
 
   const handleMouseDown = useCallback((row, col) => {
     if (disabled) return;
+    setIsDragging(true);
     onCellSelect(row, col);
   }, [disabled, onCellSelect]);
 
   const handleMouseEnter = useCallback((row, col) => {
-    if (disabled || !isTouching) return;
+    if (disabled || !isDragging) return;
     onCellSelect(row, col);
-  }, [disabled, isTouching, onCellSelect]);
+  }, [disabled, isDragging, onCellSelect]);
 
   const handleTouchStart = useCallback((row, col, e) => {
     if (disabled) return;
     e.preventDefault();
-    setIsTouching(true);
+    setIsDragging(true);
     touchStartRef.current = { row, col };
     onCellSelect(row, col);
   }, [disabled, onCellSelect]);
 
   const handleTouchMove = useCallback((e) => {
-    if (disabled || !isTouching) return;
+    if (disabled || !isDragging) return;
     e.preventDefault();
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -64,15 +65,15 @@ export default function WordBoard({
         }
       }
     }
-  }, [disabled, isTouching, isSelected, onCellSelect]);
+  }, [disabled, isDragging, isSelected, onCellSelect]);
 
   const handleTouchEnd = useCallback(() => {
-    setIsTouching(false);
+    setIsDragging(false);
     touchStartRef.current = null;
   }, []);
 
   const handleMouseUp = useCallback(() => {
-    setIsTouching(false);
+    setIsDragging(false);
   }, []);
 
   return (
@@ -80,6 +81,7 @@ export default function WordBoard({
       className="relative touch-none"
       onMouseLeave={handleTouchEnd}
       onMouseUp={handleMouseUp}
+      onMouseDown={(e) => e.preventDefault()}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       style={{ touchAction: 'none' }}
