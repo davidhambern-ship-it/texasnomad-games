@@ -198,7 +198,7 @@ function LiveStatusInline() {
       </div>
 
       {/* Scrolling feed */}
-      <div className="flex-1 overflow-hidden relative" style={{ minHeight: 0 }}>
+      <div className="overflow-hidden relative" style={{ height: 120 }}>
         {rooms.length === 0 ? (
           <div className="flex items-center justify-center h-full text-white/20 text-[6px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>No rooms yet</div>
         ) : (
