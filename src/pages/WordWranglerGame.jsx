@@ -179,28 +179,29 @@ export default function WordWranglerGame() {
   };
 
   const handleCellSelect = useCallback((row, col) => {
-    if (gamePhase !== 'playing') return;
+    if (gamePhase !== 'playing' || !game?.letterBoard) return;
 
-    const cellKey = `${row}-${col}`;
-    const isSelected = selectedCells.some(c => `${c.row}-${c.col}` === cellKey);
+    setSelectedCells(prev => {
+      const cellKey = `${row}-${col}`;
+      const isSelected = prev.some(c => `${c.row}-${c.col}` === cellKey);
 
-    if (isSelected) {
-      // Deselect from this cell onwards
-      const index = selectedCells.findIndex(c => `${c.row}-${c.col}` === cellKey);
-      setSelectedCells(selectedCells.slice(0, index));
-    } else {
-      // Check if adjacent to last selected
-      if (selectedCells.length > 0) {
-        const last = selectedCells[selectedCells.length - 1];
-        const adjacent = getAdjacentCells(last.row, last.col, game?.boardSize || 8);
-        if (!adjacent.some(c => c.row === row && c.col === col)) {
-          return; // Not adjacent
+      if (isSelected) {
+        // Deselect from this cell onwards
+        const index = prev.findIndex(c => `${c.row}-${c.col}` === cellKey);
+        return prev.slice(0, index);
+      } else {
+        // Check if adjacent to last selected
+        if (prev.length > 0) {
+          const last = prev[prev.length - 1];
+          const adjacent = getAdjacentCells(last.row, last.col, game.boardSize || 8);
+          if (!adjacent.some(c => c.row === row && c.col === col)) {
+            return prev; // Not adjacent, return unchanged
+          }
         }
+        return [...prev, { row, col }];
       }
-
-      setSelectedCells([...selectedCells, { row, col }]);
-    }
-  }, [selectedCells, gamePhase, game?.boardSize]);
+    });
+  }, [gamePhase, game?.boardSize, game?.letterBoard]);
 
   const submitWord = async () => {
     if (selectedCells.length < 3) return;

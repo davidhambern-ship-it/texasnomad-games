@@ -74,6 +74,7 @@ export default function WordBoard({
   return (
     <div 
       className="relative"
+      onMouseLeave={handleTouchEnd}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
