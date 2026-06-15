@@ -28,18 +28,25 @@ export function usePlayerSeat(room, roomCode, gameId, updateState, isHost = fals
   });
 
   const [seatNumber, setSeatNumber] = useState(() => {
-    if (!roomCode || !playerId) return null;
+    if (isHost || !roomCode || !playerId) return null;
     const cached = localStorage.getItem(`tn_seat_${roomCode}_${playerId}`);
     return cached ? Number(cached) : null;
   });
 
   const [isSeated, setIsSeated] = useState(() => {
-    if (!roomCode || !playerId) return false;
+    if (isHost || !roomCode || !playerId) return false;
     return !!localStorage.getItem(`tn_seat_${roomCode}_${playerId}`);
   });
 
   const [userType, setUserType] = useState(chosenRole === 'spectator' ? 'spectator' : 'player');
   const registeredRef = useRef(false);
+
+  // If this is a host view, clear any stale cached seat for this room
+  useEffect(() => {
+    if (isHost && roomCode && playerId) {
+      localStorage.removeItem(`tn_seat_${roomCode}_${playerId}`);
+    }
+  }, [isHost, roomCode, playerId]);
 
   useEffect(() => {
     if (isHost || !room || !playerId) return;
