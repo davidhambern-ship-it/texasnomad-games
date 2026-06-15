@@ -641,16 +641,16 @@ function StatsPanel({ players, activeIdx, mins, secs, running, paused, words, mo
   return (
     <div className="space-y-3">
       {/* Status grid */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="flex gap-2">
         {[
           { label: 'Time', value: running ? `${mins}:${secs}` : '--', color: '#FFD700' },
           { label: 'Words Left', value: words.length ? wordsLeft : '--', color: '#BC13FE' },
           { label: 'Status', value: paused ? 'PAUSED' : running ? 'LIVE' : 'OVER', color: running && !paused ? '#4ade80' : '#FF5F1F' },
         ].map(s => (
-          <div key={s.label} className="p-3 rounded-xl text-center"
-            style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `0 0 12px ${s.color}15` }}>
-            <div className="text-[6px] tracking-widest text-white/30 uppercase mb-1" style={PS2}>{s.label}</div>
-            <div className="font-heading text-lg" style={{ color: s.color, textShadow: `0 0 10px ${s.color}80` }}>{s.value}</div>
+          <div key={s.label} className="flex-1 px-2 py-1.5 rounded-lg text-center"
+            style={{ background: 'linear-gradient(135deg,#07040d,#0d0620)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: `0 0 8px ${s.color}15` }}>
+            <div className="text-[5px] tracking-widest text-white/30 uppercase mb-0.5" style={PS2}>{s.label}</div>
+            <div className="font-heading text-base leading-none" style={{ color: s.color, textShadow: `0 0 8px ${s.color}80` }}>{s.value}</div>
           </div>
         ))}
       </div>
