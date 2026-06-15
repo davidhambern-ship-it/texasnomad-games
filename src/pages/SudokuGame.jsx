@@ -292,9 +292,10 @@ function SudokuViewer({ roomCode }) {
   }, [isMobile, localComplete, localEliminated]);
 
   const handleJoinAndStart = async (difficulty) => {
-    if (!isSeated) return;
+    if (!playerId) return;
     const currentPlayers = gs.players || [];
     const { puzzle, solution } = generatePuzzle(difficulty);
+    const myEffectiveSeat = seatNumber || (currentPlayers.length + 2);
     const meExists = currentPlayers.some(p => p.playerId === playerId);
     const updatedPlayers = meExists
       ? currentPlayers.map(p => p.playerId === playerId ? {
@@ -302,7 +303,7 @@ function SudokuViewer({ roomCode }) {
           completed: false, eliminated: false, completedAt: null, status: 'active',
         } : p)
       : [...currentPlayers, {
-          playerId, seatNumber, playerName: `Seat ${seatNumber}`,
+          playerId, seatNumber: myEffectiveSeat, playerName: `Seat ${myEffectiveSeat}`,
           puzzle, solution, userGrid: Array(81).fill(0), notes: {},
           mistakes: 0, completed: false, eliminated: false, completedAt: null, status: 'active',
         }];
@@ -480,7 +481,7 @@ function SudokuViewer({ roomCode }) {
             <div className="space-y-3 w-full max-w-xs">
               <div style={{ ...PS2, fontSize: 8, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>SELECT DIFFICULTY</div>
               {DIFFICULTIES.map(d => (
-                <button key={d.key} onClick={() => handleJoinAndStart(d.key)} disabled={!isSeated}
+                <button key={d.key} onClick={() => handleJoinAndStart(d.key)} disabled={!playerId}
                   className="w-full py-4 rounded-xl border-2 font-heading text-xl tracking-widest uppercase transition-all hover:scale-105 active:scale-95 disabled:opacity-40"
                   style={{ borderColor: d.color, background: `${d.color}10`, color: d.color, boxShadow: `0 0 15px ${d.color}20`, fontFamily: "'Teko', sans-serif" }}>
                   {d.label}
