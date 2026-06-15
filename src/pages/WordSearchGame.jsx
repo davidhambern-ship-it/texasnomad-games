@@ -269,9 +269,9 @@ function WordSearchViewer({ roomCode, cpuId }) {
       const winner = [...updatedPlayers].sort((a, b) => b.score - a.score)[0];
       await updateState({ running: false, players: updatedPlayers, message: `Time up! Winner: ${winner?.name} with ${winner?.score} pts.` });
     } else {
+      // Turn-based (multi or ai): rotate to next player with 60s turn
       const nextActive = (activeIdx + 1) % Math.max(players.length, 1);
-      const timeEnd = Date.now() + 60000;
-      await updateState({ active: nextActive, players: updatedPlayers, time_end: timeEnd });
+      await updateState({ active: nextActive, players: updatedPlayers, time_end: Date.now() + 60000 });
     }
   }, [gs, updateState]);
 
@@ -347,16 +347,18 @@ function WordSearchViewer({ roomCode, cpuId }) {
         return;
       }
       const mode = gs.mode || 'single';
-      const nextActive = mode === 'single' ? activeIdx : (activeIdx + 1) % Math.max(players.length, 1);
-      const timeEnd = Date.now() + (mode === 'single' ? 300000 : 60000);
+      const isTurnBased = mode !== 'single';
+      const nextActive = isTurnBased ? (activeIdx + 1) % Math.max(players.length, 1) : activeIdx;
+      const timeEnd = Date.now() + (isTurnBased ? 60000 : 300000);
       await updateState({ words: updatedWords, players: updatedPlayers, active: nextActive, time_end: timeEnd, last_action: { word: found.word, result: 'correct', seatNumber, timestamp: Date.now() } });
     } else {
       // Wrong selection penalty
       const newScore = (activePlayer.score || 0) - 20;
       const updatedPlayers = players.map((p, i) => i === activeIdx ? { ...p, score: newScore } : p);
       const mode = gs.mode || 'single';
-      const nextActive = mode === 'single' ? activeIdx : (activeIdx + 1) % Math.max(players.length, 1);
-      const timeEnd = Date.now() + (mode === 'single' ? 300000 : 60000);
+      const isTurnBased = mode !== 'single';
+      const nextActive = isTurnBased ? (activeIdx + 1) % Math.max(players.length, 1) : activeIdx;
+      const timeEnd = Date.now() + (isTurnBased ? 60000 : 300000);
       await updateState({ players: updatedPlayers, active: nextActive, time_end: timeEnd, last_action: { word: text, result: 'wrong', seatNumber, timestamp: Date.now() } });
     }
   };
@@ -384,7 +386,8 @@ function WordSearchViewer({ roomCode, cpuId }) {
       }
     }
 
-    const timeEnd = Date.now() + (mode === 'single' ? 300000 : 60000);
+    const isTurnBased = mode !== 'single';
+    const timeEnd = Date.now() + (isTurnBased ? 60000 : 300000);
     await updateState({
       mode, difficulty, category,
       grid, words,
@@ -393,7 +396,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
       running: true,
       paused: false,
       time_end: timeEnd,
-      message: mode === 'single' ? 'Find all words before time runs out!' : `${players[0]?.name || 'Player'} has 1 minute to find a word!`,
+      message: isTurnBased ? `${players[0]?.name || 'Player'} has 1 minute to find a word!` : 'Find all words before time runs out!',
       last_action: null,
     });
   };
