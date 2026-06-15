@@ -7,6 +7,11 @@ const GAME_PATHS = {
   'square-biz': '/games/square-biz',
   hangman: '/games/hangman',
   spades: '/games/spades',
+  'word-search': '/games/word-search',
+  sudoku: '/games/sudoku',
+  'see-that': '/games/see-that',
+  viral: '/games/viral',
+  'name-that-track': '/games/name-that-track',
 };
 
 export default function JoinRoom() {
