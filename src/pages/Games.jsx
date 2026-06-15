@@ -378,6 +378,20 @@ const GAMES = [
     path: '/games/see-that',
     featured: false,
   },
+  {
+    id: 'word-wrangler',
+    title: 'Word Wrangler',
+    tagline: 'Connect & Conquer',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/afea99c64_generated_image.png',
+    color: '#BC13FE',
+    color2: '#FF5F1F',
+    marqueeText: 'CONNECT LETTERS • FORM WORDS • SCORE POINTS • BEAT OPPONENTS',
+    screenText: '🔤 WORD BUILDER',
+    description: 'Create words by connecting adjacent letters on the board. Longer words earn more points. Special tiles add bonuses and TexasNomad events!',
+    tags: ['1-4 Players', 'Word Game', 'Strategy'],
+    path: '/games/word-wrangler',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [

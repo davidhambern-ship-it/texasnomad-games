@@ -1,0 +1,169 @@
+{
+  "name": "WordWranglerGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. WW817)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "host_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "screen_connected": {
+      "type": "boolean",
+      "default": false
+    },
+    "players": {
+      "type": "array",
+      "description": "Array of player objects",
+      "items": {
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string"
+          },
+          "seatNumber": {
+            "type": "number"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number",
+            "default": 0
+          },
+          "wordsFound": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "left",
+              "winner"
+            ],
+            "default": "active"
+          },
+          "isAI": {
+            "type": "boolean",
+            "default": false
+          },
+          "aiCharacterId": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "gameMode": {
+      "type": "string",
+      "enum": [
+        "single-player",
+        "multiplayer",
+        "vs-ai",
+        "team-battle"
+      ],
+      "default": "single-player"
+    },
+    "difficulty": {
+      "type": "string",
+      "enum": [
+        "simpleton",
+        "reader",
+        "scholar"
+      ],
+      "default": "reader"
+    },
+    "boardSize": {
+      "type": "number",
+      "default": 8
+    },
+    "letterBoard": {
+      "type": "array",
+      "description": "2D array of letter objects",
+      "items": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "letter": {
+              "type": "string"
+            },
+            "specialTile": {
+              "type": "string",
+              "enum": [
+                "gold-bean",
+                "diamond",
+                "dexter",
+                "frog",
+                "microphone",
+                "texas-flag",
+                null
+              ]
+            }
+          }
+        }
+      }
+    },
+    "gameState": {
+      "type": "object",
+      "description": "Current game state",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "setup",
+            "playing",
+            "round-over",
+            "game-over"
+          ]
+        },
+        "currentPlayerIndex": {
+          "type": "number"
+        },
+        "timeRemaining": {
+          "type": "number"
+        },
+        "roundNumber": {
+          "type": "number"
+        },
+        "totalRounds": {
+          "type": "number"
+        },
+        "selectedCells": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "currentWord": {
+          "type": "string"
+        },
+        "specialTilesEnabled": {
+          "type": "boolean"
+        },
+        "timerLength": {
+          "type": "number"
+        }
+      }
+    },
+    "created_by_user_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}
