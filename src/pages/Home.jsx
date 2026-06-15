@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { createRoomAndJoin } from '@/lib/roomUtils';
+import { base44 } from '@/api/base44Client';
 import Header from '../components/home/Header';
 import Hero from '../components/home/Hero';
 import FeaturedGames from '../components/home/FeaturedGames';
@@ -126,12 +127,29 @@ function JoinGameInline() {
   );
 }
 
+const GAME_DEFS_INLINE = [
+  { id: 'bff',         name: 'BFF',         subtitle: 'BIGO FAMILY FEUD'  },
+  { id: 'square-biz',  name: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS'  },
+  { id: 'spades',      name: 'SPADES',      subtitle: 'TEXASNOMAD DECK'   },
+];
+
 function LiveStatusInline() {
-  const games = [
-    { name: 'BFF', subtitle: 'BIGO FAMILY FEUD', players: 12 },
-    { name: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS', players: 8 },
-    { name: 'SPADES', subtitle: 'TEXASNOMAD DECK', players: 16 },
-  ];
+  const [playerCounts, setPlayerCounts] = React.useState({});
+
+  React.useEffect(() => {
+    async function fetchLive() {
+      const rooms = await base44.entities.GameRoom.filter({ status: 'active' });
+      const counts = {};
+      GAME_DEFS_INLINE.forEach(g => { counts[g.id] = 0; });
+      rooms.forEach(r => {
+        if (counts[r.game_id] !== undefined) counts[r.game_id] += r.players_connected || 0;
+      });
+      setPlayerCounts(counts);
+    }
+    fetchLive();
+    const interval = setInterval(fetchLive, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
@@ -139,26 +157,30 @@ function LiveStatusInline() {
         LIVE STATUS
       </h3>
       <div className="space-y-2">
-        {games.map((game) => (
-          <div key={game.name} className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50">
-            <div className="flex items-center gap-2">
-              <div className="w-2.5 h-2.5 rounded-full bg-kinetic-orange animate-pulse-glow shrink-0" />
-              <div>
-                <span className="text-[9px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.name}</span>
-                <span className="block text-[7px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
+        {GAME_DEFS_INLINE.map((game) => {
+          const players = playerCounts[game.id] ?? 0;
+          const isLive = players > 0;
+          return (
+            <div key={game.id} className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50">
+              <div className="flex items-center gap-2">
+                <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-white/20'}`} />
+                <div>
+                  <span className="text-[9px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.name}</span>
+                  <span className="block text-[7px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <span className="text-lg text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{players}</span>
+                  <span className="block text-[6px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLAYERS</span>
+                </div>
+                <span className={`px-1.5 py-0.5 rounded text-[7px] tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                  {isLive ? 'LIVE' : 'IDLE'}
+                </span>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="text-right">
-                <span className="text-lg text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{game.players}</span>
-                <span className="block text-[6px] tracking-widest text-white/40 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLAYERS</span>
-              </div>
-              <span className="px-1.5 py-0.5 bg-cyber-purple/20 border border-cyber-purple/50 rounded text-cyber-purple text-[7px] tracking-wider animate-pulse-glow" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-                LIVE
-              </span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
       <div className="mt-4 text-center">
         <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[7px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
