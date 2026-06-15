@@ -365,6 +365,19 @@ const GAMES = [
     path: '/games/sudoku',
     featured: false,
   },
+  {
+    id: 'see-that',
+    title: 'See That!',
+    tagline: 'Hidden Object Challenge',
+    color: '#4ade80',
+    color2: '#22c55e',
+    marqueeText: 'FIND THE OBJECTS • CLICK TO SCORE • BEAT THE CLOCK • CAN YOU SEE THAT?',
+    screenText: '👁 SPOT THE HIDDEN',
+    description: 'Race to find 5 hidden objects in a chaotic saloon scene. Click fast, don\'t miss, and beat the 60-second clock!',
+    tags: ['Single Player', 'Hidden Object', 'Fast'],
+    path: '/games/see-that',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [
@@ -380,7 +393,7 @@ const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangma
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
@@ -391,6 +404,11 @@ export default function Games() {
   };
 
   const handleCreateRoom = async (gameId) => {
+    // See That! is single-player only — no room needed
+    if (gameId === 'see-that') {
+      navigate('/games/see-that');
+      return;
+    }
     setCreating(gameId);
     try {
       const code = generateRoomCode();
@@ -422,6 +440,11 @@ export default function Games() {
   };
 
   const handleSinglePlayer = async (game) => {
+    // See That! — pure single-player, navigate directly
+    if (game.id === 'see-that') {
+      navigate('/games/see-that');
+      return;
+    }
     // Sudoku solo — no CPU picker, just create a room and go
     if (game.id === 'sudoku') {
       setCreating('sudoku');
