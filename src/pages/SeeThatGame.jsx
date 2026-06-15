@@ -243,7 +243,7 @@ export default function SeeThatGame() {
   const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#FF5F1F' : '#4ade80';
 
   return (
-    <div style={{ minHeight: '100vh', background: '#05030b', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ height: '100vh', background: '#05030b', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif", overflow: 'hidden' }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Rye&family=Press+Start+2P&display=swap');
         @keyframes rippleOut { 0% { transform: translate(-50%,-50%) scale(0.3); opacity:1; } 100% { transform: translate(-50%,-50%) scale(1.8); opacity:0; } }
@@ -276,13 +276,13 @@ export default function SeeThatGame() {
       </header>
 
       {/* Title */}
-      <div style={{ textAlign: 'center', padding: '8px 16px 4px', flexShrink: 0, background: 'linear-gradient(180deg, rgba(188,19,254,0.08) 0%, transparent 100%)' }}>
-        <h1 style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(28px, 5vw, 52px)', color: '#FFD700', textShadow: '0 0 20px #FFD700, 0 0 40px rgba(255,215,0,0.4)', margin: 0, lineHeight: 1, letterSpacing: '0.05em' }}>SEE THAT!</h1>
-        <p style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.3)', margin: '4px 0 0' }}>HIDDEN OBJECT CHALLENGE • TEXASNOMAD ARCADE</p>
+      <div style={{ textAlign: 'center', padding: '4px 16px 2px', flexShrink: 0, background: 'linear-gradient(180deg, rgba(188,19,254,0.08) 0%, transparent 100%)' }}>
+        <h1 style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(20px, 3vw, 36px)', color: '#FFD700', textShadow: '0 0 20px #FFD700, 0 0 40px rgba(255,215,0,0.4)', margin: 0, lineHeight: 1, letterSpacing: '0.05em' }}>SEE THAT!</h1>
+        <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>HIDDEN OBJECT CHALLENGE • TEXASNOMAD ARCADE</p>
       </div>
 
       {/* Main layout */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 12px 12px', maxWidth: 1280, margin: '0 auto', width: '100%' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 12px 8px', maxWidth: 1280, margin: '0 auto', width: '100%', minHeight: 0 }}>
 
         {/* HUD */}
         {phase === 'playing' && (
@@ -306,7 +306,7 @@ export default function SeeThatGame() {
         )}
 
         {/* Scene row */}
-        <div style={{ display: 'flex', gap: 8, flex: 1, minHeight: 0 }}>
+        <div style={{ display: 'flex', gap: 8, flex: 1, minHeight: 0, overflow: 'hidden' }}>
 
           {/* Target list */}
           {phase === 'playing' && (
@@ -329,7 +329,7 @@ export default function SeeThatGame() {
             ref={sceneRef}
             onClick={handleSceneClick}
             style={{
-              flex: 1, minHeight: 320, position: 'relative', borderRadius: 12, overflow: 'hidden',
+              flex: 1, minHeight: 0, position: 'relative', borderRadius: 12, overflow: 'hidden',
               border: wrongFlash ? '3px solid #ef4444' : phase === 'playing' ? '2px solid rgba(188,19,254,0.5)' : '2px solid rgba(188,19,254,0.2)',
               cursor: phase === 'playing' ? 'crosshair' : 'default',
               boxShadow: wrongFlash ? '0 0 40px rgba(239,68,68,0.5), inset 0 0 40px rgba(239,68,68,0.1)' : '0 0 30px rgba(188,19,254,0.2)',
