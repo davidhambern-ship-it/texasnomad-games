@@ -114,8 +114,8 @@ function CellNumpadPopup({ onNumber, onErase, onToggleNotes, notesMode, onClose,
 }
 
 function SudokuViewer({ roomCode }) {
-  // If opened as creator (host panel iframe), skip player seat registration — but always use 'viewer' role
-  const isHostView = new URLSearchParams(window.location.search).get('creator') === '1';
+  // If opened inside the Host Panel iframe, skip player seat registration
+  const isHostView = window.self !== window.top;
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'sudoku', 'viewer');
   const gs = room?.game_state || {};
 
