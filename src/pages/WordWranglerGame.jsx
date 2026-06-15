@@ -145,7 +145,15 @@ export default function WordWranglerGame() {
         try {
           const rooms = await base44.entities.WordWranglerGame.filter({ room_code: roomCode });
           if (rooms.length > 0) {
-            setGame(rooms[0]);
+            // Only update if game exists and has players (don't overwrite freshly created game)
+            const freshGame = rooms[0];
+            setGame(prev => {
+              // If we have a player but fresh game doesn't, keep our version
+              if (prev?.players?.length > 0 && (!freshGame.players || freshGame.players.length === 0)) {
+                return prev;
+              }
+              return freshGame;
+            });
           }
         } catch (err) {
           console.error('Poll error:', err);
@@ -154,7 +162,7 @@ export default function WordWranglerGame() {
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [roomCode, vsAI]);
+  }, [roomCode, vsAI, gamePhase]);
 
   // Timer
   useEffect(() => {
@@ -299,7 +307,11 @@ export default function WordWranglerGame() {
 
     // Check if already found by this player
     const currentPlayer = currentGame.players?.find(p => p.playerId === playerId);
-    if (currentPlayer?.wordsFound?.includes(word)) {
+    if (!currentPlayer) {
+      console.error('Player not found in game:', playerId, 'players:', currentGame.players?.map(p => p.playerId));
+      return;
+    }
+    if (currentPlayer.wordsFound?.includes(word)) {
       console.log('Word already found:', word);
       return;
     }
@@ -309,11 +321,7 @@ export default function WordWranglerGame() {
     console.log('Score calculated:', score);
     
     // Update game state - find player index and update
-    const playerIndex = currentGame.players?.findIndex(p => p.playerId === playerId);
-    if (playerIndex === undefined || playerIndex === -1) {
-      console.error('Player not found in game:', playerId);
-      return;
-    }
+    const playerIndex = currentGame.players.findIndex(p => p.playerId === playerId);
 
     const updatedPlayers = [...currentGame.players];
     updatedPlayers[playerIndex] = {
