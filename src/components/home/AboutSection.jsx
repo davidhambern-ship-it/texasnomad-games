@@ -6,8 +6,16 @@ export default function AboutSection({ aboutBg }) {
       {/* Background image */}
       {aboutBg && (
         <div className="absolute inset-0 -mx-4 sm:-mx-6">
-          <img src={aboutBg} alt="" className="w-full h-full object-cover opacity-15" />
-          <div className="absolute inset-0 bg-midnight-void/80" />
+          <img 
+            src={aboutBg} 
+            alt="" 
+            className="w-full h-full object-cover"
+            style={{ 
+              opacity: 0.6,
+              filter: 'hue-rotate(260deg) saturate(2) brightness(0.8)',
+            }} 
+          />
+          <div className="absolute inset-0 bg-midnight-void/40" />
         </div>
       )}
 
