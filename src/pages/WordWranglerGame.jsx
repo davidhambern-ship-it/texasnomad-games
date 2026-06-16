@@ -6,7 +6,7 @@ import WordBoard from '@/components/wordWrangler/WordBoard';
 import PlayerPanel from '@/components/wordWrangler/PlayerPanel';
 import TargetWordDisplay from '@/components/wordWrangler/TargetWordDisplay';
 import GameInstructions from '@/components/game/GameInstructions';
-import { generateBoardWithWords, isTargetWord, injectWordIntoBoard, pickTargetWords } from '@/lib/wordWranglerWordGenerator';
+import { generateBoardWithWords, isTargetWord, injectWordIntoBoard, pickTargetWords, ensureActiveWordsOnBoard } from '@/lib/wordWranglerWordGenerator';
 import { getAdjacentCells, calculateScore, removeTilesAndCascade } from '@/lib/wordWranglerUtils';
 import { soundManager } from '@/lib/wordWranglerSound';
 
@@ -54,8 +54,9 @@ export default function WordWranglerGame() {
         if (rooms.length === 0) {
           const boardSize = 8;
           const { board, placedWords } = generateBoardWithWords(boardSize, 5);
-          const letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
           const activeWords = placedWords.map(p => p.word);
+          let letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
+          letterBoard = ensureActiveWordsOnBoard(letterBoard, activeWords);
           const gameData = { room_code: roomCode, status: 'active', host_connected: isCreator, screen_connected: false, players: [], gameMode: vsAI ? 'vs-ai' : 'single-player', difficulty: 'reader', boardSize, letterBoard, gameState: { phase: 'setup', activeWords, totalWordsFound: 0, timeRemaining: 180 }, created_by_user_id: isCreator ? (await base44.auth.me())?.id : null };
           const created = await base44.entities.WordWranglerGame.create(gameData);
           if (vsAI) {
@@ -85,11 +86,15 @@ export default function WordWranglerGame() {
           } else {
             if (!existingGame.gameState?.activeWords?.length) {
               const boardSize = existingGame.boardSize || 8;
-              const { placedWords } = generateBoardWithWords(boardSize, 5);
+              const { board, placedWords } = generateBoardWithWords(boardSize, 5);
               const activeWords = placedWords.map(p => p.word);
+
+              let letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
+              letterBoard = ensureActiveWordsOnBoard(letterBoard, activeWords);
 
               gameToUpdate = {
                 ...existingGame,
+                letterBoard,
                 gameState: {
                   ...existingGame.gameState,
                   activeWords,
@@ -222,6 +227,9 @@ export default function WordWranglerGame() {
       }
     }
     
+    // Ensure all active words are physically on the board
+    finalBoard = ensureActiveWordsOnBoard(finalBoard, newActiveWords, game.boardSize || 8);
+    
     const playerIndex = game.players.findIndex(p => p.playerId === playerId);
     if (playerIndex >= 0) {
       const updatedPlayers = [...game.players];
@@ -271,8 +279,9 @@ export default function WordWranglerGame() {
     try {
       const boardSize = 8;
       const { board, placedWords } = generateBoardWithWords(boardSize, 5);
-      const letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
       const activeWords = placedWords.map(p => p.word);
+      let letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
+      letterBoard = ensureActiveWordsOnBoard(letterBoard, activeWords);
       const updatedGame = { ...game, status: 'active', players: (game?.players || []).map(p => ({ ...p, score: 0, wordsFound: [], status: 'active' })), letterBoard, gameState: { ...game?.gameState, phase: 'playing', activeWords, totalWordsFound: 0, timeRemaining: 180 } };
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
       setGame(updatedGame);

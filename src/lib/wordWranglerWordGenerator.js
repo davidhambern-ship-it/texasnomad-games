@@ -55,6 +55,86 @@ export function pickTargetWords(count, minLength = 3, maxLength = 8) {
   return shuffled.slice(0, count);
 }
 
+// Helper functions for cell letter manipulation
+export function getLetter(cell) {
+  return typeof cell === 'string' ? cell : cell?.letter;
+}
+
+export function setLetter(cell, letter) {
+  if (typeof cell === 'string' || cell == null) return letter;
+  return { ...cell, letter };
+}
+
+export function normalizeWord(word) {
+  return String(word || '').toUpperCase().trim();
+}
+
+// All 8 directions for path building
+const PATH_DIRECTIONS = [
+  [-1,-1], [-1,0], [-1,1],
+  [0,-1],          [0,1],
+  [1,-1],  [1,0],  [1,1],
+];
+
+// Force place a connected word path on the board
+export function forcePlaceConnectedWord(board, word) {
+  const clean = normalizeWord(word);
+  const size = board.length;
+
+  for (let attempt = 0; attempt < 500; attempt++) {
+    const path = [];
+    let row = Math.floor(Math.random() * size);
+    let col = Math.floor(Math.random() * size);
+
+    path.push({ row, col });
+
+    for (let i = 1; i < clean.length; i++) {
+      const options = PATH_DIRECTIONS
+        .map(([dr, dc]) => ({ row: row + dr, col: col + dc }))
+        .filter(pos =>
+          pos.row >= 0 &&
+          pos.row < size &&
+          pos.col >= 0 &&
+          pos.col < size &&
+          !path.some(p => p.row === pos.row && p.col === pos.col)
+        );
+
+      if (!options.length) break;
+
+      const next = options[Math.floor(Math.random() * options.length)];
+      path.push(next);
+      row = next.row;
+      col = next.col;
+    }
+
+    if (path.length === clean.length) {
+      const newBoard = board.map(r => r.map(cell => ({ ...(typeof cell === 'string' ? { letter: cell } : cell) })));
+
+      path.forEach((pos, i) => {
+        newBoard[pos.row][pos.col] = {
+          ...(newBoard[pos.row][pos.col] || {}),
+          letter: clean[i]
+        };
+      });
+
+      return newBoard;
+    }
+  }
+
+  return board;
+}
+
+// Ensure all active words are placed as connected paths on the board
+export function ensureActiveWordsOnBoard(board, activeWords = []) {
+  let fixedBoard = board;
+
+  activeWords.forEach(word => {
+    fixedBoard = forcePlaceConnectedWord(fixedBoard, word);
+  });
+
+  return fixedBoard;
+}
+
 export function canPlaceWord(board, word, startRow, startCol, direction) {
   const [dRow, dCol] = direction;
   const size = board.length;
