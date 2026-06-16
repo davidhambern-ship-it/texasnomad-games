@@ -136,22 +136,29 @@ export function generateBoardWithWords(boardSize, activeWordCount = 5) {
 }
 
 export function injectWordIntoBoard(board, word, boardSize) {
-  const emptyCells = [];
-  for (let row = 0; row < boardSize; row++) {
-    for (let col = 0; col < boardSize; col++) {
-      if (!board[row][col]?.letter || board[row][col].letter === '') {
-        emptyCells.push({ row, col });
-      }
-    }
-  }
-  
-  if (emptyCells.length < word.length) return null;
-  
+  // Try to inject word by overwriting existing letters (not just empty cells)
+  // This ensures new words are always playable after cascade fills the board
   for (const direction of DIRECTIONS) {
-    for (const startCell of emptyCells) {
-      if (canPlaceWord(board, word, startCell.row, startCell.col, direction)) {
-        const placed = placeWord(board, word, startCell.row, startCell.col, direction);
-        return { word, startRow: startCell.row, startCol: startCell.col, direction };
+    for (let startRow = 0; startRow < boardSize; startRow++) {
+      for (let startCol = 0; startCol < boardSize; startCol++) {
+        const [dRow, dCol] = direction;
+        const endRow = startRow + (word.length - 1) * dRow;
+        const endCol = startCol + (word.length - 1) * dCol;
+        
+        // Check bounds
+        if (endRow < 0 || endRow >= boardSize || endCol < 0 || endCol >= boardSize) {
+          continue;
+        }
+        
+        // Place the word (overwriting existing letters)
+        const placed = [];
+        for (let i = 0; i < word.length; i++) {
+          const row = startRow + i * dRow;
+          const col = startCol + i * dCol;
+          placed.push({ row, col, letter: word[i] });
+        }
+        
+        return { word, startRow, startCol, direction, placed };
       }
     }
   }

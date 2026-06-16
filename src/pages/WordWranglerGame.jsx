@@ -207,15 +207,16 @@ export default function WordWranglerGame() {
     
     if (newTotalWordsFound < 20) {
       const wordsToPick = pickTargetWords(3, 3, 8);
-      let injected = false;
       for (const candidate of wordsToPick) {
         if (newActiveWords.includes(candidate) || wordsFound.includes(candidate) || candidate === word) continue;
         const boardCopy = finalBoard.map(row => row.map(cell => ({ ...cell })));
         const result = injectWordIntoBoard(boardCopy, candidate, game.boardSize || 8);
-        if (result) {
+        if (result?.placed) {
+          result.placed.forEach(p => {
+            boardCopy[p.row][p.col] = { ...boardCopy[p.row][p.col], letter: p.letter };
+          });
           finalBoard = boardCopy;
           newActiveWords = [...newActiveWords, candidate];
-          injected = true;
           break;
         }
       }
