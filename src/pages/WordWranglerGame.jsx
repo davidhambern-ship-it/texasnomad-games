@@ -34,6 +34,7 @@ export default function WordWranglerGame() {
   const [feedback, setFeedback] = useState(null);
   const [animatingCells, setAnimatingCells] = useState([]);
   const [isMuted, setIsMuted] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   const timerRef = useRef(null);
 
@@ -103,16 +104,16 @@ export default function WordWranglerGame() {
   }, [roomCode, vsAI, playerId]);
 
   useEffect(() => {
-    if (gamePhase === 'playing' && timeRemaining > 0) {
+    if (gamePhase === 'playing' && timeRemaining > 0 && !isPaused) {
       timerRef.current = setInterval(() => {
         setTimeRemaining(prev => { if (prev <= 1) { endGame(); return 0; } return prev - 1; });
       }, 1000);
     }
     return () => clearInterval(timerRef.current);
-  }, [gamePhase, timeRemaining]);
+  }, [gamePhase, timeRemaining, isPaused]);
 
   const handleCellSelect = useCallback((row, col) => {
-    if (gamePhase !== 'playing' || !game?.letterBoard) return;
+    if (gamePhase !== 'playing' || !game?.letterBoard || isPaused) return;
     setSelectedCells(prev => {
       const cellKey = `${row}-${col}`;
       const isSelected = prev.some(c => `${c.row}-${c.col}` === cellKey);
@@ -128,7 +129,7 @@ export default function WordWranglerGame() {
   }, [gamePhase, game?.boardSize, game?.letterBoard]);
 
   const handleSelectionComplete = useCallback(async () => {
-    if (selectedCells.length < 3 || gamePhase !== 'playing' || !game?.letterBoard) return;
+    if (selectedCells.length < 3 || gamePhase !== 'playing' || !game?.letterBoard || isPaused) return;
     const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
     const targetWords =
   game?.gameState?.allTargetWords?.length
@@ -274,16 +275,17 @@ export default function WordWranglerGame() {
             <span className="px-3 py-1 rounded bg-cyber-purple/20 border border-cyber-purple/50 text-[10px] tracking-widest uppercase" style={PS2}>{roomCode}</span>
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-2">
-              <span className={`text-2xl ${isLowTime ? 'text-kinetic-orange animate-pulse' : 'text-kinetic-orange'}`} style={PS2}>⏱</span>
-              <span className={`text-2xl font-mono font-bold ${isLowTime ? 'text-kinetic-orange animate-pulse' : 'text-white'}`}>{Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, '0')}</span>
-            </div>
-            <div className="text-white/60 text-sm font-body">Words: {wordsFound.length}/20</div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setIsMuted(!isMuted)} className="p-2 rounded hover:bg-white/10 transition-all">{isMuted ? '🔇' : '🔊'}</button>
-              <button onClick={() => setShowInstructions(true)} className="p-2 rounded hover:bg-white/10 transition-all">📖</button>
-              <button onClick={leaveGame} className="p-2 rounded hover:bg-white/10 transition-all">🚪</button>
-            </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-2xl ${isLowTime ? 'text-kinetic-orange animate-pulse' : 'text-kinetic-orange'}`} style={PS2}>⏱</span>
+            <span className={`text-2xl font-mono font-bold ${isLowTime ? 'text-kinetic-orange animate-pulse' : 'text-white'}`}>{Math.floor(timeRemaining / 60)}:{String(timeRemaining % 60).padStart(2, '0')}</span>
+          </div>
+          <div className="text-white/60 text-sm font-body">Words: {wordsFound.length}/20</div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => setIsPaused(!isPaused)} className={`p-2 rounded hover:bg-white/10 transition-all ${isPaused ? 'text-kinetic-orange' : 'text-white'}`}>{isPaused ? '▶' : '⏸'}</button>
+            <button onClick={() => setIsMuted(!isMuted)} className="p-2 rounded hover:bg-white/10 transition-all">{isMuted ? '🔇' : '🔊'}</button>
+            <button onClick={() => setShowInstructions(true)} className="p-2 rounded hover:bg-white/10 transition-all">📖</button>
+            <button onClick={leaveGame} className="p-2 rounded hover:bg-white/10 transition-all">🚪</button>
+          </div>
           </div>
         </div>
       </div>
@@ -307,7 +309,7 @@ export default function WordWranglerGame() {
               </div>
             </div>
           </div>
-          <div className="lg:col-span-3"><TargetWordDisplay targetWords={targetWords} foundWords={wordsFound} /></div>
+          <div className="lg:col-span-3">{!isPaused && <TargetWordDisplay targetWords={targetWords} foundWords={wordsFound} />}</div>
         </div>
       </div>
 
