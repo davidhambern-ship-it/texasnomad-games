@@ -169,7 +169,7 @@ export default function WordWranglerGame() {
       setTimeout(() => { setFeedback(null); setLastWordScore(null); }, 2000);
       if (wordsFound.length + 1 >= 20) endGame();
     }
-  }, [selectedCells, gamePhase, game, targetWords, wordsFound, playerId]);
+  }, [selectedCells, gamePhase, game, wordsFound, playerId]);
 
   const joinGame = async (name) => {
     try {
@@ -203,8 +203,25 @@ export default function WordWranglerGame() {
 
   const leaveGame = () => navigate('/games');
 
-  if (loading) return <div className="min-h-screen bg-midnight-void flex items-center justify-center"><div className="w-16 h-16 border-4 border-cyber-purple border-t-outlaw-gold rounded-full animate-spin mx-auto mb-4"></div><p className="text-outlaw-gold font-heading text-2xl tracking-widest uppercase">Loading...</p></div>;
-  if (error) return <div className="min-h-screen bg-midnight-void flex items-center justify-center"><div className="text-center"><p className="text-kinetic-orange font-heading text-3xl mb-4">ERROR</p><p className="text-white/60 font-body mb-6">{error}</p><button onClick={leaveGame} className="px-6 py-3 border-2 border-outlaw-gold text-outlaw-gold font-heading uppercase tracking-widest hover:bg-outlaw-gold hover:text-black transition-all">Back to Games</button></div></div>;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-midnight-void flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-cyber-purple border-t-outlaw-gold rounded-full animate-spin mx-auto mb-4"></div>
+        <p className="text-outlaw-gold font-heading text-2xl tracking-widest uppercase">Loading...</p>
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="min-h-screen bg-midnight-void flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-kinetic-orange font-heading text-3xl mb-4">ERROR</p>
+          <p className="text-white/60 font-body mb-6">{error}</p>
+          <button onClick={leaveGame} className="px-6 py-3 border-2 border-outlaw-gold text-outlaw-gold font-heading uppercase tracking-widest hover:bg-outlaw-gold hover:text-black transition-all">Back to Games</button>
+        </div>
+      </div>
+    );
+  }
 
   if (!playerId && gamePhase === 'setup' && !vsAI) {
     return (
@@ -212,9 +229,25 @@ export default function WordWranglerGame() {
         <div className="max-w-md w-full border-2 border-cyber-purple rounded-2xl p-8 box-glow-purple" style={{ background: '#08050f' }}>
           <h1 className="text-4xl font-heading text-center text-outlaw-gold mb-2" style={{ textShadow: '0 0 20px #FFD700' }}>WORD WRANGLER</h1>
           <p className="text-white/60 text-center mb-6 font-body">Enter your name to join</p>
-          <input type="text" value={playerName} onChange={(e) => setPlayerName(e.target.value)} placeholder="YOUR NAME" className="w-full px-4 py-3 rounded-lg bg-black/60 border-2 border-cyber-purple/50 text-white font-body text-lg mb-4 focus:outline-none focus:border-outlaw-gold" maxLength={20} onKeyPress={(e) => e.key === 'Enter' && playerName.trim() && joinGame(playerName.trim())} />
-          <button onClick={() => playerName.trim() && joinGame(playerName.trim())} disabled={!playerName.trim()} className="w-full py-3 rounded-lg font-heading text-lg tracking-widest uppercase bg-gradient-to-r from-cyber-purple to-cyber-purple/80 text-white disabled:opacity-50 hover:opacity-90 transition-all">JOIN GAME</button>
-          <button onClick={() => setShowInstructions(true)} className="w-full mt-3 py-2 text-sm text-white/60 font-body hover:text-white transition-all">📖 How to Play</button>
+          <input
+            type="text"
+            value={playerName}
+            onChange={(e) => setPlayerName(e.target.value)}
+            placeholder="YOUR NAME"
+            className="w-full px-4 py-3 rounded-lg bg-black/60 border-2 border-cyber-purple/50 text-white font-body text-lg mb-4 focus:outline-none focus:border-outlaw-gold"
+            maxLength={20}
+            onKeyPress={(e) => e.key === 'Enter' && playerName.trim() && joinGame(playerName.trim())}
+          />
+          <button
+            onClick={() => playerName.trim() && joinGame(playerName.trim())}
+            disabled={!playerName.trim()}
+            className="w-full py-3 rounded-lg font-heading text-lg tracking-widest uppercase bg-gradient-to-r from-cyber-purple to-cyber-purple/80 text-white disabled:opacity-50 hover:opacity-90 transition-all"
+          >
+            JOIN GAME
+          </button>
+          <button onClick={() => setShowInstructions(true)} className="w-full mt-3 py-2 text-sm text-white/60 font-body hover:text-white transition-all">
+            📖 How to Play
+          </button>
         </div>
         {showInstructions && <GameInstructions gameId="word-wrangler" onDismiss={() => setShowInstructions(false)} />}
       </div>
@@ -297,7 +330,7 @@ export default function WordWranglerGame() {
       )}
 
       {showInstructions && <GameInstructions gameId="word-wrangler" onDismiss={() => setShowInstructions(false)} />}
-      {showWordModal && lastWordScore && (
+      {lastWordScore && (
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none">
           <div className="animate-bounce">
             <div className="text-4xl font-heading text-outlaw-gold" style={{ textShadow: '0 0 20px #FFD700, 0 0 40px #FFD700' }}>+{lastWordScore.score}</div>
