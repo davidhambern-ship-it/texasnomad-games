@@ -89,10 +89,42 @@ export default function WordWranglerGame() {
             await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
             setGame(gameToUpdate); setPlayerId(pid); setPlayerName('Player 1'); setGamePhase('playing');
           } else {
-            if (!existingGame.gameState?.allTargetWords && existingGame.gameState?.targetWords) {
-              const extracted = existingGame.gameState.targetWords.map(item => typeof item === 'string' ? item : item?.word).filter(Boolean);
-              gameToUpdate = { ...existingGame, gameState: { ...existingGame.gameState, allTargetWords: extracted } };
-              await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+            if (
+  !existingGame.gameState?.allTargetWords?.length &&
+  !existingGame.gameState?.targetWords?.length
+) {
+  const boardSize = existingGame.boardSize || 8;
+  const { placedWords } = generateBoardWithWords(boardSize, 20);
+
+  gameToUpdate = {
+    ...existingGame,
+    gameState: {
+      ...existingGame.gameState,
+      targetWords: placedWords,
+      allTargetWords: placedWords.map(p => p.word),
+      timeRemaining: existingGame.gameState?.timeRemaining || 180
+    }
+  };
+
+  await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+} else if (
+  !existingGame.gameState?.allTargetWords?.length &&
+  existingGame.gameState?.targetWords?.length
+) {
+  const extracted = existingGame.gameState.targetWords
+    .map(item => typeof item === 'string' ? item : item?.word)
+    .filter(Boolean);
+
+  gameToUpdate = {
+    ...existingGame,
+    gameState: {
+      ...existingGame.gameState,
+      allTargetWords: extracted
+    }
+  };
+
+  await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+}
             }
             setGame(gameToUpdate);
             if (existingGame.players?.length > 0) {
