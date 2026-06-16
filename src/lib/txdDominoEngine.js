@@ -23,7 +23,9 @@ function shuffle(arr) {
   return a;
 }
 
-// Deal tiles to players (7 each, regardless of player count)
+// Deal tiles to players:
+// 4 players → all 28 tiles dealt (7 each, no boneyard)
+// 2-3 players → 7 each, remainder goes to boneyard
 export function deal(set, playerCount) {
   const shuffled = shuffle(set);
   const handSize = 7;

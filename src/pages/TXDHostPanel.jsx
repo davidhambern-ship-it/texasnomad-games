@@ -649,13 +649,15 @@ export default function TXDHostPanel() {
           {/* Live Board + Boneyard side-by-side */}
           <div className="flex gap-3 items-stretch">
 
-            {/* Boneyard box — left of table */}
-            <BoneyardBox
-              boneyard={game.boneyard || []}
-              canDraw={isHostTurn && (playable.length === 0) && game.phase === 'playing'}
-              onDraw={doDraw}
-              compact
-            />
+            {/* Boneyard box — only shown when fewer than 4 players */}
+            {(game.players?.length || 0) < 4 && (
+              <BoneyardBox
+                boneyard={game.boneyard || []}
+                canDraw={isHostTurn && (playable.length === 0) && game.phase === 'playing'}
+                onDraw={doDraw}
+                compact
+              />
+            )}
 
             {/* Table */}
             <div className="relative flex-1 rounded-3xl overflow-visible"

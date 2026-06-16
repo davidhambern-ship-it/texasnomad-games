@@ -343,12 +343,14 @@ export default function TXDGame() {
         {/* ── Boneyard + Game Table side-by-side ── */}
         <div className="flex gap-4 items-stretch">
 
-          {/* Boneyard box — left of table */}
-          <BoneyardBox
-            boneyard={game.boneyard || []}
-            canDraw={isMyTurn && playableIds.size === 0 && game.phase === 'playing'}
-            onDraw={doDraw}
-          />
+          {/* Boneyard box — only shown when there are fewer than 4 players */}
+          {(game.players?.length || 0) < 4 && (
+            <BoneyardBox
+              boneyard={game.boneyard || []}
+              canDraw={isMyTurn && playableIds.size === 0 && game.phase === 'playing'}
+              onDraw={doDraw}
+            />
+          )}
 
           {/* ── Game Table ── */}
           <div className="relative flex-1 rounded-3xl overflow-visible"
