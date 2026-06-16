@@ -87,51 +87,61 @@ export default function WordWranglerGame() {
             const pid = user?.id || `player_${Date.now()}`;
             gameToUpdate = { ...existingGame, players: [{ playerId: pid, seatNumber: 1, playerName: 'Player 1', score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...existingGame.gameState, phase: 'playing' } };
             await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
-            setGame(gameToUpdate); setPlayerId(pid); setPlayerName('Player 1'); setGamePhase('playing');
+            setGame(gameToUpdate);
+            setPlayerId(pid);
+            setPlayerName('Player 1');
+            setGamePhase('playing');
           } else {
             if (
-  !existingGame.gameState?.allTargetWords?.length &&
-  !existingGame.gameState?.targetWords?.length
-) {
-  const boardSize = existingGame.boardSize || 8;
-  const { placedWords } = generateBoardWithWords(boardSize, 20);
+              !existingGame.gameState?.allTargetWords?.length &&
+              !existingGame.gameState?.targetWords?.length
+            ) {
+              const boardSize = existingGame.boardSize || 8;
+              const { placedWords } = generateBoardWithWords(boardSize, 20);
 
-  gameToUpdate = {
-    ...existingGame,
-    gameState: {
-      ...existingGame.gameState,
-      targetWords: placedWords,
-      allTargetWords: placedWords.map(p => p.word),
-      timeRemaining: existingGame.gameState?.timeRemaining || 180
-    }
-  };
+              gameToUpdate = {
+                ...existingGame,
+                gameState: {
+                  ...existingGame.gameState,
+                  targetWords: placedWords,
+                  allTargetWords: placedWords.map(p => p.word),
+                  timeRemaining: existingGame.gameState?.timeRemaining || 180
+                }
+              };
 
-  await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
-} else if (
-  !existingGame.gameState?.allTargetWords?.length &&
-  existingGame.gameState?.targetWords?.length
-) {
-  const extracted = existingGame.gameState.targetWords
-    .map(item => typeof item === 'string' ? item : item?.word)
-    .filter(Boolean);
+              await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+            } else if (
+              !existingGame.gameState?.allTargetWords?.length &&
+              existingGame.gameState?.targetWords?.length
+            ) {
+              const extracted = existingGame.gameState.targetWords
+                .map(item => typeof item === 'string' ? item : item?.word)
+                .filter(Boolean);
 
-  gameToUpdate = {
-    ...existingGame,
-    gameState: {
-      ...existingGame.gameState,
-      allTargetWords: extracted
-    }
-  };
+              gameToUpdate = {
+                ...existingGame,
+                gameState: {
+                  ...existingGame.gameState,
+                  allTargetWords: extracted
+                }
+              };
 
-  await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
-}
+              await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
             }
             setGame(gameToUpdate);
             if (existingGame.players?.length > 0) {
               const player = existingGame.players.find(p => !p.isAI);
-              if (player) { setPlayerId(player.playerId); setPlayerName(player.playerName); setWordsFound(player.wordsFound || []); setCurrentScore(player.score || 0); }
+              if (player) {
+                setPlayerId(player.playerId);
+                setPlayerName(player.playerName);
+                setWordsFound(player.wordsFound || []);
+                setCurrentScore(player.score || 0);
+              }
             }
-            if (existingGame.gameState?.phase === 'playing') { setGamePhase('playing'); setTimeRemaining(existingGame.gameState.timeRemaining || 180); }
+            if (existingGame.gameState?.phase === 'playing') {
+              setGamePhase('playing');
+              setTimeRemaining(existingGame.gameState.timeRemaining || 180);
+            }
           }
         }
         setLoading(false);
