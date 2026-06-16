@@ -254,7 +254,10 @@ export default function WordWranglerGame() {
     );
   }
 
-  const targetWords = game?.gameState?.allTargetWords || [];
+  const targetWords =
+  game?.gameState?.allTargetWords?.length
+    ? game.gameState.allTargetWords
+    : game?.gameState?.targetWords || [];
   const timePercent = Math.max(0, (timeRemaining / 180) * 100);
   const isLowTime = timeRemaining <= 30;
 
