@@ -28,13 +28,13 @@ const TXD_PIP_MAP = {
 };
 
 const SYMBOL_SIZE = {
-  0: 180,
-  1: 120,
-  2: 110,
-  3: 105,
-  4: 95,
-  5: 90,
-  6: 80,
+  0: 220,
+  1: 160,
+  2: 145,
+  3: 138,
+  4: 128,
+  5: 120,
+  6: 108,
 };
 
 // Renders one half of a domino (top or bottom)
