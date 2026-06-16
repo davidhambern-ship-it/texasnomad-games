@@ -39,10 +39,16 @@ export default function WordWranglerGame() {
   const timerRef = useRef(null);
 
   const targetWords = React.useMemo(() => {
-    if (!game?.gameState) return [];
+    console.log('Computing targetWords, game:', game);
+    if (!game?.gameState) {
+      console.log('No game state');
+      return [];
+    }
     const state = game.gameState;
+    console.log('Game state:', state);
 
     if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
+      console.log('Using allTargetWords:', state.allTargetWords);
       return state.allTargetWords;
     }
 
@@ -52,11 +58,13 @@ export default function WordWranglerGame() {
         if (item && typeof item === 'object' && item.word) return item.word;
         return null;
       }).filter(Boolean);
+      console.log('Extracted from targetWords:', extracted);
       return extracted;
     }
 
+    console.log('No target words found');
     return [];
-  }, [game]);
+  }, [game?.id, game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
 
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
