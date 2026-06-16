@@ -309,37 +309,37 @@ export default function WordWranglerGame() {
     });
   }, [gamePhase, game?.boardSize, game?.letterBoard]);
 
-  const submitWord = async (autoSubmit = false) => {
+  const submitWord = async () => {
     if (selectedCells.length < 3) {
       console.log('[submitWord] Not enough cells:', selectedCells.length);
-      return false;
+      return;
     }
     
-    // Use current game state directly, not ref (ref may be stale after cascade)
+    // Use current game state directly
     if (!game || !game.letterBoard) {
       console.log('[submitWord] No game or letterBoard');
-      return false;
+      return;
     }
 
     const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
-    console.log('[submitWord] Submitting word:', word);
+    console.log('[submitWord] Submitting word:', word, 'playerId:', playerId, 'players:', game.players?.length);
     
     // Validate word
     if (!validateWord(word)) {
       console.log('[submitWord] Invalid word:', word);
-      if (!autoSubmit) soundManager.playWrong();
-      return false;
+      soundManager.playWrong();
+      return;
     }
 
     // Check if already found by this player
     const currentPlayer = game.players?.find(p => p.playerId === playerId);
     if (!currentPlayer) {
       console.error('[submitWord] Player not found:', playerId, 'players:', game.players?.map(p => p.playerId));
-      return false;
+      return;
     }
     if (currentPlayer.wordsFound?.includes(word)) {
       console.log('[submitWord] Word already found:', word);
-      return false;
+      return;
     }
 
     // Calculate score
@@ -379,6 +379,8 @@ export default function WordWranglerGame() {
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
       console.log('[submitWord] Game updated successfully');
       
+      // Update local game state immediately so next submission works
+      setGame(updatedGame);
       setWordsFound(prev => [...prev, word]);
       setCurrentScore(prev => prev + score);
       setLastWordScore({ word, score });
@@ -394,7 +396,6 @@ export default function WordWranglerGame() {
       return true;
     } catch (err) {
       console.error('[submitWord] Failed to update game:', err);
-      return false;
     }
   };
 
@@ -608,7 +609,7 @@ export default function WordWranglerGame() {
                   Clear
                 </button>
                 <button
-                  onClick={submitWord}
+                  onClick={() => submitWord()}
                   disabled={selectedCells.length < 3}
                   className="px-8 py-3 rounded-lg font-heading text-sm tracking-widest uppercase bg-gradient-to-r from-outlaw-gold to-outlaw-gold/80 text-black disabled:opacity-30 hover:opacity-90 transition-all box-glow-gold"
                 >
