@@ -50,15 +50,9 @@ export default function WordWranglerGame() {
     
     if (!allTargetWords.length) return [];
     
-    if (Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length > 0) {
-      const normalized = state.visibleTargetWords.map(w => typeof w === 'string' ? w : w?.word).filter(Boolean);
-      const remaining = normalized.filter(w => !wordsFound.includes(w));
-      if (remaining.length > 0) return remaining;
-    }
-    
     const unfound = allTargetWords.filter(w => !wordsFound.includes(w));
     return unfound.slice(0, 5);
-  }, [game?.gameState?.visibleTargetWords, game?.gameState?.allTargetWords, game?.gameState?.targetWords, wordsFound]);
+  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords, wordsFound]);
 
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
@@ -252,16 +246,10 @@ export default function WordWranglerGame() {
     if (playerIndex >= 0) {
       const updatedPlayers = [...game.players];
       updatedPlayers[playerIndex] = { ...updatedPlayers[playerIndex], score: updatedPlayers[playerIndex].score + score, wordsFound: [...(updatedPlayers[playerIndex].wordsFound || []), word] };
-      const remaining = allTargetWords.filter(w => w !== word && !wordsFound.includes(w));
-      const newPlayableWords = remaining.slice(0, 5);
       const updatedGame = { 
         ...game, 
         players: updatedPlayers, 
-        letterBoard: newBoard,
-        gameState: {
-          ...game.gameState,
-          visibleTargetWords: newPlayableWords
-        }
+        letterBoard: newBoard
       };
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
       setGame(updatedGame);
