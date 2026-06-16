@@ -38,7 +38,7 @@ export default function WordWranglerGame() {
 
   const timerRef = useRef(null);
 
-  const targetWords = useMemo(() => {
+  const targetWords = React.useMemo(() => {
     if (!game?.gameState) return [];
     const state = game.gameState;
 
@@ -56,7 +56,7 @@ export default function WordWranglerGame() {
     }
 
     return [];
-  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
+  }, [game]);
 
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
