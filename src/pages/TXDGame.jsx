@@ -119,11 +119,11 @@ export default function TXDGame() {
     } else {
       const { domino, side } = choice;
       const isFirstPlay = (g.board?.length || 0) === 0;
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive } = playDomino(
+      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom } = playDomino(
         domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false
       );
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
-      const boardEntry = { ...domino, side, isSpinner };
+      const boardEntry = { top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner };
       const newBoard = side === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
       const roundOver = newHand.length === 0;
@@ -179,11 +179,11 @@ export default function TXDGame() {
 
     const fits = actualSide === 'first' || getPlaySide(selectedDomino, g.leftEnd, g.rightEnd) !== null;
     if (!fits) { shakeInvalid(selectedDomino.id); flash("That tile doesn't fit!", 'error'); return; }
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive } = playDomino(
+    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom } = playDomino(
       selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide, g.spinnerActive || false
     );
     const newHand = myPlayer.hand.filter(d => d.id !== selectedDomino.id);
-    const boardEntry = { ...selectedDomino, side: actualSide, isSpinner };
+    const boardEntry = { top: orientedTop, bottom: orientedBottom, id: selectedDomino.id, side: actualSide, isSpinner };
     const newBoard = actualSide === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
     let ni = (myIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== myIndex) ni = (ni + 1) % g.players.length;

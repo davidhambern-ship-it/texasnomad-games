@@ -65,11 +65,13 @@ export function findDoubleSixHolder(hands) {
 // Check if a domino can be played on the current board
 export function canPlay(domino, leftEnd, rightEnd) {
   if (leftEnd === null || rightEnd === null) return true; // first play
+  // Strict exact match required — no approximate matches allowed
   return domino.top === leftEnd || domino.bottom === leftEnd ||
          domino.top === rightEnd || domino.bottom === rightEnd;
 }
 
 // Get the side a domino should be played on ('left', 'right', 'both', or null)
+// Strict: one of the domino's values must exactly equal the open end value
 export function getPlaySide(domino, leftEnd, rightEnd) {
   if (leftEnd === null || rightEnd === null) return 'first';
   const fitsLeft = domino.top === leftEnd || domino.bottom === leftEnd;
@@ -80,17 +82,52 @@ export function getPlaySide(domino, leftEnd, rightEnd) {
   return null;
 }
 
+// Given a domino and the end value it must connect to on a side,
+// returns { connectingValue, exposedValue, orientedTop, orientedBottom }
+// so the pip that matches the open end always faces inward (connects),
+// and the other pip faces outward (becomes the new open end).
+export function orientDominoForEnd(domino, side, endValue) {
+  const { top, bottom } = domino;
+  if (side === 'first' || endValue === null) {
+    // First play: top faces left, bottom faces right
+    return { connectingValue: null, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
+  }
+  if (side === 'left') {
+    // Connecting value must touch the left end (faces right, inward).
+    // Exposed value faces left (becomes new left open end).
+    if (bottom === endValue) {
+      // top=exposed (left), bottom=connecting (right toward chain)
+      return { connectingValue: bottom, exposedValue: top, orientedTop: top, orientedBottom: bottom };
+    } else {
+      // top=connecting (right toward chain), bottom=exposed (left)
+      return { connectingValue: top, exposedValue: bottom, orientedTop: bottom, orientedBottom: top };
+    }
+  }
+  // side === 'right'
+  // Connecting value must touch the right end (faces left, inward).
+  // Exposed value faces right (becomes new right open end).
+  if (top === endValue) {
+    // top=connecting (left toward chain), bottom=exposed (right)
+    return { connectingValue: top, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
+  } else {
+    // bottom=connecting (left toward chain), top=exposed (right)
+    return { connectingValue: bottom, exposedValue: top, orientedTop: bottom, orientedBottom: top };
+  }
+}
+
 // Get all playable dominoes from a hand
 export function getPlayableDominoes(hand, leftEnd, rightEnd) {
   return hand.filter(d => canPlay(d, leftEnd, rightEnd));
 }
 
 /**
- * Apply a domino play and return new open ends.
- * isSpinner is true when:
- *   - it's the first play AND it's a double, OR
- *   - it's the first double played in this hand (spinnerActive is false)
- * Callers pass spinnerActive so we can mark correctly.
+ * Apply a domino play and return new open ends plus board-entry data.
+ * Returns: { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, exposedValue }
+ *
+ * orientedTop/orientedBottom encode which pip faces which direction:
+ *   - horizontal tile: orientedTop = left pip, orientedBottom = right pip
+ *   - vertical tile (double): orientedTop = top pip, orientedBottom = bottom pip
+ * exposedValue is the pip that becomes the new open end.
  */
 export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = false) {
   if (leftEnd === null || rightEnd === null || side === 'first') {
@@ -98,19 +135,45 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
     return {
       newLeftEnd: domino.top,
       newRightEnd: domino.bottom,
-      isSpinner: isDouble, // first double played in hand = spinner
+      isSpinner: isDouble,
       newSpinnerActive: isDouble,
+      orientedTop: domino.top,
+      orientedBottom: domino.bottom,
+      exposedValue: isDouble ? domino.top : domino.bottom,
     };
   }
+
+  // Validate exact match before proceeding
+  const endValue = side === 'left' ? leftEnd : rightEnd;
+  if (domino.top !== endValue && domino.bottom !== endValue) {
+    throw new Error(`Invalid play: ${domino.top}-${domino.bottom} cannot be played on end value ${endValue}`);
+  }
+
   const isDouble = domino.top === domino.bottom;
   const becomesSpinner = isDouble && !spinnerActive;
+  const oriented = orientDominoForEnd(domino, side, endValue);
+
   if (side === 'left') {
-    const newLeft = domino.top === leftEnd ? domino.bottom : domino.top;
-    return { newLeftEnd: newLeft, newRightEnd: rightEnd, isSpinner: becomesSpinner, newSpinnerActive: spinnerActive || becomesSpinner };
+    return {
+      newLeftEnd: oriented.exposedValue,
+      newRightEnd: rightEnd,
+      isSpinner: becomesSpinner,
+      newSpinnerActive: spinnerActive || becomesSpinner,
+      orientedTop: oriented.orientedTop,
+      orientedBottom: oriented.orientedBottom,
+      exposedValue: oriented.exposedValue,
+    };
   }
   // right
-  const newRight = domino.top === rightEnd ? domino.bottom : domino.top;
-  return { newLeftEnd: leftEnd, newRightEnd: newRight, isSpinner: becomesSpinner, newSpinnerActive: spinnerActive || becomesSpinner };
+  return {
+    newLeftEnd: leftEnd,
+    newRightEnd: oriented.exposedValue,
+    isSpinner: becomesSpinner,
+    newSpinnerActive: spinnerActive || becomesSpinner,
+    orientedTop: oriented.orientedTop,
+    orientedBottom: oriented.orientedBottom,
+    exposedValue: oriented.exposedValue,
+  };
 }
 
 // Sum of pips on a hand
