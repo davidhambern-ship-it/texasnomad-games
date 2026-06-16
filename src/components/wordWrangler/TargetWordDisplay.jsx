@@ -3,7 +3,12 @@ import React from 'react';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 export default function TargetWordDisplay({ targetWords, foundWords }) {
-  const visible = targetWords.slice(0, 5);
+  const visibleWords = targetWords
+  .filter(item => {
+    const word = typeof item === 'string' ? item : item.word;
+    return !foundWords.includes(word);
+  })
+  .slice(0, 5);
   const remaining = targetWords.length - foundWords.length;
 
   return (
