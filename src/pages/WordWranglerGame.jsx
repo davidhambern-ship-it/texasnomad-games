@@ -183,14 +183,26 @@ export default function WordWranglerGame() {
         try {
           const rooms = await base44.entities.WordWranglerGame.filter({ room_code: roomCode });
           if (rooms.length > 0) {
-            // Only update if game exists and has players (don't overwrite freshly created game)
             const freshGame = rooms[0];
             setGame(prev => {
+              // Don't overwrite if we don't have prev yet
+              if (!prev) return freshGame;
               // If we have a player but fresh game doesn't, keep our version
               if (prev?.players?.length > 0 && (!freshGame.players || freshGame.players.length === 0)) {
                 return prev;
               }
-              return freshGame;
+              // Compare updated_date to see if database has newer data
+              if (freshGame.updated_date && prev.updated_date) {
+                const freshTime = new Date(freshGame.updated_date).getTime();
+                const prevTime = new Date(prev.updated_date).getTime();
+                // Only update if database is genuinely newer (by more than 500ms to avoid race conditions)
+                if (freshTime > prevTime + 500) {
+                  console.log('[Poll] Updating from database (newer by', freshTime - prevTime, 'ms)');
+                  return freshGame;
+                }
+              }
+              // Keep current state
+              return prev;
             });
           }
         } catch (err) {
