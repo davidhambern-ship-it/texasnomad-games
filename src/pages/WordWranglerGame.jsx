@@ -39,32 +39,23 @@ export default function WordWranglerGame() {
   const timerRef = useRef(null);
 
   const targetWords = React.useMemo(() => {
-    console.log('Computing targetWords, game:', game);
-    if (!game?.gameState) {
-      console.log('No game state');
-      return [];
-    }
+    if (!game?.gameState) return [];
     const state = game.gameState;
-    console.log('Game state:', state);
 
     if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
-      console.log('Using allTargetWords:', state.allTargetWords);
       return state.allTargetWords;
     }
 
     if (Array.isArray(state.targetWords) && state.targetWords.length) {
-      const extracted = state.targetWords.map(item => {
+      return state.targetWords.map(item => {
         if (typeof item === 'string') return item;
         if (item && typeof item === 'object' && item.word) return item.word;
         return null;
       }).filter(Boolean);
-      console.log('Extracted from targetWords:', extracted);
-      return extracted;
     }
 
-    console.log('No target words found');
     return [];
-  }, [game?.id, game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
+  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords, game?.id]);
 
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
@@ -86,14 +77,20 @@ export default function WordWranglerGame() {
           } else { setGame(created); }
         } else {
           const existingGame = rooms[0];
+          let gameToUpdate = existingGame;
           if (vsAI && existingGame.players?.length === 0) {
             const user = await base44.auth.me();
             const pid = user?.id || `player_${Date.now()}`;
-            const updatedGame = { ...existingGame, players: [{ playerId: pid, seatNumber: 1, playerName: 'Player 1', score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...existingGame.gameState, phase: 'playing' } };
-            await base44.entities.WordWranglerGame.update(existingGame.id, updatedGame);
-            setGame(updatedGame); setPlayerId(pid); setPlayerName('Player 1'); setGamePhase('playing');
+            gameToUpdate = { ...existingGame, players: [{ playerId: pid, seatNumber: 1, playerName: 'Player 1', score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...existingGame.gameState, phase: 'playing' } };
+            await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+            setGame(gameToUpdate); setPlayerId(pid); setPlayerName('Player 1'); setGamePhase('playing');
           } else {
-            setGame(existingGame);
+            if (!existingGame.gameState?.allTargetWords && existingGame.gameState?.targetWords) {
+              const extracted = existingGame.gameState.targetWords.map(item => typeof item === 'string' ? item : item?.word).filter(Boolean);
+              gameToUpdate = { ...existingGame, gameState: { ...existingGame.gameState, allTargetWords: extracted } };
+              await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
+            }
+            setGame(gameToUpdate);
             if (existingGame.players?.length > 0) {
               const player = existingGame.players.find(p => !p.isAI);
               if (player) { setPlayerId(player.playerId); setPlayerName(player.playerName); setWordsFound(player.wordsFound || []); setCurrentScore(player.score || 0); }
