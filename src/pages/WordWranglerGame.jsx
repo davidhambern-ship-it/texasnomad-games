@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import Header from '@/components/home/Header';
@@ -227,6 +227,26 @@ export default function WordWranglerGame() {
     );
   }
 
+  const targetWords = useMemo(() => {
+    if (!game?.gameState) return [];
+    const state = game.gameState;
+
+    if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
+      return state.allTargetWords;
+    }
+
+    if (Array.isArray(state.targetWords) && state.targetWords.length) {
+      const extracted = state.targetWords.map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && item.word) return item.word;
+        return null;
+      }).filter(Boolean);
+      return extracted;
+    }
+
+    return [];
+  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
+
   if (!playerId && gamePhase === 'setup' && !vsAI) {
     return (
       <div className="min-h-screen bg-midnight-void flex items-center justify-center p-4">
@@ -257,24 +277,6 @@ export default function WordWranglerGame() {
       </div>
     );
   }
-
-  const getTargetWords = () => {
-    const state = game?.gameState || {};
-
-    if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
-      return state.allTargetWords;
-    }
-
-    if (Array.isArray(state.targetWords) && state.targetWords.length) {
-      return state.targetWords.map(item =>
-        typeof item === 'string' ? item : item?.word
-      ).filter(Boolean);
-    }
-
-    return [];
-  };
-
-  const targetWords = getTargetWords();
   const timePercent = Math.max(0, (timeRemaining / 180) * 100);
   const isLowTime = timeRemaining <= 30;
   return (
