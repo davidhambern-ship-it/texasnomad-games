@@ -6,7 +6,7 @@ import TXDBoard from '@/components/domino/TXDBoard';
 import Header from '@/components/home/Header';
 import {
   getPlaySide, getPlayableDominoes, playDomino,
-  calculateRoundScores, aiChoosePlay,
+  calculateRoundScores, aiChoosePlay, findDoubleSixHolder,
 } from '@/lib/txdDominoEngine';
 
 const HAND_TILE_W = 54;
@@ -117,9 +117,10 @@ export default function TXDGame() {
       }
     } else {
       const { domino, side } = choice;
+      const isFirstPlay = (g.board?.length || 0) === 0;
       const { newLeftEnd, newRightEnd } = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side);
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
-      const boardEntry = { ...domino, side };
+      const boardEntry = { ...domino, side, isSpinner: isFirstPlay && domino.top === domino.bottom };
       const newBoard = side === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
       const roundOver = newHand.length === 0;
@@ -161,12 +162,21 @@ export default function TXDGame() {
   const doPlay = async (side) => {
     if (!selectedDomino || !isMyTurn || !game) return;
     const g = game;
-    const actualSide = g.board?.length === 0 ? 'first' : side;
+    const isFirstPlay = (g.board?.length || 0) === 0;
+    const actualSide = isFirstPlay ? 'first' : side;
+
+    // Enforce Double 6 as first play
+    if (isFirstPlay && selectedDomino.id !== '6-6') {
+      shakeInvalid(selectedDomino.id);
+      flash('Double 6 must be played first!', 'error');
+      return;
+    }
+
     const fits = actualSide === 'first' || getPlaySide(selectedDomino, g.leftEnd, g.rightEnd) !== null;
     if (!fits) { shakeInvalid(selectedDomino.id); flash("That tile doesn't fit!", 'error'); return; }
-    const { newLeftEnd, newRightEnd } = playDomino(selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide);
+    const { newLeftEnd, newRightEnd, isSpinner } = playDomino(selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide);
     const newHand = myPlayer.hand.filter(d => d.id !== selectedDomino.id);
-    const boardEntry = { ...selectedDomino, side: actualSide };
+    const boardEntry = { ...selectedDomino, side: actualSide, isSpinner: isFirstPlay && selectedDomino.top === selectedDomino.bottom };
     const newBoard = actualSide === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
     let ni = (myIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== myIndex) ni = (ni + 1) % g.players.length;
@@ -468,13 +478,18 @@ export default function TXDGame() {
           {/* Action buttons */}
           {isMyTurn && (
             <div className="flex flex-wrap gap-2">
-              {/* Empty board — just play */}
+              {/* Empty board — must play Double 6 */}
               {selectedDomino && game.board?.length === 0 && (
-                <button onClick={() => doPlay('first')}
-                  className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white transition-all"
-                  style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 0 12px rgba(22,163,74,0.4)' }}>
-                  PLAY TILE
-                </button>
+                selectedDomino.id === '6-6'
+                  ? <button onClick={() => doPlay('first')}
+                      className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white transition-all"
+                      style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 0 12px rgba(22,163,74,0.4)' }}>
+                      PLAY SPINNER [6-6]
+                    </button>
+                  : <span className="text-amber-400/80 text-xs font-body py-2 animate-pulse">⚠ Double 6 must be played first</span>
+              )}
+              {!selectedDomino && game.board?.length === 0 && (
+                <span className="text-white/40 text-xs font-body py-2">Select the [6-6] tile to start</span>
               )}
               {/* Board exists */}
               {selectedDomino && (game.board?.length || 0) > 0 && (() => {

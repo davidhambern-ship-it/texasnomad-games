@@ -5,7 +5,7 @@ import TXDDomino from '@/components/domino/TXDDomino';
 import TXDBoard from '@/components/domino/TXDBoard';
 import Header from '@/components/home/Header';
 import {
-  DOMINO_SET, generateRoomCode, deal, findHighestDouble,
+  DOMINO_SET, generateRoomCode, deal, findDoubleSixHolder,
   getPlaySide, getPlayableDominoes, playDomino,
   calculateRoundScores, aiChoosePlay,
 } from '@/lib/txdDominoEngine';
@@ -130,9 +130,10 @@ export default function TXDHostPanel() {
       }
     } else {
       const { domino, side } = choice;
+      const isFirstPlay = (g.board?.length || 0) === 0;
       const { newLeftEnd, newRightEnd } = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side);
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
-      const boardEntry = { ...domino, side };
+      const boardEntry = { ...domino, side, isSpinner: isFirstPlay && domino.top === domino.bottom };
       const newBoard = side === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
       const roundOver = newHand.length === 0;
@@ -253,13 +254,14 @@ export default function TXDHostPanel() {
     const active = g.players.filter(p => p.status === 'active');
     if (active.length < 2) { flash('Need at least 2 players', 'error'); return; }
     const { hands, boneyard } = deal(DOMINO_SET, active.length);
-    const { startPlayerIndex } = findHighestDouble(hands);
     let hi = 0;
     const players = g.players.map(p => p.status !== 'active' ? p : { ...p, hand: hands[hi++], roundScore: 0 });
-    const feed = [`🎮 Game started — Round 1`, ...( g.activityFeed || [])];
+    const startPlayerIndex = findDoubleSixHolder(players.map(p => p.hand || []));
+    const starterName = players[startPlayerIndex >= 0 ? startPlayerIndex : 0]?.playerName;
+    const feed = [`🎮 Game started — ${starterName} has [6-6] and goes first`, ...( g.activityFeed || [])];
     const updated = {
       ...g, status: 'active', boneyard, players, board: [], leftEnd: null, rightEnd: null,
-      currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null,
+      currentPlayerIndex: startPlayerIndex >= 0 ? startPlayerIndex : 0, phase: 'playing', roundWinner: null,
       activityFeed: feed.slice(0, 30),
     };
     await base44.entities.TXDGame.update(g.id, updated);
@@ -271,14 +273,15 @@ export default function TXDHostPanel() {
     const g = game;
     const active = g.players.filter(p => p.status === 'active');
     const { hands, boneyard } = deal(DOMINO_SET, active.length);
-    const { startPlayerIndex } = findHighestDouble(hands);
     let hi = 0;
     const players = g.players.map(p => p.status !== 'active' ? p : { ...p, hand: hands[hi++], roundScore: 0 });
+    const startPlayerIndex = findDoubleSixHolder(players.map(p => p.hand || []));
     const rn = (g.roundNumber || 1) + 1;
-    const feed = [`🎮 Round ${rn} started`, ...(g.activityFeed || [])];
+    const starterName = players[startPlayerIndex >= 0 ? startPlayerIndex : 0]?.playerName;
+    const feed = [`🎮 Round ${rn} — ${starterName} has [6-6]`, ...(g.activityFeed || [])];
     const updated = {
       ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players,
-      currentPlayerIndex: startPlayerIndex, roundNumber: rn,
+      currentPlayerIndex: startPlayerIndex >= 0 ? startPlayerIndex : 0, roundNumber: rn,
       phase: 'playing', roundWinner: null, activityFeed: feed.slice(0, 30),
     };
     await base44.entities.TXDGame.update(g.id, updated);
@@ -290,13 +293,13 @@ export default function TXDHostPanel() {
     const g = game;
     const active = g.players.filter(p => p.status === 'active');
     const { hands, boneyard } = deal(DOMINO_SET, active.length);
-    const { startPlayerIndex } = findHighestDouble(hands);
     let hi = 0;
     const players = g.players.map(p => p.status !== 'active' ? p : { ...p, hand: hands[hi++], roundScore: 0 });
+    const startPlayerIndex = findDoubleSixHolder(players.map(p => p.hand || []));
     const feed = [`↺ Host reset round ${g.roundNumber || 1}`, ...(g.activityFeed || [])];
     const updated = {
       ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players,
-      currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null,
+      currentPlayerIndex: startPlayerIndex >= 0 ? startPlayerIndex : 0, phase: 'playing', roundWinner: null,
       activityFeed: feed.slice(0, 30),
     };
     await base44.entities.TXDGame.update(g.id, updated);
@@ -321,10 +324,18 @@ export default function TXDHostPanel() {
   const doPlay = async (side) => {
     if (!selectedDomino || !isHostTurn || !game) return;
     const g = game;
-    const actualSide = g.board?.length === 0 ? 'first' : side;
+    const isFirstPlay = (g.board?.length || 0) === 0;
+    const actualSide = isFirstPlay ? 'first' : side;
+
+    // Enforce Double 6 as first play
+    if (isFirstPlay && selectedDomino.id !== '6-6') {
+      flash('Double 6 must be played first!', 'error');
+      return;
+    }
+
     const { newLeftEnd, newRightEnd } = playDomino(selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide);
     const newHand = hostPlayer.hand.filter(d => d.id !== selectedDomino.id);
-    const boardEntry = { ...selectedDomino, side: actualSide };
+    const boardEntry = { ...selectedDomino, side: actualSide, isSpinner: isFirstPlay && selectedDomino.top === selectedDomino.bottom };
     const newBoard = actualSide === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
     let ni = (hostIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== hostIndex) ni = (ni + 1) % g.players.length;
@@ -702,11 +713,16 @@ export default function TXDHostPanel() {
             {isHostTurn && (
               <div className="flex flex-wrap gap-2">
                 {selectedDomino && game.board?.length === 0 && (
-                  <button onClick={() => doPlay('first')}
-                    className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white"
-                    style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 0 10px rgba(22,163,74,0.4)' }}>
-                    PLAY TILE
-                  </button>
+                  selectedDomino.id === '6-6'
+                    ? <button onClick={() => doPlay('first')}
+                        className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white"
+                        style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 0 10px rgba(22,163,74,0.4)' }}>
+                        PLAY SPINNER [6-6]
+                      </button>
+                    : <span className="text-amber-400/80 text-xs font-body py-2 animate-pulse">⚠ Double 6 must be played first</span>
+                )}
+                {!selectedDomino && game.board?.length === 0 && isHostTurn && (
+                  <span className="text-white/40 text-xs font-body py-2">Select the [6-6] tile to start</span>
                 )}
                 {selectedDomino && (game.board?.length || 0) > 0 && (() => {
                   const side = getPlaySide(selectedDomino, game.leftEnd, game.rightEnd);

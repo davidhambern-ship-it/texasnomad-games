@@ -35,7 +35,15 @@ export function deal(set, playerCount) {
   return { hands, boneyard };
 }
 
-// Find the player with the highest double to go first
+// Find the player holding Double 6 (required first play in TXD)
+export function findDoubleSixHolder(hands) {
+  for (let i = 0; i < hands.length; i++) {
+    if (hands[i].some(d => d.id === '6-6')) return i;
+  }
+  return -1;
+}
+
+// Find the player with the highest double to go first (fallback)
 export function findHighestDouble(hands) {
   let highestDouble = -1;
   let startPlayerIndex = 0;
@@ -76,7 +84,11 @@ export function getPlayableDominoes(hand, leftEnd, rightEnd) {
 // Apply a domino play and return new open ends
 export function playDomino(domino, leftEnd, rightEnd, side) {
   if (leftEnd === null || rightEnd === null || side === 'first') {
-    return { newLeftEnd: domino.top, newRightEnd: domino.bottom };
+    // For the spinner (Double 6), both ends open at 6
+    if (domino.top === domino.bottom) {
+      return { newLeftEnd: domino.top, newRightEnd: domino.top, isSpinner: true };
+    }
+    return { newLeftEnd: domino.top, newRightEnd: domino.bottom, isSpinner: false };
   }
   if (side === 'left') {
     const newLeft = domino.top === leftEnd ? domino.bottom : domino.top;
@@ -108,13 +120,19 @@ export function checkBlocked(players, leftEnd, rightEnd, boneyardCount) {
 }
 
 // AI: pick the best domino to play (highest pip count that fits)
+// On first play, AI must play Double 6 if it has it
 export function aiChoosePlay(hand, leftEnd, rightEnd) {
+  // First play: must be Double 6
+  if (leftEnd === null && rightEnd === null) {
+    const doubleSix = hand.find(d => d.id === '6-6');
+    if (doubleSix) return { domino: doubleSix, side: 'first' };
+    return null; // shouldn't happen — this AI doesn't have the 6-6
+  }
   const playable = getPlayableDominoes(hand, leftEnd, rightEnd);
   if (playable.length === 0) return null;
   // Sort by pip total descending, play highest value
   const sorted = [...playable].sort((a, b) => (b.top + b.bottom) - (a.top + a.bottom));
   const domino = sorted[0];
-  if (leftEnd === null) return { domino, side: 'first' };
   const side = getPlaySide(domino, leftEnd, rightEnd);
   const resolvedSide = side === 'both' ? 'right' : side;
   return { domino, side: resolvedSide };

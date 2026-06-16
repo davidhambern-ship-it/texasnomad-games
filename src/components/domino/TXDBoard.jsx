@@ -21,33 +21,85 @@ export default function TXDBoard({ board = [], leftEnd, rightEnd }) {
     );
   }
 
+  // Find spinner (first domino, always index 0 which is the 6-6)
+  const spinnerIndex = board.findIndex(d => d.isSpinner);
+  const hasSpinner = spinnerIndex >= 0;
+
+  // Split board into: left chain (before spinner, reversed), spinner, right chain (after spinner)
+  let leftChain = [];
+  let spinner = null;
+  let rightChain = [];
+
+  if (hasSpinner) {
+    spinner = board[spinnerIndex];
+    leftChain = board.slice(0, spinnerIndex).reverse(); // tiles played to left
+    rightChain = board.slice(spinnerIndex + 1);          // tiles played to right
+  } else {
+    // No spinner yet — render as flat chain
+    rightChain = board;
+  }
+
   return (
     <div
       ref={scrollRef}
-      className="flex items-center gap-1 overflow-x-auto py-3 px-6 min-h-[110px]"
+      className="flex items-center justify-center gap-0.5 overflow-x-auto py-3 px-4 min-h-[110px] w-full"
       style={{ scrollbarWidth: 'thin', scrollbarColor: '#BC13FE40 transparent' }}
     >
-      {board.map((d, i) => {
-        const isFirst = i === 0;
-        const isLast = i === board.length - 1;
+      {/* Left chain (played toward left end) */}
+      {leftChain.map((d, i) => {
         const isDouble = d.top === d.bottom;
-        const glowStyle = isFirst
-          ? { filter: 'drop-shadow(0 0 8px rgba(16,185,129,0.9))' }
-          : isLast
-          ? { filter: 'drop-shadow(0 0 8px rgba(16,185,129,0.9))' }
-          : {};
         return (
-          <div key={i} className="flex-shrink-0 flex items-center gap-0.5">
+          <div key={`left-${i}`} className="flex-shrink-0">
             <TXDDomino
               top={d.top}
               bottom={d.bottom}
               width={TILE_W}
               orientation={isDouble ? 'vertical' : 'horizontal'}
-              style={glowStyle}
             />
           </div>
         );
       })}
+
+      {/* Spinner — centered, glowing */}
+      {spinner && (
+        <div
+          className="flex-shrink-0 mx-1"
+          style={{
+            filter: 'drop-shadow(0 0 12px rgba(0,255,120,0.95)) drop-shadow(0 0 18px rgba(255,95,31,0.75))',
+          }}
+        >
+          <TXDDomino
+            top={spinner.top}
+            bottom={spinner.bottom}
+            width={TILE_W + 6}
+            orientation="vertical"
+          />
+        </div>
+      )}
+
+      {/* Right chain (played toward right end) */}
+      {rightChain.map((d, i) => {
+        const isDouble = d.top === d.bottom;
+        const isFirst = !hasSpinner && i === 0;
+        return (
+          <div key={`right-${i}`} className="flex-shrink-0">
+            <TXDDomino
+              top={d.top}
+              bottom={d.bottom}
+              width={TILE_W}
+              orientation={isDouble ? 'vertical' : 'horizontal'}
+              style={isFirst ? { filter: 'drop-shadow(0 0 8px rgba(16,185,129,0.9))' } : {}}
+            />
+          </div>
+        );
+      })}
+
+      {/* End indicators */}
+      {board.length > 0 && leftEnd !== null && rightEnd !== null && (
+        <div className="flex-shrink-0 ml-2 flex flex-col gap-0.5 items-center">
+          <span className="text-emerald-400/70 text-[8px] font-mono font-bold">{rightEnd}</span>
+        </div>
+      )}
     </div>
   );
 }
