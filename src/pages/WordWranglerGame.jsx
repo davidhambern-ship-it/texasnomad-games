@@ -130,7 +130,10 @@ export default function WordWranglerGame() {
   const handleSelectionComplete = useCallback(async () => {
     if (selectedCells.length < 3 || gamePhase !== 'playing' || !game?.letterBoard) return;
     const word = selectedCells.map(c => game.letterBoard[c.row][c.col].letter).join('');
-    const targetWords = game.gameState?.allTargetWords || [];
+    const targetWords =
+  game?.gameState?.allTargetWords?.length
+    ? game.gameState.allTargetWords
+    : game?.gameState?.targetWords || [];
     if (!isTargetWord(word, targetWords)) {
       setFeedback({ type: 'penalty', message: 'NOT A TARGET!', value: -3 });
       soundManager.playWrong();
