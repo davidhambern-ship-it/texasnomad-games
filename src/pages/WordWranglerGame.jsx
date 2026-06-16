@@ -42,6 +42,10 @@ export default function WordWranglerGame() {
     if (!game?.gameState) return [];
     const state = game.gameState;
 
+    console.log("GAME STATE:", state);
+    console.log("ALL TARGET WORDS:", state.allTargetWords);
+    console.log("TARGET WORDS:", state.targetWords);
+
     if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
       return state.allTargetWords;
     }
