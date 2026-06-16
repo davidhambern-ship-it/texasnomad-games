@@ -1,11 +1,8 @@
 import React from 'react';
 
 export default function TargetWordDisplay({ targetWords = [], foundWords = [] }) {
-  const visibleWords = targetWords
-    .filter(word => !foundWords.includes(word))
-    .slice(0, 5);
-
-  const totalTargetWords = targetWords.length;
+  const visibleWords = targetWords;
+  const totalTargetWords = targetWords.length + foundWords.length;
 
   return (
     <div className="border-2 border-cyber-purple/40 rounded-xl p-4 bg-black/40 box-glow-purple">
