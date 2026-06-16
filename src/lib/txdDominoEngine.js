@@ -35,27 +35,29 @@ export function deal(set, playerCount) {
   return { hands, boneyard };
 }
 
-// Find the player holding Double 6 (required first play in TXD)
+/**
+ * Find the player index & domino that should start the first hand.
+ * Checks doubles in order: 6-6, 5-5, 4-4, 3-3, 2-2, 1-1, 0-0
+ * Returns { playerIndex, dominoId } or null if no doubles dealt.
+ */
+export function findHighestDoubleStarter(hands) {
+  const doubleRank = ['6-6', '5-5', '4-4', '3-3', '2-2', '1-1', '0-0'];
+  for (const doubleId of doubleRank) {
+    for (let i = 0; i < hands.length; i++) {
+      if (hands[i].some(d => d.id === doubleId)) {
+        return { playerIndex: i, dominoId: doubleId };
+      }
+    }
+  }
+  return null; // no doubles — redeal
+}
+
+// Legacy alias used in older host/game code (kept for compatibility)
 export function findDoubleSixHolder(hands) {
   for (let i = 0; i < hands.length; i++) {
     if (hands[i].some(d => d.id === '6-6')) return i;
   }
   return -1;
-}
-
-// Find the player with the highest double to go first (fallback)
-export function findHighestDouble(hands) {
-  let highestDouble = -1;
-  let startPlayerIndex = 0;
-  hands.forEach((hand, playerIdx) => {
-    hand.forEach(d => {
-      if (d.top === d.bottom && d.top > highestDouble) {
-        highestDouble = d.top;
-        startPlayerIndex = playerIdx;
-      }
-    });
-  });
-  return { startPlayerIndex, highestDouble };
 }
 
 // Check if a domino can be played on the current board
@@ -81,22 +83,32 @@ export function getPlayableDominoes(hand, leftEnd, rightEnd) {
   return hand.filter(d => canPlay(d, leftEnd, rightEnd));
 }
 
-// Apply a domino play and return new open ends
-export function playDomino(domino, leftEnd, rightEnd, side) {
+/**
+ * Apply a domino play and return new open ends.
+ * isSpinner is true when:
+ *   - it's the first play AND it's a double, OR
+ *   - it's the first double played in this hand (spinnerActive is false)
+ * Callers pass spinnerActive so we can mark correctly.
+ */
+export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = false) {
   if (leftEnd === null || rightEnd === null || side === 'first') {
-    // For the spinner (Double 6), both ends open at 6
-    if (domino.top === domino.bottom) {
-      return { newLeftEnd: domino.top, newRightEnd: domino.top, isSpinner: true };
-    }
-    return { newLeftEnd: domino.top, newRightEnd: domino.bottom, isSpinner: false };
+    const isDouble = domino.top === domino.bottom;
+    return {
+      newLeftEnd: domino.top,
+      newRightEnd: domino.bottom,
+      isSpinner: isDouble, // first double played in hand = spinner
+      newSpinnerActive: isDouble,
+    };
   }
+  const isDouble = domino.top === domino.bottom;
+  const becomesSpinner = isDouble && !spinnerActive;
   if (side === 'left') {
     const newLeft = domino.top === leftEnd ? domino.bottom : domino.top;
-    return { newLeftEnd: newLeft, newRightEnd: rightEnd };
+    return { newLeftEnd: newLeft, newRightEnd: rightEnd, isSpinner: becomesSpinner, newSpinnerActive: spinnerActive || becomesSpinner };
   }
   // right
   const newRight = domino.top === rightEnd ? domino.bottom : domino.top;
-  return { newLeftEnd: leftEnd, newRightEnd: newRight };
+  return { newLeftEnd: leftEnd, newRightEnd: newRight, isSpinner: becomesSpinner, newSpinnerActive: spinnerActive || becomesSpinner };
 }
 
 // Sum of pips on a hand
@@ -119,18 +131,28 @@ export function checkBlocked(players, leftEnd, rightEnd, boneyardCount) {
   return players.every(p => getPlayableDominoes(p.hand || [], leftEnd, rightEnd).length === 0);
 }
 
-// AI: pick the best domino to play (highest pip count that fits)
-// On first play, AI must play Double 6 if it has it
-export function aiChoosePlay(hand, leftEnd, rightEnd) {
-  // First play: must be Double 6
+/**
+ * AI: pick the best domino to play.
+ * First play with a locked starting domino → must play that domino.
+ * First play without lock → play highest double if available, else highest pip.
+ * Otherwise → play highest pip value that fits.
+ */
+export function aiChoosePlay(hand, leftEnd, rightEnd, startingDominoLocked = null) {
   if (leftEnd === null && rightEnd === null) {
-    const doubleSix = hand.find(d => d.id === '6-6');
-    if (doubleSix) return { domino: doubleSix, side: 'first' };
-    return null; // shouldn't happen — this AI doesn't have the 6-6
+    // First play
+    if (startingDominoLocked) {
+      const locked = hand.find(d => d.id === startingDominoLocked);
+      if (locked) return { domino: locked, side: 'first' };
+    }
+    // Play highest double available
+    const doubles = hand.filter(d => d.top === d.bottom).sort((a, b) => b.top - a.top);
+    if (doubles.length > 0) return { domino: doubles[0], side: 'first' };
+    // No doubles — play any tile
+    const sorted = [...hand].sort((a, b) => (b.top + b.bottom) - (a.top + a.bottom));
+    return sorted.length ? { domino: sorted[0], side: 'first' } : null;
   }
   const playable = getPlayableDominoes(hand, leftEnd, rightEnd);
   if (playable.length === 0) return null;
-  // Sort by pip total descending, play highest value
   const sorted = [...playable].sort((a, b) => (b.top + b.bottom) - (a.top + a.bottom));
   const domino = sorted[0];
   const side = getPlaySide(domino, leftEnd, rightEnd);
