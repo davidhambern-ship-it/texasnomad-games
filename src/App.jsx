@@ -23,6 +23,7 @@ import NameThatTrackGame from '@/pages/NameThatTrackGame';
 import SudokuGame from '@/pages/SudokuGame';
 import SeeThatGame from '@/pages/SeeThatGame';
 import WordWranglerGame from '@/pages/WordWranglerGame';
+import TXDDominoDemo from '@/pages/TXDDominoDemo';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -73,6 +74,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/sudoku" element={<SudokuGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
+      <Route path="/txd-dominoes" element={<TXDDominoDemo />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
