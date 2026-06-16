@@ -91,17 +91,14 @@ export function placeWord(board, word, startRow, startCol, direction) {
   return placed;
 }
 
-export function generateBoardWithWords(boardSize, targetWordCount = 20) {
-  // Initialize empty board
+export function generateBoardWithWords(boardSize, activeWordCount = 5) {
   const board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
   const placedWords = [];
   
-  // Sort words by length (longer first - harder to place)
-  const words = pickTargetWords(targetWordCount * 2, 3, 8).sort((a, b) => b.length - a.length);
+  const words = pickTargetWords(activeWordCount * 3, 3, 8).sort((a, b) => b.length - a.length);
   
-  // Try to place words
   for (const word of words) {
-    if (placedWords.length >= targetWordCount) break;
+    if (placedWords.length >= activeWordCount) break;
     
     let placed = false;
     const attempts = 50;
@@ -109,19 +106,12 @@ export function generateBoardWithWords(boardSize, targetWordCount = 20) {
     for (let attempt = 0; attempt < attempts && !placed; attempt++) {
       const startRow = Math.floor(Math.random() * boardSize);
       const startCol = Math.floor(Math.random() * boardSize);
-      
-      // Shuffle directions for variety
       const shuffledDirections = [...DIRECTIONS].sort(() => Math.random() - 0.5);
       
       for (const direction of shuffledDirections) {
         if (canPlaceWord(board, word, startRow, startCol, direction)) {
           placeWord(board, word, startRow, startCol, direction);
-          placedWords.push({
-            word,
-            startRow,
-            startCol,
-            direction,
-          });
+          placedWords.push({ word, startRow, startCol, direction });
           placed = true;
           break;
         }
@@ -129,14 +119,12 @@ export function generateBoardWithWords(boardSize, targetWordCount = 20) {
     }
   }
   
-  // Fill empty cells with random letters
   const vowels = 'AEIOU';
   const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
   
   for (let row = 0; row < boardSize; row++) {
     for (let col = 0; col < boardSize; col++) {
       if (board[row][col] === null) {
-        // 40% vowel, 60% consonant for natural distribution
         board[row][col] = Math.random() < 0.4 
           ? vowels[Math.floor(Math.random() * vowels.length)]
           : consonants[Math.floor(Math.random() * consonants.length)];
@@ -145,6 +133,30 @@ export function generateBoardWithWords(boardSize, targetWordCount = 20) {
   }
   
   return { board, placedWords };
+}
+
+export function injectWordIntoBoard(board, word, boardSize) {
+  const emptyCells = [];
+  for (let row = 0; row < boardSize; row++) {
+    for (let col = 0; col < boardSize; col++) {
+      if (!board[row][col]?.letter || board[row][col].letter === '') {
+        emptyCells.push({ row, col });
+      }
+    }
+  }
+  
+  if (emptyCells.length < word.length) return null;
+  
+  for (const direction of DIRECTIONS) {
+    for (const startCell of emptyCells) {
+      if (canPlaceWord(board, word, startCell.row, startCell.col, direction)) {
+        const placed = placeWord(board, word, startCell.row, startCell.col, direction);
+        return { word, startRow: startCell.row, startCol: startCell.col, direction };
+      }
+    }
+  }
+  
+  return null;
 }
 
 // Get 5 visible target words from the full list
