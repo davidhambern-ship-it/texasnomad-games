@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
 import TXDBoard from '@/components/domino/TXDBoard';
+import BoneyardBox from '@/components/domino/BoneyardBox';
 import Header from '@/components/home/Header';
 import {
   getPlaySide, getPlayableDominoes, playDomino,
@@ -337,95 +338,96 @@ export default function TXDGame() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-2 py-4 gap-4">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 py-4 gap-4">
 
-        {/* ── Game Table ── */}
-        <div className="relative w-full rounded-3xl overflow-visible"
-          style={{
-            aspectRatio: '4/3',
-            background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
-            backdropFilter: 'blur(12px)',
-            border: '4px solid rgba(255,160,50,0.6)',
-            boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3), 0 0 80px rgba(255,120,0,0.15)',
-            isolation: 'isolate',
-          }}>
+        {/* ── Boneyard + Game Table side-by-side ── */}
+        <div className="flex gap-4 items-stretch">
 
-          {/* Glass sheen overlay */}
-          <div className="absolute inset-0 rounded-3xl pointer-events-none"
-            style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
+          {/* Boneyard box — left of table */}
+          <BoneyardBox
+            boneyard={game.boneyard || []}
+            canDraw={isMyTurn && playableIds.size === 0 && game.phase === 'playing'}
+            onDraw={doDraw}
+          />
 
-          {/* Center logo watermark */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
-              alt="TN" className="object-contain" style={{ opacity: 0.25, width: 120, height: 120 }} />
-          </div>
+          {/* ── Game Table ── */}
+          <div className="relative flex-1 rounded-3xl overflow-visible"
+            style={{
+              aspectRatio: '4/3',
+              background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '4px solid rgba(255,160,50,0.6)',
+              boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3), 0 0 80px rgba(255,120,0,0.15)',
+              isolation: 'isolate',
+            }}>
 
-          {/* Seat labels around table */}
-          {allSeats.map((p, i) => {
-            if (!p) return (
-              <div key={i} className={`absolute z-10 ${SEAT_POS[i]}`}>
-                <div className="px-3 py-1.5 rounded-full text-xs font-body bg-black/50 border border-white/10 text-white/20 whitespace-nowrap">
-                  Seat {i + 1} — Empty
+            {/* Glass sheen overlay */}
+            <div className="absolute inset-0 rounded-3xl pointer-events-none"
+              style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
+
+            {/* Center logo watermark */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+                alt="TN" className="object-contain" style={{ opacity: 0.25, width: 120, height: 120 }} />
+            </div>
+
+            {/* Seat labels around table */}
+            {allSeats.map((p, i) => {
+              if (!p) return (
+                <div key={i} className={`absolute z-10 ${SEAT_POS[i]}`}>
+                  <div className="px-3 py-1.5 rounded-full text-xs font-body bg-black/50 border border-white/10 text-white/20 whitespace-nowrap">
+                    Seat {i + 1} — Empty
+                  </div>
                 </div>
-              </div>
-            );
-            const isTurn = game.currentPlayerIndex === i && game.phase === 'playing';
-            const isMe = p.playerId === playerId;
-            return (
-              <SeatLabel key={i} player={p} isTurn={isTurn} isMe={isMe}
-                tileCount={p.hand?.length ?? 0} seatIdx={i} />
-            );
-          })}
+              );
+              const isTurn = game.currentPlayerIndex === i && game.phase === 'playing';
+              const isMe = p.playerId === playerId;
+              return (
+                <SeatLabel key={i} player={p} isTurn={isTurn} isMe={isMe}
+                  tileCount={p.hand?.length ?? 0} seatIdx={i} />
+              );
+            })}
 
-          {/* Opponents' face-down tiles inside table */}
-          {allSeats.map((p, i) => {
-            if (!p || p.playerId === playerId) return null;
-            const count = p.hand?.length || 0;
-            if (count === 0) return null;
-            const posMap = {
-              0: 'bottom-6 left-1/2 -translate-x-1/2',
-              1: 'left-6 top-1/2 -translate-y-1/2',
-              2: 'top-6 left-1/2 -translate-x-1/2',
-              3: 'right-6 top-1/2 -translate-y-1/2',
-            };
-            const isVert = i === 1 || i === 3;
-            return (
-              <div key={i} className={`absolute ${posMap[i]} z-5 flex ${isVert ? 'flex-col' : 'flex-row'} gap-0.5`}>
-                {Array.from({ length: Math.min(count, 10) }).map((_, j) => (
-                  <TXDDomino key={j} top={0} bottom={0} width={isVert ? 16 : 14}
-                    orientation={isVert ? 'vertical' : 'horizontal'} faceDown />
-                ))}
-                {count > 10 && <span className="text-white/30 text-[9px] font-body text-center">+{count - 10}</span>}
-              </div>
-            );
-          })}
+            {/* Opponents' face-down tiles inside table */}
+            {allSeats.map((p, i) => {
+              if (!p || p.playerId === playerId) return null;
+              const count = p.hand?.length || 0;
+              if (count === 0) return null;
+              const posMap = {
+                0: 'bottom-6 left-1/2 -translate-x-1/2',
+                1: 'left-6 top-1/2 -translate-y-1/2',
+                2: 'top-6 left-1/2 -translate-x-1/2',
+                3: 'right-6 top-1/2 -translate-y-1/2',
+              };
+              const isVert = i === 1 || i === 3;
+              return (
+                <div key={i} className={`absolute ${posMap[i]} z-5 flex ${isVert ? 'flex-col' : 'flex-row'} gap-0.5`}>
+                  {Array.from({ length: Math.min(count, 10) }).map((_, j) => (
+                    <TXDDomino key={j} top={0} bottom={0} width={isVert ? 16 : 14}
+                      orientation={isVert ? 'vertical' : 'horizontal'} faceDown />
+                  ))}
+                  {count > 10 && <span className="text-white/30 text-[9px] font-body text-center">+{count - 10}</span>}
+                </div>
+              );
+            })}
 
-          {/* Play chain — centered in table */}
-          <div className="absolute inset-0 flex items-center justify-center z-10">
-            <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+            {/* Play chain — centered in table */}
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+            </div>
+
+            {/* Open ends display */}
+            {game.phase === 'playing' && (game.leftEnd !== null || game.rightEnd !== null) && (
+              <div className="absolute bottom-3 right-4 flex items-center gap-2 z-10">
+                <span className="text-emerald-400/60 text-[9px] font-body">ENDS:</span>
+                <span className="text-emerald-400 font-mono font-bold text-xs">{game.leftEnd ?? '?'}</span>
+                <span className="text-white/20 text-xs">↔</span>
+                <span className="text-emerald-400 font-mono font-bold text-xs">{game.rightEnd ?? '?'}</span>
+              </div>
+            )}
           </div>
 
-          {/* Boneyard — top-left corner */}
-          <div className="absolute left-3 top-3 z-20 flex flex-col items-center gap-0.5">
-            <div className="flex flex-col gap-0.5">
-              {Array.from({ length: Math.min(game.boneyard?.length || 0, 6) }).map((_, i) => (
-                <TXDDomino key={i} top={0} bottom={0} width={16} faceDown />
-              ))}
-            </div>
-            <span className="text-white/50 text-[9px] font-body font-mono mt-0.5">{game.boneyard?.length || 0}</span>
-            <span className="text-white/30 text-[8px] font-body">BONEYARD</span>
-          </div>
-
-          {/* Open ends display */}
-          {game.phase === 'playing' && (game.leftEnd !== null || game.rightEnd !== null) && (
-            <div className="absolute bottom-3 right-4 flex items-center gap-2 z-10">
-              <span className="text-emerald-400/60 text-[9px] font-body">ENDS:</span>
-              <span className="text-emerald-400 font-mono font-bold text-xs">{game.leftEnd ?? '?'}</span>
-              <span className="text-white/20 text-xs">↔</span>
-              <span className="text-emerald-400 font-mono font-bold text-xs">{game.rightEnd ?? '?'}</span>
-            </div>
-          )}
-        </div>
+        </div>{/* end boneyard + table row */}
 
         {/* ── Player Controls ── */}
         <div className="rounded-2xl p-4"
@@ -522,13 +524,7 @@ export default function TXDGame() {
                   </>
                 );
               })()}
-              {!selectedDomino && (
-                <button onClick={doDraw}
-                  className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white transition-all"
-                  style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-                  {(game.boneyard?.length || 0) > 0 ? `DRAW (${game.boneyard.length})` : 'PASS'}
-                </button>
-              )}
+              {/* Draw/Pass is handled by the BoneyardBox on the left */}
               <button onClick={doSort}
                 className="px-4 py-2 rounded-xl font-heading text-sm tracking-wider uppercase text-white/60 border border-white/20 hover:border-white/40 transition-all">
                 SORT

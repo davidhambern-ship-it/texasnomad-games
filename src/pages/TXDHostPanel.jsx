@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
 import TXDBoard from '@/components/domino/TXDBoard';
+import BoneyardBox from '@/components/domino/BoneyardBox';
 import Header from '@/components/home/Header';
 import {
   DOMINO_SET, generateRoomCode, deal, findHighestDoubleStarter,
@@ -645,51 +646,56 @@ export default function TXDHostPanel() {
         {/* ── RIGHT: Live Table + Host Hand ── */}
         <div className="lg:col-span-2 space-y-4">
 
-          {/* Live Board */}
-          <div className="relative rounded-3xl overflow-visible"
-            style={{
-              aspectRatio: '4/3',
-              background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
-              backdropFilter: 'blur(12px)',
-              border: '4px solid rgba(255,160,50,0.6)',
-              boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3)',
-              isolation: 'isolate',
-            }}>
-            {/* Glass sheen */}
-            <div className="absolute inset-0 rounded-3xl pointer-events-none"
-              style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
-            {/* Logo watermark */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
-                alt="TN" className="object-contain" style={{ opacity: 0.2, width: 100, height: 100 }} />
-            </div>
-            {/* Board chain — centered in table */}
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
-            </div>
-            {/* Boneyard — top-left corner */}
-            <div className="absolute left-3 top-3 z-20 flex flex-col items-center gap-0.5">
-              {Array.from({ length: Math.min(game.boneyard?.length || 0, 5) }).map((_, i) => (
-                <TXDDomino key={i} top={0} bottom={0} width={14} faceDown />
-              ))}
-              <span className="text-white/50 text-[8px] font-mono mt-0.5">{game.boneyard?.length || 0}</span>
-              <span className="text-white/25 text-[7px] font-body">BONEYARD</span>
-            </div>
-            {/* Turn / ends overlay */}
-            <div className="absolute bottom-2 right-3 z-10 flex items-center gap-2 text-[9px] font-body">
-              {game.phase === 'playing' && game.leftEnd !== null && (
-                <span className="text-emerald-400/80">Ends: <span className="font-mono font-bold">{game.leftEnd}</span> ↔ <span className="font-mono font-bold">{game.rightEnd}</span></span>
-              )}
-              <span className={`px-2 py-0.5 rounded ${isHostTurn ? 'text-emerald-400 bg-black/60' : 'text-white/30 bg-black/40'}`}>
-                {isHostTurn ? '▶ YOUR TURN' : currentPlayer ? currentPlayer.playerName : '—'}
-              </span>
-            </div>
-            {game.lastAction && (
-              <div className="absolute top-2 right-3 z-10 text-[9px] text-white/25 font-body italic">
-                {game.lastAction.player} {game.lastAction.type === 'play' ? 'played' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
+          {/* Live Board + Boneyard side-by-side */}
+          <div className="flex gap-3 items-stretch">
+
+            {/* Boneyard box — left of table */}
+            <BoneyardBox
+              boneyard={game.boneyard || []}
+              canDraw={isHostTurn && (playable.length === 0) && game.phase === 'playing'}
+              onDraw={doDraw}
+              compact
+            />
+
+            {/* Table */}
+            <div className="relative flex-1 rounded-3xl overflow-visible"
+              style={{
+                aspectRatio: '4/3',
+                background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
+                backdropFilter: 'blur(12px)',
+                border: '4px solid rgba(255,160,50,0.6)',
+                boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3)',
+                isolation: 'isolate',
+              }}>
+              {/* Glass sheen */}
+              <div className="absolute inset-0 rounded-3xl pointer-events-none"
+                style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
+              {/* Logo watermark */}
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
+                <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+                  alt="TN" className="object-contain" style={{ opacity: 0.2, width: 100, height: 100 }} />
               </div>
-            )}
-          </div>
+              {/* Board chain — centered in table */}
+              <div className="absolute inset-0 flex items-center justify-center z-10">
+                <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+              </div>
+              {/* Turn / ends overlay */}
+              <div className="absolute bottom-2 right-3 z-10 flex items-center gap-2 text-[9px] font-body">
+                {game.phase === 'playing' && game.leftEnd !== null && (
+                  <span className="text-emerald-400/80">Ends: <span className="font-mono font-bold">{game.leftEnd}</span> ↔ <span className="font-mono font-bold">{game.rightEnd}</span></span>
+                )}
+                <span className={`px-2 py-0.5 rounded ${isHostTurn ? 'text-emerald-400 bg-black/60' : 'text-white/30 bg-black/40'}`}>
+                  {isHostTurn ? '▶ YOUR TURN' : currentPlayer ? currentPlayer.playerName : '—'}
+                </span>
+              </div>
+              {game.lastAction && (
+                <div className="absolute top-2 right-3 z-10 text-[9px] text-white/25 font-body italic">
+                  {game.lastAction.player} {game.lastAction.type === 'play' ? 'played' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
+                </div>
+              )}
+            </div>
+
+          </div>{/* end boneyard + table row */}
 
           {/* Host Hand + Controls */}
           <div className="rounded-2xl p-4"
