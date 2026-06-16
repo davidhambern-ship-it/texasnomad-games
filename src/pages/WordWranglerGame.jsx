@@ -42,6 +42,10 @@ export default function WordWranglerGame() {
     if (!game?.gameState) return [];
     const state = game.gameState;
     
+    if (Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length > 0) {
+      return state.visibleTargetWords.filter(w => typeof w === 'string' && !wordsFound.includes(w));
+    }
+    
     const allTargetWords = Array.isArray(state.allTargetWords) && state.allTargetWords.length
       ? state.allTargetWords
       : Array.isArray(state.targetWords) && state.targetWords.length
@@ -50,11 +54,7 @@ export default function WordWranglerGame() {
     
     if (!allTargetWords.length || !game?.letterBoard) return [];
 
-    const visible = Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length
-      ? state.visibleTargetWords
-      : getPlayableTargetWords(allTargetWords, game.letterBoard, wordsFound, 5);
-
-    return visible.filter(w => typeof w === 'string');
+    return getPlayableTargetWords(allTargetWords, game.letterBoard, wordsFound, 5);
   }, [game?.gameState?.visibleTargetWords, game?.gameState?.allTargetWords, game?.gameState?.targetWords, game?.letterBoard, wordsFound]);
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function WordWranglerGame() {
               await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
             }
             
-            if (existingGame.letterBoard && gameToUpdate.gameState?.allTargetWords && !gameToUpdate.gameState?.visibleTargetWords?.length) {
+            if (existingGame.letterBoard && gameToUpdate.gameState?.allTargetWords && !existingGame.gameState?.visibleTargetWords?.length) {
               const currentVisible = getPlayableTargetWords(
                 gameToUpdate.gameState.allTargetWords,
                 gameToUpdate.letterBoard || existingGame.letterBoard,
