@@ -23,10 +23,10 @@ function shuffle(arr) {
   return a;
 }
 
-// Deal tiles to players (7 each for 2-3 players, 5 each for 4)
+// Deal tiles to players (7 each, regardless of player count)
 export function deal(set, playerCount) {
   const shuffled = shuffle(set);
-  const handSize = playerCount <= 3 ? 7 : 5;
+  const handSize = 7;
   const hands = [];
   for (let i = 0; i < playerCount; i++) {
     hands.push(shuffled.slice(i * handSize, (i + 1) * handSize));
