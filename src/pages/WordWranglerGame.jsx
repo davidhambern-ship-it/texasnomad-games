@@ -414,7 +414,6 @@ export default function WordWranglerGame() {
     // Determine winner
     const sortedPlayers = [...(game?.players || [])].sort((a, b) => b.score - a.score);
     if (sortedPlayers.length > 0) {
-      const winner = sortedPlayers[0];
       const updatedGame = {
         ...game,
         status: 'finished',
@@ -429,6 +428,44 @@ export default function WordWranglerGame() {
       };
       
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
+    }
+  };
+
+  const playAgain = async () => {
+    try {
+      // Reset game state
+      const boardSize = difficulty === 'simpleton' ? 6 : difficulty === 'reader' ? 8 : 10;
+      const newLetterBoard = generateLetterBoard(boardSize, specialTilesEnabled);
+      
+      const updatedGame = {
+        ...game,
+        status: 'active',
+        players: (game?.players || []).map(p => ({
+          ...p,
+          score: 0,
+          wordsFound: [],
+          status: 'active'
+        })),
+        letterBoard: newLetterBoard,
+        gameState: {
+          ...game?.gameState,
+          phase: 'playing',
+          timeRemaining: timerLength,
+          roundNumber: (game?.gameState?.roundNumber || 1) + 1,
+        }
+      };
+      
+      await base44.entities.WordWranglerGame.update(game.id, updatedGame);
+      setGame(updatedGame);
+      setGamePhase('playing');
+      setTimeRemaining(timerLength);
+      setWordsFound([]);
+      setCurrentScore(0);
+      setLastWordScore(null);
+      setOutlawDanger(false);
+      setSelectedCells([]);
+    } catch (err) {
+      console.error('Failed to play again:', err);
     }
   };
 
@@ -636,7 +673,7 @@ export default function WordWranglerGame() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.9)' }}>
           <div className="max-w-lg w-full border-2 border-outlaw-gold rounded-2xl p-8 box-glow-gold text-center" style={{ background: '#08050f' }}>
             <h2 className="text-4xl font-heading text-outlaw-gold mb-4" style={{ textShadow: '0 0 20px #FFD700' }}>
-              GAME OVER
+              TIME'S UP!
             </h2>
             
             <div className="mb-6">
@@ -653,12 +690,22 @@ export default function WordWranglerGame() {
               </div>
             </div>
             
-            <button
-              onClick={leaveGame}
-              className="w-full py-3 rounded-lg font-heading text-lg tracking-widest uppercase bg-gradient-to-r from-outlaw-gold to-outlaw-gold/80 text-black hover:opacity-90 transition-all"
-            >
-              Back to Games
-            </button>
+            <p className="text-white/80 font-body mb-6">Want to wrangle more words?</p>
+            
+            <div className="space-y-3">
+              <button
+                onClick={playAgain}
+                className="w-full py-3 rounded-lg font-heading text-lg tracking-widest uppercase bg-gradient-to-r from-outlaw-gold to-outlaw-gold/80 text-black hover:opacity-90 transition-all box-glow-gold"
+              >
+                🤠 PLAY AGAIN
+              </button>
+              <button
+                onClick={leaveGame}
+                className="w-full py-3 rounded-lg font-heading text-lg tracking-widest uppercase border-2 border-white/30 text-white/70 hover:border-white hover:text-white transition-all"
+              >
+                Back to Games
+              </button>
+            </div>
           </div>
         </div>
       )}
