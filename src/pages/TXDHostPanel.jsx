@@ -1,43 +1,42 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import TXDDomino from '@/components/domino/TXDDomino';
 import TXDBoard from '@/components/domino/TXDBoard';
 import Header from '@/components/home/Header';
 import {
   DOMINO_SET, generateRoomCode, deal, findHighestDouble,
-  getPlayableDominoes, playDomino, getPlaySide,
-  calculateRoundScores, aiChoosePlay,
+  calculateRoundScores, aiChoosePlay, playDomino,
 } from '@/lib/txdDominoEngine';
 
-const HAND_TILE_W = 52;
 const AI_NAMES = ['Dexter', 'Duchess', 'Ranger', 'Maverick'];
+const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+const Btn = ({ children, onClick, color = '#BC13FE', disabled = false, className = '' }) => (
+  <button onClick={onClick} disabled={disabled}
+    className={`px-4 py-2 rounded-lg border-2 font-heading tracking-wider text-sm uppercase transition-all active:scale-95 disabled:opacity-40 ${className}`}
+    style={{ borderColor: color, color }}
+    onMouseEnter={e => { if (!disabled) e.currentTarget.style.background = `${color}20`; }}
+    onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}>
+    {children}
+  </button>
+);
 
 export default function TXDHostPanel() {
   const navigate = useNavigate();
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [hostPlayerId, setHostPlayerId] = useState(null);
   const [roomCodeInput, setRoomCodeInput] = useState('');
-  const [selectedDomino, setSelectedDomino] = useState(null);
   const [feedback, setFeedback] = useState(null);
-  const [controlsOpen, setControlsOpen] = useState(true);
+  const [scoreLimit, setScoreLimit] = useState(100);
+  const [copied, setCopied] = useState(false);
   const pollRef = useRef(null);
-
-  const hostIndex = game?.players?.findIndex(p => p.playerId === hostPlayerId) ?? -1;
-  const hostPlayer = hostIndex >= 0 ? game?.players?.[hostIndex] : null;
-  const isMyTurn = game?.phase === 'playing' && game?.currentPlayerIndex === hostIndex;
-  const myHand = hostPlayer?.hand || [];
-  const playable = getPlayableDominoes(myHand, game?.leftEnd ?? null, game?.rightEnd ?? null);
-  const playableIds = new Set(playable.map(d => d.id));
-  const currentPlayer = game?.players?.[game?.currentPlayerIndex];
 
   const flash = (msg, type = 'info') => {
     setFeedback({ msg, type });
     setTimeout(() => setFeedback(null), 2500);
   };
 
-  // Poll
+  // Poll for live updates
   useEffect(() => {
     if (!game?.id) return;
     pollRef.current = setInterval(async () => {
@@ -57,7 +56,7 @@ export default function TXDHostPanel() {
     return () => clearInterval(pollRef.current);
   }, [game?.id, game?.room_code]);
 
-  // AI turns
+  // AI turn automation
   useEffect(() => {
     if (!game || game.phase !== 'playing') return;
     const current = game.players?.[game.currentPlayerIndex];
@@ -100,20 +99,16 @@ export default function TXDHostPanel() {
     setGame(updated);
   };
 
-  // Create room
+  // ── Room Actions ────────────────────────────────────────────────────────────
   const createRoom = async () => {
     setLoading(true);
-    let user = null; try { user = await base44.auth.me(); } catch (_) {}
-    const pid = user?.id || `host_${Date.now()}`;
     const code = generateRoomCode();
-    const hostObj = { playerId: pid, seatNumber: 1, playerName: 'Host', hand: [], score: 0, roundScore: 0, status: 'active', isAI: false, isHost: true };
     const created = await base44.entities.TXDGame.create({
-      room_code: code, status: 'waiting', players: [hostObj],
+      room_code: code, status: 'waiting', players: [],
       board: [], boneyard: [], leftEnd: null, rightEnd: null,
       currentPlayerIndex: 0, roundNumber: 1, phase: 'waiting',
-      scoreLimit: 100, created_by_user_id: user?.id || null,
+      scoreLimit, lastAction: null,
     });
-    setHostPlayerId(pid);
     setGame(created);
     setLoading(false);
   };
@@ -124,20 +119,38 @@ export default function TXDHostPanel() {
     try {
       const rooms = await base44.entities.TXDGame.filter({ room_code: roomCodeInput.trim().toUpperCase() });
       if (!rooms.length) { flash('Room not found', 'error'); setLoading(false); return; }
-      let user = null; try { user = await base44.auth.me(); } catch (_) {}
-      const pid = user?.id || `host_${Date.now()}`;
-      const g = rooms[0];
-      if (!g.players?.find(p => p.playerId === pid)) {
-        const hostObj = { playerId: pid, seatNumber: (g.players?.length || 0) + 1, playerName: 'Host', hand: [], score: 0, roundScore: 0, status: 'active', isAI: false, isHost: true };
-        const updated = { ...g, players: [...(g.players || []), hostObj] };
-        await base44.entities.TXDGame.update(g.id, updated);
-        setGame(updated);
-      } else {
-        setGame(g);
-      }
-      setHostPlayerId(pid);
+      setGame(rooms[0]);
     } catch (_) { flash('Error joining room', 'error'); }
     setLoading(false);
+  };
+
+  const addCPU = async () => {
+    const g = game;
+    if ((g.players?.length || 0) >= 4) { flash('Max 4 players', 'error'); return; }
+    const aiCount = g.players.filter(p => p.isAI).length;
+    const ai = {
+      playerId: `ai_${Date.now()}`, seatNumber: g.players.length + 1,
+      playerName: AI_NAMES[aiCount] || `CPU${aiCount + 1}`,
+      hand: [], score: 0, roundScore: 0, status: 'active', isAI: true, isHost: false,
+    };
+    const updated = { ...g, players: [...g.players, ai] };
+    await base44.entities.TXDGame.update(g.id, updated);
+    setGame(updated);
+  };
+
+  const removeCPU = async () => {
+    const g = game;
+    const last = [...g.players].reverse().find(p => p.isAI);
+    if (!last) return;
+    const updated = { ...g, players: g.players.filter(p => p.playerId !== last.playerId) };
+    await base44.entities.TXDGame.update(g.id, updated);
+    setGame(updated);
+  };
+
+  const kickPlayer = async (playerId) => {
+    const updated = { ...game, players: game.players.filter(p => p.playerId !== playerId) };
+    await base44.entities.TXDGame.update(game.id, updated);
+    setGame(updated);
   };
 
   const startGame = async () => {
@@ -153,28 +166,15 @@ export default function TXDHostPanel() {
     setGame(updated);
   };
 
-  const addCPU = async () => {
+  const startNextRound = async () => {
     const g = game;
-    if ((g.players?.length || 0) >= 4) { flash('Max 4 players', 'error'); return; }
-    const aiCount = g.players.filter(p => p.isAI).length;
-    const ai = { playerId: `ai_${Date.now()}`, seatNumber: g.players.length + 1, playerName: AI_NAMES[aiCount] || `CPU${aiCount + 1}`, hand: [], score: 0, roundScore: 0, status: 'active', isAI: true, isHost: false };
-    const updated = { ...g, players: [...g.players, ai] };
+    const active = g.players.filter(p => p.status === 'active');
+    const { hands, boneyard } = deal(DOMINO_SET, active.length);
+    const { startPlayerIndex } = findHighestDouble(hands);
+    let hi = 0;
+    const players = g.players.map(p => p.status !== 'active' ? p : { ...p, hand: hands[hi++], roundScore: 0 });
+    const updated = { ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players, currentPlayerIndex: startPlayerIndex, roundNumber: (g.roundNumber || 1) + 1, phase: 'playing', roundWinner: null };
     await base44.entities.TXDGame.update(g.id, updated);
-    setGame(updated);
-  };
-
-  const removeCPU = async () => {
-    const g = game;
-    const last = [...g.players].reverse().find(p => p.isAI);
-    if (!last) return;
-    const updated = { ...g, players: g.players.filter(p => p.playerId !== last.playerId) };
-    await base44.entities.TXDGame.update(g.id, updated);
-    setGame(updated);
-  };
-
-  const overrideTurn = async (idx) => {
-    const updated = { ...game, currentPlayerIndex: idx };
-    await base44.entities.TXDGame.update(game.id, updated);
     setGame(updated);
   };
 
@@ -188,63 +188,24 @@ export default function TXDHostPanel() {
     const updated = { ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players, currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null };
     await base44.entities.TXDGame.update(g.id, updated);
     setGame(updated);
-    setSelectedDomino(null);
   };
 
-  const startNextRound = async () => {
-    const g = game;
-    const active = g.players.filter(p => p.status === 'active');
-    const { hands, boneyard } = deal(DOMINO_SET, active.length);
-    const { startPlayerIndex } = findHighestDouble(hands);
-    let hi = 0;
-    const players = g.players.map(p => p.status !== 'active' ? p : { ...p, hand: hands[hi++], roundScore: 0 });
-    const updated = { ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players, currentPlayerIndex: startPlayerIndex, roundNumber: (g.roundNumber || 1) + 1, phase: 'playing', roundWinner: null };
-    await base44.entities.TXDGame.update(g.id, updated);
+  const overrideTurn = async (idx) => {
+    const updated = { ...game, currentPlayerIndex: idx };
+    await base44.entities.TXDGame.update(game.id, updated);
     setGame(updated);
   };
 
-  const doPlay = async (side) => {
-    if (!selectedDomino || !isMyTurn || !game) return;
-    const g = game;
-    const actualSide = g.board?.length === 0 ? 'first' : side;
-    const { newLeftEnd, newRightEnd } = playDomino(selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide);
-    const newHand = hostPlayer.hand.filter(d => d.id !== selectedDomino.id);
-    const boardEntry = { ...selectedDomino, side: actualSide };
-    const newBoard = actualSide === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
-    let ni = (hostIndex + 1) % g.players.length;
-    while (g.players[ni]?.status !== 'active' && ni !== hostIndex) ni = (ni + 1) % g.players.length;
-    const players = g.players.map((p, i) => i === hostIndex ? { ...p, hand: newHand } : p);
-    const roundOver = newHand.length === 0;
-    const pts = roundOver ? calculateRoundScores(players, hostIndex) : 0;
-    if (roundOver) players[hostIndex] = { ...players[hostIndex], score: (players[hostIndex].score || 0) + pts };
-    const updated = {
-      ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd, players,
-      currentPlayerIndex: roundOver ? hostIndex : ni,
-      phase: roundOver ? 'round_over' : 'playing',
-      roundWinner: roundOver ? { playerName: 'Host', points: pts } : null,
-      lastAction: { type: 'play', player: 'Host', domino: selectedDomino },
-    };
-    await base44.entities.TXDGame.update(g.id, updated);
+  const resetScores = async () => {
+    const updated = { ...game, players: game.players.map(p => ({ ...p, score: 0, roundScore: 0 })) };
+    await base44.entities.TXDGame.update(game.id, updated);
     setGame(updated);
-    setSelectedDomino(null);
   };
 
-  const doDraw = async () => {
-    if (!isMyTurn || !game) return;
-    const g = game;
-    let ni = (hostIndex + 1) % g.players.length;
-    while (g.players[ni]?.status !== 'active' && ni !== hostIndex) ni = (ni + 1) % g.players.length;
-    if (!g.boneyard?.length) {
-      const updated = { ...g, currentPlayerIndex: ni, lastAction: { type: 'pass', player: 'Host' } };
-      await base44.entities.TXDGame.update(g.id, updated);
-      setGame(updated);
-      return;
-    }
-    const [drawn, ...boneyard] = g.boneyard;
-    const players = g.players.map((p, i) => i === hostIndex ? { ...p, hand: [...p.hand, drawn] } : p);
-    const updated = { ...g, boneyard, players, lastAction: { type: 'draw', player: 'Host' } };
-    await base44.entities.TXDGame.update(g.id, updated);
-    setGame(updated);
+  const copyJoinLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}/games/txd?room=${game.room_code}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   // ── Landing ────────────────────────────────────────────────────────────────
@@ -252,18 +213,47 @@ export default function TXDHostPanel() {
     return (
       <div className="min-h-screen bg-midnight-void">
         <Header />
-        <div className="max-w-md mx-auto px-4 py-16">
-          <h1 className="text-4xl font-heading text-outlaw-gold tracking-widest text-center mb-2">TXD HOST PANEL</h1>
-          <p className="text-white/40 text-center font-body text-sm mb-10">Texas Dominoes</p>
-          <div className="space-y-4">
+        <div className="max-w-lg mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="text-center mb-10">
+            <div className="inline-block px-3 py-1 rounded bg-cyber-purple/20 border border-cyber-purple/40 text-cyber-purple text-[9px] tracking-widest uppercase mb-3" style={PS2}>
+              🎛 HOST CONTROL
+            </div>
+            <h1 className="text-5xl font-heading text-outlaw-gold tracking-widest mb-1">TXD DOMINOES</h1>
+            <p className="text-white/40 font-body text-sm">Texas Dominoes — Game Master Dashboard</p>
+          </div>
+
+          {/* Score limit */}
+          <div className="p-4 rounded-xl border border-cyber-purple/30 bg-black/40 mb-6">
+            <label className="text-[9px] text-white/40 uppercase tracking-widest font-body block mb-2" style={PS2}>Score Limit (Points to Win)</label>
+            <div className="flex gap-2">
+              {[50, 100, 150, 200].map(v => (
+                <button key={v} onClick={() => setScoreLimit(v)}
+                  className={`flex-1 py-2 rounded-lg font-heading text-sm tracking-widest transition-all
+                    ${scoreLimit === v ? 'bg-cyber-purple text-white' : 'border border-white/20 text-white/50 hover:border-cyber-purple/60'}`}>
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-3">
             <button onClick={createRoom} disabled={loading}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-cyber-purple to-purple-800 text-white font-heading text-lg tracking-widest uppercase hover:opacity-90 transition-all disabled:opacity-50">
+              className="w-full py-4 rounded-xl font-heading text-xl tracking-widest uppercase transition-all disabled:opacity-50 hover:opacity-90"
+              style={{ background: 'linear-gradient(135deg, #BC13FE, #7c3aed)', color: 'white', boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}>
               {loading ? '⚙ Creating…' : '⚡ CREATE NEW ROOM'}
             </button>
+
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 h-px bg-white/10" />
+              <span className="text-white/30 text-xs font-body">or join existing</span>
+              <div className="flex-1 h-px bg-white/10" />
+            </div>
+
             <div className="flex gap-2">
               <input value={roomCodeInput} onChange={e => setRoomCodeInput(e.target.value.toUpperCase())}
-                placeholder="EXISTING ROOM CODE" maxLength={8}
-                className="flex-1 px-4 py-3 rounded-lg bg-black/60 border-2 border-cyber-purple/50 text-white font-mono uppercase tracking-widest focus:outline-none focus:border-outlaw-gold"
+                placeholder="ROOM CODE" maxLength={8}
+                className="flex-1 px-4 py-3 rounded-lg bg-black/60 border-2 border-cyber-purple/40 text-white font-mono uppercase tracking-widest text-lg focus:outline-none focus:border-outlaw-gold"
                 onKeyDown={e => e.key === 'Enter' && joinRoom()}
               />
               <button onClick={joinRoom} disabled={!roomCodeInput.trim() || loading}
@@ -272,176 +262,201 @@ export default function TXDHostPanel() {
               </button>
             </div>
           </div>
+
           {feedback && <p className="mt-4 text-center text-red-400 text-sm font-body">{feedback.msg}</p>}
         </div>
       </div>
     );
   }
 
+  // ── Active Dashboard ────────────────────────────────────────────────────────
+  const currentPlayer = game.players?.[game.currentPlayerIndex];
   const gameOver = game.players?.some(p => (p.score || 0) >= (game.scoreLimit || 100));
   const gameWinner = gameOver ? [...game.players].sort((a, b) => (b.score || 0) - (a.score || 0))[0] : null;
 
   return (
-    <div className="min-h-screen bg-midnight-void text-white flex flex-col">
+    <div className="min-h-screen bg-midnight-void text-white">
       <Header />
 
-      {/* Scoreboard */}
-      <div className="border-b border-cyber-purple/30 bg-black/50 px-4 py-2">
-        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-2">
+      {/* Top bar */}
+      <div className="border-b border-cyber-purple/40 bg-black/70 px-4 py-3 sticky top-16 z-40">
+        <div className="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-heading text-outlaw-gold tracking-widest">TXD HOST</span>
-            <span className="px-2 py-0.5 rounded bg-cyber-purple/20 border border-cyber-purple/40 text-cyber-purple font-mono text-xs tracking-widest">{game.room_code}</span>
-            <span className="text-white/30 text-xs font-body">Round {game.roundNumber || 1}</span>
-            <span className={`text-xs font-body px-1.5 py-0.5 rounded ${game.phase === 'playing' ? 'text-emerald-400 bg-emerald-900/30' : 'text-white/40 bg-white/5'}`}>
-              {game.phase?.replace('_', ' ').toUpperCase()}
+            <span className="text-[9px] px-2 py-1 rounded bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple tracking-widest uppercase" style={PS2}>🎛 HOST</span>
+            <span className="font-mono text-outlaw-gold text-xl font-bold tracking-widest">{game.room_code}</span>
+            <span className={`text-[9px] px-2 py-0.5 rounded uppercase tracking-widest font-body
+              ${game.phase === 'playing' ? 'bg-emerald-900/40 text-emerald-400 border border-emerald-600/30'
+              : game.phase === 'round_over' ? 'bg-outlaw-gold/20 text-outlaw-gold border border-outlaw-gold/30'
+              : 'bg-white/5 text-white/40 border border-white/10'}`} style={PS2}>
+              {game.phase?.replace('_', ' ')}
             </span>
+            <span className="text-white/30 text-xs font-body">Round {game.roundNumber || 1}</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {game.players?.map((p, i) => (
-              <div key={p.playerId}
-                className={`flex items-center gap-1.5 px-2 py-1 rounded text-xs font-body
-                  ${game.currentPlayerIndex === i && game.phase === 'playing' ? 'bg-cyber-purple/20 border border-cyber-purple/60' : 'bg-white/5 text-white/60'}`}>
-                {p.isAI && '🤖'}{p.isHost && '👑'}
-                <span className={p.playerId === hostPlayerId ? 'text-outlaw-gold font-bold' : ''}>{p.playerName}</span>
-                <span className="text-emerald-400 font-mono font-bold">{p.score || 0}</span>
-                <span className="text-white/30">({p.hand?.length ?? 0})</span>
+          <div className="flex items-center gap-2">
+            <button onClick={copyJoinLink}
+              className="px-3 py-1.5 rounded-lg border border-outlaw-gold/50 text-outlaw-gold text-xs font-heading tracking-wider hover:bg-outlaw-gold/10 transition-all">
+              {copied ? '✓ COPIED!' : '📋 COPY JOIN LINK'}
+            </button>
+            <button onClick={() => setGame(null)}
+              className="px-3 py-1.5 rounded-lg border border-white/20 text-white/40 text-xs font-heading hover:border-white/40 transition-all">
+              ✕ CLOSE ROOM
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
+
+        {/* ── Board Overview (Spectator) ── */}
+        <div className="rounded-xl border border-cyber-purple/30 bg-black/50 overflow-hidden">
+          <div className="px-4 py-2 border-b border-cyber-purple/20 flex items-center justify-between">
+            <h2 className="font-heading text-xs tracking-widest text-cyber-purple uppercase">🁢 Live Board</h2>
+            <div className="text-xs text-white/30 font-body">
+              Ends: <span className="text-white font-mono">{game.leftEnd ?? '—'}</span>
+              <span className="mx-2">↔</span>
+              <span className="text-white font-mono">{game.rightEnd ?? '—'}</span>
+              <span className="ml-4">Boneyard: <span className="text-white font-mono">{game.boneyard?.length || 0}</span></span>
+            </div>
+          </div>
+          <div className="min-h-[100px] max-h-[180px] overflow-hidden relative">
+            <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+            {game.board?.length === 0 && game.phase === 'waiting' && (
+              <div className="absolute inset-0 flex items-center justify-center text-white/20 font-body text-sm">
+                Board is empty — start the game to deal tiles
               </div>
-            ))}
+            )}
           </div>
-          <div className="text-xs text-white/30 font-body hidden sm:block">
-            Boneyard: {game.boneyard?.length || 0} | Ends: {game.leftEnd ?? '?'} — {game.rightEnd ?? '?'}
-          </div>
-        </div>
-      </div>
-
-      {/* Board */}
-      <div className="border-b border-cyber-purple/20 bg-black/20 min-h-[120px] max-h-[200px] overflow-hidden relative">
-        <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
-        {game.lastAction && (
-          <span className="absolute bottom-1 right-3 text-[10px] text-white/25 font-body italic">
-            {game.lastAction.player} {game.lastAction.type === 'play' ? 'played' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
-          </span>
-        )}
-      </div>
-
-      {/* Host hand */}
-      <div className="px-4 py-4 bg-black/40 border-b border-cyber-purple/20">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-sm font-body">
-            {game.phase === 'waiting'
-              ? <span className="text-white/40">Start the game to deal tiles</span>
-              : isMyTurn
-              ? <span className="text-emerald-400 font-bold tracking-wider">▶ YOUR TURN</span>
-              : <span className="text-white/50">{currentPlayer?.playerName}'s turn</span>}
-          </div>
-          <span className="text-xs text-white/30 font-mono">{myHand.length} tiles</span>
-        </div>
-
-        <div className="flex flex-wrap gap-2 justify-center mb-4">
-          {myHand.map(d => (
-            <TXDDomino key={d.id} top={d.top} bottom={d.bottom} width={HAND_TILE_W}
-              playable={isMyTurn && playableIds.has(d.id)}
-              selected={selectedDomino?.id === d.id}
-              onClick={() => {
-                if (!isMyTurn) return;
-                if (!playableIds.has(d.id)) { flash("Doesn't fit right now", 'error'); return; }
-                setSelectedDomino(prev => prev?.id === d.id ? null : d);
-              }} />
-          ))}
-          {myHand.length === 0 && game.phase !== 'waiting' && (
-            <div className="text-white/30 font-body text-sm py-4">No tiles in hand</div>
+          {game.lastAction && (
+            <div className="px-4 py-1.5 border-t border-white/5 text-xs text-white/30 font-body italic">
+              Last: <span className="text-white/50">{game.lastAction.player}</span> {game.lastAction.type === 'play' ? 'played a tile' : game.lastAction.type === 'draw' ? 'drew from boneyard' : 'passed turn'}
+            </div>
           )}
         </div>
 
-        {isMyTurn && (
-          <div className="flex flex-wrap gap-2 justify-center">
-            {selectedDomino && game.board?.length === 0 && (
-              <button onClick={() => doPlay('first')} className="px-6 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-heading text-sm">PLAY DOMINO</button>
-            )}
-            {selectedDomino && (game.board?.length || 0) > 0 && (() => {
-              const side = getPlaySide(selectedDomino, game.leftEnd, game.rightEnd);
-              if (!side) return <span className="text-red-400 text-xs font-body">Doesn't fit</span>;
-              if (side === 'both') return (
-                <>
-                  <button onClick={() => doPlay('left')} className="px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-heading text-sm">PLAY LEFT ({game.leftEnd})</button>
-                  <button onClick={() => doPlay('right')} className="px-4 py-2.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-heading text-sm">PLAY RIGHT ({game.rightEnd})</button>
-                </>
-              );
-              return <button onClick={() => doPlay(side)} className="px-6 py-2.5 rounded-lg bg-emerald-600 text-white font-heading text-sm">
-                PLAY {side.toUpperCase()} ({side === 'left' ? game.leftEnd : game.rightEnd})
-              </button>;
-            })()}
-            {!selectedDomino && (
-              <button onClick={doDraw} className="px-6 py-2.5 rounded-lg bg-cyber-purple/70 hover:bg-cyber-purple text-white font-heading tracking-wider text-sm">
-                {(game.boneyard?.length || 0) > 0 ? `DRAW (${game.boneyard.length})` : 'PASS TURN'}
-              </button>
-            )}
-            {selectedDomino && (
-              <button onClick={() => setSelectedDomino(null)} className="px-4 py-2.5 rounded-lg border border-white/20 text-white/50 font-heading text-sm">CANCEL</button>
-            )}
+        {/* ── Player Seats ── */}
+        <div className="rounded-xl border border-cyber-purple/30 bg-black/50">
+          <div className="px-4 py-3 border-b border-cyber-purple/20 flex items-center justify-between">
+            <h2 className="font-heading text-xs tracking-widest text-cyber-purple uppercase">👥 Players ({game.players?.length || 0}/4)</h2>
+            <div className="flex gap-2">
+              <Btn onClick={addCPU} color="#BC13FE" disabled={(game.players?.length || 0) >= 4}>+ ADD CPU</Btn>
+              <Btn onClick={removeCPU} color="#ffffff">− REMOVE CPU</Btn>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Host Controls */}
-      <div className="border-t border-cyber-purple/30 bg-black/60">
-        <button onClick={() => setControlsOpen(!controlsOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 text-white/60 hover:text-white font-heading tracking-wider text-sm">
-          <span>🎛 HOST CONTROLS</span>
-          <span>{controlsOpen ? '▲' : '▼'}</span>
-        </button>
-
-        {controlsOpen && (
-          <div className="px-4 pb-4 space-y-3">
-            {/* Override turn */}
-            <div>
-              <p className="text-white/30 text-[10px] font-body uppercase tracking-widest mb-1.5">Override Turn</p>
-              <div className="flex flex-wrap gap-2">
-                {game.players?.map((p, i) => (
-                  <button key={p.playerId} onClick={() => overrideTurn(i)}
-                    className={`px-3 py-1.5 rounded text-xs font-body transition-all
-                      ${game.currentPlayerIndex === i ? 'bg-cyber-purple text-white' : 'border border-white/20 text-white/50 hover:border-white/40'}`}>
-                    {p.isAI ? '🤖 ' : ''}{p.playerName}
-                  </button>
-                ))}
+          <div className="p-4">
+            {game.players?.length === 0 ? (
+              <div className="text-center py-6 text-white/30 font-body text-sm">
+                No players yet. Share the join link below to invite players, or add CPU opponents.
               </div>
-            </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {game.players.map((p, i) => {
+                  const isActive = game.currentPlayerIndex === i && game.phase === 'playing';
+                  return (
+                    <div key={p.playerId}
+                      className={`flex items-center justify-between p-3 rounded-xl border transition-all
+                        ${isActive ? 'border-emerald-500/60 bg-emerald-900/10' : 'border-white/10 bg-white/3'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold
+                          ${isActive ? 'bg-emerald-600' : p.isAI ? 'bg-cyber-purple/40' : 'bg-white/10'}`}>
+                          {isActive ? '▶' : p.isAI ? '🤖' : p.playerName?.charAt(0)?.toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-body text-sm font-medium">{p.playerName}</div>
+                          <div className="text-xs text-white/40 font-body">
+                            {p.isAI ? 'CPU' : 'Human'} · {p.hand?.length ?? 0} tiles · {p.score || 0} pts
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isActive && <span className="text-[9px] text-emerald-400 font-body uppercase tracking-widest">TURN</span>}
+                        <button onClick={() => overrideTurn(i)}
+                          className="px-2 py-1 rounded border border-white/20 text-white/40 text-xs font-heading hover:border-cyber-purple/60 hover:text-cyber-purple transition-all"
+                          title="Force turn to this player">
+                          FORCE
+                        </button>
+                        {!p.isAI && (
+                          <button onClick={() => kickPlayer(p.playerId)}
+                            className="px-2 py-1 rounded border border-red-500/30 text-red-400 text-xs font-heading hover:bg-red-500/10 transition-all">
+                            KICK
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
-            {/* Action buttons */}
-            <div className="flex flex-wrap gap-2">
-              {game.phase === 'waiting' && (
-                <button onClick={startGame} className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-heading text-sm tracking-wider">
-                  ▶ START GAME
-                </button>
-              )}
-              {game.phase === 'round_over' && (
-                <button onClick={startNextRound} className="px-4 py-2 rounded-lg bg-outlaw-gold text-black font-heading text-sm tracking-wider">
-                  NEXT ROUND
-                </button>
-              )}
-              <button onClick={addCPU} disabled={(game.players?.length || 0) >= 4}
-                className="px-4 py-2 rounded-lg border border-cyber-purple/50 text-cyber-purple hover:bg-cyber-purple/20 font-heading text-sm tracking-wider disabled:opacity-30">
-                + ADD CPU
-              </button>
-              <button onClick={removeCPU}
-                className="px-4 py-2 rounded-lg border border-white/20 text-white/50 hover:border-white/40 font-heading text-sm tracking-wider">
-                − REMOVE CPU
-              </button>
-              <button onClick={resetRound}
-                className="px-4 py-2 rounded-lg border border-kinetic-orange/50 text-kinetic-orange hover:bg-kinetic-orange/10 font-heading text-sm tracking-wider">
-                ↺ RESET ROUND
-              </button>
-            </div>
-
-            {/* Player link */}
-            <div className="p-3 rounded-lg bg-white/5 border border-white/10">
-              <p className="text-white/30 text-[10px] font-body uppercase tracking-widest mb-1">Player Join Link</p>
-              <p className="text-outlaw-gold font-mono text-xs break-all select-all">
-                {window.location.origin}/games/txd?room={game.room_code}
-              </p>
+        {/* ── Scoreboard ── */}
+        <div className="rounded-xl border border-outlaw-gold/30 bg-black/50">
+          <div className="px-4 py-3 border-b border-outlaw-gold/20 flex items-center justify-between">
+            <h2 className="font-heading text-xs tracking-widest text-outlaw-gold uppercase">🏆 Scoreboard</h2>
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-white/30 font-body">Limit: <span className="text-outlaw-gold font-mono">{game.scoreLimit || 100}</span> pts</span>
+              <Btn onClick={resetScores} color="#ef4444">RESET SCORES</Btn>
             </div>
           </div>
-        )}
+          <div className="p-4">
+            <div className="space-y-2">
+              {[...game.players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => {
+                const pct = Math.min(100, ((p.score || 0) / (game.scoreLimit || 100)) * 100);
+                return (
+                  <div key={p.playerId} className="flex items-center gap-3">
+                    <span className="text-white/40 text-xs w-4 font-mono">{i + 1}.</span>
+                    <span className="font-body text-sm w-24 truncate">{p.isAI ? '🤖 ' : ''}{p.playerName}</span>
+                    <div className="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-cyber-purple to-outlaw-gold rounded-full transition-all"
+                        style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-outlaw-gold font-mono font-bold text-sm w-16 text-right">{p.score || 0} pts</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* ── Game Controls ── */}
+        <div className="rounded-xl border border-white/10 bg-black/50">
+          <div className="px-4 py-3 border-b border-white/10">
+            <h2 className="font-heading text-xs tracking-widest text-white/50 uppercase">🎛 Game Controls</h2>
+          </div>
+          <div className="p-4 flex flex-wrap gap-3">
+            {game.phase === 'waiting' && (
+              <button onClick={startGame} disabled={(game.players?.length || 0) < 2}
+                className="px-6 py-3 rounded-xl font-heading text-base tracking-widest uppercase disabled:opacity-40 hover:opacity-90 transition-all"
+                style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', boxShadow: '0 0 15px rgba(22,163,74,0.4)' }}>
+                ▶ START GAME
+              </button>
+            )}
+            {game.phase === 'round_over' && (
+              <button onClick={startNextRound}
+                className="px-6 py-3 rounded-xl font-heading text-base tracking-widest uppercase hover:opacity-90 transition-all"
+                style={{ background: '#FFD700', color: 'black', boxShadow: '0 0 15px rgba(255,215,0,0.4)' }}>
+                ▶ NEXT ROUND
+              </button>
+            )}
+            <Btn onClick={resetRound} color="#FF5F1F">↺ RESET ROUND</Btn>
+            <Btn onClick={resetScores} color="#ef4444">RESET SCORES</Btn>
+          </div>
+        </div>
+
+        {/* ── Join Link ── */}
+        <div className="rounded-xl border border-cyber-purple/20 bg-black/30 p-4">
+          <p className="text-[9px] text-white/30 uppercase tracking-widest font-body mb-2" style={PS2}>Player Join Link</p>
+          <div className="flex gap-3 items-center">
+            <code className="flex-1 text-outlaw-gold font-mono text-xs break-all bg-black/40 px-3 py-2 rounded border border-white/10">
+              {window.location.origin}/games/txd?room={game.room_code}
+            </code>
+            <button onClick={copyJoinLink}
+              className="px-4 py-2 rounded-lg border-2 border-outlaw-gold text-outlaw-gold font-heading text-sm tracking-wider hover:bg-outlaw-gold/10 transition-all whitespace-nowrap">
+              {copied ? '✓ DONE' : 'COPY'}
+            </button>
+          </div>
+        </div>
+
       </div>
 
       {/* Feedback */}
@@ -452,41 +467,48 @@ export default function TXDHostPanel() {
         </div>
       )}
 
-      {/* Round Over */}
+      {/* Round Over Modal */}
       {game.phase === 'round_over' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="max-w-sm w-full border-2 border-outlaw-gold rounded-2xl p-6 bg-black text-center"
-            style={{ boxShadow: '0 0 30px rgba(255,215,0,0.4)' }}>
+            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
             <h2 className="text-3xl font-heading text-outlaw-gold mb-2">ROUND OVER!</h2>
-            {game.roundWinner && <p className="text-white/70 font-body mb-4">{game.roundWinner.playerName} wins +{game.roundWinner.points} pts</p>}
-            <div className="space-y-1 mb-6">
-              {[...game.players].sort((a, b) => (b.score || 0) - (a.score || 0)).map(p => (
-                <div key={p.playerId} className="flex justify-between text-sm font-body px-4">
-                  <span>{p.isAI ? '🤖 ' : ''}{p.playerName}</span>
-                  <span className="text-outlaw-gold font-mono font-bold">{p.score || 0}</span>
+            {game.roundWinner && <p className="text-white/70 font-body mb-5">{game.roundWinner.playerName} wins +{game.roundWinner.points} pts</p>}
+            <div className="space-y-2 mb-6">
+              {[...game.players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
+                <div key={p.playerId} className="flex justify-between items-center font-body px-4 py-1.5 rounded-lg bg-white/5">
+                  <span className="text-sm">{i === 0 ? '🥇 ' : ''}{p.isAI ? '🤖 ' : ''}{p.playerName}</span>
+                  <span className="text-outlaw-gold font-mono font-bold">{p.score || 0} pts</span>
                 </div>
               ))}
             </div>
-            <button onClick={startNextRound} className="w-full py-2.5 rounded-lg bg-outlaw-gold text-black font-heading tracking-wider">NEXT ROUND</button>
+            <button onClick={startNextRound}
+              className="w-full py-3 rounded-xl font-heading tracking-widest uppercase text-black text-lg"
+              style={{ background: '#FFD700', boxShadow: '0 0 15px rgba(255,215,0,0.4)' }}>
+              START NEXT ROUND
+            </button>
           </div>
         </div>
       )}
 
-      {/* Game Over */}
-      {(gameOver || game.phase === 'game_over') && game.phase !== 'round_over' && (
+      {/* Game Over Modal */}
+      {gameOver && game.phase !== 'round_over' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="max-w-sm w-full border-2 border-outlaw-gold rounded-2xl p-6 bg-black text-center">
-            <h2 className="text-4xl font-heading text-outlaw-gold mb-4">GAME OVER!</h2>
-            <p className="text-2xl font-heading text-white mb-4">🏆 {gameWinner?.playerName} WINS!</p>
-            <div className="space-y-1 mb-6">
+            <h2 className="text-4xl font-heading text-outlaw-gold mb-2">GAME OVER!</h2>
+            <p className="text-2xl font-heading text-white mb-5">🏆 {gameWinner?.playerName} WINS!</p>
+            <div className="space-y-2 mb-6">
               {[...game.players].sort((a, b) => (b.score || 0) - (a.score || 0)).map((p, i) => (
-                <div key={p.playerId} className="flex justify-between text-sm font-body px-4">
-                  <span>{i === 0 ? '👑 ' : ''}{p.isAI ? '🤖 ' : ''}{p.playerName}</span>
-                  <span className="text-outlaw-gold font-mono font-bold">{p.score || 0}</span>
+                <div key={p.playerId} className="flex justify-between font-body px-4 py-1.5 rounded-lg bg-white/5">
+                  <span className="text-sm">{i === 0 ? '👑 ' : ''}{p.isAI ? '🤖 ' : ''}{p.playerName}</span>
+                  <span className="text-outlaw-gold font-mono font-bold">{p.score || 0} pts</span>
                 </div>
               ))}
             </div>
-            <button onClick={() => setGame(null)} className="w-full py-2.5 rounded-lg border border-white/30 text-white font-heading hover:bg-white/10">NEW GAME</button>
+            <button onClick={() => setGame(null)}
+              className="w-full py-2.5 rounded-lg border border-white/30 text-white font-heading hover:bg-white/10 transition-all">
+              NEW GAME
+            </button>
           </div>
         </div>
       )}
