@@ -1,119 +1,88 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
 
 const SPECIAL_TILES = {
-  'gold-bean': { icon: '🫘', bg: 'bg-gradient-to-br from-yellow-600 to-yellow-400', border: 'border-yellow-300', glow: 'shadow-[0_0_15px_rgba(255,215,0,0.6)]', bonus: 50 },
-  'diamond': { icon: '💎', bg: 'bg-gradient-to-br from-blue-600 to-cyan-400', border: 'border-cyan-300', glow: 'shadow-[0_0_15px_rgba(0,255,255,0.6)]', bonus: 100 },
-  'dexter': { icon: '🤠', bg: 'bg-gradient-to-br from-red-600 to-orange-500', border: 'border-orange-400', glow: 'shadow-[0_0_15px_rgba(255,100,0,0.6)]', steal: 25 },
-  'frog': { icon: '🐸', bg: 'bg-gradient-to-br from-green-600 to-emerald-400', border: 'border-emerald-400', glow: 'shadow-[0_0_15px_rgba(0,255,100,0.6)]', event: true },
-  'microphone': { icon: '🎤', bg: 'bg-gradient-to-br from-pink-600 to-purple-500', border: 'border-purple-400', glow: 'shadow-[0_0_15px_rgba(255,0,255,0.6)]', double: true },
-  'texas-flag': { icon: '🤠', bg: 'bg-gradient-to-br from-blue-700 to-blue-500', border: 'border-blue-300', glow: 'shadow-[0_0_15px_rgba(0,100,255,0.6)]', team: true },
+  'gold-bean': { icon: '🫘', bonus: 50 },
+  diamond: { icon: '💎', bonus: 100 },
+  dexter: { icon: '🤠', steal: 25 },
+  frog: { icon: '🐸', event: true },
+  microphone: { icon: '🎤', double: true },
+  'texas-flag': { icon: '🏴', team: true },
 };
 
-export default function WordBoard({ 
-  board, 
-  boardSize, 
-  selectedCells, 
-  onCellSelect, 
+export default function WordBoard({
+  board,
+  boardSize,
+  selectedCells,
+  onCellSelect,
   onSelectionComplete,
   disabled = false,
-  animatingCells = []
+  animatingCells = [],
 }) {
   const [isDragging, setIsDragging] = useState(false);
   const boardRef = useRef(null);
 
-  const isSelected = useCallback((row, col) => {
-    return selectedCells.some(c => c.row === row && c.col === col);
-  }, [selectedCells]);
+  const isSelected = useCallback(
+    (row, col) => selectedCells.some(c => c.row === row && c.col === col),
+    [selectedCells]
+  );
 
-  const isAnimating = useCallback((row, col) => {
-    return animatingCells.some(c => c.row === row && c.col === col);
-  }, [animatingCells]);
+  const isAnimating = useCallback(
+    (row, col) => animatingCells.some(c => c.row === row && c.col === col),
+    [animatingCells]
+  );
 
-  const handleMouseDown = useCallback((row, col, e) => {
+  const startDrag = useCallback((row, col, e) => {
     if (disabled) return;
     e.preventDefault();
     setIsDragging(true);
     onCellSelect(row, col);
   }, [disabled, onCellSelect]);
 
-  const handleMouseEnter = useCallback((row, col) => {
+  const enterCell = useCallback((row, col) => {
     if (disabled || !isDragging) return;
     onCellSelect(row, col);
   }, [disabled, isDragging, onCellSelect]);
 
-  const handleMouseUp = useCallback(() => {
-    if (isDragging) {
-      setIsDragging(false);
-      onSelectionComplete?.();
-    }
+  const endDrag = useCallback(() => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    onSelectionComplete?.();
   }, [isDragging, onSelectionComplete]);
-
-  const handleTouchStart = useCallback((row, col, e) => {
-    if (disabled) return;
-    e.preventDefault();
-    setIsDragging(true);
-    onCellSelect(row, col);
-  }, [disabled, onCellSelect]);
 
   const handleTouchMove = useCallback((e) => {
     if (disabled || !isDragging) return;
     e.preventDefault();
-    
+
     const touch = e.touches[0];
     const element = document.elementFromPoint(touch.clientX, touch.clientY);
-    
-    if (element && element.dataset.row && element.dataset.col) {
-      const row = parseInt(element.dataset.row);
-      const col = parseInt(element.dataset.col);
-      
-      if (!isNaN(row) && !isNaN(col)) {
-        const alreadySelected = selectedCells.some(c => c.row === row && c.col === col);
-        if (!alreadySelected) {
-          onCellSelect(row, col);
-        }
-      }
-    }
-  }, [disabled, isDragging, selectedCells, onCellSelect]);
+    const tile = element?.closest?.('[data-row][data-col]');
 
-  const handleTouchEnd = useCallback((e) => {
-    if (isDragging) {
-      setIsDragging(false);
-      onSelectionComplete?.();
-    }
-  }, [isDragging, onSelectionComplete]);
+    if (!tile) return;
 
-  // Global mouse up handler
+    const row = Number(tile.dataset.row);
+    const col = Number(tile.dataset.col);
+
+    if (!Number.isNaN(row) && !Number.isNaN(col)) {
+      onCellSelect(row, col);
+    }
+  }, [disabled, isDragging, onCellSelect]);
+
   useEffect(() => {
-    const handleGlobalMouseUp = () => {
-      if (isDragging) {
-        setIsDragging(false);
-        onSelectionComplete?.();
-      }
-    };
-
-    document.addEventListener('mouseup', handleGlobalMouseUp);
-    return () => document.removeEventListener('mouseup', handleGlobalMouseUp);
-  }, [isDragging, onSelectionComplete]);
+    document.addEventListener('mouseup', endDrag);
+    return () => document.removeEventListener('mouseup', endDrag);
+  }, [endDrag]);
 
   return (
-    <div 
-      ref={boardRef}
-      className="relative touch-none select-none"
-      onMouseLeave={() => {
-        if (isDragging) {
-          setIsDragging(false);
-          onSelectionComplete?.();
-        }
-      }}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      style={{ touchAction: 'none' }}
-    >
-      <div 
-        className="grid gap-1.5 mx-auto"
-        style={{ 
+    <div className="ww-rope-frame">
+      <div
+        ref={boardRef}
+        className="ww-board-grid"
+        onMouseLeave={endDrag}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={endDrag}
+        style={{
           gridTemplateColumns: `repeat(${boardSize}, minmax(0, 1fr))`,
-          maxWidth: boardSize <= 6 ? '280px' : boardSize <= 8 ? '360px' : '420px',
+          touchAction: 'none',
         }}
       >
         {board.map((row, rowIndex) =>
@@ -121,81 +90,170 @@ export default function WordBoard({
             const selected = isSelected(rowIndex, colIndex);
             const animating = isAnimating(rowIndex, colIndex);
             const specialTile = cell.specialType ? SPECIAL_TILES[cell.specialType] : null;
-            
+
             return (
-              <div
+              <button
                 key={`${rowIndex}-${colIndex}`}
                 data-row={rowIndex}
                 data-col={colIndex}
-                onMouseDown={(e) => handleMouseDown(rowIndex, colIndex, e)}
-                onMouseEnter={() => handleMouseEnter(rowIndex, colIndex)}
-                onTouchStart={(e) => handleTouchStart(rowIndex, colIndex, e)}
-                className={`
-                  aspect-square rounded-lg md:rounded-xl flex items-center justify-center
-                  text-xl md:text-2xl font-bold cursor-pointer
-                  transition-all duration-100
-                  relative overflow-hidden
-                  ${selected 
-                    ? 'bg-gradient-to-br from-cyber-purple to-purple-700 border-2 border-purple-400 scale-105 z-10' 
-                    : specialTile
-                      ? `${specialTile.bg} ${specialTile.border} border-2 ${specialTile.glow}`
-                      : 'bg-gradient-to-br from-orange-500 to-orange-600 border-2 border-orange-400/50'
-                  }
-                  ${disabled ? 'cursor-not-allowed opacity-60' : 'hover:scale-105 active:scale-95'}
-                  ${animating ? 'animate-pulse' : ''}
-                `}
-                style={{
-                  boxShadow: selected 
-                    ? '0 0 20px rgba(188, 19, 254, 0.8), inset 0 0 10px rgba(188, 19, 254, 0.3)' 
-                    : '0 4px 6px rgba(0,0,0,0.3), inset 0 2px 4px rgba(255,255,255,0.2)',
-                }}
+                type="button"
+                disabled={disabled}
+                onMouseDown={(e) => startDrag(rowIndex, colIndex, e)}
+                onMouseEnter={() => enterCell(rowIndex, colIndex)}
+                onTouchStart={(e) => startDrag(rowIndex, colIndex, e)}
+                className={[
+                  'ww-letter-tile',
+                  selected ? 'ww-selected' : '',
+                  animating ? 'ww-animating' : '',
+                  specialTile ? 'ww-special' : '',
+                ].join(' ')}
               >
-                {/* Shine effect */}
-                <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                  <div 
-                    className={`absolute w-full h-full opacity-30 ${
-                      selected ? 'bg-gradient-to-br from-purple-300/40 to-transparent' : 'bg-gradient-to-br from-white/30 to-transparent'
-                    }`}
-                    style={{
-                      transform: 'translateX(-100%)',
-                      animation: selected ? 'none' : 'shine 3s ease-in-out infinite',
-                    }}
-                  />
-                </div>
-                
-                {/* Letter */}
-                <span 
-                  className={`drop-shadow-md relative z-10 ${
-                    selected ? 'text-outlaw-gold' : 'text-emerald-300'
-                  }`}
-                  style={{
-                    textShadow: selected 
-                      ? '0 0 10px #FFD700, 0 0 20px #FFD700' 
-                      : '0 0 5px rgba(16, 185, 129, 0.5)',
-                    fontFamily: "'Teko', sans-serif",
-                    fontWeight: '700',
-                  }}
-                >
-                  {cell.letter}
-                </span>
-                
-                {/* Special tile icon */}
-                {specialTile && (
-                  <span className="absolute top-0.5 right-0.5 text-[8px] z-20">
-                    {specialTile.icon}
-                  </span>
-                )}
-              </div>
+                <span className="ww-letter">{cell.letter}</span>
+                {specialTile && <span className="ww-special-icon">{specialTile.icon}</span>}
+              </button>
             );
           })
         )}
       </div>
-      
-      {/* CSS for shine animation */}
+
       <style>{`
-        @keyframes shine {
-          0% { transform: translateX(-100%) skewX(-15deg); }
-          50%, 100% { transform: translateX(100%) skewX(-15deg); }
+        .ww-rope-frame {
+          position: relative;
+          padding: clamp(18px, 3vw, 32px);
+          border-radius: 34px;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(255,122,0,.18), transparent 68%),
+            linear-gradient(135deg, rgba(20, 8, 35, .95), rgba(5, 2, 15, .98));
+          box-shadow:
+            0 0 30px rgba(255, 122, 0, .35),
+            0 0 60px rgba(188, 19, 254, .28);
+          isolation: isolate;
+        }
+
+        .ww-rope-frame::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          border-radius: 34px;
+          padding: 14px;
+          background:
+            repeating-linear-gradient(
+              45deg,
+              #5a3518 0px,
+              #c58a3a 8px,
+              #f4cf7a 14px,
+              #8a541f 22px,
+              #3b220f 30px
+            );
+          -webkit-mask:
+            linear-gradient(#000 0 0) content-box,
+            linear-gradient(#000 0 0);
+          -webkit-mask-composite: xor;
+          mask-composite: exclude;
+          box-shadow:
+            inset 0 0 14px rgba(0,0,0,.75),
+            0 0 20px rgba(255, 190, 72, .55);
+          z-index: -1;
+        }
+
+        .ww-rope-frame::after {
+          content: "";
+          position: absolute;
+          inset: -8px;
+          border-radius: 42px;
+          pointer-events: none;
+          background:
+            radial-gradient(circle at 15% 0%, rgba(255, 210, 40, .9), transparent 10%),
+            radial-gradient(circle at 45% 100%, rgba(255, 80, 0, .8), transparent 12%),
+            radial-gradient(circle at 88% 12%, rgba(255, 170, 0, .85), transparent 10%),
+            radial-gradient(circle at 10% 78%, rgba(255, 40, 0, .75), transparent 11%),
+            radial-gradient(circle at 72% 92%, rgba(188, 19, 254, .45), transparent 12%);
+          filter: blur(8px);
+          opacity: .9;
+          animation: wwFireFlicker .8s infinite alternate;
+          z-index: -2;
+        }
+
+        .ww-board-grid {
+          display: grid;
+          gap: clamp(5px, 1vw, 9px);
+          position: relative;
+          z-index: 1;
+        }
+
+        .ww-letter-tile {
+          aspect-ratio: 1 / 1;
+          border-radius: 14px;
+          border: 2px solid rgba(255, 170, 60, .8);
+          background:
+            linear-gradient(135deg, #ff9f1c, #ff6b00 50%, #b54800);
+          color: #00ff99;
+          font-weight: 900;
+          font-size: clamp(1rem, 3vw, 1.65rem);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          overflow: hidden;
+          cursor: pointer;
+          box-shadow:
+            inset 0 2px 4px rgba(255,255,255,.35),
+            inset 0 -5px 10px rgba(0,0,0,.35),
+            0 6px 10px rgba(0,0,0,.4);
+          transition: transform .1s ease, box-shadow .1s ease, background .1s ease;
+        }
+
+        .ww-letter-tile::before {
+          content: "";
+          position: absolute;
+          inset: -40%;
+          background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,.55), transparent 65%);
+          transform: translateX(-70%) rotate(20deg);
+          animation: wwGemShine 2.8s infinite;
+        }
+
+        .ww-letter-tile:hover {
+          transform: scale(1.05);
+        }
+
+        .ww-selected {
+          background: linear-gradient(135deg, #bc13fe, #6d1bb3);
+          border-color: #ffd700;
+          color: #ffd700;
+          transform: scale(1.07);
+          box-shadow:
+            0 0 22px rgba(188, 19, 254, .95),
+            0 0 16px rgba(255, 215, 0, .7),
+            inset 0 0 14px rgba(255,255,255,.25);
+          z-index: 3;
+        }
+
+        .ww-animating {
+          animation: wwTilePop .45s ease forwards;
+        }
+
+        .ww-special-icon {
+          position: absolute;
+          right: 3px;
+          bottom: 1px;
+          font-size: .65em;
+          filter: drop-shadow(0 0 4px rgba(255,255,255,.7));
+        }
+
+        @keyframes wwGemShine {
+          0%, 45% { transform: translateX(-80%) rotate(20deg); }
+          65%, 100% { transform: translateX(90%) rotate(20deg); }
+        }
+
+        @keyframes wwTilePop {
+          0% { transform: scale(1); opacity: 1; }
+          60% { transform: scale(1.22); opacity: .9; }
+          100% { transform: scale(.15); opacity: 0; }
+        }
+
+        @keyframes wwFireFlicker {
+          from { opacity: .55; transform: scale(.995); }
+          to { opacity: 1; transform: scale(1.015); }
         }
       `}</style>
     </div>
