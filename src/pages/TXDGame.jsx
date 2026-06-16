@@ -392,20 +392,20 @@ export default function TXDGame() {
             );
           })}
 
-          {/* Boneyard — left side */}
-          <div className="absolute left-4 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1">
-            <div className="flex flex-col gap-0.5">
-              {Array.from({ length: Math.min(game.boneyard?.length || 0, 6) }).map((_, i) => (
-                <TXDDomino key={i} top={0} bottom={0} width={18} faceDown />
-              ))}
-            </div>
-            <span className="text-white/50 text-[9px] font-body font-mono mt-1">{game.boneyard?.length || 0}</span>
-            <span className="text-white/30 text-[8px] font-body">BONEYARD</span>
+          {/* Play chain — centered in table */}
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
           </div>
 
-          {/* Play chain — center */}
-          <div className="absolute left-24 right-4 top-12 bottom-12 overflow-hidden rounded-xl flex items-center">
-            <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+          {/* Boneyard — top-left corner */}
+          <div className="absolute left-3 top-3 z-20 flex flex-col items-center gap-0.5">
+            <div className="flex flex-col gap-0.5">
+              {Array.from({ length: Math.min(game.boneyard?.length || 0, 6) }).map((_, i) => (
+                <TXDDomino key={i} top={0} bottom={0} width={16} faceDown />
+              ))}
+            </div>
+            <span className="text-white/50 text-[9px] font-body font-mono mt-0.5">{game.boneyard?.length || 0}</span>
+            <span className="text-white/30 text-[8px] font-body">BONEYARD</span>
           </div>
 
           {/* Open ends display */}

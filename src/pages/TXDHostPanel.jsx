@@ -629,17 +629,17 @@ export default function TXDHostPanel() {
               <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
                 alt="TN" className="object-contain" style={{ opacity: 0.2, width: 100, height: 100 }} />
             </div>
-            {/* Boneyard left */}
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-0.5">
+            {/* Board chain — centered in table */}
+            <div className="absolute inset-0 flex items-center justify-center z-10">
+              <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+            </div>
+            {/* Boneyard — top-left corner */}
+            <div className="absolute left-3 top-3 z-20 flex flex-col items-center gap-0.5">
               {Array.from({ length: Math.min(game.boneyard?.length || 0, 5) }).map((_, i) => (
-                <TXDDomino key={i} top={0} bottom={0} width={16} faceDown />
+                <TXDDomino key={i} top={0} bottom={0} width={14} faceDown />
               ))}
               <span className="text-white/50 text-[8px] font-mono mt-0.5">{game.boneyard?.length || 0}</span>
               <span className="text-white/25 text-[7px] font-body">BONEYARD</span>
-            </div>
-            {/* Board chain */}
-            <div className="relative z-10" style={{ marginLeft: 52, minHeight: 110, maxHeight: 170, overflowY: 'hidden' }}>
-              <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
             </div>
             {/* Turn / ends overlay */}
             <div className="absolute bottom-2 right-3 z-10 flex items-center gap-2 text-[9px] font-body">
