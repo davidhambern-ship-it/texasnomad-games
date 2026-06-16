@@ -39,7 +39,7 @@ export default function WordWranglerGame() {
   const timerRef = useRef(null);
 
   const targetWords = React.useMemo(() => {
-    if (!game?.gameState) return [];
+    if (!game?.gameState || !game?.letterBoard) return [];
     const state = game.gameState;
 
     if (Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length) {
@@ -52,8 +52,8 @@ export default function WordWranglerGame() {
         ? state.targetWords.map(item => typeof item === 'string' ? item : item?.word).filter(Boolean)
         : [];
 
-    return getPlayableTargetWords(allTargetWords, game.letterBoard || [], wordsFound, 5);
-  }, [game?.gameState?.visibleTargetWords, game?.gameState?.allTargetWords, game?.gameState?.targetWords, game?.id, game?.letterBoard, wordsFound]);
+    return getPlayableTargetWords(allTargetWords, game.letterBoard, wordsFound, 5);
+  }, [game?.gameState?.visibleTargetWords, game?.gameState?.allTargetWords, game?.gameState?.targetWords, game?.letterBoard, wordsFound]);
 
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
@@ -133,7 +133,7 @@ export default function WordWranglerGame() {
               await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
             }
             
-            if (existingGame.letterBoard && gameToUpdate.gameState?.allTargetWords) {
+            if (existingGame.letterBoard && gameToUpdate.gameState?.allTargetWords && !gameToUpdate.gameState?.visibleTargetWords?.length) {
               const currentVisible = getPlayableTargetWords(
                 gameToUpdate.gameState.allTargetWords,
                 gameToUpdate.letterBoard || existingGame.letterBoard,
