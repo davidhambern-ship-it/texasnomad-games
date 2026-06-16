@@ -6,7 +6,7 @@ import WordBoard from '@/components/wordWrangler/WordBoard';
 import PlayerPanel from '@/components/wordWrangler/PlayerPanel';
 import TargetWordDisplay from '@/components/wordWrangler/TargetWordDisplay';
 import GameInstructions from '@/components/game/GameInstructions';
-import { generateBoardWithWords, isTargetWord, canSpellWordOnBoard, getPlayableTargetWords } from '@/lib/wordWranglerWordGenerator';
+import { generateBoardWithWords, isTargetWord } from '@/lib/wordWranglerWordGenerator';
 import { getAdjacentCells, calculateScore, removeTilesAndCascade } from '@/lib/wordWranglerUtils';
 import { soundManager } from '@/lib/wordWranglerSound';
 
@@ -99,7 +99,6 @@ export default function WordWranglerGame() {
               const boardSize = existingGame.boardSize || 8;
               const { placedWords } = generateBoardWithWords(boardSize, 20);
               const allTargetWords = placedWords.map(p => p.word);
-              const visibleTargetWords = allTargetWords.slice(0, 5);
 
               gameToUpdate = {
                 ...existingGame,
@@ -107,7 +106,6 @@ export default function WordWranglerGame() {
                   ...existingGame.gameState,
                   targetWords: placedWords,
                   allTargetWords,
-                  visibleTargetWords,
                   timeRemaining: existingGame.gameState?.timeRemaining || 180
                 }
               };
@@ -130,17 +128,6 @@ export default function WordWranglerGame() {
               };
 
               await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
-            }
-            
-            if (existingGame.letterBoard && gameToUpdate.gameState?.allTargetWords && !existingGame.gameState?.visibleTargetWords?.length) {
-              const unfound = gameToUpdate.gameState.allTargetWords.slice(0, 5);
-              gameToUpdate = {
-                ...gameToUpdate,
-                gameState: {
-                  ...gameToUpdate.gameState,
-                  visibleTargetWords: unfound
-                }
-              };
             }
             setGame(gameToUpdate);
             if (existingGame.players?.length > 0) {
@@ -176,7 +163,7 @@ export default function WordWranglerGame() {
                 if (freshTime > prevTime + 500) {
                   const player = freshGame.players?.find(p => p.playerId === playerId);
                   if (player) { setWordsFound(player.wordsFound || []); setCurrentScore(player.score || 0); }
-                  return freshGame;
+                  return { ...prev, players: freshGame.players, letterBoard: freshGame.letterBoard };
                 }
               }
               return prev;
@@ -246,10 +233,17 @@ export default function WordWranglerGame() {
     if (playerIndex >= 0) {
       const updatedPlayers = [...game.players];
       updatedPlayers[playerIndex] = { ...updatedPlayers[playerIndex], score: updatedPlayers[playerIndex].score + score, wordsFound: [...(updatedPlayers[playerIndex].wordsFound || []), word] };
+      const allTargetWords = game?.gameState?.allTargetWords?.length
+        ? game.gameState.allTargetWords
+        : game?.gameState?.targetWords?.map(t => typeof t === 'string' ? t : t?.word).filter(Boolean) || [];
       const updatedGame = { 
         ...game, 
         players: updatedPlayers, 
-        letterBoard: newBoard
+        letterBoard: newBoard,
+        gameState: {
+          ...game.gameState,
+          allTargetWords
+        }
       };
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
       setGame(updatedGame);
