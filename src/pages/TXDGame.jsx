@@ -329,7 +329,7 @@ export default function TXDGame() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-3 py-4 gap-4">
+      <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-2 py-4 gap-4">
 
         {/* ── Game Table ── */}
         <div className="relative w-full rounded-3xl overflow-visible"

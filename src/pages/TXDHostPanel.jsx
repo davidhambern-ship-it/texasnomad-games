@@ -481,7 +481,7 @@ export default function TXDHostPanel() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-3 py-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="max-w-7xl mx-auto px-3 py-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* ── LEFT: Command Center ── */}
         <div className="lg:col-span-1 space-y-4">
@@ -614,6 +614,7 @@ export default function TXDHostPanel() {
           {/* Live Board */}
           <div className="relative rounded-3xl overflow-visible"
             style={{
+              aspectRatio: '4/3',
               background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
               backdropFilter: 'blur(12px)',
               border: '4px solid rgba(255,160,50,0.6)',
