@@ -601,32 +601,46 @@ export default function TXDHostPanel() {
         <div className="lg:col-span-2 space-y-4">
 
           {/* Live Board */}
-          <div className="rounded-2xl overflow-hidden border border-emerald-500/30"
+          <div className="relative rounded-3xl overflow-visible"
             style={{
-              background: 'radial-gradient(ellipse at center, rgba(60,15,100,0.92), rgba(10,3,20,0.98))',
-              boxShadow: '0 0 20px rgba(188,19,254,0.3), inset 0 0 20px rgba(0,0,0,0.5)',
+              background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
+              backdropFilter: 'blur(12px)',
+              border: '4px solid rgba(255,160,50,0.6)',
+              boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3)',
+              isolation: 'isolate',
             }}>
-            <div className="flex items-center justify-between px-4 py-2 border-b border-emerald-500/20">
-              <span className="text-[9px] text-emerald-400 uppercase tracking-widest font-body" style={PS2}>🁢 Live Board</span>
-              <div className="flex items-center gap-3 text-[10px] font-body text-white/40">
-                {game.phase === 'playing' && (
-                  <>
-                    <span>Left: <span className="text-emerald-400 font-mono font-bold">{game.leftEnd ?? '—'}</span></span>
-                    <span>Right: <span className="text-emerald-400 font-mono font-bold">{game.rightEnd ?? '—'}</span></span>
-                    <span>Boneyard: <span className="text-white/60 font-mono">{game.boneyard?.length || 0}</span></span>
-                  </>
-                )}
-                <span className={`px-2 py-0.5 rounded uppercase ${isHostTurn ? 'text-emerald-400 bg-emerald-900/40' : 'text-white/30'}`} style={PS2}>
-                  {isHostTurn ? '▶ YOUR TURN' : currentPlayer ? `${currentPlayer.playerName}` : '—'}
-                </span>
-              </div>
+            {/* Glass sheen */}
+            <div className="absolute inset-0 rounded-3xl pointer-events-none"
+              style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
+            {/* Logo watermark */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
+              <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+                alt="TN" className="object-contain" style={{ opacity: 0.2, width: 100, height: 100 }} />
             </div>
-            <div style={{ minHeight: 110, maxHeight: 170, overflowY: 'hidden' }}>
+            {/* Boneyard left */}
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-0.5">
+              {Array.from({ length: Math.min(game.boneyard?.length || 0, 5) }).map((_, i) => (
+                <TXDDomino key={i} top={0} bottom={0} width={16} faceDown />
+              ))}
+              <span className="text-white/50 text-[8px] font-mono mt-0.5">{game.boneyard?.length || 0}</span>
+              <span className="text-white/25 text-[7px] font-body">BONEYARD</span>
+            </div>
+            {/* Board chain */}
+            <div className="relative z-10" style={{ marginLeft: 52, minHeight: 110, maxHeight: 170, overflowY: 'hidden' }}>
               <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
             </div>
+            {/* Turn / ends overlay */}
+            <div className="absolute bottom-2 right-3 z-10 flex items-center gap-2 text-[9px] font-body">
+              {game.phase === 'playing' && game.leftEnd !== null && (
+                <span className="text-emerald-400/80">Ends: <span className="font-mono font-bold">{game.leftEnd}</span> ↔ <span className="font-mono font-bold">{game.rightEnd}</span></span>
+              )}
+              <span className={`px-2 py-0.5 rounded ${isHostTurn ? 'text-emerald-400 bg-black/60' : 'text-white/30 bg-black/40'}`}>
+                {isHostTurn ? '▶ YOUR TURN' : currentPlayer ? currentPlayer.playerName : '—'}
+              </span>
+            </div>
             {game.lastAction && (
-              <div className="px-4 py-1 border-t border-white/5 text-[10px] text-white/25 font-body italic">
-                {game.lastAction.player} {game.lastAction.type === 'play' ? 'played a tile' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
+              <div className="absolute top-2 right-3 z-10 text-[9px] text-white/25 font-body italic">
+                {game.lastAction.player} {game.lastAction.type === 'play' ? 'played' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
               </div>
             )}
           </div>

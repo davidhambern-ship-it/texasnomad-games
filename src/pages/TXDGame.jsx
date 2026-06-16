@@ -322,13 +322,25 @@ export default function TXDGame() {
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-3 py-4 gap-4">
 
         {/* ── Game Table ── */}
-        <div className="relative rounded-3xl overflow-visible"
+        <div className="relative w-full rounded-3xl overflow-visible"
           style={{
-            minHeight: 380,
-            background: 'radial-gradient(ellipse at center, rgba(80,20,130,0.92), rgba(18,5,35,0.98))',
-            border: '3px solid rgba(16,185,129,0.6)',
-            boxShadow: '0 0 30px rgba(188,19,254,0.45), inset 0 0 28px rgba(255,95,31,0.2)',
+            aspectRatio: '4/3',
+            background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
+            backdropFilter: 'blur(12px)',
+            border: '4px solid rgba(255,160,50,0.6)',
+            boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3), 0 0 80px rgba(255,120,0,0.15)',
+            isolation: 'isolate',
           }}>
+
+          {/* Glass sheen overlay */}
+          <div className="absolute inset-0 rounded-3xl pointer-events-none"
+            style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
+
+          {/* Center logo watermark */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
+            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+              alt="TN" className="object-contain" style={{ opacity: 0.25, width: 120, height: 120 }} />
+          </div>
 
           {/* Seat labels around table */}
           {allSeats.map((p, i) => {
