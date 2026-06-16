@@ -392,6 +392,20 @@ const GAMES = [
     path: '/games/word-wrangler',
     featured: false,
   },
+  {
+    id: 'txd',
+    title: 'TXD Dominoes',
+    tagline: 'Texas Domino Showdown',
+    image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9f8b50e18_crowned_b.png',
+    color: '#FFD700',
+    color2: '#FF5F1F',
+    marqueeText: 'MATCH THE PIPS • PLAY YOUR TILES • CLEAR YOUR HAND • DOMINO!',
+    screenText: '🁣 DOMINOES',
+    description: 'Classic Texas-style dominoes for 2–4 players. Match pips, drain your hand, and score big. First to 100 wins the table.',
+    tags: ['2-4 Players', 'Dominoes', 'Strategy'],
+    path: '/games/txd',
+    featured: false,
+  },
 ];
 
 const COMING_SOON = [
@@ -407,7 +421,7 @@ const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangma
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '' });
+  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
@@ -421,6 +435,11 @@ export default function Games() {
     // See That! is single-player only — no room needed
     if (gameId === 'see-that') {
       navigate('/games/see-that');
+      return;
+    }
+    // TXD Dominoes — goes to dedicated host panel
+    if (gameId === 'txd') {
+      navigate('/games/txd/host');
       return;
     }
     setCreating(gameId);
@@ -503,6 +522,11 @@ export default function Games() {
       } finally {
         setCreating(null);
       }
+      return;
+    }
+    // TXD Dominoes — goes to host panel with CPU auto-added
+    if (game.id === 'txd') {
+      navigate('/games/txd/host');
       return;
     }
     // VIRAL! uses in-game AI selector - create room with default AI

@@ -1,0 +1,145 @@
+{
+  "name": "TXDGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string",
+      "description": "Unique room code (e.g. TXD817)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "players": {
+      "type": "array",
+      "description": "Array of player objects",
+      "items": {
+        "type": "object",
+        "properties": {
+          "playerId": {
+            "type": "string"
+          },
+          "seatNumber": {
+            "type": "number"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "hand": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "score": {
+            "type": "number",
+            "default": 0
+          },
+          "roundScore": {
+            "type": "number",
+            "default": 0
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "left",
+              "winner"
+            ],
+            "default": "active"
+          },
+          "isAI": {
+            "type": "boolean",
+            "default": false
+          },
+          "isHost": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "boneyard": {
+      "type": "array",
+      "description": "Remaining dominoes",
+      "items": {
+        "type": "object"
+      }
+    },
+    "board": {
+      "type": "array",
+      "description": "Played dominoes on the table",
+      "items": {
+        "type": "object",
+        "properties": {
+          "top": {
+            "type": "number"
+          },
+          "bottom": {
+            "type": "number"
+          },
+          "orientation": {
+            "type": "string",
+            "enum": [
+              "vertical",
+              "horizontal"
+            ]
+          },
+          "position": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "leftEnd": {
+      "type": "number",
+      "description": "Open left end value"
+    },
+    "rightEnd": {
+      "type": "number",
+      "description": "Open right end value"
+    },
+    "currentPlayerIndex": {
+      "type": "number",
+      "default": 0
+    },
+    "roundNumber": {
+      "type": "number",
+      "default": 1
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "playing",
+        "round_over",
+        "game_over"
+      ],
+      "default": "waiting"
+    },
+    "winner": {
+      "type": "object"
+    },
+    "roundWinner": {
+      "type": "object"
+    },
+    "lastAction": {
+      "type": "object"
+    },
+    "scoreLimit": {
+      "type": "number",
+      "default": 100
+    },
+    "created_by_user_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}
