@@ -23,7 +23,7 @@ export default function TargetWordDisplay({ targetWords, foundWords }) {
       </div>
       
       <div className="space-y-2">
-        {visible.map((item, idx) => {
+        {visibleWords.map((item, idx) => {
           const word = typeof item === 'string' ? item : item.word;
           const found = foundWords.includes(word);
           
@@ -43,7 +43,7 @@ export default function TargetWordDisplay({ targetWords, foundWords }) {
           );
         })}
         
-        {visible.length < 5 && Array(5 - visible.length).fill(null).map((_, idx) => (
+        {visibleWords.length < 5 && Array(5 - visibleWords.length).fill(null).map((_, idx) => (
           <div key={`empty-${idx}`} className="px-3 py-2 rounded border border-white/5 bg-white/5">
             <div className="text-sm font-mono tracking-widest text-white/20">???</div>
           </div>
