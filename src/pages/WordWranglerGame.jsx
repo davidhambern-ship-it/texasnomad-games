@@ -57,10 +57,12 @@ export default function WordWranglerGame() {
           const activeWords = placedWords.map(p => p.word);
           let letterBoard = board.map((row) => row.map((letter) => ({ letter, specialType: Math.random() < 0.12 ? ['gold-bean','diamond','dexter','frog','microphone','texas-flag'][Math.floor(Math.random() * 6)] : null })));
           letterBoard = ensureActiveWordsOnBoard(letterBoard, activeWords);
-          const gameData = { room_code: roomCode, status: 'active', host_connected: isCreator, screen_connected: false, players: [], gameMode: vsAI ? 'vs-ai' : 'single-player', difficulty: 'reader', boardSize, letterBoard, gameState: { phase: 'setup', activeWords, totalWordsFound: 0, timeRemaining: 180 }, created_by_user_id: isCreator ? (await base44.auth.me())?.id : null };
+          let creatorId = null;
+          if (isCreator) { try { const u = await base44.auth.me(); creatorId = u?.id || null; } catch (_) {} }
+          const gameData = { room_code: roomCode, status: 'active', host_connected: isCreator, screen_connected: false, players: [], gameMode: vsAI ? 'vs-ai' : 'single-player', difficulty: 'reader', boardSize, letterBoard, gameState: { phase: 'setup', activeWords, totalWordsFound: 0, timeRemaining: 180 }, created_by_user_id: creatorId };
           const created = await base44.entities.WordWranglerGame.create(gameData);
           if (vsAI) {
-            const user = await base44.auth.me();
+            let user = null; try { user = await base44.auth.me(); } catch (_) {}
             const pid = user?.id || `player_${Date.now()}`;
             const gameWithPlayer = { ...created, players: [{ playerId: pid, seatNumber: 1, playerName: 'Player 1', score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...created.gameState, phase: 'playing' } };
             await base44.entities.WordWranglerGame.update(created.id, gameWithPlayer);
@@ -75,7 +77,7 @@ export default function WordWranglerGame() {
           const existingGame = rooms[0];
           let gameToUpdate = existingGame;
           if (vsAI && existingGame.players?.length === 0) {
-            const user = await base44.auth.me();
+            let user = null; try { user = await base44.auth.me(); } catch (_) {}
             const pid = user?.id || `player_${Date.now()}`;
             gameToUpdate = { ...existingGame, players: [{ playerId: pid, seatNumber: 1, playerName: 'Player 1', score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...existingGame.gameState, phase: 'playing' } };
             await base44.entities.WordWranglerGame.update(existingGame.id, gameToUpdate);
@@ -258,7 +260,7 @@ export default function WordWranglerGame() {
 
   const joinGame = async (name) => {
     try {
-      const user = await base44.auth.me();
+      let user = null; try { user = await base44.auth.me(); } catch (_) {}
       const playerId = user?.id || `player_${Date.now()}`;
       const updatedGame = { ...game, players: [...(game?.players || []), { playerId, seatNumber: (game?.players?.length || 0) + 1, playerName: name, score: 0, wordsFound: [], status: 'active', isAI: false }], gameState: { ...game?.gameState, phase: 'playing' } };
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
