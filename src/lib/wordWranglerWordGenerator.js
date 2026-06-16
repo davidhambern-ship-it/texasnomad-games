@@ -155,7 +155,11 @@ export function getVisibleTargetWords(allWords, foundWords, visibleCount = 5) {
 
 // Check if a word matches any target word
 export function isTargetWord(word, targetWords) {
-  return targetWords.some(t => t.word === word);
+  if (!Array.isArray(targetWords)) return false;
+  return targetWords.some(t => {
+    const targetWord = typeof t === 'string' ? t : t?.word;
+    return targetWord === word;
+  });
 }
 
 // Check if a word can be spelled on the current board using adjacent tiles
