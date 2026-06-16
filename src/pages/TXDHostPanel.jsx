@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
 import TXDBoard from '@/components/domino/TXDBoard';
-import BoneyardBox from '@/components/domino/BoneyardBox';
 import Header from '@/components/home/Header';
 import {
   DOMINO_SET, generateRoomCode, deal, findHighestDoubleStarter,
-  getPlaySide, getPlayableDominoes, playDomino,
-  calculateRoundScores, aiChoosePlay,
+  playDomino, calculateRoundScores, aiChoosePlay,
+  getLegalMoves, getPlayableEndsForDomino,
 } from '@/lib/txdDominoEngine';
 
 const HAND_TILE_W = 50;
@@ -80,8 +79,13 @@ export default function TXDHostPanel() {
   const hostPlayer = hostIndex >= 0 ? game?.players?.[hostIndex] : null;
   const isHostTurn = game?.phase === 'playing' && game?.currentPlayerIndex === hostIndex;
   const hostHand = hostPlayer?.hand || [];
-  const playable = getPlayableDominoes(hostHand, game?.leftEnd ?? null, game?.rightEnd ?? null);
-  const playableIds = new Set(playable.map(d => d.id));
+  const openEnds = game?.openEnds || null;
+  const legalMoves = isHostTurn ? getLegalMoves(hostHand, openEnds) : [];
+  const playableIds = new Set(legalMoves.map(m => m.dominoId));
+  const hasLegalMove = legalMoves.length > 0;
+  const playableEndIds = selectedDomino
+    ? new Set(getPlayableEndsForDomino(selectedDomino, openEnds))
+    : new Set();
   const currentPlayer = game?.players?.[game?.currentPlayerIndex];
 
   const flash = (msg, type = 'info') => {
@@ -119,25 +123,24 @@ export default function TXDHostPanel() {
 
   const runAI = async (g, aiPlayer, aiIdx) => {
     const next = (aiIdx + 1) % g.players.length;
-    const choice = aiChoosePlay(aiPlayer.hand, g.leftEnd ?? null, g.rightEnd ?? null, g.startingDominoLocked);
+    const choice = aiChoosePlay(aiPlayer.hand, g.leftEnd ?? null, g.rightEnd ?? null, g.startingDominoLocked, g.openEnds);
     let updated;
     if (!choice) {
-      if (g.boneyard?.length > 0) {
-        const [drawn, ...boneyard] = g.boneyard;
-        const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: [...p.hand, drawn] } : p);
-        updated = { ...g, boneyard, players, currentPlayerIndex: next, lastAction: { type: 'draw', player: aiPlayer.playerName } };
-      } else {
-        updated = { ...g, currentPlayerIndex: next, lastAction: { type: 'pass', player: aiPlayer.playerName } };
-      }
+      // No legal move — knock
+      const feed = [...(g.activityFeed || [])];
+      feed.unshift(`🤖 ${aiPlayer.playerName} knocked`);
+      updated = { ...g, currentPlayerIndex: next, lastAction: { type: 'knock', player: aiPlayer.playerName }, activityFeed: feed.slice(0, 30) };
     } else {
       const { domino, side } = choice;
       const isFirstPlay = (g.board?.length || 0) === 0;
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom } = playDomino(
-        domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false
-      );
+      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
+      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedRotation } = result;
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
-      const boardEntry = { top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner };
-      const newBoard = side === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
+      const boardEntry = {
+        top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
+        x: placedX ?? 50, y: placedY ?? 50, rotation: placedRotation ?? 90,
+      };
+      const newBoard = [...(g.board || []), boardEntry];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
       const roundOver = newHand.length === 0;
       const pts = roundOver ? calculateRoundScores(players, aiIdx) : 0;
@@ -145,7 +148,8 @@ export default function TXDHostPanel() {
       const feed = [...(g.activityFeed || [])];
       feed.unshift(`🤖 ${aiPlayer.playerName} played ${domino.top}-${domino.bottom}`);
       updated = {
-        ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd, players,
+        ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
+        openEnds: newOpenEnds || g.openEnds, players,
         currentPlayerIndex: roundOver ? aiIdx : next,
         phase: roundOver ? 'round_over' : 'playing',
         roundWinner: roundOver ? { playerName: aiPlayer.playerName, playerId: aiPlayer.playerId, points: pts } : null,
@@ -274,7 +278,7 @@ export default function TXDHostPanel() {
     const feed = [`🎮 Game started — ${starterName} starts with [${startingDominoLocked}]`, ...( g.activityFeed || [])];
     const updated = {
       ...g, status: 'active', boneyard, players, board: [], leftEnd: null, rightEnd: null,
-      currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null,
+      openEnds: null, currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null,
       startingDominoLocked, spinnerActive: false, roundNumber: 1,
       activityFeed: feed.slice(0, 30),
     };
@@ -300,7 +304,7 @@ export default function TXDHostPanel() {
     const boneyard = dealResult2.boneyard;
     const players = players2;
     const updated = {
-      ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players,
+      ...g, board: [], leftEnd: null, rightEnd: null, openEnds: null, boneyard, players,
       currentPlayerIndex: startPlayerIndex, roundNumber: rn,
       startingDominoLocked: null, spinnerActive: false,
       phase: 'playing', roundWinner: null, activityFeed: feed.slice(0, 30),
@@ -328,7 +332,7 @@ export default function TXDHostPanel() {
     const startingDominoLocked = resetStart ? resetStart.dominoId : null;
     const feed = [`↺ Host reset round ${g.roundNumber || 1}`, ...(g.activityFeed || [])];
     const updated = {
-      ...g, board: [], leftEnd: null, rightEnd: null, boneyard, players,
+      ...g, board: [], leftEnd: null, rightEnd: null, openEnds: null, boneyard, players,
       currentPlayerIndex: startPlayerIndex, phase: 'playing', roundWinner: null,
       startingDominoLocked, spinnerActive: false,
       activityFeed: feed.slice(0, 30),
@@ -352,24 +356,38 @@ export default function TXDHostPanel() {
   };
 
   // ── Host Play Actions ──────────────────────────────────────────────────────
-  const doPlay = async (side) => {
-    if (!selectedDomino || !isHostTurn || !game) return;
+  const doPlayOnEnd = async (endId, dominoId) => {
+    if (!isHostTurn || !game) return;
     const g = game;
+    const domino = hostHand.find(d => d.id === dominoId);
+    if (!domino) return;
     const isFirstPlay = (g.board?.length || 0) === 0;
-    const actualSide = isFirstPlay ? 'first' : side;
+    const side = isFirstPlay ? 'first' : endId;
 
-    // Enforce locked starting domino (first hand only)
-    if (isFirstPlay && g.startingDominoLocked && selectedDomino.id !== g.startingDominoLocked) {
+    if (isFirstPlay && g.startingDominoLocked && domino.id !== g.startingDominoLocked) {
       flash(`You must start with [${g.startingDominoLocked}]!`, 'error');
       return;
     }
 
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom } = playDomino(
-      selectedDomino, g.leftEnd ?? null, g.rightEnd ?? null, actualSide, g.spinnerActive || false
-    );
-    const newHand = hostPlayer.hand.filter(d => d.id !== selectedDomino.id);
-    const boardEntry = { top: orientedTop, bottom: orientedBottom, id: selectedDomino.id, side: actualSide, isSpinner };
-    const newBoard = actualSide === 'left' ? [boardEntry, ...(g.board || [])] : [...(g.board || []), boardEntry];
+    if (!isFirstPlay) {
+      const end = g.openEnds?.[endId];
+      if (!end || !end.active) { flash('Invalid placement zone', 'error'); return; }
+      if (domino.top !== end.value && domino.bottom !== end.value) {
+        flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
+        return;
+      }
+    }
+
+    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
+    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedRotation } = result;
+    const newHand = hostPlayer.hand.filter(d => d.id !== domino.id);
+    const boardEntry = {
+      top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
+      x: isFirstPlay ? 50 : (placedX ?? 50),
+      y: isFirstPlay ? 50 : (placedY ?? 50),
+      rotation: isFirstPlay ? (domino.top === domino.bottom ? 0 : 90) : (placedRotation ?? 90),
+    };
+    const newBoard = [...(g.board || []), boardEntry];
     let ni = (hostIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== hostIndex) ni = (ni + 1) % g.players.length;
     const players = g.players.map((p, i) => i === hostIndex ? { ...p, hand: newHand } : p);
@@ -377,13 +395,14 @@ export default function TXDHostPanel() {
     const pts = roundOver ? calculateRoundScores(players, hostIndex) : 0;
     if (roundOver) players[hostIndex] = { ...players[hostIndex], score: (players[hostIndex].score || 0) + pts };
     const feed = [...(g.activityFeed || [])];
-    feed.unshift(`👑 Host played ${selectedDomino.top}-${selectedDomino.bottom}`);
+    feed.unshift(`👑 Host played ${domino.top}-${domino.bottom}`);
     const updated = {
-      ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd, players,
+      ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
+      openEnds: newOpenEnds || g.openEnds, players,
       currentPlayerIndex: roundOver ? hostIndex : ni,
       phase: roundOver ? 'round_over' : 'playing',
       roundWinner: roundOver ? { playerName: 'Host', playerId: hostPlayer.playerId, points: pts } : null,
-      lastAction: { type: 'play', player: 'Host', domino: selectedDomino },
+      lastAction: { type: 'play', player: 'Host', domino },
       activityFeed: feed.slice(0, 30),
       spinnerActive: newSpinnerActive,
       startingDominoLocked: isFirstPlay ? null : g.startingDominoLocked,
@@ -393,26 +412,18 @@ export default function TXDHostPanel() {
     setSelectedDomino(null);
   };
 
-  const doDraw = async () => {
+  const doKnock = async () => {
     if (!isHostTurn || !game) return;
+    if (hasLegalMove) { flash("You have a playable tile — you can't knock!", 'error'); return; }
     const g = game;
     let ni = (hostIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== hostIndex) ni = (ni + 1) % g.players.length;
-    if (!g.boneyard?.length) {
-      const feed = [...(g.activityFeed || [])];
-      feed.unshift(`👑 Host passed (boneyard empty)`);
-      const updated = { ...g, currentPlayerIndex: ni, lastAction: { type: 'pass', player: 'Host' }, activityFeed: feed.slice(0, 30) };
-      await base44.entities.TXDGame.update(g.id, updated);
-      setGame(updated);
-      return;
-    }
-    const [drawn, ...boneyard] = g.boneyard;
-    const players = g.players.map((p, i) => i === hostIndex ? { ...p, hand: [...p.hand, drawn] } : p);
     const feed = [...(g.activityFeed || [])];
-    feed.unshift(`👑 Host drew from boneyard`);
-    const updated = { ...g, boneyard, players, lastAction: { type: 'draw', player: 'Host' }, activityFeed: feed.slice(0, 30) };
+    feed.unshift(`👑 Host knocked`);
+    const updated = { ...g, currentPlayerIndex: ni, lastAction: { type: 'knock', player: 'Host' }, activityFeed: feed.slice(0, 30) };
     await base44.entities.TXDGame.update(g.id, updated);
     setGame(updated);
+    flash('Knocked — turn passed', 'info');
   };
 
   const doSort = () => {
@@ -649,40 +660,32 @@ export default function TXDHostPanel() {
           {/* Live Board + Boneyard side-by-side */}
           <div className="flex gap-3 items-stretch">
 
-            {/* Boneyard box — only shown when fewer than 4 players */}
-            {(game.players?.length || 0) < 4 && (
-              <BoneyardBox
-                boneyard={game.boneyard || []}
-                canDraw={isHostTurn && (playable.length === 0) && game.phase === 'playing'}
-                onDraw={doDraw}
-                compact
-              />
-            )}
-
             {/* Table */}
-            <div className="relative flex-1 rounded-3xl overflow-visible"
+            <div className="relative flex-1 rounded-3xl overflow-hidden"
               style={{
                 aspectRatio: '4/3',
                 background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
                 backdropFilter: 'blur(12px)',
                 border: '4px solid rgba(255,160,50,0.6)',
-                boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), inset 0 0 30px rgba(255,180,60,0.1), 0 10px 40px rgba(255,100,0,0.3)',
+                boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), 0 10px 40px rgba(255,100,0,0.3)',
                 isolation: 'isolate',
               }}>
-              {/* Glass sheen */}
               <div className="absolute inset-0 rounded-3xl pointer-events-none"
                 style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
-              {/* Logo watermark */}
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
                 <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
                   alt="TN" className="object-contain" style={{ opacity: 0.2, width: 100, height: 100 }} />
               </div>
-              {/* Board chain — centered in table */}
-              <div className="absolute inset-0 flex items-center justify-center z-10">
-                <TXDBoard board={game.board || []} leftEnd={game.leftEnd} rightEnd={game.rightEnd} />
+              <div className="absolute inset-0 z-10">
+                <TXDBoard
+                  board={game.board || []}
+                  openEnds={isHostTurn ? openEnds : null}
+                  selectedDomino={selectedDomino}
+                  playableEndIds={isHostTurn ? playableEndIds : new Set()}
+                  onDropOnEnd={doPlayOnEnd}
+                />
               </div>
-              {/* Turn / ends overlay */}
-              <div className="absolute bottom-2 right-3 z-10 flex items-center gap-2 text-[9px] font-body">
+              <div className="absolute bottom-2 right-3 z-20 flex items-center gap-2 text-[9px] font-body">
                 {game.phase === 'playing' && game.leftEnd !== null && (
                   <span className="text-emerald-400/80">Ends: <span className="font-mono font-bold">{game.leftEnd}</span> ↔ <span className="font-mono font-bold">{game.rightEnd}</span></span>
                 )}
@@ -690,11 +693,6 @@ export default function TXDHostPanel() {
                   {isHostTurn ? '▶ YOUR TURN' : currentPlayer ? currentPlayer.playerName : '—'}
                 </span>
               </div>
-              {game.lastAction && (
-                <div className="absolute top-2 right-3 z-10 text-[9px] text-white/25 font-body italic">
-                  {game.lastAction.player} {game.lastAction.type === 'play' ? 'played' : game.lastAction.type === 'draw' ? 'drew' : 'passed'}
-                </div>
-              )}
             </div>
 
           </div>{/* end boneyard + table row */}
@@ -729,7 +727,7 @@ export default function TXDHostPanel() {
                 const isSelected = selectedDomino?.id === d.id;
                 return (
                   <div key={d.id} className="flex-shrink-0 transition-all duration-150"
-                    style={{ transform: isSelected ? 'translateY(-10px) scale(1.05)' : 'none' }}>
+                    style={{ transform: isSelected ? 'translateY(-10px) scale(1.05)' : 'none', opacity: isHostTurn && !isPlayable ? 0.4 : 1 }}>
                     <TXDDomino
                       top={d.top} bottom={d.bottom}
                       width={HAND_TILE_W}
@@ -737,7 +735,9 @@ export default function TXDHostPanel() {
                       selected={isSelected}
                       onClick={() => {
                         if (!isHostTurn) return;
-                        if (!playableIds.has(d.id)) { flash("Doesn't fit right now", 'error'); return; }
+                        if (!isPlayable) { flash("That tile doesn't fit!", 'error'); return; }
+                        // First play: play immediately
+                        if ((game.board?.length || 0) === 0) { doPlayOnEnd('first', d.id); return; }
                         setSelectedDomino(prev => prev?.id === d.id ? null : d);
                       }}
                     />
@@ -754,46 +754,24 @@ export default function TXDHostPanel() {
 
             {/* Play buttons */}
             {isHostTurn && (
-              <div className="flex flex-wrap gap-2">
-                {selectedDomino && game.board?.length === 0 && (
-                  (!game.startingDominoLocked || selectedDomino.id === game.startingDominoLocked)
-                    ? <button onClick={() => doPlay('first')}
-                        className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white"
-                        style={{ background: 'linear-gradient(135deg, #16a34a, #15803d)', boxShadow: '0 0 10px rgba(22,163,74,0.4)' }}>
-                        {selectedDomino.top === selectedDomino.bottom ? `PLAY SPINNER [${selectedDomino.id}]` : `PLAY [${selectedDomino.id}]`}
-                      </button>
-                    : <span className="text-amber-400/80 text-xs font-body py-2 animate-pulse">⚠ Must start with [{game.startingDominoLocked}]</span>
+              <div className="flex flex-wrap gap-2 items-center">
+                {selectedDomino && (game.board?.length || 0) > 0 && (
+                  <span className="text-emerald-400/80 text-xs font-body py-1">
+                    {playableEndIds.size > 0
+                      ? `Click a glowing zone on the board to place [${selectedDomino.id}]`
+                      : <span className="text-red-400">Doesn't fit any open end</span>}
+                  </span>
                 )}
-                {!selectedDomino && game.board?.length === 0 && isHostTurn && (
+                {!selectedDomino && (game.board?.length || 0) === 0 && (
                   <span className="text-white/40 text-xs font-body py-2">
                     {game.startingDominoLocked ? `Select [${game.startingDominoLocked}] to start` : 'Select a tile to start'}
                   </span>
                 )}
-                {selectedDomino && (game.board?.length || 0) > 0 && (() => {
-                  const side = getPlaySide(selectedDomino, game.leftEnd, game.rightEnd);
-                  if (!side) return <span className="text-red-400 text-xs font-body py-2">Doesn't fit</span>;
-                  return (
-                    <>
-                      {(side === 'left' || side === 'both') && (
-                        <button onClick={() => doPlay('left')}
-                          className="px-4 py-2 rounded-xl font-heading text-sm uppercase text-white bg-emerald-700 hover:bg-emerald-600">
-                          PLAY LEFT ({game.leftEnd})
-                        </button>
-                      )}
-                      {(side === 'right' || side === 'both') && (
-                        <button onClick={() => doPlay('right')}
-                          className="px-4 py-2 rounded-xl font-heading text-sm uppercase text-white bg-emerald-800 hover:bg-emerald-700">
-                          PLAY RIGHT ({game.rightEnd})
-                        </button>
-                      )}
-                    </>
-                  );
-                })()}
-                {!selectedDomino && (
-                  <button onClick={doDraw}
-                    className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white"
-                    style={{ background: 'linear-gradient(135deg, #7c3aed, #5b21b6)' }}>
-                    {(game.boneyard?.length || 0) > 0 ? `DRAW (${game.boneyard.length})` : 'PASS'}
+                {!hasLegalMove && (
+                  <button onClick={doKnock}
+                    className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-black"
+                    style={{ background: 'linear-gradient(135deg, #FFD700, #f59e0b)', boxShadow: '0 0 12px rgba(255,215,0,0.5)' }}>
+                    🤜 KNOCK
                   </button>
                 )}
                 <button onClick={doSort}

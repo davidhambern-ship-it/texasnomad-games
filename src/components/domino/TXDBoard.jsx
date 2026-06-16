@@ -1,114 +1,124 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import TXDDomino from './TXDDomino';
 
-const TILE_W = 36;
-
 /**
- * TXDBoard renders the domino chain.
+ * TXDBoard — absolute-positioned board with drag-drop open-end zones.
  *
- * Each board entry has:
- *   top, bottom   — already oriented by playDomino() so the matching pip faces inward
- *   side          — 'first' | 'left' | 'right'
- *   isSpinner     — true for the opening double
- *
- * Orientation rules (locked to branch direction, never to player seat):
- *   - Doubles (top === bottom) → vertical
- *   - Horizontal chain tiles   → horizontal; top = left pip, bottom = right pip
- *   - Left-branch tiles        → horizontal; rendered in reverse visual order (chain extends left)
- *   - Right-branch tiles       → horizontal; normal order
- *
- * The orientedTop/orientedBottom from the engine already place the connecting pip
- * touching the open end, so we just pass them straight through.
+ * Props:
+ *   board        — array of placed pieces: { top, bottom, id, side, isSpinner, x, y, rotation }
+ *   openEnds     — object: { left, right, top, bottom } each with { x, y, rotation, value, active }
+ *   selectedDomino — currently selected domino from hand (for drop zone highlighting)
+ *   playableEndIds — set of endIds the selected domino can play on
+ *   onDropOnEnd  — (endId) => void — called when player drops on a valid zone
+ *   draggingDominoId — id of domino being dragged (for cursor feedback)
  */
-export default function TXDBoard({ board = [], leftEnd, rightEnd }) {
-  const scrollRef = useRef(null);
-
-  useEffect(() => {
-    if (scrollRef.current) {
-      const el = scrollRef.current;
-      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-    }
-  }, [board.length]);
-
+export default function TXDBoard({
+  board = [],
+  openEnds = null,
+  selectedDomino = null,
+  playableEndIds = new Set(),
+  onDropOnEnd,
+  draggingDominoId = null,
+}) {
   if (board.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full min-h-[110px] text-white/20 font-body text-xs tracking-widest italic">
+      <div className="flex items-center justify-center h-full w-full text-white/20 font-body text-xs tracking-widest italic">
         — no tiles played yet —
       </div>
     );
   }
 
-  const spinnerIndex = board.findIndex(d => d.isSpinner);
-  const hasSpinner = spinnerIndex >= 0;
+  const handleDragOver = (e, endId) => {
+    if (playableEndIds.has(endId)) e.preventDefault();
+  };
 
-  // Split into left chain (before spinner, played leftward), spinner, right chain (after spinner)
-  let leftChain = [];
-  let spinner = null;
-  let rightChain = [];
+  const handleDrop = (e, endId) => {
+    e.preventDefault();
+    const dominoId = e.dataTransfer.getData('dominoId');
+    if (dominoId && onDropOnEnd) onDropOnEnd(endId, dominoId);
+  };
 
-  if (hasSpinner) {
-    spinner = board[spinnerIndex];
-    // Left chain: tiles played to the left — most-recently-played is closest to spinner
-    leftChain = board.slice(0, spinnerIndex).reverse();
-    rightChain = board.slice(spinnerIndex + 1);
-  } else {
-    rightChain = board;
-  }
-
-  const renderTile = (d, key, extraStyle = {}) => {
-    const isDouble = d.top === d.bottom;
-    // Doubles always vertical; non-doubles always horizontal (chain direction)
-    const orientation = isDouble ? 'vertical' : 'horizontal';
-    return (
-      <div key={key} className="flex-shrink-0" style={extraStyle}>
-        <TXDDomino
-          top={d.top}
-          bottom={d.bottom}
-          width={TILE_W}
-          orientation={orientation}
-        />
-      </div>
-    );
+  // Click-to-play: if a domino is selected and this end is playable, trigger play
+  const handleEndClick = (endId) => {
+    if (selectedDomino && playableEndIds.has(endId) && onDropOnEnd) {
+      onDropOnEnd(endId, selectedDomino.id);
+    }
   };
 
   return (
-    <div
-      ref={scrollRef}
-      className="flex items-center justify-center gap-0.5 overflow-x-auto py-3 px-4 min-h-[110px] w-full"
-      style={{ scrollbarWidth: 'thin', scrollbarColor: '#BC13FE40 transparent' }}
-    >
-      {/* Left chain — tiles grow leftward from spinner */}
-      {leftChain.map((d, i) => renderTile(d, `left-${i}`))}
+    <div className="relative w-full h-full">
+      {/* Placed tiles */}
+      {board.map((piece, i) => {
+        const isDouble = piece.top === piece.bottom;
+        const orientation = isDouble ? 'vertical' : 'horizontal';
+        // x/y are % coordinates from center of piece
+        const x = piece.x ?? 50;
+        const y = piece.y ?? 50;
+        const rot = piece.rotation ?? (isDouble ? 0 : 90);
 
-      {/* Spinner — always vertical, glowing */}
-      {spinner && (
-        <div
-          className="flex-shrink-0 mx-1"
-          style={{
-            filter: 'drop-shadow(0 0 12px rgba(0,255,120,0.95)) drop-shadow(0 0 18px rgba(255,95,31,0.75))',
-          }}
-        >
-          <TXDDomino
-            top={spinner.top}
-            bottom={spinner.bottom}
-            width={TILE_W + 6}
-            orientation="vertical"
-          />
-        </div>
-      )}
-
-      {/* Right chain — tiles grow rightward */}
-      {rightChain.map((d, i) => {
-        const isFirst = !hasSpinner && i === 0;
-        return renderTile(d, `right-${i}`, isFirst ? { filter: 'drop-shadow(0 0 8px rgba(16,185,129,0.9))' } : {});
+        return (
+          <div
+            key={piece.id || i}
+            style={{
+              position: 'absolute',
+              left: `${x}%`,
+              top: `${y}%`,
+              transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+              zIndex: 5 + i,
+              filter: piece.isSpinner
+                ? 'drop-shadow(0 0 10px rgba(0,255,120,0.9)) drop-shadow(0 0 16px rgba(255,95,31,0.7))'
+                : 'none',
+            }}
+          >
+            <TXDDomino
+              top={piece.top}
+              bottom={piece.bottom}
+              width={piece.isSpinner ? 40 : 34}
+              orientation={orientation}
+            />
+          </div>
+        );
       })}
 
-      {/* Open ends indicator */}
-      {board.length > 0 && leftEnd !== null && rightEnd !== null && (
-        <div className="flex-shrink-0 ml-2 flex flex-col gap-0.5 items-center">
-          <span className="text-emerald-400/70 text-[8px] font-mono font-bold">{rightEnd}</span>
-        </div>
-      )}
+      {/* Open-end drop zones */}
+      {openEnds && Object.entries(openEnds).map(([endId, end]) => {
+        if (!end || !end.active) return null;
+        const isPlayable = playableEndIds.has(endId);
+        return (
+          <div
+            key={endId}
+            onDragOver={(e) => handleDragOver(e, endId)}
+            onDrop={(e) => handleDrop(e, endId)}
+            onClick={() => handleEndClick(endId)}
+            style={{
+              position: 'absolute',
+              left: `${end.x}%`,
+              top: `${end.y}%`,
+              width: 68,
+              height: 36,
+              transform: `translate(-50%, -50%) rotate(${end.rotation}deg)`,
+              borderRadius: 10,
+              border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.1)',
+              background: isPlayable ? 'rgba(0, 255, 120, 0.12)' : 'rgba(255,255,255,0.02)',
+              boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.65)' : 'none',
+              cursor: isPlayable ? 'pointer' : 'default',
+              pointerEvents: isPlayable || draggingDominoId ? 'auto' : 'none',
+              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'box-shadow 0.15s, background 0.15s',
+            }}
+            title={isPlayable ? `Play on ${end.value}` : `End: ${end.value}`}
+          >
+            {isPlayable && (
+              <span style={{ fontSize: 11, color: '#00ff78', fontWeight: 'bold', fontFamily: 'monospace', opacity: 0.9 }}>
+                {end.value}
+              </span>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
