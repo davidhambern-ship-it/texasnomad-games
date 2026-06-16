@@ -39,20 +39,22 @@ export default function WordWranglerGame() {
   const timerRef = useRef(null);
 
   const targetWords = React.useMemo(() => {
-    if (!game?.gameState || !game?.letterBoard) return [];
+    if (!game?.gameState) return [];
     const state = game.gameState;
-
-    if (Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length) {
-      return state.visibleTargetWords.filter(w => !wordsFound.includes(w));
-    }
-
+    
     const allTargetWords = Array.isArray(state.allTargetWords) && state.allTargetWords.length
       ? state.allTargetWords
       : Array.isArray(state.targetWords) && state.targetWords.length
         ? state.targetWords.map(item => typeof item === 'string' ? item : item?.word).filter(Boolean)
         : [];
+    
+    if (!allTargetWords.length || !game?.letterBoard) return [];
 
-    return getPlayableTargetWords(allTargetWords, game.letterBoard, wordsFound, 5);
+    const visible = Array.isArray(state.visibleTargetWords) && state.visibleTargetWords.length
+      ? state.visibleTargetWords
+      : getPlayableTargetWords(allTargetWords, game.letterBoard, wordsFound, 5);
+
+    return visible.filter(w => typeof w === 'string');
   }, [game?.gameState?.visibleTargetWords, game?.gameState?.allTargetWords, game?.gameState?.targetWords, game?.letterBoard, wordsFound]);
 
   useEffect(() => {

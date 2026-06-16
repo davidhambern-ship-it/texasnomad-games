@@ -1,8 +1,9 @@
 import React from 'react';
 
 export default function TargetWordDisplay({ targetWords = [], foundWords = [] }) {
-  const visibleWords = targetWords;
-  const totalTargetWords = targetWords.length + foundWords.length;
+  const visibleWords = Array.isArray(targetWords) ? targetWords : [];
+  const foundCount = Array.isArray(foundWords) ? foundWords.length : 0;
+  const totalTargetWords = visibleWords.length + foundCount;
 
   return (
     <div className="border-2 border-cyber-purple/40 rounded-xl p-4 bg-black/40 box-glow-purple">
@@ -11,7 +12,7 @@ export default function TargetWordDisplay({ targetWords = [], foundWords = [] })
       </h3>
 
       <div className="text-white/60 text-xs mb-3">
-        {foundWords.length}/{totalTargetWords}
+        {foundCount}/{totalTargetWords}
       </div>
 
       <div className="space-y-2">
@@ -19,7 +20,7 @@ export default function TargetWordDisplay({ targetWords = [], foundWords = [] })
           visibleWords.map((word, idx) => (
             <div key={`${word}-${idx}`} className="px-3 py-2 rounded-lg bg-white/5 border border-white/10">
               <span className="text-emerald-400 font-heading tracking-widest">
-                ○ {word.toUpperCase()}
+                ○ {String(word).toUpperCase()}
               </span>
             </div>
           ))
