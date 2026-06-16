@@ -257,14 +257,24 @@ export default function WordWranglerGame() {
       </div>
     );
   }
-
-  const targetWords =
-  game?.gameState?.allTargetWords?.length
-    ? game.gameState.allTargetWords
-    : game?.gameState?.targetWords || [];
+  const targetWords = getTargetWords();
   const timePercent = Math.max(0, (timeRemaining / 180) * 100);
   const isLowTime = timeRemaining <= 30;
+const getTargetWords = () => {
+  const state = game?.gameState || {};
 
+  if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
+    return state.allTargetWords;
+  }
+
+  if (Array.isArray(state.targetWords) && state.targetWords.length) {
+    return state.targetWords.map(item =>
+      typeof item === 'string' ? item : item?.word
+    ).filter(Boolean);
+  }
+
+  return [];
+};
   return (
     <div className="min-h-screen bg-midnight-void text-white overflow-hidden">
       <Header />
