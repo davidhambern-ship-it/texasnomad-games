@@ -38,6 +38,26 @@ export default function WordWranglerGame() {
 
   const timerRef = useRef(null);
 
+  const targetWords = useMemo(() => {
+    if (!game?.gameState) return [];
+    const state = game.gameState;
+
+    if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
+      return state.allTargetWords;
+    }
+
+    if (Array.isArray(state.targetWords) && state.targetWords.length) {
+      const extracted = state.targetWords.map(item => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object' && item.word) return item.word;
+        return null;
+      }).filter(Boolean);
+      return extracted;
+    }
+
+    return [];
+  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
+
   useEffect(() => {
     if (!roomCode) { setError('No room code provided'); setLoading(false); return; }
     async function initGame() {
@@ -226,26 +246,6 @@ export default function WordWranglerGame() {
       </div>
     );
   }
-
-  const targetWords = useMemo(() => {
-    if (!game?.gameState) return [];
-    const state = game.gameState;
-
-    if (Array.isArray(state.allTargetWords) && state.allTargetWords.length) {
-      return state.allTargetWords;
-    }
-
-    if (Array.isArray(state.targetWords) && state.targetWords.length) {
-      const extracted = state.targetWords.map(item => {
-        if (typeof item === 'string') return item;
-        if (item && typeof item === 'object' && item.word) return item.word;
-        return null;
-      }).filter(Boolean);
-      return extracted;
-    }
-
-    return [];
-  }, [game?.gameState?.allTargetWords, game?.gameState?.targetWords]);
 
   if (!playerId && gamePhase === 'setup' && !vsAI) {
     return (
