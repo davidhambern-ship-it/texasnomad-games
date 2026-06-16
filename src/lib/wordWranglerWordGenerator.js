@@ -157,3 +157,60 @@ export function getVisibleTargetWords(allWords, foundWords, visibleCount = 5) {
 export function isTargetWord(word, targetWords) {
   return targetWords.some(t => t.word === word);
 }
+
+// Check if a word can be spelled on the current board using adjacent tiles
+export function canSpellWordOnBoard(word, board) {
+  if (!word || word.length === 0 || !board || board.length === 0) return false;
+  
+  const size = board.length;
+  
+  function canFindFromCell(rowIndex, colIndex, charIndex, visited) {
+    if (charIndex === word.length) return true;
+    
+    const key = `${rowIndex}-${colIndex}`;
+    if (rowIndex < 0 || rowIndex >= size || colIndex < 0 || colIndex >= size) return false;
+    if (visited.has(key)) return false;
+    
+    const cellLetter = board[rowIndex][colIndex]?.letter;
+    if (cellLetter !== word[charIndex]) return false;
+    
+    visited.add(key);
+    
+    const directions = [
+      [0, 1], [0, -1], [1, 0], [-1, 0],
+      [1, 1], [1, -1], [-1, 1], [-1, -1]
+    ];
+    
+    for (const [dRow, dCol] of directions) {
+      if (canFindFromCell(rowIndex + dRow, colIndex + dCol, charIndex + 1, visited)) {
+        return true;
+      }
+    }
+    
+    visited.delete(key);
+    return false;
+  }
+  
+  for (let row = 0; row < size; row++) {
+    for (let col = 0; col < size; col++) {
+      if (board[row][col]?.letter === word[0]) {
+        const visited = new Set();
+        if (canFindFromCell(row, col, 0, visited)) {
+          return true;
+        }
+      }
+    }
+  }
+  
+  return false;
+}
+
+// Get playable target words that can actually be spelled on the current board
+export function getPlayableTargetWords(allTargetWords, board, foundWords, count = 5) {
+  if (!allTargetWords || !board) return [];
+  
+  const remaining = allTargetWords.filter(w => !foundWords.includes(w));
+  const playable = remaining.filter(word => canSpellWordOnBoard(word, board));
+  
+  return playable.slice(0, count);
+}

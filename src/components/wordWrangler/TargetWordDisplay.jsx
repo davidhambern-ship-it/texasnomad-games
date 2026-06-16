@@ -1,13 +1,11 @@
 import React from 'react';
 
 export default function TargetWordDisplay({ targetWords = [], foundWords = [] }) {
-  const normalizedWords = targetWords
-    .map(item => typeof item === 'string' ? item : item?.word)
-    .filter(Boolean);
-
-  const visibleWords = normalizedWords
+  const visibleWords = targetWords
     .filter(word => !foundWords.includes(word))
     .slice(0, 5);
+
+  const totalTargetWords = targetWords.length;
 
   return (
     <div className="border-2 border-cyber-purple/40 rounded-xl p-4 bg-black/40 box-glow-purple">
@@ -16,7 +14,7 @@ export default function TargetWordDisplay({ targetWords = [], foundWords = [] })
       </h3>
 
       <div className="text-white/60 text-xs mb-3">
-        {foundWords.length}/{normalizedWords.length}
+        {foundWords.length}/{totalTargetWords}
       </div>
 
       <div className="space-y-2">
