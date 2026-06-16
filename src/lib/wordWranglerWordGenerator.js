@@ -1,5 +1,5 @@
 // Word Wrangler - Target Word Generator for Bookworm-style gameplay
-// Generates a board with 20 embeddable target words that can actually be found
+// Generates a board with 5 connected target words that are physically playable
 
 // WORD WRANGLER MASTER WORD LIST
 // Curated word bank organized by category
@@ -91,40 +91,64 @@ export function placeWord(board, word, startRow, startCol, direction) {
   return placed;
 }
 
-export function generateBoardWithWords(boardSize, activeWordCount = 5) {
-  const board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
-  const placedWords = [];
-  
-  const words = pickTargetWords(activeWordCount * 3, 3, 8).sort((a, b) => b.length - a.length);
-  
-  for (const word of words) {
-    if (placedWords.length >= activeWordCount) break;
-    
-    let placed = false;
-    const attempts = 50;
-    
-    for (let attempt = 0; attempt < attempts && !placed; attempt++) {
-      const startRow = Math.floor(Math.random() * boardSize);
-      const startCol = Math.floor(Math.random() * boardSize);
-      const shuffledDirections = [...DIRECTIONS].sort(() => Math.random() - 0.5);
-      
-      for (const direction of shuffledDirections) {
-        if (canPlaceWord(board, word, startRow, startCol, direction)) {
-          placeWord(board, word, startRow, startCol, direction);
-          placedWords.push({ word, startRow, startCol, direction });
-          placed = true;
-          break;
+// Place a word as a connected path on the board, overwriting if needed
+function placeWordAsPath(board, word, boardSize) {
+  // Try to find a valid path for this word
+  for (let startRow = 0; startRow < boardSize; startRow++) {
+    for (let startCol = 0; startCol < boardSize; startCol++) {
+      for (const [dRow, dCol] of DIRECTIONS) {
+        const endRow = startRow + (word.length - 1) * dRow;
+        const endCol = startCol + (word.length - 1) * dCol;
+        
+        if (endRow < 0 || endRow >= boardSize || endCol < 0 || endCol >= boardSize) {
+          continue;
         }
+        
+        // Place the word
+        const path = [];
+        for (let i = 0; i < word.length; i++) {
+          const row = startRow + i * dRow;
+          const col = startCol + i * dCol;
+          board[row][col] = word[i];
+          path.push({ row, col, letter: word[i] });
+        }
+        
+        return { word, path, startRow, startCol, direction: [dRow, dCol] };
       }
     }
   }
   
+  return null;
+}
+
+export function generateBoardWithWords(boardSize, activeWordCount = 5) {
+  // Initialize empty board
+  const board = Array(boardSize).fill(null).map(() => Array(boardSize).fill(null));
+  const placedWords = [];
+  
+  // Pick words and sort by length (longer first for better placement)
+  const words = pickTargetWords(activeWordCount * 4, 3, 8).sort((a, b) => b.length - a.length);
+  
+  // Place each word as a connected path
+  for (const word of words) {
+    if (placedWords.length >= activeWordCount) break;
+    
+    // Skip if word is too long for board
+    if (word.length > boardSize) continue;
+    
+    const placed = placeWordAsPath(board, word, boardSize);
+    if (placed) {
+      placedWords.push(placed);
+    }
+  }
+  
+  // Fill remaining empty cells with random letters
   const vowels = 'AEIOU';
   const consonants = 'BCDFGHJKLMNPQRSTVWXYZ';
   
   for (let row = 0; row < boardSize; row++) {
     for (let col = 0; col < boardSize; col++) {
-      if (board[row][col] === null) {
+      if (board[row][col] === null || board[row][col] === '') {
         board[row][col] = Math.random() < 0.4 
           ? vowels[Math.floor(Math.random() * vowels.length)]
           : consonants[Math.floor(Math.random() * consonants.length)];
