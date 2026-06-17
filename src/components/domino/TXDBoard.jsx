@@ -69,11 +69,10 @@ export default function TXDBoard({
       {/* Placed tiles */}
       {board.map((piece, i) => {
         const isDouble = piece.top === piece.bottom;
-        const orientation = isDouble ? 'vertical' : 'horizontal';
-        // x/y are % coordinates from center of piece
+        // Use stored orientation if available, otherwise derive from isDouble
+        const orientation = piece.placedOrientation || (isDouble ? 'vertical' : 'horizontal');
         const x = piece.x ?? 50;
         const y = piece.y ?? 50;
-        const rot = piece.rotation ?? (isDouble ? 0 : 90);
 
         return (
           <div
@@ -82,7 +81,7 @@ export default function TXDBoard({
               position: 'absolute',
               left: `${x}%`,
               top: `${y}%`,
-              transform: `translate(-50%, -50%) rotate(${rot}deg)`,
+              transform: 'translate(-50%, -50%)',
               zIndex: 5 + i,
               filter: piece.isSpinner
                 ? 'drop-shadow(0 0 10px rgba(0,255,120,0.9)) drop-shadow(0 0 16px rgba(255,95,31,0.7))'

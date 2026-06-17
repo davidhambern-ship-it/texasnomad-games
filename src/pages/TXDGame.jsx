@@ -123,11 +123,12 @@ export default function TXDGame() {
       const { domino, side } = choice;
       const isFirstPlay = (g.board?.length || 0) === 0;
       const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedRotation } = result;
+      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
       const boardEntry = {
         top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-        x: placedX ?? 50, y: placedY ?? 50, rotation: placedRotation ?? 90,
+        x: placedX ?? 50, y: placedY ?? 50,
+        placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
       };
       const newBoard = [...(g.board || []), boardEntry];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
@@ -197,14 +198,13 @@ export default function TXDGame() {
     }
 
     const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedRotation } = result;
-
+    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
     const newHand = myPlayer.hand.filter(d => d.id !== domino.id);
     const boardEntry = {
       top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-      x: isFirstPlay ? 50 : (placedX ?? 50),
-      y: isFirstPlay ? 50 : (placedY ?? 50),
-      rotation: isFirstPlay ? (domino.top === domino.bottom ? 0 : 90) : (placedRotation ?? 90),
+      x: placedX ?? 50,
+      y: placedY ?? 50,
+      placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
     };
     const newBoard = [...(g.board || []), boardEntry];
     let ni = (myIndex + 1) % g.players.length;
