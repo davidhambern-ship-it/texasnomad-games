@@ -256,7 +256,10 @@ export function calculateRoundScores(players, winnerIndex) {
  * Each move: { dominoId, endId, requiredValue, domino }
  */
 export function getLegalMoves(hand, openEnds) {
-  if (!openEnds) return [];
+  // Board is empty — every tile is a legal first play
+  if (!openEnds) {
+    return hand.map(domino => ({ dominoId: domino.id, endId: 'first', requiredValue: null, domino }));
+  }
   const moves = [];
   hand.forEach(domino => {
     Object.entries(openEnds).forEach(([endId, end]) => {
@@ -273,7 +276,7 @@ export function getLegalMoves(hand, openEnds) {
  * Get playable end IDs for a specific domino.
  */
 export function getPlayableEndsForDomino(domino, openEnds) {
-  if (!openEnds) return [];
+  if (!openEnds) return ['first'];
   return Object.entries(openEnds)
     .filter(([, end]) => end && end.active && (domino.top === end.value || domino.bottom === end.value))
     .map(([endId]) => endId);
