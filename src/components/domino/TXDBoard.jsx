@@ -21,9 +21,28 @@ export default function TXDBoard({
   draggingDominoId = null,
 }) {
   if (board.length === 0) {
+    // Show a center drop zone for the first play
+    const isFirstPlayable = !!onDropOnEnd;
     return (
-      <div className="flex items-center justify-center h-full w-full text-white/20 font-body text-xs tracking-widest italic">
-        — no tiles played yet —
+      <div className="flex items-center justify-center h-full w-full">
+        <div
+          onDragOver={(e) => { if (isFirstPlayable) e.preventDefault(); }}
+          onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd('first', id); }}
+          onClick={() => { if (selectedDomino && onDropOnEnd) onDropOnEnd('first', selectedDomino.id); }}
+          style={{
+            width: 120, height: 64, borderRadius: 14,
+            border: isFirstPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.1)',
+            background: isFirstPlayable ? 'rgba(0,255,120,0.08)' : 'rgba(255,255,255,0.02)',
+            boxShadow: isFirstPlayable ? '0 0 18px rgba(0,255,120,0.5)' : 'none',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: isFirstPlayable ? 'pointer' : 'default',
+            transition: 'box-shadow 0.15s, background 0.15s',
+          }}
+        >
+          <span style={{ fontSize: 10, color: isFirstPlayable ? '#00ff78' : 'rgba(255,255,255,0.15)', fontFamily: 'monospace' }}>
+            {isFirstPlayable ? 'PLAY HERE' : '— empty —'}
+          </span>
+        </div>
       </div>
     );
   }
