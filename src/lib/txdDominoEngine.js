@@ -55,11 +55,13 @@ export function findDoubleSixHolder(hands) {
 
 // ── Board placement engine ────────────────────────────────────────────────────
 
-const TABLE_BOUNDS = { minX: 8, maxX: 92, minY: 12, maxY: 88 };
+const TABLE_BOUNDS = { minX: 10, maxX: 90, minY: 14, maxY: 86 };
 
 // Step sizes in % units for each orientation
-const STEP_H = 7;  // horizontal tile width step
-const STEP_V = 9;  // vertical tile height step
+// A domino is ~68px wide / ~34px tall in a ~600px board (~11% x 5.7%)
+// Use generous steps so tiles never visually overlap
+const STEP_H = 14;  // horizontal tile step (% of board width)
+const STEP_V = 16;  // vertical tile step (% of board height)
 
 const DIR = {
   left:  { dx: -STEP_H, dy: 0,       rotation: 90  },
@@ -109,12 +111,12 @@ export function buildOpenEndsForOpening(domino) {
   const cx = 50, cy = 50;
 
   if (isDouble) {
-    // Spinner: 4 open ends
+    // Spinner: 4 open ends — positioned one step away from center
     return {
-      left:   { id: 'left',   value: domino.top,    x: cx - STEP_H, y: cy,          direction: 'left',  rotation: DIR.left.rotation,  active: true },
-      right:  { id: 'right',  value: domino.top,    x: cx + STEP_H, y: cy,          direction: 'right', rotation: DIR.right.rotation, active: true },
-      top:    { id: 'top',    value: domino.top,    x: cx,          y: cy - STEP_V, direction: 'up',    rotation: DIR.up.rotation,    active: true },
-      bottom: { id: 'bottom', value: domino.top,    x: cx,          y: cy + STEP_V, direction: 'down',  rotation: DIR.down.rotation,  active: true },
+      left:   { id: 'left',   value: domino.top, x: cx - STEP_H, y: cy,          direction: 'left',  rotation: DIR.left.rotation,  active: true },
+      right:  { id: 'right',  value: domino.top, x: cx + STEP_H, y: cy,          direction: 'right', rotation: DIR.right.rotation, active: true },
+      top:    { id: 'top',    value: domino.top, x: cx,          y: cy - STEP_V, direction: 'up',    rotation: DIR.up.rotation,    active: true },
+      bottom: { id: 'bottom', value: domino.top, x: cx,          y: cy + STEP_V, direction: 'down',  rotation: DIR.down.rotation,  active: true },
     };
   }
   // Non-double: left + right only
