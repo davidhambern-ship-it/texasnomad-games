@@ -66,10 +66,12 @@ export function findDoubleSixHolder(hands) {
 // STEP_H = how far to advance the center point along the horizontal axis per tile
 // STEP_V = how far to advance along the vertical axis per tile
 
-const STEP_H = 14; // % board width per horizontal step
-const STEP_V = 14; // % board height per vertical step
+// A horizontal domino (width=34) is 68px wide. Board is ~450px → 68/450 ≈ 15%.
+// Use 20% so tiles have a small gap between them and never overlap.
+const STEP_H = 20; // % board width per horizontal step
+const STEP_V = 20; // % board height per vertical step
 
-const TABLE_BOUNDS = { minX: 12, maxX: 88, minY: 15, maxY: 85 };
+const TABLE_BOUNDS = { minX: 14, maxX: 86, minY: 16, maxY: 84 };
 
 // Returns the CSS rotation for a tile on a given arm direction.
 // Non-doubles are horizontal (no rotation). Doubles are vertical (no rotation either — 
@@ -112,12 +114,13 @@ export function buildOpenEndsForOpening(domino) {
 
   if (isDouble) {
     return {
-      left:   { id: 'left',   value: domino.top, x: cx - STEP_H, y: cy,          direction: 'left',  active: true },
-      right:  { id: 'right',  value: domino.top, x: cx + STEP_H, y: cy,          direction: 'right', active: true },
-      top:    { id: 'top',    value: domino.top, x: cx,          y: cy - STEP_V, direction: 'up',    active: true },
-      bottom: { id: 'bottom', value: domino.top, x: cx,          y: cy + STEP_V, direction: 'down',  active: true },
+      left:   { id: 'left',   value: domino.top, x: cx - STEP_H, y: cy,           direction: 'left',  active: true },
+      right:  { id: 'right',  value: domino.top, x: cx + STEP_H, y: cy,           direction: 'right', active: true },
+      top:    { id: 'top',    value: domino.top, x: cx,           y: cy - STEP_V,  direction: 'up',    active: true },
+      bottom: { id: 'bottom', value: domino.top, x: cx,           y: cy + STEP_V,  direction: 'down',  active: true },
     };
   }
+  // Non-double: left end gets top value (left half), right end gets bottom value (right half)
   return {
     left:   { id: 'left',   value: domino.top,    x: cx - STEP_H, y: cy, direction: 'left',  active: true },
     right:  { id: 'right',  value: domino.bottom, x: cx + STEP_H, y: cy, direction: 'right', active: true },
