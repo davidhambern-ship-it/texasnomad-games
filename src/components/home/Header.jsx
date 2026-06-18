@@ -16,6 +16,7 @@ export default function Header() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
+    let heartbeatInterval;
     async function initProfile() {
       try {
         const u = await base44.auth.me();
@@ -25,9 +26,24 @@ export default function Header() {
         if (profiles.length === 0) {
           await base44.functions.invoke('initPlayerProfile', { data: { id: u.id, email: u.email, full_name: u.full_name } });
         }
+        // Presence heartbeat — upsert every 60s
+        async function heartbeat() {
+          try {
+            const existing = await base44.entities.PlayerPresence.filter({ user_id: u.id });
+            const username = profiles[0]?.username || u.full_name || 'Player';
+            if (existing.length > 0) {
+              await base44.entities.PlayerPresence.update(existing[0].id, { is_online: true, last_seen: new Date().toISOString(), username });
+            } else {
+              await base44.entities.PlayerPresence.create({ user_id: u.id, username, is_online: true, last_seen: new Date().toISOString() });
+            }
+          } catch (_) {}
+        }
+        heartbeat();
+        heartbeatInterval = setInterval(heartbeat, 60000);
       } catch (_) {}
     }
     initProfile();
+    return () => clearInterval(heartbeatInterval);
   }, []);
 
   return (

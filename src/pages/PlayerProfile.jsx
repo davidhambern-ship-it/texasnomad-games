@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import Header from '@/components/home/Header';
+import FriendsList from '@/components/friends/FriendsList';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -267,6 +268,11 @@ export default function PlayerProfilePage() {
             </div>
           </div>
         )}
+
+        {/* Friends */}
+        <div style={{ gridColumn: '1 / -1' }}>
+          <FriendsList userId={user?.id} theme={theme} />
+        </div>
 
         {/* Referral */}
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>

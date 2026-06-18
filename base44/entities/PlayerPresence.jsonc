@@ -1,0 +1,40 @@
+{
+  "name": "PlayerPresence",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Foreign key to User"
+    },
+    "username": {
+      "type": "string"
+    },
+    "is_online": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_seen": {
+      "type": "string",
+      "description": "ISO timestamp of last heartbeat"
+    },
+    "current_game_id": {
+      "type": "string",
+      "description": "e.g. bff, spades, txd"
+    },
+    "current_room_code": {
+      "type": "string",
+      "description": "Active room code if in a game"
+    },
+    "current_players": {
+      "type": "number",
+      "description": "Current player count in room"
+    },
+    "max_players": {
+      "type": "number",
+      "description": "Max players for the room"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

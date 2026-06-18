@@ -1,0 +1,35 @@
+{
+  "name": "Friendship",
+  "type": "object",
+  "properties": {
+    "requester_user_id": {
+      "type": "string",
+      "description": "User ID who sent the friend request"
+    },
+    "recipient_user_id": {
+      "type": "string",
+      "description": "User ID who received the friend request"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "accepted",
+        "declined"
+      ],
+      "default": "pending"
+    },
+    "requester_username": {
+      "type": "string",
+      "description": "Cached username of requester"
+    },
+    "recipient_username": {
+      "type": "string",
+      "description": "Cached username of recipient"
+    }
+  },
+  "required": [
+    "requester_user_id",
+    "recipient_user_id"
+  ]
+}
