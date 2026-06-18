@@ -12,6 +12,7 @@ import BFFTeamRoster from '@/components/bff/BFFTeamRoster.jsx';
 import BFFBuzzer from '@/components/bff/BFFBuzzer.jsx';
 import { useBFFVsAI } from '@/hooks/useBFFVsAI.js';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
+import useGameStats from '@/hooks/useGameStats';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const TN_TEAM = TEXASNOMAD_CHARACTERS;
@@ -28,6 +29,7 @@ export default function BFFGame() {
 function BFFViewer({ roomCode, isVsAI }) {
   const { room, loading, updateState, ensureRoom, registerUser } = useGameRoom(roomCode, 'bff', 'viewer');
   const gs = room?.game_state || {};
+  const { recordStat, resetStat } = useGameStats('bff');
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_bff_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_bff_${roomCode}`, '1'); setShowInstructions(false); };
 
@@ -98,6 +100,20 @@ function BFFViewer({ roomCode, isVsAI }) {
     humanPlayers,
     enabled: isVsAI && !!gs.phase && !showSetup,
   });
+
+  // ── Record stats when game ends ───────────────────────────────────────────
+  const statRecordedRef = useRef(false);
+  useEffect(() => {
+    if (gs.phase !== 'round_over' || statRecordedRef.current) return;
+    // Only record for the human player on team 1
+    const myPlayer = (gs.players || []).find(p => p.playerId === playerId);
+    if (!myPlayer) return;
+    statRecordedRef.current = true;
+    const myTeam = Number(myPlayer.familyTeam) === 1 ? 1 : 2;
+    const myScore = myTeam === 1 ? (gs.score1 || 0) : (gs.score2 || 0);
+    const oppScore = myTeam === 1 ? (gs.score2 || 0) : (gs.score1 || 0);
+    recordStat({ score: myScore, won: myScore > oppScore });
+  }, [gs.phase]);
 
   // ── Watch last_submission for notifications ───────────────────────────────
   const lastSubRef = useRef(null);

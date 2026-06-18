@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
+import useGameStats from '@/hooks/useGameStats';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesRoundSummary from '@/components/spades/SpadesRoundSummary';
@@ -85,6 +86,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   // Round summary / match over
   const [roundResult, setRoundResult] = useState(null);
   const [matchOver, setMatchOver] = useState(false);
+  const { recordStat, resetStat } = useGameStats('spades');
   const nextHandInfoRef = useRef(null); // { handNumber, dealerSeat } captured at round-end time
 
   // Join-flow state
@@ -404,6 +406,11 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         // Check win condition
         if (newScore1 >= 100 || newScore2 >= 100) {
           setMatchOver(true);
+          // Record stats: determine if this human player won
+          const myTeam = (mySeatNumber === 1 || mySeatNumber === 3) ? 1 : 2;
+          const myFinalScore = myTeam === 1 ? newScore1 : newScore2;
+          const oppFinalScore = myTeam === 1 ? newScore2 : newScore1;
+          recordStat({ score: myFinalScore, won: myFinalScore > oppFinalScore });
         }
       } finally {
         setTimeout(() => { isUpdatingRef.current = false; }, 500);
@@ -705,6 +712,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const handlePlayAgain = async () => {
     setMatchOver(false);
     setRoundResult(null);
+    resetStat();
     if (isUpdatingRef.current) return;
     isUpdatingRef.current = true;
     try {

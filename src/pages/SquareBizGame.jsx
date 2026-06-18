@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
+import useGameStats from '@/hooks/useGameStats';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
@@ -182,6 +183,7 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
   const popup = gs.popup;
   const sty = PS2;
 
+  const { recordStat, resetStat } = useGameStats('square-biz');
   const [triviaQuestion, setTriviaQuestion] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
   const [answerResult, setAnswerResult] = useState(null); // true | false | null
@@ -377,8 +379,20 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     runCPUTurn();
   }, [phase, winner, gs.board, gs.score_o]);
 
+  // Record stats when game ends
+  const statRecordedRef = useRef(false);
+  useEffect(() => {
+    if (!winner || statRecordedRef.current) return;
+    statRecordedRef.current = true;
+    const won = winner === 'X';
+    const score = won ? (gs.score_x || 1) * 100 : 0;
+    recordStat({ score, won });
+  }, [winner]);
+
   // New game
   const handleNewGame = async () => {
+    statRecordedRef.current = false;
+    resetStat();
     setTriviaQuestion(null);
     setSelectedAnswer(null);
     setAnswerResult(null);
