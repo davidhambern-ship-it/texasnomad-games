@@ -27,6 +27,10 @@ import TXDDominoDemo from '@/pages/TXDDominoDemo';
 import TXDGame from '@/pages/TXDGame';
 import TXDHostPanel from '@/pages/TXDHostPanel';
 import PlayerProfile from '@/pages/PlayerProfile';
+import Register from '@/pages/Register';
+import Login from '@/pages/Login';
+import ForgotPassword from '@/pages/ForgotPassword';
+import ResetPassword from '@/pages/ResetPassword';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -61,6 +65,10 @@ const AuthenticatedApp = () => {
   return (
     <Routes>
       <Route path="/welcome" element={<Welcome />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<HomeGate />} />
       <Route path="/games" element={<Games />} />
       <Route path="/games/bff" element={<BFFGame />} />
