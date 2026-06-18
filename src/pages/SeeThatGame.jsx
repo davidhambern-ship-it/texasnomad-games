@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import SaloonBackground from '@/components/seeThis/SaloonBackground';
+import ArcadeCabinetShell from '@/components/arcade/ArcadeCabinetShell';
 
 // ─── Object Definitions ───────────────────────────────────────────────────────
 // Objects are small and semi-transparent so they blend into the cluttered scene
@@ -242,98 +243,87 @@ export default function SeeThatGame() {
   const timerPct = timeLeft / GAME_DURATION;
   const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#FF5F1F' : '#4ade80';
 
+  const deckCenter = (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      {phase === 'playing' && (
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ ...PS2, fontSize: 6, color: 'rgba(74,222,128,0.6)' }}>FOUND</div>
+            <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 22, color: '#4ade80', lineHeight: 1 }}>{foundCount}/{TARGETS_COUNT}</div>
+          </div>
+          <div style={{ textAlign: 'center', padding: '2px 10px', border: `1px solid ${timerColor}60`, borderRadius: 6 }}>
+            <div style={{ ...PS2, fontSize: 6, color: `${timerColor}80` }}>TIME</div>
+            <div style={{ ...PS2, fontSize: 14, color: timerColor, textShadow: `0 0 10px ${timerColor}` }}>{String(Math.floor(timeLeft / 60)).padStart(2,'0')}:{String(timeLeft % 60).padStart(2,'0')}</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.6)' }}>SCORE</div>
+            <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 22, color: score < 0 ? '#ef4444' : '#FFD700', lineHeight: 1 }}>{score}</div>
+          </div>
+        </div>
+      )}
+      {phase === 'lobby' && <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>HIDDEN OBJECT</div>}
+    </div>
+  );
+
+  const deckControls = [
+    ...(phase === 'lobby' ? [{ label: '▶ START', action: startGame }] : []),
+    ...(phase === 'playing' ? [
+      { label: '🔄 NEW', action: startGame },
+      { label: 'HITBOX', action: () => setShowHitbox(h => !h), variant: showHitbox ? 'primary' : 'secondary' },
+      { label: '↩ QUIT', action: () => setPhase('lobby'), variant: 'secondary' },
+    ] : []),
+    ...((phase === 'win' || phase === 'lose') ? [
+      { label: '▶ AGAIN', action: startGame },
+      { label: '↩ LOBBY', action: () => setPhase('lobby'), variant: 'secondary' },
+    ] : []),
+  ];
+
   return (
-    <div style={{ minHeight: '100vh', background: '#05030b', color: 'white', display: 'flex', flexDirection: 'column', fontFamily: "'Inter', sans-serif" }}>
+    <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;500;600;700&family=Inter:wght@400;500;600&family=Rye&family=Press+Start+2P&display=swap');
         @keyframes rippleOut { 0% { transform: translate(-50%,-50%) scale(0.3); opacity:1; } 100% { transform: translate(-50%,-50%) scale(1.8); opacity:0; } }
         @keyframes sparkle { 0% { transform:scale(0); opacity:1; } 100% { transform:scale(1.5); opacity:0; } }
         @keyframes feedbackFloat { 0% { transform:translateY(0); opacity:1; } 100% { transform:translateY(-50px); opacity:0; } }
         @keyframes wrongShake { 0%,100% { transform:translateX(0); } 20% { transform:translateX(-6px); } 60% { transform:translateX(6px); } }
         @keyframes pulseGlow { 0%,100% { box-shadow:0 0 10px #BC13FE60; } 50% { box-shadow:0 0 25px #BC13FE,0 0 50px #BC13FE60; } }
         @keyframes winPop { 0% { transform:scale(0.5); opacity:0; } 70% { transform:scale(1.05); opacity:1; } 100% { transform:scale(1); opacity:1; } }
-        * { box-sizing: border-box; }
       `}</style>
 
-      {/* Header */}
-      <header style={{ borderBottom: '1px solid rgba(188,19,254,0.3)', background: 'rgba(5,3,11,0.95)', backdropFilter: 'blur(10px)', padding: '0 16px', height: 48, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, position: 'sticky', top: 0, zIndex: 100 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <Link to="/" style={{ textDecoration: 'none' }}>
-            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" style={{ width: 28, height: 28, objectFit: 'contain' }} />
-          </Link>
-          <span style={{ ...PS2, fontSize: 11, color: '#BC13FE', textShadow: '0 0 10px #BC13FE' }}>SEE THAT!</span>
-          <span style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>by TexasNomad</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} onClick={() => setShowHitbox(h => !h)}>
-            <div style={{ width: 36, height: 20, borderRadius: 10, background: showHitbox ? '#BC13FE' : 'rgba(255,255,255,0.1)', border: '1px solid rgba(188,19,254,0.5)', position: 'relative', transition: 'background 0.2s' }}>
-              <div style={{ width: 14, height: 14, borderRadius: '50%', background: 'white', position: 'absolute', top: 2, left: showHitbox ? 18 : 2, transition: 'left 0.2s' }} />
-            </div>
-            <span style={{ ...PS2, fontSize: 6, color: showHitbox ? '#BC13FE' : 'rgba(255,255,255,0.4)' }}>HITBOXES</span>
-          </div>
-          <Link to="/games" style={{ ...PS2, fontSize: 7, padding: '4px 10px', border: '1px solid rgba(255,215,0,0.4)', color: 'rgba(255,215,0,0.8)', borderRadius: 4, textDecoration: 'none' }}>← LOBBY</Link>
-        </div>
-      </header>
-
-      {/* Title */}
-      <div style={{ textAlign: 'center', padding: '4px 16px 2px', flexShrink: 0, background: 'linear-gradient(180deg, rgba(188,19,254,0.08) 0%, transparent 100%)' }}>
-        <h1 style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(20px, 3vw, 36px)', color: '#FFD700', textShadow: '0 0 20px #FFD700, 0 0 40px rgba(255,215,0,0.4)', margin: 0, lineHeight: 1, letterSpacing: '0.05em' }}>SEE THAT!</h1>
-        <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.3)', margin: '2px 0 0' }}>HIDDEN OBJECT CHALLENGE • TEXASNOMAD ARCADE</p>
-      </div>
-
-      {/* Main layout */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6, padding: '6px 12px 8px', maxWidth: 1280, margin: '0 auto', width: '100%' }}>
-
-        {/* HUD */}
-        {phase === 'playing' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 8, alignItems: 'center', flexShrink: 0 }}>
-            <div style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(74,222,128,0.3)', background: 'rgba(74,222,128,0.05)', textAlign: 'center' }}>
-              <div style={{ ...PS2, fontSize: 7, color: 'rgba(74,222,128,0.6)', marginBottom: 3 }}>FOUND</div>
-              <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 32, color: '#4ade80', lineHeight: 1 }}>{foundCount} <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.3)' }}>/ {TARGETS_COUNT}</span></div>
-            </div>
-            <div style={{ padding: '8px 20px', borderRadius: 10, border: `2px solid ${timerColor}60`, background: `${timerColor}08`, textAlign: 'center', minWidth: 120, animation: timeLeft <= 10 ? 'wrongShake 0.3s ease-in-out infinite' : 'none' }}>
-              <div style={{ ...PS2, fontSize: 7, color: `${timerColor}80`, marginBottom: 3 }}>TIME</div>
-              <div style={{ ...PS2, fontSize: 26, color: timerColor, textShadow: `0 0 20px ${timerColor}`, lineHeight: 1 }}>{String(Math.floor(timeLeft / 60)).padStart(2,'0')}:{String(timeLeft % 60).padStart(2,'0')}</div>
-              <div style={{ marginTop: 5, height: 4, borderRadius: 2, background: 'rgba(255,255,255,0.1)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${timerPct * 100}%`, background: timerColor, transition: 'width 1s linear, background 0.3s', borderRadius: 2 }} />
-              </div>
-            </div>
-            <div style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(255,215,0,0.3)', background: 'rgba(255,215,0,0.05)', textAlign: 'center' }}>
-              <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,215,0,0.6)', marginBottom: 3 }}>SCORE</div>
-              <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 32, color: score < 0 ? '#ef4444' : '#FFD700', lineHeight: 1, textShadow: `0 0 12px ${score < 0 ? '#ef4444' : '#FFD700'}60` }}>{score}</div>
-            </div>
-          </div>
-        )}
-
+      <ArcadeCabinetShell
+        gameId="see-that"
+        gameTitle="SEE THAT!"
+        controls={deckControls}
+        centerInfo={deckCenter}
+      >
         {/* Scene row */}
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, padding: 8 }}>
 
           {/* Target list */}
           {phase === 'playing' && (
-            <div style={{ width: 150, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ ...PS2, fontSize: 7, color: '#BC13FE', textAlign: 'center', marginBottom: 4 }}>FIND THESE</div>
+            <div style={{ width: 130, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <div style={{ ...PS2, fontSize: 6, color: '#f43f5e', textAlign: 'center', marginBottom: 2 }}>FIND THESE</div>
               {targets.map(t => (
-                <div key={t.id} style={{ padding: '8px 10px', borderRadius: 10, border: `2px solid ${t.found ? '#4ade80' : t.color + '50'}`, background: t.found ? 'rgba(74,222,128,0.1)' : t.color + '08', display: 'flex', alignItems: 'center', gap: 8, transition: 'all 0.3s', opacity: t.found ? 0.6 : 1 }}>
-                  <span style={{ fontSize: 24, filter: t.found ? 'grayscale(1) opacity(0.5)' : `drop-shadow(0 0 4px ${t.color})`, flexShrink: 0 }}>{t.emoji}</span>
+                <div key={t.id} style={{ padding: '5px 8px', borderRadius: 8, border: `2px solid ${t.found ? '#4ade80' : t.color + '50'}`, background: t.found ? 'rgba(74,222,128,0.1)' : t.color + '08', display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.3s', opacity: t.found ? 0.6 : 1 }}>
+                  <span style={{ fontSize: 18, filter: t.found ? 'grayscale(1) opacity(0.5)' : `drop-shadow(0 0 4px ${t.color})`, flexShrink: 0 }}>{t.emoji}</span>
                   <div>
-                    <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, color: t.found ? '#4ade80' : 'white', lineHeight: 1.1, textDecoration: t.found ? 'line-through' : 'none' }}>{t.label}</div>
-                    {t.found && <div style={{ ...PS2, fontSize: 6, color: '#4ade80' }}>✓ FOUND</div>}
+                    <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 13, color: t.found ? '#4ade80' : 'white', lineHeight: 1.1, textDecoration: t.found ? 'line-through' : 'none' }}>{t.label}</div>
+                    {t.found && <div style={{ ...PS2, fontSize: 5, color: '#4ade80' }}>✓ FOUND</div>}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* Scene — fixed 900:600 aspect ratio, scrollable on small screens */}
+          {/* Scene */}
           <div
             ref={sceneRef}
             onClick={handleSceneClick}
             style={{
-              flex: 1, position: 'relative', borderRadius: 12, overflow: 'hidden',
-              aspectRatio: '900 / 600', minWidth: 0, minHeight: 320,
-              border: wrongFlash ? '3px solid #ef4444' : phase === 'playing' ? '2px solid rgba(188,19,254,0.5)' : '2px solid rgba(188,19,254,0.2)',
+              flex: 1, position: 'relative', borderRadius: 8, overflow: 'hidden',
+              aspectRatio: '900 / 560', minWidth: 0, minHeight: 240,
+              border: wrongFlash ? '3px solid #ef4444' : phase === 'playing' ? '2px solid rgba(244,63,94,0.5)' : '2px solid rgba(244,63,94,0.2)',
               cursor: phase === 'playing' ? 'crosshair' : 'default',
-              boxShadow: wrongFlash ? '0 0 40px rgba(239,68,68,0.5), inset 0 0 40px rgba(239,68,68,0.1)' : '0 0 30px rgba(188,19,254,0.2)',
+              boxShadow: wrongFlash ? '0 0 40px rgba(239,68,68,0.5), inset 0 0 40px rgba(239,68,68,0.1)' : '0 0 20px rgba(244,63,94,0.2)',
               transition: 'border-color 0.15s, box-shadow 0.15s',
               background: '#050310',
             }}
@@ -354,36 +344,32 @@ export default function SeeThatGame() {
 
             {/* Lobby overlay */}
             {phase === 'lobby' && (
-              <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,3,11,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 20, zIndex: 40 }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,3,11,0.85)', backdropFilter: 'blur(4px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, zIndex: 40 }}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(32px, 6vw, 64px)', color: '#FFD700', textShadow: '0 0 30px #FFD700', lineHeight: 1 }}>SEE THAT!</div>
-                  <div style={{ ...PS2, fontSize: 8, color: '#BC13FE', marginTop: 8 }}>HIDDEN OBJECT CHALLENGE</div>
+                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(28px, 5vw, 56px)', color: '#FFD700', textShadow: '0 0 30px #FFD700', lineHeight: 1 }}>SEE THAT!</div>
+                  <div style={{ ...PS2, fontSize: 7, color: '#f43f5e', marginTop: 6 }}>HIDDEN OBJECT CHALLENGE</div>
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, maxWidth: 360 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, maxWidth: 320 }}>
                   {[{ icon: '👁', label: '5 Objects', sub: 'Find them all' }, { icon: '⏱', label: '60 Seconds', sub: 'Race the clock' }, { icon: '🎯', label: 'No Misses', sub: '-10 per miss' }].map(f => (
-                    <div key={f.label} style={{ padding: '12px 8px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                      <div style={{ fontSize: 28 }}>{f.icon}</div>
-                      <div style={{ ...PS2, fontSize: 7, color: '#FFD700', marginTop: 4 }}>{f.label}</div>
-                      <div style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{f.sub}</div>
+                    <div key={f.label} style={{ padding: '10px 6px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', textAlign: 'center' }}>
+                      <div style={{ fontSize: 24 }}>{f.icon}</div>
+                      <div style={{ ...PS2, fontSize: 6, color: '#FFD700', marginTop: 3 }}>{f.label}</div>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>{f.sub}</div>
                     </div>
                   ))}
                 </div>
-                <button onClick={startGame} style={{ padding: '14px 48px', background: 'linear-gradient(135deg, #BC13FE, #9333ea)', border: 'none', borderRadius: 12, color: 'white', fontFamily: "'Teko', sans-serif", fontSize: 28, letterSpacing: '0.15em', cursor: 'pointer', boxShadow: '0 0 30px rgba(188,19,254,0.5)', animation: 'pulseGlow 2s ease-in-out infinite', textTransform: 'uppercase' }}>
-                  ▶ START GAME
-                </button>
               </div>
             )}
 
             {/* Win overlay */}
             {phase === 'win' && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,3,11,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40 }}>
-                <div style={{ padding: '32px 48px', borderRadius: 20, border: '3px solid #FFD700', background: 'rgba(5,3,11,0.95)', textAlign: 'center', boxShadow: '0 0 60px rgba(255,215,0,0.4)', animation: 'winPop 0.5s ease-out' }}>
-                  <div style={{ fontSize: 64 }}>🏆</div>
-                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(28px, 5vw, 52px)', color: '#FFD700', textShadow: '0 0 30px #FFD700' }}>YOU WIN!</div>
-                  <div style={{ ...PS2, fontSize: 9, color: '#4ade80', marginTop: 8 }}>ALL OBJECTS FOUND!</div>
-                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 48, color: '#FFD700', marginTop: 8 }}>{score} PTS</div>
-                  <div style={{ ...PS2, fontSize: 8, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>TIME REMAINING: {timeLeft}s</div>
-                  <button onClick={startGame} style={{ marginTop: 20, padding: '12px 36px', background: 'linear-gradient(135deg,#4ade80,#22c55e)', border: 'none', borderRadius: 10, color: 'black', fontFamily: "'Teko', sans-serif", fontSize: 24, letterSpacing: '0.1em', cursor: 'pointer', fontWeight: 700 }}>PLAY AGAIN</button>
+                <div style={{ padding: '24px 36px', borderRadius: 16, border: '3px solid #FFD700', background: 'rgba(5,3,11,0.95)', textAlign: 'center', boxShadow: '0 0 60px rgba(255,215,0,0.4)', animation: 'winPop 0.5s ease-out' }}>
+                  <div style={{ fontSize: 52 }}>🏆</div>
+                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(24px, 4vw, 44px)', color: '#FFD700', textShadow: '0 0 30px #FFD700' }}>YOU WIN!</div>
+                  <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginTop: 6 }}>ALL OBJECTS FOUND!</div>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 40, color: '#FFD700', marginTop: 6 }}>{score} PTS</div>
+                  <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.4)', marginTop: 3 }}>TIME REMAINING: {timeLeft}s</div>
                 </div>
               </div>
             )}
@@ -391,40 +377,28 @@ export default function SeeThatGame() {
             {/* Lose overlay */}
             {phase === 'lose' && (
               <div style={{ position: 'absolute', inset: 0, background: 'rgba(5,3,11,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 40 }}>
-                <div style={{ padding: '32px 48px', borderRadius: 20, border: '3px solid #ef4444', background: 'rgba(5,3,11,0.95)', textAlign: 'center', boxShadow: '0 0 60px rgba(239,68,68,0.4)', animation: 'winPop 0.5s ease-out' }}>
-                  <div style={{ fontSize: 64 }}>⏰</div>
-                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(24px, 4vw, 44px)', color: '#ef4444', textShadow: '0 0 20px #ef4444' }}>TIME'S UP!</div>
-                  <div style={{ ...PS2, fontSize: 9, color: 'rgba(255,255,255,0.5)', marginTop: 8 }}>{foundCount} / {TARGETS_COUNT} FOUND</div>
-                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 48, color: score < 0 ? '#ef4444' : '#FFD700', marginTop: 8 }}>{score} PTS</div>
-                  <div style={{ marginTop: 12 }}>
-                    <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>MISSING OBJECTS WERE:</div>
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <div style={{ padding: '24px 36px', borderRadius: 16, border: '3px solid #ef4444', background: 'rgba(5,3,11,0.95)', textAlign: 'center', boxShadow: '0 0 60px rgba(239,68,68,0.4)', animation: 'winPop 0.5s ease-out' }}>
+                  <div style={{ fontSize: 52 }}>⏰</div>
+                  <div style={{ fontFamily: "'Rye', serif", fontSize: 'clamp(20px, 3vw, 36px)', color: '#ef4444', textShadow: '0 0 20px #ef4444' }}>TIME'S UP!</div>
+                  <div style={{ ...PS2, fontSize: 8, color: 'rgba(255,255,255,0.5)', marginTop: 6 }}>{foundCount} / {TARGETS_COUNT} FOUND</div>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 40, color: score < 0 ? '#ef4444' : '#FFD700', marginTop: 6 }}>{score} PTS</div>
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', marginBottom: 5 }}>MISSING:</div>
+                    <div style={{ display: 'flex', gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
                       {targets.filter(t => !t.found).map(t => (
-                        <div key={t.id} style={{ padding: '4px 10px', borderRadius: 6, border: `1px solid ${t.color}50`, background: `${t.color}10`, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ fontSize: 18 }}>{t.emoji}</span>
-                          <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 14, color: t.color }}>{t.label}</span>
+                        <div key={t.id} style={{ padding: '3px 8px', borderRadius: 5, border: `1px solid ${t.color}50`, background: `${t.color}10`, display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ fontSize: 14 }}>{t.emoji}</span>
+                          <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 12, color: t.color }}>{t.label}</span>
                         </div>
                       ))}
                     </div>
                   </div>
-                  <button onClick={startGame} style={{ marginTop: 20, padding: '12px 36px', background: 'linear-gradient(135deg,#BC13FE,#9333ea)', border: 'none', borderRadius: 10, color: 'white', fontFamily: "'Teko', sans-serif", fontSize: 24, letterSpacing: '0.1em', cursor: 'pointer' }}>TRY AGAIN</button>
                 </div>
               </div>
             )}
           </div>
         </div>
-
-        {/* Bottom bar */}
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 16, flexShrink: 0, paddingTop: 4 }}>
-          {phase !== 'lobby' && (
-            <button onClick={() => setPhase('lobby')} style={{ padding: '8px 24px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 8, color: 'rgba(255,255,255,0.6)', fontFamily: "'Teko', sans-serif", fontSize: 18, letterSpacing: '0.1em', cursor: 'pointer' }}>↩ BACK TO LOBBY</button>
-          )}
-          {phase === 'playing' && (
-            <button onClick={startGame} style={{ padding: '8px 28px', background: 'linear-gradient(135deg,#FF5F1F,#cc4a18)', border: 'none', borderRadius: 8, color: 'white', fontFamily: "'Teko', sans-serif", fontSize: 20, letterSpacing: '0.1em', cursor: 'pointer' }}>🔄 NEW GAME</button>
-          )}
-          <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.2)', textAlign: 'center' }}>TEXASNOMAD GAMES • SEE THAT! v1.0</div>
-        </div>
-      </div>
-    </div>
+      </ArcadeCabinetShell>
+    </>
   );
 }
