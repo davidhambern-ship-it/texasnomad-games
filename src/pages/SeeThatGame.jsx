@@ -243,6 +243,29 @@ export default function SeeThatGame() {
   const timerPct = timeLeft / GAME_DURATION;
   const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#FF5F1F' : '#4ade80';
 
+  const cabinetHeader = (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', height: 44, gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Link to="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
+          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+        </Link>
+        <span style={{ ...PS2, fontSize: 9, color: '#f43f5e', textShadow: '0 0 10px #f43f5e' }}>SEE THAT!</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(244,63,94,0.4)', background: 'rgba(244,63,94,0.08)' }}>
+          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#f43f5e', boxShadow: '0 0 6px #f43f5e', animation: 'pulse 1.5s ease-in-out infinite' }} />
+          <span style={{ ...PS2, fontSize: 6, color: '#f43f5e' }}>LIVE</span>
+        </div>
+        {phase === 'playing' && (
+          <div style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.08)' }}>
+            <span style={{ ...PS2, fontSize: 6, color: '#4ade80' }}>PLAYING • {foundCount}/{TARGETS_COUNT} FOUND</span>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <Link to="/games" style={{ ...PS2, fontSize: 6, padding: '3px 8px', border: '1px solid rgba(255,215,0,0.4)', color: 'rgba(255,215,0,0.8)', borderRadius: 4, textDecoration: 'none' }}>← LOBBY</Link>
+      </div>
+    </div>
+  );
+
   const deckCenter = (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
       {phase === 'playing' && (
@@ -294,6 +317,7 @@ export default function SeeThatGame() {
         gameTitle="SEE THAT!"
         controls={deckControls}
         centerInfo={deckCenter}
+        header={cabinetHeader}
       >
         {/* Scene row */}
         <div style={{ display: 'flex', gap: 8, padding: 8 }}>
