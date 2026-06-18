@@ -105,11 +105,10 @@ function BFFViewer({ roomCode, isVsAI }) {
   const statRecordedRef = useRef(false);
   useEffect(() => {
     if (gs.phase !== 'round_over' || statRecordedRef.current) return;
-    // Only record for the human player on team 1
-    const myPlayer = (gs.players || []).find(p => p.playerId === playerId);
-    if (!myPlayer) return;
     statRecordedRef.current = true;
-    const myTeam = Number(myPlayer.familyTeam) === 1 ? 1 : 2;
+    // Human is always team 1 in vsAI mode; in multiplayer use the player lookup
+    const myPlayer = (gs.players || []).find(p => p.playerId === playerId);
+    const myTeam = myPlayer ? Number(myPlayer.familyTeam) : 1;
     const myScore = myTeam === 1 ? (gs.score1 || 0) : (gs.score2 || 0);
     const oppScore = myTeam === 1 ? (gs.score2 || 0) : (gs.score1 || 0);
     recordStat({ score: myScore, won: myScore > oppScore });
