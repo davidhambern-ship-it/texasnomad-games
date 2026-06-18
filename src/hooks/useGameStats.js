@@ -17,6 +17,8 @@ export default function useGameStats(gameId) {
     const elapsedMinutes = play_time_minutes ?? Math.round((Date.now() - startTimeRef.current) / 60000);
 
     try {
+      const isAuthed = await base44.auth.isAuthenticated();
+      if (!isAuthed) return;
       const user = await base44.auth.me();
       if (!user) return;
 
