@@ -1,12 +1,34 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+
+const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoComplete }) {
+  return (
+    <div style={{ position: 'relative' }}>
+      {type === 'email'
+        ? <Mail style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(188,19,254,0.5)' }} />
+        : <Lock style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(188,19,254,0.5)' }} />
+      }
+      <input
+        id={id} type={type} placeholder={placeholder} value={value} onChange={onChange}
+        autoFocus={autoFocus} autoComplete={autoComplete} required
+        style={{
+          width: '100%', paddingLeft: 38, paddingRight: 14, height: 46,
+          background: 'rgba(0,0,0,0.6)', border: '1.5px solid rgba(188,19,254,0.35)',
+          borderRadius: 10, color: 'white', fontSize: 14, fontFamily: "'Inter', sans-serif",
+          outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s',
+        }}
+        onFocus={e => e.target.style.borderColor = '#BC13FE'}
+        onBlur={e => e.target.style.borderColor = 'rgba(188,19,254,0.35)'}
+      />
+    </div>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -35,90 +57,73 @@ export default function Login() {
   return (
     <AuthLayout
       icon={LogIn}
-      title="Welcome back"
+      title="Welcome Back"
       subtitle="Log in to your account"
       footer={
         <>
-          Don't have an account?{" "}
-          <Link to="/register" className="text-primary font-medium hover:underline">
-            Create one
-          </Link>
+          Don't have an account?{' '}
+          <Link to="/register" style={{ color: '#BC13FE', fontWeight: 600 }}>Create one free</Link>
         </>
       }
     >
-      <Button
-        variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6"
+      {/* Google */}
+      <button
         onClick={handleGoogle}
+        style={{
+          width: '100%', height: 46, borderRadius: 10, border: '1.5px solid rgba(255,255,255,0.15)',
+          background: 'rgba(255,255,255,0.05)', color: 'white', display: 'flex', alignItems: 'center',
+          justifyContent: 'center', gap: 10, cursor: 'pointer', fontSize: 14,
+          fontFamily: "'Inter', sans-serif", marginBottom: 18, transition: 'background 0.2s',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
       >
-        <GoogleIcon className="w-5 h-5 mr-2" />
+        <GoogleIcon style={{ width: 18, height: 18 }} />
         Continue with Google
-      </Button>
+      </button>
 
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">or</span>
-        </div>
+      {/* Divider */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
+        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
+        <span style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.2)' }}>or</span>
+        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
       </div>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div>
+          <label htmlFor="email" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>EMAIL</label>
+          <TNGInput id="email" type="email" placeholder="you@example.com" value={email} onChange={e => setEmail(e.target.value)} autoFocus autoComplete="email" />
         </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-              Forgot password?
-            </Link>
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+            <label htmlFor="password" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)' }}>PASSWORD</label>
+            <Link to="/forgot-password" style={{ ...PS2, fontSize: 6, color: '#BC13FE', textDecoration: 'none' }}>Forgot?</Link>
           </div>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12"
-              required
-            />
-          </div>
+          <TNGInput id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
         </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-          {loading ? (
-            <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Logging in...
-            </>
-          ) : (
-            "Log in"
-          )}
-        </Button>
+        <div style={{ marginTop: 4 }}>
+          <button
+            type="submit" disabled={loading}
+            style={{
+              width: '100%', height: 46, borderRadius: 10, border: '2px solid #BC13FE',
+              background: loading ? 'rgba(188,19,254,0.1)' : 'rgba(188,19,254,0.2)',
+              color: loading ? 'rgba(188,19,254,0.5)' : '#BC13FE',
+              fontFamily: "'Teko', sans-serif", fontSize: 18, letterSpacing: '0.15em',
+              cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center',
+              justifyContent: 'center', gap: 8, boxShadow: loading ? 'none' : '0 0 16px rgba(188,19,254,0.3)',
+            }}
+          >
+            {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
+            {loading ? 'LOGGING IN…' : 'LOG IN →'}
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </button>
+        </div>
       </form>
     </AuthLayout>
   );
