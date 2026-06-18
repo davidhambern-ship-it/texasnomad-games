@@ -1,0 +1,129 @@
+{
+  "name": "PlayerProfile",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "Foreign key to User entity"
+    },
+    "username": {
+      "type": "string",
+      "description": "Player's chosen display name"
+    },
+    "avatar_url": {
+      "type": "string",
+      "description": "Profile picture URL"
+    },
+    "bio": {
+      "type": "string",
+      "description": "Short player bio"
+    },
+    "social_links": {
+      "type": "object",
+      "description": "Map of platform to URL: { twitter, instagram, tiktok, twitch, youtube }"
+    },
+    "total_games_played": {
+      "type": "number",
+      "default": 0
+    },
+    "total_play_time_minutes": {
+      "type": "number",
+      "default": 0,
+      "description": "Total minutes spent playing across all games"
+    },
+    "game_stats": {
+      "type": "object",
+      "description": "Map of game_id to { high_score, times_played, total_points, wins, last_played }"
+    },
+    "badges": {
+      "type": "array",
+      "description": "Array of earned badge objects { id, name, game_id, type, earned_at, description }",
+      "items": {
+        "type": "object"
+      }
+    },
+    "favorite_games": {
+      "type": "array",
+      "description": "Top games by times_played, auto-computed",
+      "items": {
+        "type": "string"
+      }
+    },
+    "playstyle_tags": {
+      "type": "array",
+      "description": "AI-generated tags e.g. 'Fast-Thinker', 'Aggressive', 'Strategist'",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ambassador_status": {
+      "type": "string",
+      "enum": [
+        "player",
+        "ambassador"
+      ],
+      "default": "player"
+    },
+    "ambassador_path": {
+      "type": "string",
+      "enum": [
+        "none",
+        "master",
+        "specialist"
+      ],
+      "default": "none",
+      "description": "Which ambassador path they qualified under"
+    },
+    "has_seen_ambassador_reveal": {
+      "type": "boolean",
+      "default": false
+    },
+    "referral_code": {
+      "type": "string",
+      "description": "Their unique referral code"
+    },
+    "referred_by": {
+      "type": "string",
+      "description": "Referral code used when they signed up"
+    },
+    "referral_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Number of players they've referred"
+    },
+    "subscription_status": {
+      "type": "string",
+      "enum": [
+        "free",
+        "pro"
+      ],
+      "default": "free"
+    },
+    "profile_theme": {
+      "type": "string",
+      "enum": [
+        "neon-noir",
+        "retro-gold",
+        "sunset-kinetic",
+        "void-black",
+        "cyber-grid"
+      ],
+      "default": "neon-noir",
+      "description": "TNG-branded profile visual theme"
+    },
+    "pinned_games": {
+      "type": "array",
+      "description": "Player-selected pinned games for profile (like MySpace Top 8)",
+      "items": {
+        "type": "string"
+      }
+    },
+    "member_since": {
+      "type": "string",
+      "description": "ISO date string of profile creation"
+    }
+  },
+  "required": [
+    "user_id"
+  ]
+}

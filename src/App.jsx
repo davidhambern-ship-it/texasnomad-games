@@ -26,6 +26,7 @@ import WordWranglerGame from '@/pages/WordWranglerGame';
 import TXDDominoDemo from '@/pages/TXDDominoDemo';
 import TXDGame from '@/pages/TXDGame';
 import TXDHostPanel from '@/pages/TXDHostPanel';
+import PlayerProfile from '@/pages/PlayerProfile';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -79,6 +80,7 @@ const AuthenticatedApp = () => {
       <Route path="/txd-dominoes" element={<TXDDominoDemo />} />
       <Route path="/games/txd" element={<TXDGame />} />
       <Route path="/games/txd/host" element={<TXDHostPanel />} />
+      <Route path="/profile" element={<PlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 
 const NAV_ITEMS = [
   { label: 'HOME', path: '/' },
@@ -12,6 +13,22 @@ const NAV_ITEMS = [
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    async function initProfile() {
+      try {
+        const u = await base44.auth.me();
+        setUser(u);
+        // Ensure PlayerProfile exists for this user (idempotent)
+        const profiles = await base44.entities.PlayerProfile.filter({ user_id: u.id });
+        if (profiles.length === 0) {
+          await base44.functions.invoke('initPlayerProfile', { data: { id: u.id, email: u.email, full_name: u.full_name } });
+        }
+      } catch (_) {}
+    }
+    initProfile();
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-cyber-purple/30 bg-midnight-void/80 backdrop-blur-xl">
@@ -40,6 +57,17 @@ export default function Header() {
             </Link>
           ))}
         </nav>
+
+        {/* Profile Link - Desktop */}
+        {user && (
+          <Link
+            to="/profile"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/70 rounded text-[9px] tracking-widest uppercase hover:bg-[#FFD700]/10 hover:border-[#FFD700] transition-all mr-1"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            👤 PROFILE
+          </Link>
+        )}
 
         {/* Host Link - Desktop */}
         <Link
