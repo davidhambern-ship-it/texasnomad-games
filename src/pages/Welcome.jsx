@@ -50,7 +50,7 @@ export default function Welcome() {
 
   const goPlayer = () => {
     localStorage.setItem('tn_welcome_seen', '1');
-    navigate('/');
+    navigate('/register');
   };
 
   const goHost = () => {

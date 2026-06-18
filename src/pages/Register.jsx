@@ -128,7 +128,35 @@ export default function Register() {
     <AuthLayout
       icon={UserPlus}
       title="Create your account"
-      subtitle="Sign up to get started"
+      subtitle={
+        <span>
+          <span style={{
+            display: 'inline-block',
+            background: 'linear-gradient(90deg, #BC13FE, #FFD700)',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: 9,
+            letterSpacing: '0.1em',
+          }}>⚡ FREE SIGN UP — LIMITED TIME</span>
+          <span style={{
+            display: 'block',
+            marginTop: 6,
+            padding: '8px 14px',
+            borderRadius: 8,
+            border: '1px solid rgba(255,215,0,0.35)',
+            background: 'rgba(255,215,0,0.06)',
+            fontFamily: "'Press Start 2P', monospace",
+            fontSize: 7,
+            color: 'rgba(255,215,0,0.7)',
+            letterSpacing: '0.05em',
+            lineHeight: 1.8,
+          }}>
+            Join now for FREE. When TNG officially launches,<br/>
+            membership will be <span style={{ color: '#FF5F1F', WebkitTextFillColor: '#FF5F1F' }}>$10/month</span>. Lock in your spot today.
+          </span>
+        </span>
+      }
       footer={
         <>
           Already have an account?{" "}
