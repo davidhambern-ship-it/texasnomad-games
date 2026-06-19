@@ -4,8 +4,8 @@ import HostPasswordGate from '@/components/host/HostPasswordGate';
 import HostAccountGate from '@/components/host/HostAccountGate';
 import HostGameSelect from '@/components/host/HostGameSelect';
 import HostConsole from '@/components/host/HostConsole';
-import LivePlayersPanel from '@/components/host/admin/LivePlayersPanel.jsx';
-import PlayerProfilesPanel from '@/components/host/admin/PlayerProfilesPanel.jsx';
+import LivePlayersPanel from '@/components/host/AdminLivePlayers';
+import PlayerProfilesPanel from '@/components/host/AdminPlayerProfiles';
 import useHostSession from '@/hooks/useHostSession';
 
 const HOST_PASSWORD = 'BERNA88@tx';
