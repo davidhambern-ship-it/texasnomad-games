@@ -50,159 +50,171 @@ export function findDoubleSixHolder(hands) {
 
 // ── Board layout engine ───────────────────────────────────────────────────────
 //
-// Instead of storing x/y positions in the DB (fragile with JSON round-trips),
-// we COMPUTE positions from the board array at render time.
+// Computes pixel positions for each tile from the sequence of plays.
+// Uses pixel units so tiles are evenly spaced regardless of container size.
+// The board component scales these to fit.
 //
-// Each board entry has: { id, top, bottom, side, placedOrientation }
-// We track 4 "cursors" (left/right/top/bottom) starting from center.
+// Layout: tiles chain left←center→right horizontally.
+// Doubles are placed vertically (narrow), non-doubles horizontally.
+// Tile pixel sizes (at scale 1):
+//   non-double horizontal: W=56, H=28
+//   double    vertical:    W=28, H=56
 
-const STEP = 18; // % of board dimension per tile
-const CX = 50, CY = 50; // center
+const TW = 56;  // non-double tile width (horizontal)
+const TH = 28;  // tile height
+const GAP = 4;  // gap between tiles
+
+// Step sizes (center-to-center distance when placing next tile)
+const HSTEP = TW + GAP; // horizontal step
+const VSTEP = TH + GAP; // vertical step (for top/bottom arms)
 
 /**
- * Compute the {x, y} position for every tile on the board, derived purely
- * from the sequence of plays (no stored coordinates needed).
- *
- * Returns an array of { ...piece, x, y } in the same order as board[].
+ * Compute pixel positions for every tile, relative to the board's virtual canvas.
+ * Returns { tiles: [{...piece, px, py, tw, th}], bounds: {minX,minY,maxX,maxY} }
+ * px/py = top-left corner of the tile.
  */
 export function computeBoardLayout(board) {
-  if (!board || board.length === 0) return [];
+  if (!board || board.length === 0) return { tiles: [], bounds: null };
 
-  // Cursors track the NEXT available position in each arm.
-  // After placing a tile at cursor, advance cursor by STEP in that direction.
-  const cursors = {
-    first: { x: CX, y: CY },
-    left:  { x: CX - STEP, y: CY,      dx: -STEP, dy: 0 },
-    right: { x: CX + STEP, y: CY,      dx:  STEP, dy: 0 },
-    top:   { x: CX,        y: CY - STEP, dx: 0, dy: -STEP },
-    bottom:{ x: CX,        y: CY + STEP, dx: 0, dy:  STEP },
-  };
+  // Track the "attachment point" (the open edge) for each arm, in pixels.
+  // We place a tile such that its connecting edge aligns with the arm's cursor.
+  // For left arm: cursor.x is the RIGHT edge of the next tile to place → tile's left = cursor.x - TW
+  // For right arm: cursor.x is the LEFT edge of next tile to place
 
-  const result = [];
+  // Virtual canvas origin: first tile placed at (0, 0)
+  const tileData = [];
 
-  board.forEach((piece) => {
+  // cursors: track where the OPEN EDGE is for each arm
+  // left arm: moves in -x direction. cursor.x = next tile's right edge x
+  // right arm: moves in +x direction. cursor.x = next tile's left edge x
+  // top arm: moves in -y direction. cursor.y = next tile's bottom edge y
+  // bottom arm: moves in +y direction. cursor.y = next tile's top edge y
+
+  let leftCursorX = 0;        // left arm: next tile's right edge
+  let rightCursorX = 0;       // right arm: next tile's left edge
+  let topCursorY = 0;         // top arm: next tile's bottom edge
+  let bottomCursorY = 0;      // bottom arm: next tile's top edge
+  let spinnerX = 0;           // x center of spinner (for top/bottom arms)
+
+  board.forEach((piece, idx) => {
     const side = piece.side || 'first';
+    const isDouble = piece.top === piece.bottom;
+    // For doubles: tile is rendered vertically → w=TH, h=TW (narrow and tall)
+    // For non-doubles: horizontal → w=TW, h=TH
+    const tw = isDouble ? TH : TW;
+    const th = isDouble ? TW : TH;
 
     if (side === 'first') {
-      result.push({ ...piece, x: CX, y: CY });
-      // First tile occupies center — arms start at ±STEP from center
-      // (cursors already initialized correctly above)
+      // Center the first tile at origin
+      const px = -tw / 2;
+      const py = -th / 2;
+      tileData.push({ ...piece, px, py, tw, th });
+
+      // Initialize arm cursors from the edges of the first tile
+      leftCursorX  = px - GAP;           // left arm: next tile's right edge
+      rightCursorX = px + tw + GAP;      // right arm: next tile's left edge
+      topCursorY   = py - GAP;           // top arm: next tile's bottom edge
+      bottomCursorY= py + th + GAP;      // bottom arm: next tile's top edge
+      spinnerX     = px + tw / 2;        // horizontal center of first tile
       return;
     }
 
-    const cursor = cursors[side];
-    if (!cursor) {
-      result.push({ ...piece, x: CX, y: CY });
+    if (side === 'left') {
+      const px = leftCursorX - tw;
+      const py = -th / 2;
+      tileData.push({ ...piece, px, py, tw, th });
+      leftCursorX = px - GAP;
       return;
     }
 
-    // Clamp to table bounds
-    const bx = Math.max(10, Math.min(90, cursor.x));
-    const by = Math.max(12, Math.min(88, cursor.y));
-    result.push({ ...piece, x: bx, y: by });
-
-    // Advance cursor
-    cursor.x += cursor.dx;
-    cursor.y += cursor.dy;
-
-    // Simple wrap: if we hit a wall, turn 90° inward
-    if (cursor.x < 10 || cursor.x > 90) {
-      cursor.dx = 0;
-      cursor.dy = STEP * (cursor.y < 50 ? 1 : -1);
-      cursor.x = Math.max(10, Math.min(90, cursor.x));
+    if (side === 'right') {
+      const px = rightCursorX;
+      const py = -th / 2;
+      tileData.push({ ...piece, px, py, tw, th });
+      rightCursorX = px + tw + GAP;
+      return;
     }
-    if (cursor.y < 12 || cursor.y > 88) {
-      cursor.dy = 0;
-      cursor.dx = STEP * (cursor.x < 50 ? 1 : -1);
-      cursor.y = Math.max(12, Math.min(88, cursor.y));
+
+    if (side === 'top') {
+      const px = spinnerX - tw / 2;
+      const py = topCursorY - th;
+      tileData.push({ ...piece, px, py, tw, th });
+      topCursorY = py - GAP;
+      return;
     }
+
+    if (side === 'bottom') {
+      const px = spinnerX - tw / 2;
+      const py = bottomCursorY;
+      tileData.push({ ...piece, px, py, tw, th });
+      bottomCursorY = py + th + GAP;
+      return;
+    }
+
+    // Fallback
+    tileData.push({ ...piece, px: 0, py: 0, tw, th });
   });
 
-  return result;
+  // Compute bounds
+  if (tileData.length === 0) return { tiles: [], bounds: null };
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  tileData.forEach(t => {
+    minX = Math.min(minX, t.px);
+    minY = Math.min(minY, t.py);
+    maxX = Math.max(maxX, t.px + t.tw);
+    maxY = Math.max(maxY, t.py + t.th);
+  });
+
+  return {
+    tiles: tileData,
+    bounds: { minX, minY, maxX, maxY },
+    // Open end positions (for drop zones), in the same virtual pixel space
+    openEnds: {
+      leftX: leftCursorX - GAP,
+      rightX: rightCursorX,
+      topY: topCursorY - GAP,
+      bottomY: bottomCursorY,
+      spinnerX,
+    },
+  };
 }
 
 /**
- * Compute where the open-end drop zones should appear, based on the current
- * cursor positions AFTER all tiles have been placed.
- * Returns { left, right, top, bottom } — same shape as before, but derived
- * from board state, not stored in DB.
+ * Compute where open-end drop zones are, returning normalized values
+ * compatible with the existing interface used by TXDBoard and game pages.
+ * Returns { left, right, top?, bottom? } with pixel coords in virtual space.
  */
 export function computeOpenEnds(board, leftEnd, rightEnd, spinnerActive) {
   if (!board || board.length === 0) return null;
 
-  // Re-run the cursor simulation to find where each arm is now
-  const cursors = {
-    left:   { x: CX - STEP, y: CY,       dx: -STEP, dy: 0 },
-    right:  { x: CX + STEP, y: CY,       dx:  STEP, dy: 0 },
-    top:    { x: CX,        y: CY - STEP, dx: 0, dy: -STEP },
-    bottom: { x: CX,        y: CY + STEP, dx: 0, dy:  STEP },
-  };
+  const layout = computeBoardLayout(board);
+  const oe = layout.openEnds;
+  if (!oe) return null;
 
-  // Track which arms are active
-  let topActive = false;
-  let bottomActive = false;
-
-  board.forEach((piece) => {
-    const side = piece.side || 'first';
-    if (side === 'first') {
-      // First tile is a spinner → all 4 arms active
-      if (piece.top === piece.bottom) {
-        topActive = true;
-        bottomActive = true;
-      }
-      return;
-    }
-    if (side === 'top') topActive = true;
-    if (side === 'bottom') bottomActive = true;
-
-    const cursor = cursors[side];
-    if (!cursor) return;
-    cursor.x += cursor.dx;
-    cursor.y += cursor.dy;
-    if (cursor.x < 10 || cursor.x > 90) {
-      cursor.dx = 0;
-      cursor.dy = STEP * (cursor.y < 50 ? 1 : -1);
-      cursor.x = Math.max(10, Math.min(90, cursor.x));
-    }
-    if (cursor.y < 12 || cursor.y > 88) {
-      cursor.dy = 0;
-      cursor.dx = STEP * (cursor.x < 50 ? 1 : -1);
-      cursor.y = Math.max(12, Math.min(88, cursor.y));
-    }
-  });
-
-  // Determine open end values from board edges
-  // leftEnd/rightEnd from game state are the authoritative values
   const firstPiece = board[0];
   const isFirstDouble = firstPiece && firstPiece.top === firstPiece.bottom;
 
-  // Find the last tile played on each arm to get its exposed value
   function lastOnSide(s) {
     const pieces = board.filter(p => p.side === s);
     return pieces.length > 0 ? pieces[pieces.length - 1] : null;
   }
 
-  // Exposed value = the "outer" pip of the last tile on that arm
-  // We use leftEnd/rightEnd from game state as the authoritative source
-  const openEnds = {
-    left:   { id: 'left',   value: leftEnd,  x: Math.max(10, Math.min(90, cursors.left.x)),   y: Math.max(12, Math.min(88, cursors.left.y)),   active: true },
-    right:  { id: 'right',  value: rightEnd, x: Math.max(10, Math.min(90, cursors.right.x)),  y: Math.max(12, Math.min(88, cursors.right.y)),  active: true },
+  const result = {
+    left:   { id: 'left',   value: leftEnd,  active: true, _px: oe.leftX,  _py: 0 },
+    right:  { id: 'right',  value: rightEnd, active: true, _px: oe.rightX, _py: 0 },
     top:    null,
     bottom: null,
   };
 
-  // Top/bottom arms open if spinner played
-  if (spinnerActive || topActive || isFirstDouble) {
-    // Get the value exposed at top/bottom — it's the spinner's value if nothing played there yet
-    const topLast = lastOnSide('top');
-    const bottomLast = lastOnSide('bottom');
+  if (spinnerActive || isFirstDouble) {
     const spinnerVal = firstPiece?.top ?? leftEnd;
-
-    openEnds.top    = { id: 'top',    value: topLast    ? topLast.exposedValue    ?? spinnerVal : spinnerVal, x: Math.max(10, Math.min(90, cursors.top.x)),    y: Math.max(12, Math.min(88, cursors.top.y)),    active: true };
-    openEnds.bottom = { id: 'bottom', value: bottomLast ? bottomLast.exposedValue ?? spinnerVal : spinnerVal, x: Math.max(10, Math.min(90, cursors.bottom.x)), y: Math.max(12, Math.min(88, cursors.bottom.y)), active: true };
+    const topLast    = lastOnSide('top');
+    const bottomLast = lastOnSide('bottom');
+    result.top    = { id: 'top',    value: topLast    ? (topLast.exposedValue    ?? spinnerVal) : spinnerVal, active: true, _px: oe.spinnerX, _py: oe.topY };
+    result.bottom = { id: 'bottom', value: bottomLast ? (bottomLast.exposedValue ?? spinnerVal) : spinnerVal, active: true, _px: oe.spinnerX, _py: oe.bottomY };
   }
 
-  return openEnds;
+  return result;
 }
 
 // ── Orient a domino for a given end ──────────────────────────────────────────
