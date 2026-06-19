@@ -18,14 +18,15 @@ const PIP_LAYOUTS = {
 
 function PipDot({ col, row, halfW, halfH }) {
   // Place pip in a 3×3 grid inside the half
-  const padding = 0.15; // 15% padding from edge
-  const cellW = (1 - padding * 2) / 2; // each cell step
-  const cellH = (1 - padding * 2) / 2;
-  const x = (padding + col * cellW) * 100;
-  const y = (padding + row * cellH) * 100;
+  // x positions: col 0=25%, col 1=50%, col 2=75%
+  // y positions: row 0=22%, row 1=50%, row 2=78%
+  const xPct = [25, 50, 75][col];
+  const yPct = [22, 50, 78][row];
+  const x = xPct;
+  const y = yPct;
   // Pip size relative to the smaller dimension
   const minDim = Math.min(halfW, halfH);
-  const pipSize = Math.max(3, minDim * 0.18);
+  const pipSize = Math.max(4, minDim * 0.28);
 
   return (
     <img
@@ -40,6 +41,7 @@ function PipDot({ col, row, halfW, halfH }) {
         transform: 'translate(-50%, -50%)',
         objectFit: 'contain',
         pointerEvents: 'none',
+        userSelect: 'none',
       }}
     />
   );
