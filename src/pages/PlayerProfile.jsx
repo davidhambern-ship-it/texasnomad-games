@@ -275,27 +275,36 @@ export default function PlayerProfilePage() {
           )}
         </div>
 
-        {/* High Scores */}
+        {/* High Scores — vertical scroll ticker */}
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,215,0,0.25)', background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
+          <style>{`
+            @keyframes hs-scroll {
+              0%   { transform: translateY(0); }
+              100% { transform: translateY(-50%); }
+            }
+            .hs-track { animation: hs-scroll ${Math.max(highScores.length * 3, 8)}s linear infinite; }
+            .hs-track:hover { animation-play-state: paused; }
+          `}</style>
           <div style={{ ...PS2, fontSize: 8, color: '#FFD700', marginBottom: 12 }}>🥇 HIGH SCORES</div>
           {highScores.length === 0 ? (
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Play some games to set high scores!</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              {highScores.map(([gameId, stats], i) => (
-                <div key={gameId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 8, background: i === 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}` }}>
-                  <div style={{ ...PS2, fontSize: 8, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'rgba(255,255,255,0.3)', width: 20, textAlign: 'center', flexShrink: 0 }}>
-                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+            <div style={{ height: 180, overflow: 'hidden', position: 'relative' }}>
+              {/* fade edges */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+              <div className="hs-track">
+                {[...highScores, ...highScores].map(([gameId, stats], i) => (
+                  <div key={`${gameId}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 10px', marginBottom: 5, borderRadius: 8, background: (i % highScores.length) === 0 ? 'rgba(255,215,0,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${(i % highScores.length) === 0 ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.05)'}` }}>
+                    <span style={{ fontSize: 14, flexShrink: 0, width: 20, textAlign: 'center' }}>
+                      {(i % highScores.length) === 0 ? '🥇' : (i % highScores.length) === 1 ? '🥈' : (i % highScores.length) === 2 ? '🥉' : '▸'}
+                    </span>
+                    <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', flex: 1 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</span>
+                    <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score.toLocaleString()}</span>
+                    <span style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>{stats.wins || 0}W · {stats.times_played || 0}P</span>
                   </div>
-                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', flex: 1 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
-                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 26, color: '#FFD700', lineHeight: 1, textShadow: i === 0 ? '0 0 12px rgba(255,215,0,0.6)' : 'none' }}>
-                    {stats.high_score.toLocaleString()}
-                  </div>
-                  <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', textAlign: 'right', minWidth: 40 }}>
-                    {stats.wins || 0}W / {stats.times_played || 0}P
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           )}
         </div>
