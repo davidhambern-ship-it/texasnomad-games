@@ -32,6 +32,15 @@
     "max_players": {
       "type": "number",
       "description": "Max players for the room"
+    },
+    "current_context": {
+      "type": "string",
+      "enum": [
+        "player",
+        "host"
+      ],
+      "default": "player",
+      "description": "Whether the user is currently acting as a player or a host"
     }
   },
   "required": [

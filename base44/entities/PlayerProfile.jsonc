@@ -121,6 +121,10 @@
     "member_since": {
       "type": "string",
       "description": "ISO date string of profile creation"
+    },
+    "host_stats": {
+      "type": "object",
+      "description": "Hosting activity stats: { total_sessions, total_host_time_minutes, last_hosted }"
     }
   },
   "required": [

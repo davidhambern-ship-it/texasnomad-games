@@ -274,6 +274,22 @@ export default function PlayerProfilePage() {
           <FriendsList userId={user?.id} theme={theme} />
         </div>
 
+        {/* Host Stats */}
+        {profile.host_stats && (profile.host_stats.total_sessions > 0) && (
+          <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,95,31,0.25)', background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ ...PS2, fontSize: 8, color: '#FF5F1F', marginBottom: 12 }}>🎛 HOST ACTIVITY</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <StatCard label="SESSIONS HOSTED" value={profile.host_stats.total_sessions || 0} color="#FF5F1F" />
+              <StatCard label="HOST TIME" value={`${Math.floor((profile.host_stats.total_host_time_minutes || 0) / 60)}h`} color="#FFD700" />
+            </div>
+            {profile.host_stats.last_hosted && (
+              <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>
+                LAST HOSTED: {new Date(profile.host_stats.last_hosted).toLocaleDateString()}
+              </p>
+            )}
+          </div>
+        )}
+
         {/* Referral */}
         <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>
           <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginBottom: 12 }}>🔗 REFERRAL CODE</div>
