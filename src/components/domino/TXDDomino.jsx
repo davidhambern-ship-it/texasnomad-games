@@ -1,41 +1,57 @@
 import React from 'react';
 
-const CROWNED_B = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9f8b50e18_crowned_b.png';
-const TEXAS_ZERO = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/34e8d668a_texas_zero.png';
 const DOMINO_FRONT = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/348f82880_domino_front.png';
-const DOMINO_BACK = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/967ce20c4_domino_back.png';
+const DOMINO_BACK  = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/967ce20c4_domino_back.png';
+const CROWNED_B    = 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9f8b50e18_crowned_b.png';
 
-const POSITIONS = {
-  TL: { x: 25, y: 20 }, TC: { x: 50, y: 20 }, TR: { x: 75, y: 20 },
-  ML: { x: 25, y: 50 }, C:  { x: 50, y: 50 }, MR: { x: 75, y: 50 },
-  BL: { x: 25, y: 80 }, BC: { x: 50, y: 80 }, BR: { x: 75, y: 80 },
+// Pip grid positions as [col, row] in a 3×3 grid (0-indexed)
+// Each cell is ~33% of the half width/height
+const PIP_LAYOUTS = {
+  0: [],
+  1: [[1,1]],
+  2: [[0,0],[2,2]],
+  3: [[0,0],[1,1],[2,2]],
+  4: [[0,0],[2,0],[0,2],[2,2]],
+  5: [[0,0],[2,0],[1,1],[0,2],[2,2]],
+  6: [[0,0],[2,0],[0,1],[2,1],[0,2],[2,2]],
 };
 
-const TXD_PIP_MAP = {
-  0: ['C'], 1: ['C'], 2: ['TL', 'BR'], 3: ['TL', 'C', 'BR'],
-  4: ['TL', 'TR', 'BL', 'BR'], 5: ['TL', 'TR', 'C', 'BL', 'BR'],
-  6: ['TL', 'TR', 'ML', 'MR', 'BL', 'BR'],
-};
+function PipDot({ col, row, halfW, halfH }) {
+  // Place pip in a 3×3 grid inside the half
+  const padding = 0.15; // 15% padding from edge
+  const cellW = (1 - padding * 2) / 2; // each cell step
+  const cellH = (1 - padding * 2) / 2;
+  const x = (padding + col * cellW) * 100;
+  const y = (padding + row * cellH) * 100;
+  // Pip size relative to the smaller dimension
+  const minDim = Math.min(halfW, halfH);
+  const pipSize = Math.max(3, minDim * 0.18);
 
-const SYMBOL_SIZE = { 0: 220, 1: 160, 2: 145, 3: 138, 4: 128, 5: 120, 6: 108 };
+  return (
+    <img
+      src={CROWNED_B}
+      alt=""
+      style={{
+        position: 'absolute',
+        width: pipSize,
+        height: pipSize,
+        left: `${x}%`,
+        top: `${y}%`,
+        transform: 'translate(-50%, -50%)',
+        objectFit: 'contain',
+        pointerEvents: 'none',
+      }}
+    />
+  );
+}
 
-function DominoHalf({ value, halfSize }) {
-  const positions = TXD_PIP_MAP[value] || [];
-  const symbol = value === 0 ? TEXAS_ZERO : CROWNED_B;
-  const size = (SYMBOL_SIZE[value] ?? 90) * (halfSize / 500);
+function DominoHalf({ value, halfW, halfH }) {
+  const pips = PIP_LAYOUTS[value] ?? [];
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {positions.map((posKey) => {
-        const pos = POSITIONS[posKey];
-        if (!pos) return null;
-        return (
-          <img key={posKey} src={symbol} alt="" style={{
-            position: 'absolute', width: size, height: size,
-            left: `${pos.x}%`, top: `${pos.y}%`,
-            transform: 'translate(-50%, -50%)', objectFit: 'contain', pointerEvents: 'none',
-          }} />
-        );
-      })}
+      {pips.map(([col, row], i) => (
+        <PipDot key={i} col={col} row={row} halfW={halfW} halfH={halfH} />
+      ))}
     </div>
   );
 }
@@ -43,13 +59,13 @@ function DominoHalf({ value, halfSize }) {
 /**
  * TXDDomino
  * Props:
- *   top, bottom  {number} 0-6
- *   width        {number} px — narrow dimension (default 100)
- *   orientation  {"vertical"|"horizontal"} default "vertical"
- *   faceDown     {boolean}
- *   playable     {boolean} — glows green
- *   selected     {boolean} — glows gold, lifts
- *   onClick      {function}
+ *   top, bottom   {number} 0-6
+ *   width         {number} px — narrow dimension (default 100)
+ *   orientation   {"vertical"|"horizontal"} default "vertical"
+ *   faceDown      {boolean}
+ *   playable      {boolean} — glows green
+ *   selected      {boolean} — glows gold, lifts
+ *   onClick       {function}
  *   style, className
  */
 export default function TXDDomino({
@@ -60,7 +76,11 @@ export default function TXDDomino({
 }) {
   const isHoriz = orientation === 'horizontal';
   const w = isHoriz ? width * 2 : width;
-  const h = isHoriz ? width : width * 2;
+  const h = isHoriz ? width     : width * 2;
+
+  // half dimensions
+  const halfW = isHoriz ? width     : width;
+  const halfH = isHoriz ? width     : width;
 
   const glowFilter = selected
     ? 'drop-shadow(0 0 10px #FFD700) drop-shadow(0 0 4px #FFD700)'
@@ -71,7 +91,13 @@ export default function TXDDomino({
   const transform = selected ? 'translateY(-8px)' : 'none';
   const cursor = onClick ? 'pointer' : 'default';
 
-  const wrapStyle = { width: w, height: h, position: 'relative', filter: glowFilter, transform, cursor, transition: 'transform 0.15s, filter 0.15s', ...style };
+  const wrapStyle = {
+    width: w, height: h, position: 'relative',
+    filter: glowFilter, transform, cursor,
+    transition: 'transform 0.15s, filter 0.15s',
+    flexShrink: 0,
+    ...style,
+  };
 
   if (faceDown) {
     return (
@@ -82,29 +108,32 @@ export default function TXDDomino({
   }
 
   if (isHoriz) {
-    // Horizontal: left half = top value, right half = bottom value
     return (
       <div className={className} style={wrapStyle} onClick={onClick}>
         <img src={DOMINO_FRONT} alt="domino" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }} />
+        {/* Left half = top value */}
         <div style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: '100%' }}>
-          <DominoHalf value={top} halfSize={width} />
+          <DominoHalf value={top} halfW={halfW} halfH={halfH} />
         </div>
+        {/* Right half = bottom value */}
         <div style={{ position: 'absolute', top: 0, left: '50%', width: '50%', height: '100%' }}>
-          <DominoHalf value={bottom} halfSize={width} />
+          <DominoHalf value={bottom} halfW={halfW} halfH={halfH} />
         </div>
       </div>
     );
   }
 
-  // Vertical (default)
+  // Vertical
   return (
     <div className={className} style={wrapStyle} onClick={onClick}>
       <img src={DOMINO_FRONT} alt="domino" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }} />
+      {/* Top half */}
       <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '50%' }}>
-        <DominoHalf value={top} halfSize={width} />
+        <DominoHalf value={top} halfW={halfW} halfH={halfH} />
       </div>
+      {/* Bottom half */}
       <div style={{ position: 'absolute', top: '50%', left: 0, width: '100%', height: '50%' }}>
-        <DominoHalf value={bottom} halfSize={width} />
+        <DominoHalf value={bottom} halfW={halfW} halfH={halfH} />
       </div>
     </div>
   );
