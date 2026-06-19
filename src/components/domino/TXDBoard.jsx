@@ -120,6 +120,8 @@ export default function TXDBoard({
   // ── Subcomponents ──────────────────────────────────────────────────────────
   const ChainTile = ({ piece, flip = false }) => {
     const isDouble = piece.top === piece.bottom;
+    // Use stored placedOrientation if available, otherwise default by type
+    const orientation = piece.placedOrientation || (isDouble ? 'vertical' : 'horizontal');
     return (
       <div style={{
         flexShrink: 0,
@@ -131,7 +133,7 @@ export default function TXDBoard({
           top={flip ? piece.bottom : piece.top}
           bottom={flip ? piece.top : piece.bottom}
           width={HALF}
-          orientation={isDouble ? 'vertical' : 'horizontal'}
+          orientation={orientation}
         />
       </div>
     );

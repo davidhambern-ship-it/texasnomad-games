@@ -243,10 +243,12 @@ function getTileOrientation(isDouble, side) {
 
 // ── Apply a domino play ───────────────────────────────────────────────────────
 
-export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = false, openEnds = null) {
+export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = false, openEnds = null, chosenOrientation = null) {
   // First play
   if (side === 'first' || leftEnd === null || rightEnd === null) {
     const isDouble = domino.top === domino.bottom;
+    // For doubles on first play, allow caller to choose orientation; default vertical
+    const orientation = chosenOrientation || (isDouble ? 'vertical' : 'horizontal');
     return {
       newLeftEnd: domino.top,
       newRightEnd: domino.bottom,
@@ -255,7 +257,7 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
       orientedTop: domino.top,
       orientedBottom: domino.bottom,
       exposedValue: isDouble ? domino.top : domino.bottom,
-      placedOrientation: isDouble ? 'vertical' : 'horizontal',
+      placedOrientation: orientation,
     };
   }
 

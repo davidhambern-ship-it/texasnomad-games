@@ -51,6 +51,7 @@ export default function TXDGame() {
   const [draggingId, setDraggingId] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const [shakeTile, setShakeTile] = useState(null);
+  const [orientPicker, setOrientPicker] = useState(null); // { domino } — pending first-play double
   const pollRef = useRef(null);
 
   const myIndex = game?.players?.findIndex(p => p.playerId === playerId) ?? -1;
@@ -169,7 +170,7 @@ export default function TXDGame() {
   };
 
   // Play a domino on a specific open end (via drop zone click or drag-drop)
-  const doPlayOnEnd = async (endId, dominoId) => {
+  const doPlayOnEnd = async (endId, dominoId, chosenOrientation = null) => {
     if (!isMyTurn || !game) return;
     const g = game;
     const domino = myHand.find(d => d.id === dominoId);
@@ -194,13 +195,13 @@ export default function TXDGame() {
       }
     }
 
-    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, openEnds);
+    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, openEnds, chosenOrientation);
     const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
     const newHand = myPlayer.hand.filter(d => d.id !== domino.id);
     const boardEntry = {
       top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
       exposedValue: result.exposedValue,
-      placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
+      placedOrientation,
     };
     const newBoard = [...(g.board || []), boardEntry];
     let ni = (myIndex + 1) % g.players.length;
@@ -443,18 +444,19 @@ export default function TXDGame() {
                     playable={isPlayable}
                     selected={isSelected}
                     onClick={() => {
-                      if (!isMyTurn) return;
-                      if (!isPlayable) {
-                        shakeInvalid(d.id);
-                        flash("That tile doesn't fit!", 'error');
-                        return;
-                      }
-                      // First play → play immediately
-                      if ((game.board?.length || 0) === 0) {
-                        doPlayOnEnd('first', d.id);
-                        return;
-                      }
-                      setSelectedDomino(prev => prev?.id === d.id ? null : d);
+                    if (!isMyTurn) return;
+                    if (!isPlayable) {
+                      shakeInvalid(d.id);
+                      flash("That tile doesn't fit!", 'error');
+                      return;
+                    }
+                    // First play of a double → ask orientation
+                    if ((game.board?.length || 0) === 0) {
+                      if (d.top === d.bottom) { setOrientPicker(d); return; }
+                      doPlayOnEnd('first', d.id);
+                      return;
+                    }
+                    setSelectedDomino(prev => prev?.id === d.id ? null : d);
                     }}
                   />
                 </div>
@@ -505,6 +507,31 @@ export default function TXDGame() {
         <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl font-body text-sm z-50 pointer-events-none
           ${feedback.type === 'error' ? 'bg-red-950 border border-red-500 text-red-200' : 'bg-black/90 border border-emerald-500/50 text-emerald-300'}`}>
           {feedback.msg}
+        </div>
+      )}
+
+      {/* Orientation Picker for first-play double */}
+      {orientPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="max-w-xs w-full border-2 border-cyber-purple rounded-2xl p-6 bg-black text-center" style={{ boxShadow: '0 0 30px rgba(188,19,254,0.4)' }}>
+            <p className="text-[9px] text-cyber-purple tracking-widest uppercase mb-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>Place [{orientPicker.top}-{orientPicker.bottom}]</p>
+            <p className="text-white/50 font-body text-xs mb-5">Choose orientation</p>
+            <div className="flex justify-center gap-8 mb-5">
+              <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => { doPlayOnEnd('first', orientPicker.id || `${orientPicker.top}-${orientPicker.bottom}`, 'horizontal'); setOrientPicker(null); }}>
+                <div className="p-2 rounded-xl border border-white/10 group-hover:border-cyber-purple/60 group-hover:bg-cyber-purple/10 transition-all">
+                  <TXDDomino top={orientPicker.top} bottom={orientPicker.bottom} width={36} orientation="horizontal" />
+                </div>
+                <span className="text-white/60 font-body text-xs group-hover:text-white">Horizontal</span>
+              </div>
+              <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => { doPlayOnEnd('first', orientPicker.id || `${orientPicker.top}-${orientPicker.bottom}`, 'vertical'); setOrientPicker(null); }}>
+                <div className="p-2 rounded-xl border border-white/10 group-hover:border-cyber-purple/60 group-hover:bg-cyber-purple/10 transition-all">
+                  <TXDDomino top={orientPicker.top} bottom={orientPicker.bottom} width={36} orientation="vertical" />
+                </div>
+                <span className="text-white/60 font-body text-xs group-hover:text-white">Vertical</span>
+              </div>
+            </div>
+            <button onClick={() => setOrientPicker(null)} className="text-white/30 font-body text-xs hover:text-white/60">Cancel</button>
+          </div>
         </div>
       )}
 
