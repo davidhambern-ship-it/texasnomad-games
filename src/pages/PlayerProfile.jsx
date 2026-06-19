@@ -242,132 +242,139 @@ export default function PlayerProfilePage() {
         </div>
       </div>
 
-      {/* Main content */}
-      <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+      {/* Main content — side by side: left col (content) + right col (portrait high scores) */}
+      <style>{`
+        @keyframes hs-scroll {
+          0%   { transform: translateY(0); }
+          100% { transform: translateY(-50%); }
+        }
+        .hs-track { animation: hs-scroll ${Math.max(highScores.length * 3, 8)}s linear infinite; }
+        .hs-track:hover { animation-play-state: paused; }
+      `}</style>
+      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 16px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 16, alignItems: 'start' }}>
 
-        {/* Game Stats */}
-        <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
-          <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🎮 GAME HISTORY</div>
-          {topGames.length === 0 ? (
-            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No games played yet. Jump into the arcade!</p>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
-              {topGames.map(([gameId, stats]) => (
-                <div key={gameId} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.accent}20`, background: `${theme.accent}06` }}>
-                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', marginBottom: 6 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>HIGH SCORE</div>
-                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score || 0}</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>PLAYED</div>
-                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: theme.accent, lineHeight: 1 }}>{stats.times_played || 0}×</div>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
-                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        {/* Left column — all content */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
-        {/* High Scores — vertical scroll ticker */}
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,215,0,0.25)', background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
-          <style>{`
-            @keyframes hs-scroll {
-              0%   { transform: translateY(0); }
-              100% { transform: translateY(-50%); }
-            }
-            .hs-track { animation: hs-scroll ${Math.max(highScores.length * 3, 8)}s linear infinite; }
-            .hs-track:hover { animation-play-state: paused; }
-          `}</style>
-          <div style={{ ...PS2, fontSize: 8, color: '#FFD700', marginBottom: 12 }}>🥇 HIGH SCORES</div>
-          {highScores.length === 0 ? (
-            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Play some games to set high scores!</p>
-          ) : (
-            <div style={{ height: 180, overflow: 'hidden', position: 'relative' }}>
-              {/* fade edges */}
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to bottom, rgba(0,0,0,0.6), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to top, rgba(0,0,0,0.6), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-              <div className="hs-track">
-                {[...highScores, ...highScores].map(([gameId, stats], i) => (
-                  <div key={`${gameId}-${i}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '7px 10px', marginBottom: 5, borderRadius: 8, background: (i % highScores.length) === 0 ? 'rgba(255,215,0,0.07)' : 'rgba(255,255,255,0.03)', border: `1px solid ${(i % highScores.length) === 0 ? 'rgba(255,215,0,0.25)' : 'rgba(255,255,255,0.05)'}` }}>
-                    <span style={{ fontSize: 14, flexShrink: 0, width: 20, textAlign: 'center' }}>
-                      {(i % highScores.length) === 0 ? '🥇' : (i % highScores.length) === 1 ? '🥈' : (i % highScores.length) === 2 ? '🥉' : '▸'}
-                    </span>
-                    <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', flex: 1 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</span>
-                    <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score.toLocaleString()}</span>
-                    <span style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', minWidth: 50, textAlign: 'right' }}>{stats.wins || 0}W · {stats.times_played || 0}P</span>
+          {/* Game Stats */}
+          <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
+            <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🎮 GAME HISTORY</div>
+            {topGames.length === 0 ? (
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No games played yet. Jump into the arcade!</p>
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+                {topGames.map(([gameId, stats]) => (
+                  <div key={gameId} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.accent}20`, background: `${theme.accent}06` }}>
+                    <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', marginBottom: 6 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>HIGH SCORE</div>
+                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score || 0}</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>PLAYED</div>
+                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: theme.accent, lineHeight: 1 }}>{stats.times_played || 0}×</div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
+                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
+                      </div>
+                    </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+
+          {/* Badges */}
+          <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🏆 BADGE CASE</div>
+            {badges.length === 0 ? (
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No badges yet. Win some games to earn them!</p>
+            ) : (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {badges.map((badge, i) => <BadgeChip key={i} badge={badge} />)}
+              </div>
+            )}
+          </div>
+
+          {/* Playstyle */}
+          {(profile.playstyle_tags || []).length > 0 && (
+            <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.secondary}20`, background: 'rgba(0,0,0,0.3)' }}>
+              <div style={{ ...PS2, fontSize: 8, color: theme.secondary, marginBottom: 12 }}>⚡ PLAYSTYLE</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {(profile.playstyle_tags || []).map((tag, i) => (
+                  <span key={i} style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${theme.secondary}40`, background: `${theme.secondary}10`, ...PS2, fontSize: 6, color: theme.secondary }}>{tag}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Friends */}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <FriendsList userId={user?.id} theme={theme} />
+          </div>
+
+          {/* Host Stats */}
+          {profile.host_stats && (profile.host_stats.total_sessions > 0) && (
+            <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,95,31,0.25)', background: 'rgba(0,0,0,0.3)' }}>
+              <div style={{ ...PS2, fontSize: 8, color: '#FF5F1F', marginBottom: 12 }}>🎛 HOST ACTIVITY</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <StatCard label="SESSIONS HOSTED" value={profile.host_stats.total_sessions || 0} color="#FF5F1F" />
+                <StatCard label="HOST TIME" value={`${Math.floor((profile.host_stats.total_host_time_minutes || 0) / 60)}h`} color="#FFD700" />
+              </div>
+              {profile.host_stats.last_hosted && (
+                <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>
+                  LAST HOSTED: {new Date(profile.host_stats.last_hosted).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Referral */}
+          <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>
+            <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginBottom: 12 }}>🔗 REFERRAL CODE</div>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(74,222,128,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontFamily: "'Courier New', monospace", fontSize: 16, color: '#4ade80', letterSpacing: 3 }}>{profile.referral_code || '—'}</span>
+              <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?ref=${profile.referral_code}`)}
+                style={{ ...PS2, fontSize: 6, color: '#4ade80', background: 'transparent', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 5, padding: '4px 8px', cursor: 'pointer' }}>
+                COPY
+              </button>
+            </div>
+            <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8, lineHeight: 1.6 }}>
+              Share your code. Earn rewards when new players join.
+            </p>
+          </div>
+        </div>
+
+        {/* Right column — portrait High Scores ticker */}
+        <div style={{ position: 'sticky', top: 80, padding: 14, borderRadius: 12, border: '1px solid rgba(255,215,0,0.3)', background: 'rgba(0,0,0,0.4)', boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
+          <div style={{ ...PS2, fontSize: 7, color: '#FFD700', marginBottom: 10, textAlign: 'center', letterSpacing: '0.1em' }}>🥇 HIGH SCORES</div>
+          {highScores.length === 0 ? (
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Play games to set scores!</p>
+          ) : (
+            <div style={{ height: 480, overflow: 'hidden', position: 'relative' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 30, background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 30, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+              <div className="hs-track">
+                {[...highScores, ...highScores].map(([gameId, stats], i) => {
+                  const rank = i % highScores.length;
+                  return (
+                    <div key={`${gameId}-${i}`} style={{ padding: '10px 8px', marginBottom: 6, borderRadius: 8, background: rank === 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rank === 0 ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}`, textAlign: 'center' }}>
+                      <div style={{ fontSize: 18, marginBottom: 4 }}>
+                        {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
+                      </div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 15, color: 'white', lineHeight: 1.1, marginBottom: 4 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 28, color: '#FFD700', lineHeight: 1, textShadow: rank === 0 ? '0 0 10px rgba(255,215,0,0.5)' : 'none' }}>{stats.high_score.toLocaleString()}</div>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{stats.wins || 0}W · {stats.times_played || 0}P</div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
         </div>
 
-        {/* Badges */}
-        <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)' }}>
-          <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🏆 BADGE CASE</div>
-          {badges.length === 0 ? (
-            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No badges yet. Win some games to earn them!</p>
-          ) : (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {badges.map((badge, i) => <BadgeChip key={i} badge={badge} />)}
-            </div>
-          )}
-        </div>
-
-        {/* Playstyle */}
-        {(profile.playstyle_tags || []).length > 0 && (
-          <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.secondary}20`, background: 'rgba(0,0,0,0.3)' }}>
-            <div style={{ ...PS2, fontSize: 8, color: theme.secondary, marginBottom: 12 }}>⚡ PLAYSTYLE</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {(profile.playstyle_tags || []).map((tag, i) => (
-                <span key={i} style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${theme.secondary}40`, background: `${theme.secondary}10`, ...PS2, fontSize: 6, color: theme.secondary }}>{tag}</span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Friends */}
-        <div style={{ gridColumn: '1 / -1' }}>
-          <FriendsList userId={user?.id} theme={theme} />
-        </div>
-
-        {/* Host Stats */}
-        {profile.host_stats && (profile.host_stats.total_sessions > 0) && (
-          <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,95,31,0.25)', background: 'rgba(0,0,0,0.3)' }}>
-            <div style={{ ...PS2, fontSize: 8, color: '#FF5F1F', marginBottom: 12 }}>🎛 HOST ACTIVITY</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <StatCard label="SESSIONS HOSTED" value={profile.host_stats.total_sessions || 0} color="#FF5F1F" />
-              <StatCard label="HOST TIME" value={`${Math.floor((profile.host_stats.total_host_time_minutes || 0) / 60)}h`} color="#FFD700" />
-            </div>
-            {profile.host_stats.last_hosted && (
-              <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8 }}>
-                LAST HOSTED: {new Date(profile.host_stats.last_hosted).toLocaleDateString()}
-              </p>
-            )}
-          </div>
-        )}
-
-        {/* Referral */}
-        <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>
-          <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginBottom: 12 }}>🔗 REFERRAL CODE</div>
-          <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(74,222,128,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontFamily: "'Courier New', monospace", fontSize: 16, color: '#4ade80', letterSpacing: 3 }}>{profile.referral_code || '—'}</span>
-            <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?ref=${profile.referral_code}`)}
-              style={{ ...PS2, fontSize: 6, color: '#4ade80', background: 'transparent', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 5, padding: '4px 8px', cursor: 'pointer' }}>
-              COPY
-            </button>
-          </div>
-          <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8, lineHeight: 1.6 }}>
-            Share your code. Earn rewards when new players join.
-          </p>
-        </div>
       </div>
     </div>
   );
