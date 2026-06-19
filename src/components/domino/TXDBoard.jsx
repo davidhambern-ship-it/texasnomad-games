@@ -1,13 +1,10 @@
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import TXDDomino from './TXDDomino';
 
-const W = 32;   // narrow dim of a tile in px
-const GAP = 4;  // gap between tiles
+const W = 32;  // narrow tile dimension px
+const GAP = 4;
 
-// Compute pixel layout for all tiles relative to a virtual origin
 function buildLayout(board) {
-  if (!board || board.length === 0) return { tiles: [], w: 0, h: 0, originX: 0, originY: 0 };
-
   const placed = [];
   let lx = 0, rx = 0, ty = 0, by = 0, spinX = 0;
 
@@ -20,68 +17,45 @@ function buildLayout(board) {
     if (side === 'first') {
       const px = -tw / 2;
       const py = -th / 2;
-      placed.push({ ...piece, px, py, tw, th });
-      lx = px - GAP;
-      rx = px + tw + GAP;
-      ty = py - GAP;
-      by = py + th + GAP;
+      placed.push({ ...piece, _px: px, _py: py, _tw: tw, _th: th });
+      lx = px - GAP; rx = px + tw + GAP;
+      ty = py - GAP; by = py + th + GAP;
       spinX = px + tw / 2;
-      return;
-    }
-    if (side === 'left') {
+    } else if (side === 'left') {
       const px = lx - tw;
-      const py = -th / 2;
-      placed.push({ ...piece, px, py, tw, th });
+      placed.push({ ...piece, _px: px, _py: -th / 2, _tw: tw, _th: th });
       lx = px - GAP;
-      return;
-    }
-    if (side === 'right') {
-      const px = rx;
-      const py = -th / 2;
-      placed.push({ ...piece, px, py, tw, th });
-      rx = px + tw + GAP;
-      return;
-    }
-    if (side === 'top') {
-      const px = spinX - tw / 2;
+    } else if (side === 'right') {
+      placed.push({ ...piece, _px: rx, _py: -th / 2, _tw: tw, _th: th });
+      rx = rx + tw + GAP;
+    } else if (side === 'top') {
       const py = ty - th;
-      placed.push({ ...piece, px, py, tw, th });
+      placed.push({ ...piece, _px: spinX - tw / 2, _py: py, _tw: tw, _th: th });
       ty = py - GAP;
-      return;
+    } else if (side === 'bottom') {
+      placed.push({ ...piece, _px: spinX - tw / 2, _py: by, _tw: tw, _th: th });
+      by = by + th + GAP;
+    } else {
+      placed.push({ ...piece, _px: 0, _py: 0, _tw: tw, _th: th });
     }
-    if (side === 'bottom') {
-      const px = spinX - tw / 2;
-      const py = by;
-      placed.push({ ...piece, px, py, tw, th });
-      by = py + th + GAP;
-      return;
-    }
-    // fallback
-    placed.push({ ...piece, px: 0, py: 0, tw, th });
   });
 
-  // Compute bounds
+  if (placed.length === 0) return null;
+
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   placed.forEach(t => {
-    minX = Math.min(minX, t.px);
-    minY = Math.min(minY, t.py);
-    maxX = Math.max(maxX, t.px + t.tw);
-    maxY = Math.max(maxY, t.py + t.th);
+    minX = Math.min(minX, t._px); minY = Math.min(minY, t._py);
+    maxX = Math.max(maxX, t._px + t._tw); maxY = Math.max(maxY, t._py + t._th);
   });
 
-  const PADDING = W * 2;
-  const totalW = maxX - minX + PADDING * 2;
-  const totalH = maxY - minY + PADDING * 2;
-  const originX = -minX + PADDING;
-  const originY = -minY + PADDING;
-
+  const PAD = W * 2;
   return {
-    tiles: placed,
-    w: totalW,
-    h: totalH,
-    originX,
-    originY,
-    openEnds: { lx, rx, ty, by, spinX },
+    placed,
+    canvasW: maxX - minX + PAD * 2,
+    canvasH: maxY - minY + PAD * 2,
+    ox: -minX + PAD,  // origin offset x
+    oy: -minY + PAD,  // origin offset y
+    lx, rx, ty, by, spinX,
   };
 }
 
@@ -95,8 +69,6 @@ export default function TXDBoard({
   onDropOnEnd,
   draggingDominoId = null,
 }) {
-  const containerRef = useRef(null);
-
   // Empty board
   if (board.length === 0) {
     const canPlay = !!onDropOnEnd;
@@ -124,47 +96,49 @@ export default function TXDBoard({
   }
 
   const layout = buildLayout(board);
-  const { tiles, w, h, originX, originY, openEnds: oe } = layout;
+  if (!layout) return null;
+
+  const { placed, canvasW, canvasH, ox, oy, lx, rx, ty, by, spinX } = layout;
 
   const firstPiece = board[0];
-  const isFirstDouble = firstPiece?.top === firstPiece?.bottom;
+  const isFirstDouble = firstPiece && firstPiece.top === firstPiece.bottom;
   const hasSpinnerArms = isFirstDouble || spinnerActive;
+  const spinnerVal = firstPiece ? firstPiece.top : 0;
 
-  // Drop zone sizes
-  const DZ_HORIZ_W = W * 2, DZ_HORIZ_H = W;
-  const DZ_VERT_W  = W * 2, DZ_VERT_H  = W * 2;
+  const topLast    = [...board].reverse().find(p => p.side === 'top');
+  const bottomLast = [...board].reverse().find(p => p.side === 'bottom');
+  const topEndVal    = topLast    ? (topLast.exposedValue    ?? spinnerVal) : spinnerVal;
+  const bottomEndVal = bottomLast ? (bottomLast.exposedValue ?? spinnerVal) : spinnerVal;
 
-  const spinnerVal = firstPiece?.top ?? 0;
-  const topLastPiece    = [...board].reverse().find(p => p.side === 'top');
-  const bottomLastPiece = [...board].reverse().find(p => p.side === 'bottom');
-  const topEndVal    = topLastPiece    ? (topLastPiece.exposedValue    ?? spinnerVal) : spinnerVal;
-  const bottomEndVal = bottomLastPiece ? (bottomLastPiece.exposedValue ?? spinnerVal) : spinnerVal;
+  const DZH = { w: W * 2, h: W };       // horizontal drop zone size
+  const DZV = { w: W * 2, h: W * 2 };   // vertical drop zone size
 
-  function DropZone({ endId, value, px, py, dw, dh }) {
+  function renderDropZone(endId, value, px, py, dw, dh) {
     const isPlayable = playableEndIds.has(endId);
     const active = isPlayable || !!draggingDominoId;
+    if (!active && !isPlayable) return null;
     return (
       <div
+        key={'dz-' + endId}
         onDragOver={active ? (e) => e.preventDefault() : undefined}
         onDrop={active ? (e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd(endId, id); } : undefined}
         onClick={isPlayable ? () => { if (selectedDomino && onDropOnEnd) onDropOnEnd(endId, selectedDomino.id); } : undefined}
         style={{
           position: 'absolute',
-          left: originX + px,
-          top: originY + py,
+          left: ox + px,
+          top: oy + py,
           width: dw,
           height: dh,
           borderRadius: 8,
-          border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.12)',
+          border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.08)',
           background: isPlayable ? 'rgba(0,255,120,0.15)' : 'transparent',
           boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.6)' : 'none',
           cursor: isPlayable ? 'pointer' : 'default',
-          pointerEvents: active ? 'auto' : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 2,
         }}
       >
-        <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)' }}>
+        <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.15)' }}>
           {value ?? '?'}
         </span>
       </div>
@@ -172,28 +146,21 @@ export default function TXDBoard({
   }
 
   return (
-    <div
-      ref={containerRef}
-      style={{ width: '100%', height: '100%', overflow: 'auto', position: 'relative', scrollbarWidth: 'none' }}
-    >
-      {/* Virtual canvas — sized to fit all tiles */}
-      <div style={{ position: 'relative', width: w, height: h, margin: 'auto' }}>
+    <div style={{ width: '100%', height: '100%', overflow: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', scrollbarWidth: 'none' }}>
+      <div style={{ position: 'relative', width: canvasW, height: canvasH, flexShrink: 0 }}>
 
-        {/* Render each tile at its fixed pixel position */}
-        {tiles.map((t) => {
+        {placed.map((t) => {
           const orientation = t.placedOrientation
-            || ((['top', 'bottom'].includes(t.side) || t.top === t.bottom) ? 'vertical' : 'horizontal');
+            || ((t.side === 'top' || t.side === 'bottom' || t.top === t.bottom) ? 'vertical' : 'horizontal');
           return (
             <div
               key={t.id}
               style={{
                 position: 'absolute',
-                left: originX + t.px,
-                top: originY + t.py,
+                left: ox + t._px,
+                top: oy + t._py,
                 zIndex: 1,
-                filter: t.isSpinner
-                  ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))'
-                  : undefined,
+                filter: t.isSpinner ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))' : undefined,
               }}
             >
               <TXDDomino top={t.top} bottom={t.bottom} width={W} orientation={orientation} />
@@ -201,31 +168,11 @@ export default function TXDBoard({
           );
         })}
 
-        {/* Drop zones — only rendered when onDropOnEnd is provided */}
-        {onDropOnEnd && oe && (
-          <>
-            {/* Left */}
-            <DropZone endId="left" value={leftEnd ?? firstPiece?.top}
-              px={oe.lx - DZ_HORIZ_W} py={-DZ_HORIZ_H / 2}
-              dw={DZ_HORIZ_W} dh={DZ_HORIZ_H} />
-            {/* Right */}
-            <DropZone endId="right" value={rightEnd ?? firstPiece?.bottom}
-              px={oe.rx} py={-DZ_HORIZ_H / 2}
-              dw={DZ_HORIZ_W} dh={DZ_HORIZ_H} />
-            {/* Top */}
-            {hasSpinnerArms && (
-              <DropZone endId="top" value={topEndVal}
-                px={oe.spinX - DZ_VERT_W / 2} py={oe.ty - DZ_VERT_H}
-                dw={DZ_VERT_W} dh={DZ_VERT_H} />
-            )}
-            {/* Bottom */}
-            {hasSpinnerArms && (
-              <DropZone endId="bottom" value={bottomEndVal}
-                px={oe.spinX - DZ_VERT_W / 2} py={oe.by}
-                dw={DZ_VERT_W} dh={DZ_VERT_H} />
-            )}
-          </>
-        )}
+        {onDropOnEnd && renderDropZone('left',   leftEnd  ?? firstPiece?.top,   lx - DZH.w,         -DZH.h / 2, DZH.w, DZH.h)}
+        {onDropOnEnd && renderDropZone('right',  rightEnd ?? firstPiece?.bottom, rx,                 -DZH.h / 2, DZH.w, DZH.h)}
+        {onDropOnEnd && hasSpinnerArms && renderDropZone('top',    topEndVal,    spinX - DZV.w / 2, ty - DZV.h, DZV.w, DZV.h)}
+        {onDropOnEnd && hasSpinnerArms && renderDropZone('bottom', bottomEndVal, spinX - DZV.w / 2, by,         DZV.w, DZV.h)}
+
       </div>
     </div>
   );

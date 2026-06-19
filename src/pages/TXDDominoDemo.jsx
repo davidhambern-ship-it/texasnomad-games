@@ -38,16 +38,16 @@ export default function TXDDominoDemo() {
 
         {/* Domino grid */}
         <div className="flex flex-wrap justify-center gap-4">
-          {DOMINO_SET.map(([top, bottom], i) => (
+          {DOMINO_SET.map((d, i) => (
             <div key={i} className="flex flex-col items-center gap-1">
               <TXDDomino
-                top={top}
-                bottom={bottom}
+                top={d.top}
+                bottom={d.bottom}
                 width={size}
                 faceDown={showBack}
               />
               {!showBack && (
-                <span className="text-white/40 font-mono text-xs">{top}-{bottom}</span>
+                <span className="text-white/40 font-mono text-xs">{d.top}-{d.bottom}</span>
               )}
             </div>
           ))}
