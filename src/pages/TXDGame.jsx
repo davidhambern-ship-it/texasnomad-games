@@ -2,40 +2,24 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
-import TXDBoard from '@/components/domino/TXDBoard.jsx';
+import TXDBoard from '@/components/domino/TXDBoard';
 import Header from '@/components/home/Header';
 import {
-  playDomino, calculateRoundScores, aiChoosePlay, findHighestDoubleStarter,
-  getLegalMoves, getPlayableEndsForDomino, computeOpenEnds, deal, DOMINO_SET,
+  DOMINO_SET, deal, findHighestDoubleStarter,
+  playDomino, calculateRoundScores, aiChoosePlay,
+  getLegalMoves, getPlayableEnds, drawFromBoneyard,
 } from '@/lib/txdDominoEngine';
 
-const HAND_TILE_W = 54;
+const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-const SEAT_POS = {
-  0: 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2',
-  1: 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2',
-  2: 'top-0 left-1/2 -translate-x-1/2 -translate-y-1/2',
-  3: 'right-0 top-1/2 translate-x-1/2 -translate-y-1/2',
-};
-
-function SeatLabel({ player, isTurn, isMe, tileCount, seatIdx }) {
-  return (
-    <div className={`absolute z-10 ${SEAT_POS[seatIdx]}`}>
-      <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-body whitespace-nowrap
-        ${isTurn ? 'bg-emerald-900/90 border border-emerald-400 text-emerald-300' : isMe ? 'bg-cyber-purple/80 border border-cyber-purple text-white' : 'bg-black/80 border border-white/20 text-white/70'}`}
-        style={{ boxShadow: isTurn ? '0 0 12px rgba(16,185,129,0.5)' : 'none' }}>
-        {isTurn && <span className="text-emerald-400">▶</span>}
-        {player.isAI && <span>🤖</span>}
-        {player.isHost && <span>👑</span>}
-        <span className={isMe ? 'text-outlaw-gold font-bold' : ''}>{player.playerName}</span>
-        <span className="text-white/40">·</span>
-        <span className="font-mono">{tileCount}</span>
-        <span className="text-white/30 text-[10px]">tiles</span>
-        <span className="text-white/40">·</span>
-        <span className="text-emerald-400 font-mono font-bold">{player.score || 0}</span>
-      </div>
-    </div>
-  );
+function gameStateFromGame(g) {
+  return {
+    leftEnd:       g.leftEnd       ?? null,
+    rightEnd:      g.rightEnd      ?? null,
+    topEnd:        g.topEnd        ?? null,
+    bottomEnd:     g.bottomEnd     ?? null,
+    spinnerPlayed: g.spinnerPlayed ?? false,
+  };
 }
 
 export default function TXDGame() {
@@ -43,45 +27,32 @@ export default function TXDGame() {
   const navigate = useNavigate();
   const roomCode = searchParams.get('room')?.toUpperCase();
 
-  const [game, setGame] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [playerId, setPlayerId] = useState(null);
-  const [nameInput, setNameInput] = useState('');
+  const [game, setGame]             = useState(null);
+  const [loading, setLoading]       = useState(true);
+  const [playerId, setPlayerId]     = useState(null);
+  const [nameInput, setNameInput]   = useState('');
   const [selectedDomino, setSelectedDomino] = useState(null);
-  const [draggingId, setDraggingId] = useState(null);
-  const [feedback, setFeedback] = useState(null);
-  const [shakeTile, setShakeTile] = useState(null);
-  const [orientPicker, setOrientPicker] = useState(null); // { domino } — pending first-play double
+  const [feedback, setFeedback]     = useState(null);
+  const [orientPicker, setOrientPicker] = useState(null);
   const pollRef = useRef(null);
 
-  const myIndex = game?.players?.findIndex(p => p.playerId === playerId) ?? -1;
-  const myPlayer = myIndex >= 0 ? game?.players?.[myIndex] : null;
-  const isMyTurn = game?.phase === 'playing' && game?.currentPlayerIndex === myIndex;
-  const myHand = myPlayer?.hand || [];
-  // Derive open ends from board state — never trust stored coordinates
-  const openEnds = game?.board?.length > 0
-    ? computeOpenEnds(game.board, game?.leftEnd ?? null, game?.rightEnd ?? null, game?.spinnerActive || false)
-    : null;
-  const legalMoves = isMyTurn ? getLegalMoves(myHand, openEnds, game?.leftEnd ?? null, game?.rightEnd ?? null) : [];
-  const playableDominoIds = new Set(legalMoves.map(m => m.dominoId));
-  const hasLegalMove = legalMoves.length > 0;
-  const currentPlayer = game?.players?.[game?.currentPlayerIndex];
-
-  // Which ends the selected domino can play on
-  const playableEndIds = selectedDomino
-    ? new Set(getPlayableEndsForDomino(selectedDomino, openEnds))
-    : new Set();
+  const myIndex   = game?.players?.findIndex(p => p.playerId === playerId) ?? -1;
+  const myPlayer  = myIndex >= 0 ? game?.players?.[myIndex] : null;
+  const isMyTurn  = game?.phase === 'playing' && game?.currentPlayerIndex === myIndex;
+  const myHand    = myPlayer?.hand || [];
+  const gs        = game ? gameStateFromGame(game) : { leftEnd: null, rightEnd: null, topEnd: null, bottomEnd: null, spinnerPlayed: false };
+  const legalMoves       = isMyTurn ? getLegalMoves(myHand, gs) : [];
+  const playableDominoIds = new Set(legalMoves.map(m => m.domino.id));
+  const hasLegalMove     = legalMoves.length > 0;
+  const currentPlayer    = game?.players?.[game?.currentPlayerIndex];
+  const playableEnds     = selectedDomino ? new Set(getPlayableEnds(selectedDomino, gs)) : new Set();
 
   const flash = (msg, type = 'error') => {
     setFeedback({ msg, type });
-    setTimeout(() => setFeedback(null), 2500);
+    setTimeout(() => setFeedback(null), 2800);
   };
 
-  const shakeInvalid = (id) => {
-    setShakeTile(id);
-    setTimeout(() => setShakeTile(null), 500);
-  };
-
+  // Poll
   useEffect(() => {
     if (!roomCode) { setLoading(false); return; }
     fetchGame();
@@ -91,8 +62,8 @@ export default function TXDGame() {
 
   const fetchGame = async () => {
     try {
-      const rooms = await base44.entities.TXDGame.filter({ room_code: roomCode });
-      if (rooms.length > 0) setGame(rooms[0]);
+      const rows = await base44.entities.TXDGame.filter({ room_code: roomCode });
+      if (rows.length > 0) setGame(rows[0]);
       setLoading(false);
     } catch (_) { setLoading(false); }
   };
@@ -107,43 +78,39 @@ export default function TXDGame() {
   }, [game?.currentPlayerIndex, game?.phase, game?.board?.length]);
 
   const runAI = async (g, aiPlayer, aiIdx) => {
+    const gs = gameStateFromGame(g);
     const next = (aiIdx + 1) % g.players.length;
-    const choice = aiChoosePlay(aiPlayer.hand, g.leftEnd ?? null, g.rightEnd ?? null, g.startingDominoLocked, g.openEnds || null);
+    const choice = aiChoosePlay(aiPlayer.hand, gs, g.startingDominoLocked);
     let updated;
     if (!choice) {
-      // No legal move → knock (pass)
-      const feed = [...(g.activityFeed || [])];
-      feed.unshift(`🤖 ${aiPlayer.playerName} knocked`);
-      updated = { ...g, currentPlayerIndex: next, lastAction: { type: 'knock', player: aiPlayer.playerName }, activityFeed: feed.slice(0, 30) };
+      if ((g.boneyard || []).length > 0) {
+        const { drawn, newBoneyard } = drawFromBoneyard(g.boneyard);
+        const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: [...p.hand, drawn] } : p);
+        const feed = [...(g.activityFeed || [])]; feed.unshift(`🤖 ${aiPlayer.playerName} drew`);
+        updated = { ...g, boneyard: newBoneyard, players, activityFeed: feed.slice(0, 20) };
+      } else {
+        const feed = [...(g.activityFeed || [])]; feed.unshift(`🤖 ${aiPlayer.playerName} knocked`);
+        updated = { ...g, currentPlayerIndex: next, activityFeed: feed.slice(0, 20) };
+      }
     } else {
       const { domino, side } = choice;
-      const isFirstPlay = (g.board?.length || 0) === 0;
-      const aiOpenEnds = g.board?.length > 0 ? computeOpenEnds(g.board, g.leftEnd ?? null, g.rightEnd ?? null, g.spinnerActive || false) : null;
-      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, aiOpenEnds);
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
+      const result = playDomino(domino, gs, side);
+      const { entry, newLeftEnd, newRightEnd, newTopEnd, newBottomEnd, newSpinnerPlayed } = result;
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
-      const boardEntry = {
-        top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-        exposedValue: result.exposedValue,
-        placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
-      };
-      const newBoard = [...(g.board || []), boardEntry];
+      const newBoard = [...(g.board || []), { ...entry, isSpinner: newSpinnerPlayed && !g.spinnerPlayed }];
       const players = g.players.map((p, i) => i === aiIdx ? { ...p, hand: newHand } : p);
       const roundOver = newHand.length === 0;
       const pts = roundOver ? calculateRoundScores(players, aiIdx) : 0;
       if (roundOver) players[aiIdx] = { ...players[aiIdx], score: (players[aiIdx].score || 0) + pts };
-      const feed = [...(g.activityFeed || [])];
-      feed.unshift(`🤖 ${aiPlayer.playerName} played ${domino.top}-${domino.bottom}`);
+      const feed = [...(g.activityFeed || [])]; feed.unshift(`🤖 ${aiPlayer.playerName} played [${domino.id}]`);
       updated = {
-        ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-        players,
-        currentPlayerIndex: roundOver ? aiIdx : next,
+        ...g, board: newBoard,
+        leftEnd: newLeftEnd, rightEnd: newRightEnd, topEnd: newTopEnd, bottomEnd: newBottomEnd, spinnerPlayed: newSpinnerPlayed,
+        players, currentPlayerIndex: roundOver ? aiIdx : next,
         phase: roundOver ? 'round_over' : 'playing',
         roundWinner: roundOver ? { playerName: aiPlayer.playerName, playerId: aiPlayer.playerId, points: pts } : null,
-        lastAction: { type: 'play', player: aiPlayer.playerName, domino },
-        activityFeed: feed.slice(0, 30),
-        spinnerActive: newSpinnerActive,
-        startingDominoLocked: isFirstPlay ? null : g.startingDominoLocked,
+        activityFeed: feed.slice(0, 20),
+        startingDominoLocked: gs.leftEnd === null ? null : g.startingDominoLocked,
       };
     }
     await base44.entities.TXDGame.update(g.id, updated);
@@ -156,105 +123,74 @@ export default function TXDGame() {
     const pid = user?.id || `p_${Date.now()}`;
     if (game.players?.find(p => p.playerId === pid)) { setPlayerId(pid); return; }
     const humanNonHost = game.players?.filter(p => !p.isHost) || [];
-    if (humanNonHost.length >= 3) { flash('Room is full (3 player slots)', 'error'); return; }
-    const newPlayer = {
-      playerId: pid, seatNumber: humanNonHost.length + 2,
-      playerName: nameInput.trim(),
-      hand: [], score: 0, roundScore: 0,
-      status: 'active', isAI: false, isHost: false,
-    };
+    if (humanNonHost.length >= 3) { flash('Room is full', 'error'); return; }
+    const newPlayer = { playerId: pid, seatNumber: humanNonHost.length + 2, playerName: nameInput.trim(), hand: [], score: 0, status: 'active', isAI: false, isHost: false };
     const updated = { ...game, players: [...(game.players || []), newPlayer] };
     await base44.entities.TXDGame.update(game.id, updated);
     setPlayerId(pid);
     setGame(updated);
   };
 
-  // Play a domino on a specific open end (via drop zone click or drag-drop)
-  const doPlayOnEnd = async (endId, dominoId, chosenOrientation = null) => {
-    if (!isMyTurn || !game) return;
+  // Play on an end
+  const doPlayOnEnd = async (side, chosenOrientation = null) => {
+    if (!isMyTurn || !selectedDomino || !game) return;
     const g = game;
-    const domino = myHand.find(d => d.id === dominoId);
+    const domino = myHand.find(d => d.id === selectedDomino.id);
     if (!domino) return;
-    const isFirstPlay = (g.board?.length || 0) === 0;
-    const side = isFirstPlay ? 'first' : endId;
 
-    if (isFirstPlay && g.startingDominoLocked && domino.id !== g.startingDominoLocked) {
-      shakeInvalid(domino.id);
-      flash(`Must start with [${g.startingDominoLocked}]!`, 'error');
-      return;
+    if (gs.leftEnd === null && g.startingDominoLocked && domino.id !== g.startingDominoLocked) {
+      flash(`Must start with [${g.startingDominoLocked}]`); return;
+    }
+    if (gs.leftEnd === null && domino.top === domino.bottom && !chosenOrientation) {
+      setOrientPicker({ domino, side }); return;
     }
 
-    if (!isFirstPlay) {
-      const endValue = openEnds?.[endId]?.value ?? (endId === 'left' ? g.leftEnd : g.rightEnd);
-      if (endValue !== null && endValue !== undefined) {
-        if (domino.top !== endValue && domino.bottom !== endValue) {
-          shakeInvalid(domino.id);
-          flash(`[${domino.id}] doesn't match end value ${endValue}`, 'error');
-          return;
-        }
-      }
-    }
-
-    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, openEnds, chosenOrientation);
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
+    const result = playDomino(domino, gs, side, chosenOrientation);
+    const { entry, newLeftEnd, newRightEnd, newTopEnd, newBottomEnd, newSpinnerPlayed } = result;
     const newHand = myPlayer.hand.filter(d => d.id !== domino.id);
-    const boardEntry = {
-      top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-      exposedValue: result.exposedValue,
-      placedOrientation,
-    };
-    const newBoard = [...(g.board || []), boardEntry];
+    const newBoard = [...(g.board || []), { ...entry, isSpinner: newSpinnerPlayed && !g.spinnerPlayed }];
     let ni = (myIndex + 1) % g.players.length;
     while (g.players[ni]?.status !== 'active' && ni !== myIndex) ni = (ni + 1) % g.players.length;
     const players = g.players.map((p, i) => i === myIndex ? { ...p, hand: newHand } : p);
     const roundOver = newHand.length === 0;
     const pts = roundOver ? calculateRoundScores(players, myIndex) : 0;
     if (roundOver) players[myIndex] = { ...players[myIndex], score: (players[myIndex].score || 0) + pts };
-    const feed = [...(g.activityFeed || [])];
-    feed.unshift(`${myPlayer.playerName} played ${domino.top}-${domino.bottom}`);
+    const feed = [...(g.activityFeed || [])]; feed.unshift(`${myPlayer.playerName} played [${domino.id}]`);
     const updated = {
-      ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-      players,
-      currentPlayerIndex: roundOver ? myIndex : ni,
+      ...g, board: newBoard,
+      leftEnd: newLeftEnd, rightEnd: newRightEnd, topEnd: newTopEnd, bottomEnd: newBottomEnd, spinnerPlayed: newSpinnerPlayed,
+      players, currentPlayerIndex: roundOver ? myIndex : ni,
       phase: roundOver ? 'round_over' : 'playing',
       roundWinner: roundOver ? { playerName: myPlayer.playerName, playerId: myPlayer.playerId, points: pts } : null,
-      lastAction: { type: 'play', player: myPlayer.playerName, domino },
       activityFeed: feed.slice(0, 20),
-      spinnerActive: newSpinnerActive,
-      startingDominoLocked: isFirstPlay ? null : g.startingDominoLocked,
+      startingDominoLocked: gs.leftEnd === null ? null : g.startingDominoLocked,
     };
     await base44.entities.TXDGame.update(g.id, updated);
     setGame(updated);
     setSelectedDomino(null);
   };
 
+  const doDraw = async () => {
+    if (!isMyTurn || !game) return;
+    if ((game.boneyard || []).length === 0) { flash('Boneyard is empty'); return; }
+    const { drawn, newBoneyard } = drawFromBoneyard(game.boneyard);
+    const players = game.players.map((p, i) => i === myIndex ? { ...p, hand: [...p.hand, drawn] } : p);
+    const feed = [...(game.activityFeed || [])]; feed.unshift(`${myPlayer.playerName} drew from boneyard`);
+    const updated = { ...game, boneyard: newBoneyard, players, activityFeed: feed.slice(0, 20) };
+    await base44.entities.TXDGame.update(game.id, updated);
+    setGame(updated);
+  };
+
   const doKnock = async () => {
     if (!isMyTurn || !game) return;
-    if (hasLegalMove) { flash("You have a playable tile — you can't knock!", 'error'); return; }
-    const g = game;
-    let ni = (myIndex + 1) % g.players.length;
-    while (g.players[ni]?.status !== 'active' && ni !== myIndex) ni = (ni + 1) % g.players.length;
-    const feed = [...(g.activityFeed || [])];
-    feed.unshift(`${myPlayer.playerName} knocked`);
-    const updated = { ...g, currentPlayerIndex: ni, lastAction: { type: 'knock', player: myPlayer.playerName }, activityFeed: feed.slice(0, 20) };
-    await base44.entities.TXDGame.update(g.id, updated);
+    if (hasLegalMove) { flash("You have a playable tile!"); return; }
+    const ni = (myIndex + 1) % game.players.length;
+    const feed = [...(game.activityFeed || [])]; feed.unshift(`${myPlayer.playerName} knocked`);
+    const updated = { ...game, currentPlayerIndex: ni, activityFeed: feed.slice(0, 20) };
+    await base44.entities.TXDGame.update(game.id, updated);
     setGame(updated);
     flash('You knocked — turn passed', 'info');
   };
-
-  const doSort = () => {
-    if (!game || !myPlayer) return;
-    const sorted = [...myHand].sort((a, b) => (a.top + a.bottom) - (b.top + b.bottom));
-    const players = game.players.map((p, i) => i === myIndex ? { ...p, hand: sorted } : p);
-    setGame({ ...game, players });
-  };
-
-  // Drag from hand
-  const handleDragStart = (e, domino) => {
-    e.dataTransfer.setData('dominoId', domino.id);
-    setDraggingId(domino.id);
-  };
-  const handleDragEnd = () => setDraggingId(null);
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) return (
@@ -272,16 +208,15 @@ export default function TXDGame() {
     </div>
   );
 
-  // ── Join Screen ────────────────────────────────────────────────────────────
+  // ── Join screen ────────────────────────────────────────────────────────────
   if (!playerId) {
     const nonHostPlayers = game.players?.filter(p => !p.isHost) || [];
     const isFull = nonHostPlayers.length >= 3;
     return (
-      <div className="min-h-screen flex items-center justify-center p-4"
-        style={{ background: 'radial-gradient(ellipse at 50% 0%, #0d0518, #050505)' }}>
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at 50% 0%,#0d0518,#050505)' }}>
         <div className="max-w-sm w-full">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-heading text-outlaw-gold tracking-widest mb-1" style={{ textShadow: '0 0 20px rgba(255,215,0,0.5)' }}>TXD DOMINOES</h1>
+            <h1 className="text-4xl font-heading text-outlaw-gold tracking-widest mb-2">TXD DOMINOES</h1>
             <div className="flex items-center justify-center gap-2 mb-4">
               <span className="text-white/40 font-body text-sm">Room</span>
               <span className="px-3 py-1 rounded-lg bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple font-mono tracking-widest">{roomCode}</span>
@@ -298,8 +233,8 @@ export default function TXDGame() {
           <div className="border-2 border-cyber-purple/40 rounded-2xl p-6 bg-black/60">
             {isFull ? (
               <div className="text-center">
-                <p className="text-red-400 font-body mb-4">All player seats are full</p>
-                <button onClick={() => navigate('/games')} className="w-full py-3 rounded-lg border border-white/30 text-white font-heading tracking-wider hover:bg-white/10">← Back</button>
+                <p className="text-red-400 font-body mb-4">Room is full</p>
+                <button onClick={() => navigate('/games')} className="w-full py-3 rounded-lg border border-white/30 text-white font-heading hover:bg-white/10">← Back</button>
               </div>
             ) : (
               <>
@@ -308,8 +243,8 @@ export default function TXDGame() {
                   className="w-full px-4 py-3 rounded-lg bg-black/60 border-2 border-cyber-purple/50 text-white font-body text-xl mb-4 text-center tracking-wider focus:outline-none focus:border-outlaw-gold"
                   onKeyDown={e => e.key === 'Enter' && joinGame()} />
                 <button onClick={joinGame} disabled={!nameInput.trim()}
-                  className="w-full py-4 rounded-xl font-heading text-xl tracking-widest uppercase text-white disabled:opacity-40 hover:opacity-90 transition-all"
-                  style={{ background: 'linear-gradient(135deg, #BC13FE, #7c3aed)', boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}>
+                  className="w-full py-4 rounded-xl font-heading text-xl tracking-widest uppercase text-white disabled:opacity-40"
+                  style={{ background: 'linear-gradient(135deg,#BC13FE,#7c3aed)', boxShadow: '0 0 20px rgba(188,19,254,0.4)' }}>
                   SIT DOWN
                 </button>
               </>
@@ -320,20 +255,19 @@ export default function TXDGame() {
     );
   }
 
-  // ── Main Game View ─────────────────────────────────────────────────────────
+  // ── Main game view ─────────────────────────────────────────────────────────
   const gameOver = game.players?.some(p => (p.score || 0) >= (game.scoreLimit || 100));
   const gameWinner = gameOver ? [...game.players].sort((a, b) => (b.score || 0) - (a.score || 0))[0] : null;
-  const allSeats = Array.from({ length: 4 }, (_, i) => game.players?.[i] || null);
 
   return (
-    <div className="min-h-screen text-white flex flex-col"
-      style={{ background: 'radial-gradient(ellipse at 50% 0%, #0d0518, #050505)' }}>
+    <div className="min-h-screen text-white flex flex-col" style={{ background: 'radial-gradient(ellipse at 50% 0%,#0d0518,#050505)' }}>
       <Header />
 
+      {/* Top bar */}
       <div className="border-b border-cyber-purple/30 bg-black/60 px-4 py-2">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="text-lg font-heading text-outlaw-gold tracking-widest">TXD: TEXAS DOMINOES</span>
+            <span className="text-lg font-heading text-outlaw-gold tracking-widest">TXD DOMINOES</span>
             <span className="px-2 py-0.5 rounded bg-cyber-purple/20 border border-cyber-purple/40 text-cyber-purple font-mono text-xs">{roomCode}</span>
             <span className="text-white/30 text-xs font-body">Round {game.roundNumber || 1}</span>
           </div>
@@ -345,155 +279,140 @@ export default function TXDGame() {
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 py-4 gap-4">
-
-        {/* ── Game Table ── */}
-        <div className="relative rounded-3xl overflow-hidden"
-          style={{
-            aspectRatio: '4/3',
-            background: 'radial-gradient(ellipse at center, rgba(255,140,30,0.55) 0%, rgba(200,80,10,0.45) 50%, rgba(120,40,0,0.6) 100%)',
-            backdropFilter: 'blur(12px)',
-            border: '4px solid rgba(255,160,50,0.6)',
-            boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15), 0 10px 40px rgba(255,100,0,0.3)',
-            isolation: 'isolate',
-          }}>
-
-          <div className="absolute inset-0 rounded-3xl pointer-events-none"
-            style={{ background: 'linear-gradient(135deg, rgba(255,220,100,0.08) 0%, transparent 50%, rgba(0,0,0,0.15) 100%)' }} />
-
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 1 }}>
-            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
-              alt="TN" className="object-contain" style={{ opacity: 0.2, width: 110, height: 110 }} />
-          </div>
-
-          {/* Seat labels */}
-          {allSeats.map((p, i) => {
-            if (!p) return (
-              <div key={i} className={`absolute z-10 ${SEAT_POS[i]}`}>
-                <div className="px-3 py-1.5 rounded-full text-xs font-body bg-black/50 border border-white/10 text-white/20 whitespace-nowrap">
-                  Seat {i + 1} — Empty
-                </div>
-              </div>
-            );
+      {/* Scoreboard strip */}
+      <div className="border-b border-white/5 bg-black/40 px-4 py-1.5">
+        <div className="max-w-4xl mx-auto flex gap-4 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {game.players?.map((p, i) => {
             const isTurn = game.currentPlayerIndex === i && game.phase === 'playing';
             const isMe = p.playerId === playerId;
-            return <SeatLabel key={i} player={p} isTurn={isTurn} isMe={isMe} tileCount={p.hand?.length ?? 0} seatIdx={i} />;
+            return (
+              <div key={p.playerId} className={`flex items-center gap-1.5 text-xs font-body flex-shrink-0 px-2 py-0.5 rounded ${isTurn ? 'bg-emerald-900/40 text-emerald-300' : isMe ? 'bg-cyber-purple/20 text-white' : 'text-white/50'}`}>
+                {isTurn && <span className="text-emerald-400">▶</span>}
+                {p.isHost ? '👑' : p.isAI ? '🤖' : ''}
+                <span className={isMe ? 'text-outlaw-gold font-bold' : ''}>{p.playerName}</span>
+                <span className="text-white/30">·</span>
+                <span className="font-mono">{p.hand?.length ?? 0}🁣</span>
+                <span className="text-white/30">·</span>
+                <span className="text-outlaw-gold font-mono font-bold">{p.score || 0}</span>
+              </div>
+            );
           })}
+        </div>
+      </div>
 
-          {/* Board — full table area */}
-          <div className="absolute inset-0 z-10">
+      <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 py-3 gap-3">
+
+        {/* Game table */}
+        <div className="relative rounded-3xl overflow-hidden flex-1"
+          style={{
+            minHeight: 220,
+            background: 'radial-gradient(ellipse at center,rgba(255,140,30,0.55) 0%,rgba(200,80,10,0.45) 50%,rgba(120,40,0,0.6) 100%)',
+            border: '4px solid rgba(255,160,50,0.6)',
+            boxShadow: 'inset 0 0 60px rgba(255,120,20,0.15),0 10px 40px rgba(255,100,0,0.3)',
+          }}>
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 0 }}>
+            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png" alt="" style={{ opacity: 0.12, width: 90 }} />
+          </div>
+          <div className="absolute inset-0" style={{ zIndex: 1 }}>
             <TXDBoard
               board={game.board || []}
-              leftEnd={game.leftEnd ?? null}
-              rightEnd={game.rightEnd ?? null}
-              spinnerActive={game.spinnerActive || false}
+              gameState={gs}
               selectedDomino={selectedDomino}
-              playableEndIds={isMyTurn ? playableEndIds : new Set()}
-              onDropOnEnd={isMyTurn ? doPlayOnEnd : null}
-              draggingDominoId={draggingId}
+              playableEnds={playableEnds}
+              onPlayEnd={isMyTurn && selectedDomino ? doPlayOnEnd : undefined}
+              interactive={isMyTurn && !!selectedDomino}
             />
           </div>
-
-          {/* Open ends display */}
-          {game.phase === 'playing' && game.leftEnd !== null && (
-            <div className="absolute bottom-3 right-4 flex items-center gap-2 z-20">
-              <span className="text-emerald-400/60 text-[9px] font-body">ENDS:</span>
-              {openEnds && Object.entries(openEnds).map(([eid, e]) =>
-                e && e.active ? <span key={eid} className="text-emerald-400 font-mono font-bold text-xs">{e.value}</span> : null
-              )}
+          {game.phase === 'playing' && gs.leftEnd !== null && (
+            <div className="absolute bottom-2 right-3 z-20 text-[9px] font-body text-emerald-400/60">
+              {gs.leftEnd} ↔ {gs.rightEnd}{gs.topEnd !== null ? ` · ↕ ${gs.topEnd}` : ''}
             </div>
           )}
         </div>
 
-        {/* ── Player Controls ── */}
-        <div className="rounded-2xl p-4"
+        {/* Player hand & controls */}
+        <div className="rounded-2xl p-3 sm:p-4"
           style={{ background: 'rgba(12,6,30,0.94)', border: '2px solid rgba(188,19,254,0.55)', boxShadow: '0 0 20px rgba(188,19,254,0.2)' }}>
 
-          <div className="flex items-center justify-between mb-3">
-            <div className="text-sm font-body">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-body">
               {game.phase === 'waiting'
                 ? <span className="text-white/30">⏳ Waiting for host to start…</span>
                 : isMyTurn
-                ? hasLegalMove
-                  ? <span className="text-emerald-400 font-bold tracking-widest animate-pulse">⚡ YOUR TURN — select a tile or drag to board</span>
-                  : <span className="text-amber-400 font-bold tracking-widest animate-pulse">⚡ YOUR TURN — No moves! KNOCK to pass</span>
-                : <span className="text-white/40">{currentPlayer?.playerName || '...'} is playing…</span>}
+                  ? hasLegalMove
+                    ? <span className="text-emerald-400 font-bold animate-pulse">⚡ YOUR TURN — tap a tile then tap where to play</span>
+                    : (game.boneyard || []).length > 0
+                      ? <span className="text-amber-400 font-bold animate-pulse">⚡ No moves — DRAW a tile</span>
+                      : <span className="text-amber-400 font-bold animate-pulse">⚡ No moves — KNOCK to pass</span>
+                  : <span className="text-white/40">{currentPlayer?.playerName || '...'} is playing…</span>}
             </div>
-            <span className="text-xs text-white/30 font-mono">{myHand.length} tiles</span>
+            <span className="text-xs text-white/30 font-mono">{myHand.length} tiles · boneyard: {game.boneyard?.length || 0}</span>
           </div>
 
           {/* Hand */}
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-3"
-            style={{ scrollbarWidth: 'thin', scrollbarColor: '#BC13FE40 transparent' }}>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: '#BC13FE40 transparent' }}>
             {myHand.map(d => {
               const isPlayable = isMyTurn && playableDominoIds.has(d.id);
               const isSelected = selectedDomino?.id === d.id;
-              const isShaking = shakeTile === d.id;
               return (
-                <div
-                  key={d.id}
-                  className={`flex-shrink-0 transition-all duration-150 ${isShaking ? 'animate-shake' : ''}`}
-                  style={{ transform: isSelected ? 'translateY(-10px) scale(1.05)' : 'none', opacity: isMyTurn && !isPlayable ? 0.4 : 1 }}
-                  draggable={isMyTurn && isPlayable}
-                  onDragStart={(e) => isPlayable && handleDragStart(e, d)}
-                  onDragEnd={handleDragEnd}
-                >
-                  <TXDDomino
-                    top={d.top} bottom={d.bottom}
-                    width={HAND_TILE_W}
-                    playable={isPlayable}
-                    selected={isSelected}
-                    onClick={() => {
+                <div key={d.id} className="flex-shrink-0 transition-all duration-150 cursor-pointer"
+                  style={{ transform: isSelected ? 'translateY(-10px) scale(1.08)' : 'none', opacity: isMyTurn && !isPlayable ? 0.35 : 1 }}
+                  onClick={() => {
                     if (!isMyTurn) return;
-                    if (!isPlayable) {
-                      shakeInvalid(d.id);
-                      flash("That tile doesn't fit!", 'error');
-                      return;
-                    }
-                    // First play of a double → ask orientation
-                    if ((game.board?.length || 0) === 0) {
-                      if (d.top === d.bottom) { setOrientPicker(d); return; }
-                      doPlayOnEnd('first', d.id);
+                    if (!isPlayable) { flash("That tile doesn't fit!"); return; }
+                    if (gs.leftEnd === null) {
+                      if (game.startingDominoLocked && d.id !== game.startingDominoLocked) {
+                        flash(`Must start with [${game.startingDominoLocked}]`); return;
+                      }
+                      if (d.top === d.bottom) { setSelectedDomino(d); setOrientPicker({ domino: d, side: 'first' }); return; }
+                      setSelectedDomino(d);
+                      // Single end — auto-play
+                      setTimeout(() => {
+                        setSelectedDomino(d);
+                        doPlayOnEndWith(d, 'first', null);
+                      }, 20);
                       return;
                     }
                     setSelectedDomino(prev => prev?.id === d.id ? null : d);
-                    }}
-                  />
+                  }}
+                >
+                  <TXDDomino top={d.top} bottom={d.bottom} width={44} playable={isPlayable} selected={isSelected} />
                 </div>
               );
             })}
-            {myHand.length === 0 && game.phase === 'playing' && (
-              <div className="text-white/20 font-body text-sm py-4 px-2">Hand is empty</div>
-            )}
-            {game.phase === 'waiting' && (
-              <div className="text-white/20 font-body text-sm py-4 px-2">Tiles will be dealt when the game starts</div>
+            {myHand.length === 0 && (
+              <div className="text-white/20 font-body text-sm py-4 px-2">
+                {game.phase === 'waiting' ? 'Tiles dealt when game starts' : 'No tiles in hand'}
+              </div>
             )}
           </div>
 
-          {/* Action buttons */}
+          {/* Actions */}
           {isMyTurn && (
             <div className="flex flex-wrap gap-2 items-center">
-              {selectedDomino && (game.board?.length || 0) > 0 && (
-                <span className="text-emerald-400/80 text-xs font-body py-1">
-                  {playableEndIds.size > 0
-                    ? `Click a glowing zone on the board to place [${selectedDomino.id}]`
-                    : <span className="text-red-400">Doesn't fit any open end</span>}
+              {selectedDomino && gs.leftEnd !== null && (
+                <span className="text-xs font-body py-1">
+                  {playableEnds.size > 0
+                    ? <span className="text-emerald-400">Tap a glowing zone to place [{selectedDomino.id}]</span>
+                    : <span className="text-red-400">Tile doesn't fit any open end</span>}
                 </span>
               )}
-              {!hasLegalMove && (
+              {!hasLegalMove && (game.boneyard || []).length > 0 && (
+                <button onClick={doDraw}
+                  className="px-4 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white border-2 border-emerald-500 hover:bg-emerald-500/20"
+                  style={{ boxShadow: '0 0 10px rgba(16,185,129,0.4)' }}>
+                  📦 DRAW FROM BONEYARD
+                </button>
+              )}
+              {!hasLegalMove && (game.boneyard || []).length === 0 && (
                 <button onClick={doKnock}
-                  className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-black transition-all"
-                  style={{ background: 'linear-gradient(135deg, #FFD700, #f59e0b)', boxShadow: '0 0 12px rgba(255,215,0,0.5)' }}>
+                  className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-black"
+                  style={{ background: 'linear-gradient(135deg,#FFD700,#f59e0b)', boxShadow: '0 0 12px rgba(255,215,0,0.5)' }}>
                   🤜 KNOCK
                 </button>
               )}
-              <button onClick={doSort}
-                className="px-4 py-2 rounded-xl font-heading text-sm tracking-wider uppercase text-white/60 border border-white/20 hover:border-white/40 transition-all">
-                SORT
-              </button>
               {selectedDomino && (
-                <button onClick={() => setSelectedDomino(null)}
-                  className="px-4 py-2 rounded-xl font-heading text-sm tracking-wider uppercase text-white/50 border border-white/15 hover:border-white/30 transition-all">
+                <button onClick={() => setSelectedDomino(null)} className="px-3 py-2 rounded-xl font-heading text-sm uppercase text-white/40 border border-white/15 hover:border-white/30">
                   CANCEL
                 </button>
               )}
@@ -504,42 +423,36 @@ export default function TXDGame() {
 
       {/* Feedback */}
       {feedback && (
-        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl font-body text-sm z-50 pointer-events-none
-          ${feedback.type === 'error' ? 'bg-red-950 border border-red-500 text-red-200' : 'bg-black/90 border border-emerald-500/50 text-emerald-300'}`}>
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl font-body text-sm z-50 pointer-events-none ${feedback.type === 'error' ? 'bg-red-950 border border-red-500 text-red-200' : 'bg-black/90 border border-emerald-500/50 text-emerald-300'}`}>
           {feedback.msg}
         </div>
       )}
 
-      {/* Orientation Picker for first-play double */}
+      {/* Orientation picker */}
       {orientPicker && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="max-w-xs w-full border-2 border-cyber-purple rounded-2xl p-6 bg-black text-center" style={{ boxShadow: '0 0 30px rgba(188,19,254,0.4)' }}>
-            <p className="text-[9px] text-cyber-purple tracking-widest uppercase mb-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>Place [{orientPicker.top}-{orientPicker.bottom}]</p>
-            <p className="text-white/50 font-body text-xs mb-5">Choose orientation</p>
+            <p className="text-[8px] text-cyber-purple tracking-widest uppercase mb-4" style={PS2}>Choose orientation for [{orientPicker.domino.id}]</p>
             <div className="flex justify-center gap-8 mb-5">
-              <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => { doPlayOnEnd('first', orientPicker.id || `${orientPicker.top}-${orientPicker.bottom}`, 'horizontal'); setOrientPicker(null); }}>
-                <div className="p-2 rounded-xl border border-white/10 group-hover:border-cyber-purple/60 group-hover:bg-cyber-purple/10 transition-all">
-                  <TXDDomino top={orientPicker.top} bottom={orientPicker.bottom} width={36} orientation="horizontal" />
+              {['horizontal', 'vertical'].map(ori => (
+                <div key={ori} className="flex flex-col items-center gap-2 cursor-pointer group"
+                  onClick={() => { doPlayOnEndWith(orientPicker.domino, orientPicker.side, ori); setOrientPicker(null); }}>
+                  <div className="p-2 rounded-xl border border-white/10 group-hover:border-cyber-purple/60 group-hover:bg-cyber-purple/10 transition-all">
+                    <TXDDomino top={orientPicker.domino.top} bottom={orientPicker.domino.bottom} width={34} orientation={ori} />
+                  </div>
+                  <span className="text-white/60 font-body text-xs group-hover:text-white capitalize">{ori}</span>
                 </div>
-                <span className="text-white/60 font-body text-xs group-hover:text-white">Horizontal</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 cursor-pointer group" onClick={() => { doPlayOnEnd('first', orientPicker.id || `${orientPicker.top}-${orientPicker.bottom}`, 'vertical'); setOrientPicker(null); }}>
-                <div className="p-2 rounded-xl border border-white/10 group-hover:border-cyber-purple/60 group-hover:bg-cyber-purple/10 transition-all">
-                  <TXDDomino top={orientPicker.top} bottom={orientPicker.bottom} width={36} orientation="vertical" />
-                </div>
-                <span className="text-white/60 font-body text-xs group-hover:text-white">Vertical</span>
-              </div>
+              ))}
             </div>
             <button onClick={() => setOrientPicker(null)} className="text-white/30 font-body text-xs hover:text-white/60">Cancel</button>
           </div>
         </div>
       )}
 
-      {/* Round Over */}
+      {/* Round over */}
       {game.phase === 'round_over' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
-          <div className="max-w-sm w-full border-2 border-outlaw-gold rounded-2xl p-6 bg-black text-center"
-            style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
+          <div className="max-w-sm w-full border-2 border-outlaw-gold rounded-2xl p-6 bg-black text-center" style={{ boxShadow: '0 0 40px rgba(255,215,0,0.3)' }}>
             <h2 className="text-3xl font-heading text-outlaw-gold mb-2">ROUND OVER!</h2>
             {game.roundWinner && <p className="text-white/70 font-body mb-4 text-sm"><span className="text-white font-bold">{game.roundWinner.playerName}</span> wins +{game.roundWinner.points} pts</p>}
             <div className="space-y-2 mb-5">
@@ -555,7 +468,7 @@ export default function TXDGame() {
         </div>
       )}
 
-      {/* Game Over */}
+      {/* Game over */}
       {gameOver && game.phase !== 'round_over' && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
           <div className="max-w-sm w-full border-2 border-outlaw-gold rounded-2xl p-6 bg-black text-center">
@@ -569,10 +482,39 @@ export default function TXDGame() {
                 </div>
               ))}
             </div>
-            <button onClick={() => navigate('/games')} className="w-full py-3 rounded-xl border border-white/30 text-white font-heading tracking-wider hover:bg-white/10 transition-all">← BACK TO GAMES</button>
+            <button onClick={() => navigate('/games')} className="w-full py-3 rounded-xl border border-white/30 text-white font-heading tracking-wider hover:bg-white/10">← BACK TO GAMES</button>
           </div>
         </div>
       )}
     </div>
   );
+
+  // Helper: play a specific domino on an end (used by orient picker)
+  async function doPlayOnEndWith(domino, side, chosenOrientation) {
+    if (!isMyTurn || !game) return;
+    const g = game;
+    const result = playDomino(domino, gs, side, chosenOrientation);
+    const { entry, newLeftEnd, newRightEnd, newTopEnd, newBottomEnd, newSpinnerPlayed } = result;
+    const newHand = myPlayer.hand.filter(d => d.id !== domino.id);
+    const newBoard = [...(g.board || []), { ...entry, isSpinner: newSpinnerPlayed && !g.spinnerPlayed }];
+    let ni = (myIndex + 1) % g.players.length;
+    while (g.players[ni]?.status !== 'active' && ni !== myIndex) ni = (ni + 1) % g.players.length;
+    const players = g.players.map((p, i) => i === myIndex ? { ...p, hand: newHand } : p);
+    const roundOver = newHand.length === 0;
+    const pts = roundOver ? calculateRoundScores(players, myIndex) : 0;
+    if (roundOver) players[myIndex] = { ...players[myIndex], score: (players[myIndex].score || 0) + pts };
+    const feed = [...(g.activityFeed || [])]; feed.unshift(`${myPlayer.playerName} played [${domino.id}]`);
+    const updated = {
+      ...g, board: newBoard,
+      leftEnd: newLeftEnd, rightEnd: newRightEnd, topEnd: newTopEnd, bottomEnd: newBottomEnd, spinnerPlayed: newSpinnerPlayed,
+      players, currentPlayerIndex: roundOver ? myIndex : ni,
+      phase: roundOver ? 'round_over' : 'playing',
+      roundWinner: roundOver ? { playerName: myPlayer.playerName, playerId: myPlayer.playerId, points: pts } : null,
+      activityFeed: feed.slice(0, 20),
+      startingDominoLocked: gs.leftEnd === null ? null : g.startingDominoLocked,
+    };
+    await base44.entities.TXDGame.update(g.id, updated);
+    setGame(updated);
+    setSelectedDomino(null);
+  }
 }

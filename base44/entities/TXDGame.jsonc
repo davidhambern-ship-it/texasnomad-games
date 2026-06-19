@@ -40,10 +40,6 @@
             "type": "number",
             "default": 0
           },
-          "roundScore": {
-            "type": "number",
-            "default": 0
-          },
           "status": {
             "type": "string",
             "enum": [
@@ -66,43 +62,37 @@
     },
     "boneyard": {
       "type": "array",
-      "description": "Remaining dominoes",
       "items": {
         "type": "object"
       }
     },
     "board": {
       "type": "array",
-      "description": "Played dominoes on the table",
+      "description": "Played dominoes. Each entry: { id, top, bottom, side, orientation, exposedLeft, exposedRight, isSpinner }",
       "items": {
-        "type": "object",
-        "properties": {
-          "top": {
-            "type": "number"
-          },
-          "bottom": {
-            "type": "number"
-          },
-          "orientation": {
-            "type": "string",
-            "enum": [
-              "vertical",
-              "horizontal"
-            ]
-          },
-          "position": {
-            "type": "number"
-          }
-        }
+        "type": "object"
       }
     },
     "leftEnd": {
       "type": "number",
-      "description": "Open left end value"
+      "description": "Pip value at the left open end"
     },
     "rightEnd": {
       "type": "number",
-      "description": "Open right end value"
+      "description": "Pip value at the right open end"
+    },
+    "topEnd": {
+      "type": "number",
+      "description": "Pip value at the top arm (spinner arms)"
+    },
+    "bottomEnd": {
+      "type": "number",
+      "description": "Pip value at the bottom arm (spinner arms)"
+    },
+    "spinnerPlayed": {
+      "type": "boolean",
+      "default": false,
+      "description": "True once a double has been played on the board"
     },
     "currentPlayerIndex": {
       "type": "number",
@@ -134,6 +124,16 @@
     "scoreLimit": {
       "type": "number",
       "default": 100
+    },
+    "startingDominoLocked": {
+      "type": "string",
+      "description": "ID of domino that must be played first in this round"
+    },
+    "activityFeed": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
     },
     "created_by_user_id": {
       "type": "string"
