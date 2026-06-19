@@ -88,15 +88,7 @@ export default function TXDGame() {
   const fetchGame = async () => {
     try {
       const rooms = await base44.entities.TXDGame.filter({ room_code: roomCode });
-      if (rooms.length > 0) {
-        setGame(prev => {
-          const fresh = rooms[0];
-          if (!prev) return fresh;
-          const ft = new Date(fresh.updated_date || 0).getTime();
-          const pt = new Date(prev.updated_date || 0).getTime();
-          return ft > pt ? fresh : prev;
-        });
-      }
+      if (rooms.length > 0) setGame(rooms[0]);
       setLoading(false);
     } catch (_) { setLoading(false); }
   };
@@ -108,7 +100,7 @@ export default function TXDGame() {
     if (!current?.isAI) return;
     const t = setTimeout(() => runAI(game, current, game.currentPlayerIndex), 1400);
     return () => clearTimeout(t);
-  }, [game?.currentPlayerIndex, game?.phase, game?.id]);
+  }, [game?.currentPlayerIndex, game?.phase, game?.board?.length]);
 
   const runAI = async (g, aiPlayer, aiIdx) => {
     const next = (aiIdx + 1) % g.players.length;
