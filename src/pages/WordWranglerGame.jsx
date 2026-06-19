@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import useGameStats from '@/hooks/useGameStats';
 import Header from '@/components/home/Header';
 import WordBoard from '@/components/wordWrangler/WordBoard';
 import PlayerPanel from '@/components/wordWrangler/PlayerPanel';
@@ -268,12 +269,20 @@ export default function WordWranglerGame() {
     } catch (err) { console.error('Failed to join game:', err); setError('Failed to join game'); }
   };
 
+  const { recordStat, resetStat } = useGameStats('word-wrangler');
+
   const endGame = async () => {
     setGamePhase('game-over');
     const sortedPlayers = [...(game?.players || [])].sort((a, b) => b.score - a.score);
     if (sortedPlayers.length > 0) {
       const updatedGame = { ...game, status: 'finished', players: sortedPlayers.map((p, i) => ({ ...p, status: i === 0 ? 'winner' : 'active' })), gameState: { ...game?.gameState, phase: 'game-over' } };
       await base44.entities.WordWranglerGame.update(game.id, updatedGame);
+      // Record stats: find this player's score
+      const myPlayer = sortedPlayers.find(p => p.playerId === playerId);
+      if (myPlayer) {
+        const won = sortedPlayers[0].playerId === playerId;
+        recordStat({ score: myPlayer.score, won });
+      }
     }
   };
 

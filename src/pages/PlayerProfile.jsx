@@ -230,19 +230,33 @@ export default function PlayerProfilePage() {
       <div style={{ maxWidth: 800, margin: '0 auto', padding: '20px 16px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
         {/* Game Stats */}
-        <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)' }}>
+        <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
           <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🎮 GAME HISTORY</div>
           {topGames.length === 0 ? (
             <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No games played yet. Jump into the arcade!</p>
-          ) : topGames.map(([gameId, stats]) => (
-            <div key={gameId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <span style={{ fontFamily: "'Teko', sans-serif", fontSize: 16, color: 'white' }}>{GAME_LABELS[gameId] || gameId}</span>
-              <div style={{ display: 'flex', gap: 12 }}>
-                <span style={{ ...PS2, fontSize: 6, color: '#FFD700' }}>{stats.high_score || 0} pts</span>
-                <span style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.3)' }}>×{stats.times_played || 0}</span>
-              </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+              {topGames.map(([gameId, stats]) => (
+                <div key={gameId} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.accent}20`, background: `${theme.accent}06` }}>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', marginBottom: 6 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>HIGH SCORE</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score || 0}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>PLAYED</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: theme.accent, lineHeight: 1 }}>{stats.times_played || 0}×</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          ))}
+          )}
         </div>
 
         {/* Badges */}

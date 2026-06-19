@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
+import useGameStats from '@/hooks/useGameStats';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
@@ -112,6 +113,8 @@ function HangmanViewer({ roomCode, cpuId }) {
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_hangman_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_hangman_${roomCode}`, '1'); setShowInstructions(false); };
   const isSinglePlayer = !!(cpuId || gs.single_player);
+  const { recordStat, resetStat } = useGameStats('hangman');
+  const statRecordedRef = useRef(false);
 
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'hangman', updateState, false, null, registerUser);
 
@@ -503,7 +506,18 @@ function HangmanViewer({ roomCode, cpuId }) {
     setSetterHint('');
   };
 
+  // Record stat when a round finishes
+  useEffect(() => {
+    if (gs.phase !== 'finished' || statRecordedRef.current) return;
+    statRecordedRef.current = true;
+    const won = !!(gs.winner_seat === seatNumber || (!hostIsHuman && gs.winner_seat === seatNumber));
+    const score = won ? Math.max(100, (word.length * 10) - (wrong.length * 5)) : 0;
+    recordStat({ score, won });
+  }, [gs.phase]);
+
   const handleNextRound = async () => {
+    statRecordedRef.current = false;
+    resetStat();
     if (isSinglePlayer) {
       // Strict alternation: whoever was host switches to guesser
       const nextHostIsHuman = !hostIsHuman;

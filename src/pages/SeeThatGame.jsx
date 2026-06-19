@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
+import useGameStats from '@/hooks/useGameStats';
 import SaloonBackground from '@/components/seeThis/SaloonBackground';
 import ArcadeCabinetShell from '@/components/arcade/ArcadeCabinetShell';
 
@@ -160,6 +161,8 @@ export default function SeeThatGame() {
   const sceneRef = useRef(null);
   const [sceneDims, setSceneDims] = useState({ w: 900, h: 600 });
   const [phase, setPhase] = useState('lobby');
+  const { recordStat, resetStat } = useGameStats('see-that');
+  const statRecordedRef = useRef(false);
   const [targets, setTargets] = useState([]);
   const [allObjects, setAllObjects] = useState([]);
   const [score, setScore] = useState(0);
@@ -187,7 +190,12 @@ export default function SeeThatGame() {
     if (phase !== 'playing') { clearInterval(timerRef.current); return; }
     timerRef.current = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1) { clearInterval(timerRef.current); setPhase('lose'); return 0; }
+        if (t <= 1) {
+          clearInterval(timerRef.current);
+          setPhase('lose');
+          if (!statRecordedRef.current) { statRecordedRef.current = true; setScore(s => { recordStat({ score: Math.max(0, s), won: false }); return s; }); }
+          return 0;
+        }
         return t - 1;
       });
     }, 1000);
@@ -195,6 +203,8 @@ export default function SeeThatGame() {
   }, [phase]);
 
   const startGame = useCallback(() => {
+    statRecordedRef.current = false;
+    resetStat();
     const selectedTargets = shuffle(OBJECT_POOL).slice(0, TARGETS_COUNT);
     const placed = placeObjects(shuffle(OBJECT_POOL), sceneDims.w, sceneDims.h);
     setTargets(selectedTargets.map(t => ({ ...t, found: false })));
@@ -211,7 +221,13 @@ export default function SeeThatGame() {
       setAllObjects(prev => prev.map(o => o.id === objectId ? { ...o, found: true } : o));
       setFoundCount(c => {
         const n = c + 1;
-        if (n >= TARGETS_COUNT) { clearInterval(timerRef.current); setTimeout(() => setPhase('win'), 400); }
+        if (n >= TARGETS_COUNT) {
+          clearInterval(timerRef.current);
+          setTimeout(() => {
+            setPhase('win');
+            setScore(s => { if (!statRecordedRef.current) { statRecordedRef.current = true; recordStat({ score: s + POINTS_CORRECT, won: true }); } return s; });
+          }, 400);
+        }
         return n;
       });
       setFeedback({ text: '+100', correct: true, x, y });

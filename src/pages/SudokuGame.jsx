@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { Link } from 'react-router-dom';
+import useGameStats from '@/hooks/useGameStats';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import { generatePuzzle, isPuzzleComplete, hasConflict } from '@/lib/sudokuEngine';
@@ -117,6 +118,8 @@ function CellNumpadPopup({ onNumber, onErase, onToggleNotes, notesMode, onClose,
 function SudokuViewer({ roomCode }) {
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_sudoku_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_sudoku_${roomCode}`, '1'); setShowInstructions(false); };
+  const { recordStat } = useGameStats('sudoku');
+  const statRecordedRef = useRef(false);
   // If opened inside the Host Panel iframe, skip player seat registration
   const isHostView = window.self !== window.top;
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'sudoku', 'viewer');
@@ -261,6 +264,7 @@ function SudokuViewer({ roomCode }) {
       const now = Date.now();
       setLocalComplete(true);
       setWinEffect(true);
+      if (!statRecordedRef.current) { statRecordedRef.current = true; recordStat({ score: Math.max(0, 300 - mistakes * 50), won: true }); }
       setConfettiPieces(Array.from({ length: 40 }, (_, i) => ({
         id: i,
         x: Math.random() * 100,
