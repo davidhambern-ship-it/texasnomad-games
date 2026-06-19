@@ -189,11 +189,23 @@ export default function TXDGame() {
 
     if (!isFirstPlay) {
       const end = g.openEnds?.[endId];
-      if (!end || !end.active) { flash('Invalid placement zone', 'error'); return; }
-      if (domino.top !== end.value && domino.bottom !== end.value) {
-        shakeInvalid(domino.id);
-        flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
-        return;
+      // If openEnds is missing/stale, fall back to leftEnd/rightEnd matching
+      if (end && end.active) {
+        if (domino.top !== end.value && domino.bottom !== end.value) {
+          shakeInvalid(domino.id);
+          flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
+          return;
+        }
+      } else if (!end || !end.active) {
+        // openEnds not available — try matching leftEnd/rightEnd directly
+        const le = g.leftEnd, re = g.rightEnd;
+        const fitsLeft = domino.top === le || domino.bottom === le;
+        const fitsRight = domino.top === re || domino.bottom === re;
+        if (!fitsLeft && !fitsRight) {
+          shakeInvalid(domino.id);
+          flash(`[${domino.id}] doesn't fit any open end`, 'error');
+          return;
+        }
       }
     }
 

@@ -102,23 +102,26 @@ export default function TXDBoard({
       {openEnds && Object.entries(openEnds).map(([endId, end]) => {
         if (!end || !end.active) return null;
         const isPlayable = playableEndIds.has(endId);
+        // Always show zones when it's the player's turn (onDropOnEnd is provided)
+        // Highlight green only when selected domino fits this end
+        const isActive = !!onDropOnEnd;
         return (
           <div
             key={endId}
-            onDragOver={(e) => handleDragOver(e, endId)}
+            onDragOver={(e) => { if (isActive) e.preventDefault(); }}
             onDrop={(e) => handleDrop(e, endId)}
             onClick={() => handleEndClick(endId)}
             style={{
               position: 'absolute',
               left: `${end.x}%`,
               top: `${end.y}%`,
-              width: 68,
-              height: 36,
-              transform: `translate(-50%, -50%) rotate(${end.rotation}deg)`,
+              width: 72,
+              height: 42,
+              transform: `translate(-50%, -50%)`,
               borderRadius: 10,
-              border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.1)',
-              background: isPlayable ? 'rgba(0, 255, 120, 0.12)' : 'rgba(255,255,255,0.02)',
-              boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.65)' : 'none',
+              border: isPlayable ? '2px dashed #00ff78' : isActive ? '1px dashed rgba(255,255,255,0.2)' : '1px dashed rgba(255,255,255,0.05)',
+              background: isPlayable ? 'rgba(0, 255, 120, 0.15)' : 'rgba(255,255,255,0.02)',
+              boxShadow: isPlayable ? '0 0 18px rgba(0,255,120,0.7)' : 'none',
               cursor: isPlayable ? 'pointer' : 'default',
               pointerEvents: isPlayable || draggingDominoId ? 'auto' : 'none',
               zIndex: 20,
@@ -127,13 +130,11 @@ export default function TXDBoard({
               justifyContent: 'center',
               transition: 'box-shadow 0.15s, background 0.15s',
             }}
-            title={isPlayable ? `Play on ${end.value}` : `End: ${end.value}`}
+            title={isPlayable ? `Play on ${end.value}` : `End value: ${end.value}`}
           >
-            {isPlayable && (
-              <span style={{ fontSize: 11, color: '#00ff78', fontWeight: 'bold', fontFamily: 'monospace', opacity: 0.9 }}>
-                {end.value}
-              </span>
-            )}
+            <span style={{ fontSize: 12, color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)', fontWeight: 'bold', fontFamily: 'monospace' }}>
+              {end.value}
+            </span>
           </div>
         );
       })}

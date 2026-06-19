@@ -147,16 +147,19 @@ export function orientDominoForEnd(domino, side, endValue) {
   if (side === 'first' || endValue === null) {
     return { connectingValue: null, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
   }
+  // For doubles, exposed value is always the same pip — no orientation matters
+  if (top === bottom) {
+    return { connectingValue: top, exposedValue: top, orientedTop: top, orientedBottom: bottom };
+  }
   if (side === 'left') {
-    // Left arm grows leftward. The right side of the new tile connects to the chain.
-    // bottom connects → exposed = top; else top connects → exposed = bottom
+    // Left arm grows leftward. The right/inner side of the tile connects.
     if (bottom === endValue) {
       return { connectingValue: bottom, exposedValue: top, orientedTop: top, orientedBottom: bottom };
     } else {
       return { connectingValue: top, exposedValue: bottom, orientedTop: bottom, orientedBottom: top };
     }
   }
-  // right / up / down: top side connects to chain
+  // right / top / bottom: the left/inner side of the tile connects
   if (top === endValue) {
     return { connectingValue: top, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
   } else {
@@ -218,7 +221,7 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
 
   const isDouble = domino.top === domino.bottom;
   const becomesSpinner = isDouble && !spinnerActive;
-  const oriented = orientDominoForEnd(domino, side === 'top' || side === 'bottom' ? 'right' : side, endValue);
+  const oriented = orientDominoForEnd(domino, side, endValue);
 
   // The tile is placed AT the current open end position
   const placedX = endObj?.x ?? 50;
@@ -233,8 +236,9 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
   if (newOpenEnds && newOpenEnds[side]) {
     const advanced = advanceEnd({ ...newOpenEnds[side], value: oriented.exposedValue });
     newOpenEnds[side] = { ...advanced, value: oriented.exposedValue, active: true };
-    newLeftEnd  = newOpenEnds.left  ? newOpenEnds.left.value  : leftEnd;
-    newRightEnd = newOpenEnds.right ? newOpenEnds.right.value : rightEnd;
+    // Update left/right end tracking from the open ends
+    newLeftEnd  = newOpenEnds.left?.active  ? newOpenEnds.left.value  : leftEnd;
+    newRightEnd = newOpenEnds.right?.active ? newOpenEnds.right.value : rightEnd;
   }
 
   return {
@@ -272,11 +276,19 @@ export function getLegalMoves(hand, openEnds) {
   if (!openEnds) {
     return hand.map(domino => ({ dominoId: domino.id, endId: 'first', requiredValue: null, domino }));
   }
+  const activeEnds = Object.entries(openEnds).filter(([, end]) => end && end.active);
+  // If somehow openEnds exists but has no active ends, treat as no board
+  if (activeEnds.length === 0) {
+    return hand.map(domino => ({ dominoId: domino.id, endId: 'first', requiredValue: null, domino }));
+  }
   const moves = [];
+  const seen = new Set(); // avoid duplicate domino+end combos
   hand.forEach(domino => {
-    Object.entries(openEnds).forEach(([endId, end]) => {
-      if (!end || !end.active) return;
+    activeEnds.forEach(([endId, end]) => {
+      const key = `${domino.id}:${endId}`;
+      if (seen.has(key)) return;
       if (domino.top === end.value || domino.bottom === end.value) {
+        seen.add(key);
         moves.push({ dominoId: domino.id, endId, requiredValue: end.value, domino });
       }
     });

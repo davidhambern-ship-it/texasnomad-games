@@ -372,10 +372,19 @@ export default function TXDHostPanel() {
 
     if (!isFirstPlay) {
       const end = g.openEnds?.[endId];
-      if (!end || !end.active) { flash('Invalid placement zone', 'error'); return; }
-      if (domino.top !== end.value && domino.bottom !== end.value) {
-        flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
-        return;
+      if (end && end.active) {
+        if (domino.top !== end.value && domino.bottom !== end.value) {
+          flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
+          return;
+        }
+      } else if (!end || !end.active) {
+        const le = g.leftEnd, re = g.rightEnd;
+        const fitsLeft = domino.top === le || domino.bottom === le;
+        const fitsRight = domino.top === re || domino.bottom === re;
+        if (!fitsLeft && !fitsRight) {
+          flash(`[${domino.id}] doesn't fit any open end`, 'error');
+          return;
+        }
       }
     }
 
