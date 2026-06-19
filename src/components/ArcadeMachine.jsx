@@ -1,5 +1,4 @@
 import React from "react";
-import "./ArcadeMachine.css";
 
 const GAME_THEMES = {
   bff: {
