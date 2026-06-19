@@ -80,7 +80,7 @@ export default function TXDHostPanel() {
   const isHostTurn = game?.phase === 'playing' && game?.currentPlayerIndex === hostIndex;
   const hostHand = hostPlayer?.hand || [];
   const openEnds = game?.openEnds || null;
-  const legalMoves = isHostTurn ? getLegalMoves(hostHand, openEnds) : [];
+  const legalMoves = isHostTurn ? getLegalMoves(hostHand, openEnds, game?.leftEnd ?? null, game?.rightEnd ?? null) : [];
   const playableIds = new Set(legalMoves.map(m => m.dominoId));
   const hasLegalMove = legalMoves.length > 0;
   const playableEndIds = selectedDomino
@@ -372,17 +372,10 @@ export default function TXDHostPanel() {
 
     if (!isFirstPlay) {
       const end = g.openEnds?.[endId];
-      if (end && end.active) {
-        if (domino.top !== end.value && domino.bottom !== end.value) {
-          flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
-          return;
-        }
-      } else if (!end || !end.active) {
-        const le = g.leftEnd, re = g.rightEnd;
-        const fitsLeft = domino.top === le || domino.bottom === le;
-        const fitsRight = domino.top === re || domino.bottom === re;
-        if (!fitsLeft && !fitsRight) {
-          flash(`[${domino.id}] doesn't fit any open end`, 'error');
+      const endValue = end?.active ? end.value : (endId === 'left' ? g.leftEnd : g.rightEnd);
+      if (endValue !== null && endValue !== undefined) {
+        if (domino.top !== endValue && domino.bottom !== endValue) {
+          flash(`[${domino.id}] doesn't match end value ${endValue}`, 'error');
           return;
         }
       }

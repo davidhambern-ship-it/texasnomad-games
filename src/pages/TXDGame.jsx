@@ -58,7 +58,7 @@ export default function TXDGame() {
   const isMyTurn = game?.phase === 'playing' && game?.currentPlayerIndex === myIndex;
   const myHand = myPlayer?.hand || [];
   const openEnds = game?.openEnds || null;
-  const legalMoves = isMyTurn ? getLegalMoves(myHand, openEnds) : [];
+  const legalMoves = isMyTurn ? getLegalMoves(myHand, openEnds, game?.leftEnd ?? null, game?.rightEnd ?? null) : [];
   const playableDominoIds = new Set(legalMoves.map(m => m.dominoId));
   const hasLegalMove = legalMoves.length > 0;
   const currentPlayer = game?.players?.[game?.currentPlayerIndex];
@@ -112,7 +112,7 @@ export default function TXDGame() {
 
   const runAI = async (g, aiPlayer, aiIdx) => {
     const next = (aiIdx + 1) % g.players.length;
-    const choice = aiChoosePlay(aiPlayer.hand, g.leftEnd ?? null, g.rightEnd ?? null, g.startingDominoLocked, g.openEnds);
+    const choice = aiChoosePlay(aiPlayer.hand, g.leftEnd ?? null, g.rightEnd ?? null, g.startingDominoLocked, g.openEnds || null);
     let updated;
     if (!choice) {
       // No legal move → knock (pass)
@@ -188,22 +188,13 @@ export default function TXDGame() {
     }
 
     if (!isFirstPlay) {
+      // Validate the domino fits the chosen end
       const end = g.openEnds?.[endId];
-      // If openEnds is missing/stale, fall back to leftEnd/rightEnd matching
-      if (end && end.active) {
-        if (domino.top !== end.value && domino.bottom !== end.value) {
+      const endValue = end?.active ? end.value : (endId === 'left' ? g.leftEnd : g.rightEnd);
+      if (endValue !== null && endValue !== undefined) {
+        if (domino.top !== endValue && domino.bottom !== endValue) {
           shakeInvalid(domino.id);
-          flash(`[${domino.id}] doesn't match end value ${end.value}`, 'error');
-          return;
-        }
-      } else if (!end || !end.active) {
-        // openEnds not available — try matching leftEnd/rightEnd directly
-        const le = g.leftEnd, re = g.rightEnd;
-        const fitsLeft = domino.top === le || domino.bottom === le;
-        const fitsRight = domino.top === re || domino.bottom === re;
-        if (!fitsLeft && !fitsRight) {
-          shakeInvalid(domino.id);
-          flash(`[${domino.id}] doesn't fit any open end`, 'error');
+          flash(`[${domino.id}] doesn't match end value ${endValue}`, 'error');
           return;
         }
       }
