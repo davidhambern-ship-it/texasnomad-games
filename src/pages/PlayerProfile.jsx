@@ -51,6 +51,10 @@ export default function PlayerProfilePage() {
   const [editing, setEditing] = useState(false);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
+  const [editingCode, setEditingCode] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [codeError, setCodeError] = useState('');
+  const [codeSaving, setCodeSaving] = useState(false);
   const navigate = useNavigate();
 
   const profileIdRef = useRef(null);
@@ -89,6 +93,44 @@ export default function PlayerProfilePage() {
     });
     return unsubscribe;
   }, []);
+
+  const saveReferralCode = async () => {
+    setCodeError('');
+    const code = newCode.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 4 || code.length > 16) {
+      setCodeError('Code must be 4–16 letters/numbers.');
+      return;
+    }
+    // Check 30-day cooldown
+    if (profile.referral_code_last_changed) {
+      const daysSince = (Date.now() - new Date(profile.referral_code_last_changed).getTime()) / (1000 * 60 * 60 * 24);
+      if (daysSince < 30) {
+        const daysLeft = Math.ceil(30 - daysSince);
+        setCodeError(`You can change your code again in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}.`);
+        return;
+      }
+    }
+    // Check uniqueness
+    setCodeSaving(true);
+    try {
+      const existing = await base44.entities.PlayerProfile.filter({ referral_code: code });
+      if (existing.length > 0 && existing[0].id !== profile.id) {
+        setCodeError('That code is already taken. Try another.');
+        setCodeSaving(false);
+        return;
+      }
+      await base44.entities.PlayerProfile.update(profile.id, {
+        referral_code: code,
+        referral_code_last_changed: new Date().toISOString(),
+      });
+      setProfile(p => ({ ...p, referral_code: code, referral_code_last_changed: new Date().toISOString() }));
+      setEditingCode(false);
+      setNewCode('');
+    } catch (e) {
+      setCodeError('Something went wrong. Try again.');
+    }
+    setCodeSaving(false);
+  };
 
   const saveProfile = async () => {
     if (!profile) return;
@@ -361,16 +403,56 @@ export default function PlayerProfilePage() {
           )}
 
           <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>
-            <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginBottom: 12 }}>🔗 REFERRAL CODE</div>
-            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(74,222,128,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span style={{ fontFamily: "'Courier New', monospace", fontSize: 16, color: '#4ade80', letterSpacing: 3 }}>{profile.referral_code || '—'}</span>
-              <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?ref=${profile.referral_code}`)}
-                style={{ ...PS2, fontSize: 6, color: '#4ade80', background: 'transparent', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 5, padding: '4px 8px', cursor: 'pointer' }}>
-                COPY
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ ...PS2, fontSize: 8, color: '#4ade80' }}>🔗 REFERRAL CODE</div>
+              {!editingCode && (() => {
+                const lastChanged = profile.referral_code_last_changed;
+                const daysSince = lastChanged ? (Date.now() - new Date(lastChanged).getTime()) / (1000 * 60 * 60 * 24) : 999;
+                const canEdit = daysSince >= 30;
+                const daysLeft = canEdit ? 0 : Math.ceil(30 - daysSince);
+                return (
+                  <button
+                    onClick={() => { if (canEdit) { setEditingCode(true); setNewCode(profile.referral_code || ''); setCodeError(''); } }}
+                    disabled={!canEdit}
+                    title={canEdit ? 'Change your referral code' : `Available in ${daysLeft} days`}
+                    style={{ ...PS2, fontSize: 5, color: canEdit ? '#4ade80' : 'rgba(255,255,255,0.2)', background: 'transparent', border: `1px solid ${canEdit ? 'rgba(74,222,128,0.4)' : 'rgba(255,255,255,0.1)'}`, borderRadius: 5, padding: '4px 8px', cursor: canEdit ? 'pointer' : 'not-allowed' }}>
+                    {canEdit ? '✏ EDIT' : `🔒 ${daysLeft}D`}
+                  </button>
+                );
+              })()}
             </div>
+
+            {editingCode ? (
+              <div>
+                <input
+                  value={newCode}
+                  onChange={e => setNewCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16))}
+                  placeholder="YOUR CUSTOM CODE"
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(74,222,128,0.5)', color: '#4ade80', fontFamily: "'Courier New', monospace", fontSize: 16, letterSpacing: 3, outline: 'none', marginBottom: 8, boxSizing: 'border-box' }}
+                />
+                {codeError && <p style={{ ...PS2, fontSize: 5, color: '#f87171', marginBottom: 8 }}>{codeError}</p>}
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={saveReferralCode} disabled={codeSaving}
+                    style={{ ...PS2, fontSize: 6, color: '#000', background: '#4ade80', border: 'none', borderRadius: 5, padding: '6px 14px', cursor: codeSaving ? 'wait' : 'pointer' }}>
+                    {codeSaving ? 'SAVING…' : 'SAVE'}
+                  </button>
+                  <button onClick={() => { setEditingCode(false); setCodeError(''); }}
+                    style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 5, padding: '6px 14px', cursor: 'pointer' }}>
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(74,222,128,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: "'Courier New', monospace", fontSize: 16, color: '#4ade80', letterSpacing: 3 }}>{profile.referral_code || '—'}</span>
+                <button onClick={() => navigator.clipboard.writeText(`${window.location.origin}?ref=${profile.referral_code}`)}
+                  style={{ ...PS2, fontSize: 6, color: '#4ade80', background: 'transparent', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 5, padding: '4px 8px', cursor: 'pointer' }}>
+                  COPY
+                </button>
+              </div>
+            )}
             <p style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.2)', marginTop: 8, lineHeight: 1.6 }}>
-              Share your code. Earn rewards when new players join.
+              Share your code. Earn rewards when new players join. Code can be changed once every 30 days.
             </p>
           </div>
         </div>

@@ -82,6 +82,10 @@
       "type": "string",
       "description": "Their unique referral code"
     },
+    "referral_code_last_changed": {
+      "type": "string",
+      "description": "ISO timestamp of when referral code was last manually changed"
+    },
     "referred_by": {
       "type": "string",
       "description": "Referral code used when they signed up"
