@@ -327,6 +327,11 @@ export default function PlayerProfilePage() {
           )}
         </div>
 
+        {/* Friends */}
+        <div>
+          <FriendsList userId={user?.id} theme={theme} />
+        </div>
+
         {/* Row 3: Playstyle + other */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {(profile.playstyle_tags || []).length > 0 && (
@@ -370,10 +375,6 @@ export default function PlayerProfilePage() {
           </div>
         </div>
 
-        {/* Friends */}
-        <div>
-          <FriendsList userId={user?.id} theme={theme} />
-        </div>
 
       </div>
     </div>
