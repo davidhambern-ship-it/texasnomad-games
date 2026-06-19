@@ -51,46 +51,15 @@ export default function TXDBoard({
     );
   }
 
-  // ── Reconstruct arms from board ─────────────────────────────────────────────
-  // Normalize side assignments (handle legacy records without `side`)
-  const normalized = [];
-  let curLeft = null;
-  let curRight = null;
-
-  board.forEach((p, i) => {
-    if (i === 0) {
-      curLeft  = p.orientedTop    ?? p.top;
-      curRight = p.orientedBottom ?? p.bottom;
-      normalized.push({ ...p, side: 'first' });
-      return;
-    }
-    if (p.side && ['left','right','top','bottom'].includes(p.side)) {
-      // Trust stored side, update open ends
-      const connectVal = p.top === curLeft || p.top === curRight ? p.top : p.bottom;
-      const exposedVal = connectVal === p.top ? p.bottom : p.top;
-      if (p.side === 'left')   curLeft  = p.exposedValue ?? exposedVal;
-      if (p.side === 'right')  curRight = p.exposedValue ?? exposedVal;
-      normalized.push({ ...p });
-      return;
-    }
-    // Legacy inference
-    const fitsLeft  = p.top === curLeft  || p.bottom === curLeft;
-    const fitsRight = p.top === curRight || p.bottom === curRight;
-    let side = fitsLeft ? 'left' : fitsRight ? 'right' : (i % 2 === 1 ? 'right' : 'left');
-    if (fitsLeft && fitsRight) side = i % 2 === 1 ? 'right' : 'left';
-    if (side === 'left')  curLeft  = p.top === curLeft  ? p.bottom : p.top;
-    if (side === 'right') curRight = p.top === curRight ? p.bottom : p.top;
-    normalized.push({ ...p, side });
-  });
-
-  const firstPiece = normalized[0];
+  // ── Split board into arms using stored side — never reclassify ────────────
+  const firstPiece = board[0];
   const isFirstDouble = firstPiece?.top === firstPiece?.bottom;
   const hasSpinnerArms = isFirstDouble || spinnerActive;
 
-  const leftArm   = normalized.filter(p => p.side === 'left');   // stored outermost-last
-  const rightArm  = normalized.filter(p => p.side === 'right');
-  const topArm    = normalized.filter(p => p.side === 'top');
-  const bottomArm = normalized.filter(p => p.side === 'bottom');
+  const leftArm   = board.filter(p => p.side === 'left');
+  const rightArm  = board.filter(p => p.side === 'right');
+  const topArm    = board.filter(p => p.side === 'top');
+  const bottomArm = board.filter(p => p.side === 'bottom');
 
   // Open end values
   const leftVal   = leftEnd   ?? firstPiece?.top;
@@ -102,7 +71,7 @@ export default function TXDBoard({
 
   // ── Subcomponents ──────────────────────────────────────────────────────────
   const Tile = ({ piece, flip = false }) => {
-    const orientation = piece.placedOrientation || (piece.top === piece.bottom ? 'vertical' : 'horizontal');
+    const orientation = piece.placedOrientation || ((['top','bottom'].includes(piece.side) || piece.top === piece.bottom) ? 'vertical' : 'horizontal');
     return (
       <div style={{
         flexShrink: 0,
