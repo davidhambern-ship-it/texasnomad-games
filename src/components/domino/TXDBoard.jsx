@@ -1,53 +1,88 @@
 import React, { useRef, useEffect } from 'react';
 import TXDDomino from './TXDDomino';
 
-const W = 32;
-const GAP = 3;
+const W = 32;   // narrow dim of a tile in px
+const GAP = 4;  // gap between tiles
 
-function Tile({ piece }) {
-  const orientation = piece.placedOrientation
-    || ((['top', 'bottom'].includes(piece.side) || piece.top === piece.bottom) ? 'vertical' : 'horizontal');
-  return (
-    <div style={{
-      flexShrink: 0,
-      filter: piece.isSpinner
-        ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))'
-        : undefined,
-    }}>
-      <TXDDomino
-        top={piece.top}
-        bottom={piece.bottom}
-        width={W}
-        orientation={orientation}
-      />
-    </div>
-  );
-}
+// Compute pixel layout for all tiles relative to a virtual origin
+function buildLayout(board) {
+  if (!board || board.length === 0) return { tiles: [], w: 0, h: 0, originX: 0, originY: 0 };
 
-function DropZone({ endId, value, horiz, isPlayable, dragging, selectedDomino, onDropOnEnd }) {
-  const active = isPlayable || dragging;
-  const zW = W * 2;
-  const zH = horiz ? W : W * 2;
-  return (
-    <div
-      onDragOver={(e) => { if (active) e.preventDefault(); }}
-      onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd(endId, id); }}
-      onClick={() => { if (isPlayable && selectedDomino && onDropOnEnd) onDropOnEnd(endId, selectedDomino.id); }}
-      style={{
-        width: zW, height: zH, flexShrink: 0, borderRadius: 8,
-        border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.12)',
-        background: isPlayable ? 'rgba(0,255,120,0.15)' : 'transparent',
-        boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.6)' : 'none',
-        cursor: isPlayable ? 'pointer' : 'default',
-        pointerEvents: active ? 'auto' : 'none',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-      }}
-    >
-      <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)' }}>
-        {value ?? '?'}
-      </span>
-    </div>
-  );
+  const placed = [];
+  let lx = 0, rx = 0, ty = 0, by = 0, spinX = 0;
+
+  board.forEach((piece, idx) => {
+    const side = idx === 0 ? 'first' : (piece.side || 'right');
+    const isDouble = piece.top === piece.bottom;
+    const tw = isDouble ? W : W * 2;
+    const th = isDouble ? W * 2 : W;
+
+    if (side === 'first') {
+      const px = -tw / 2;
+      const py = -th / 2;
+      placed.push({ ...piece, px, py, tw, th });
+      lx = px - GAP;
+      rx = px + tw + GAP;
+      ty = py - GAP;
+      by = py + th + GAP;
+      spinX = px + tw / 2;
+      return;
+    }
+    if (side === 'left') {
+      const px = lx - tw;
+      const py = -th / 2;
+      placed.push({ ...piece, px, py, tw, th });
+      lx = px - GAP;
+      return;
+    }
+    if (side === 'right') {
+      const px = rx;
+      const py = -th / 2;
+      placed.push({ ...piece, px, py, tw, th });
+      rx = px + tw + GAP;
+      return;
+    }
+    if (side === 'top') {
+      const px = spinX - tw / 2;
+      const py = ty - th;
+      placed.push({ ...piece, px, py, tw, th });
+      ty = py - GAP;
+      return;
+    }
+    if (side === 'bottom') {
+      const px = spinX - tw / 2;
+      const py = by;
+      placed.push({ ...piece, px, py, tw, th });
+      by = py + th + GAP;
+      return;
+    }
+    // fallback
+    placed.push({ ...piece, px: 0, py: 0, tw, th });
+  });
+
+  // Compute bounds
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  placed.forEach(t => {
+    minX = Math.min(minX, t.px);
+    minY = Math.min(minY, t.py);
+    maxX = Math.max(maxX, t.px + t.tw);
+    maxY = Math.max(maxY, t.py + t.th);
+  });
+
+  const PADDING = W * 2;
+  const totalW = maxX - minX + PADDING * 2;
+  const totalH = maxY - minY + PADDING * 2;
+  const originX = -minX + PADDING;
+  const originY = -minY + PADDING;
+
+  return {
+    tiles: placed,
+    w: totalW,
+    h: totalH,
+    originX,
+    originY,
+    openEnds: { lx, rx, ty, by, spinX },
+  };
 }
 
 export default function TXDBoard({
@@ -60,23 +95,17 @@ export default function TXDBoard({
   onDropOnEnd,
   draggingDominoId = null,
 }) {
-  const scrollRef = useRef(null);
+  const containerRef = useRef(null);
 
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    setTimeout(() => { el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2; }, 30);
-  }, [board.length]);
-
-  // ── Empty board ─────────────────────────────────────────────────────────────
+  // Empty board
   if (board.length === 0) {
     const canPlay = !!onDropOnEnd;
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}>
         <div
-          onDragOver={(e) => { if (canPlay) e.preventDefault(); }}
-          onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd('first', id); }}
-          onClick={() => { if (selectedDomino && onDropOnEnd) onDropOnEnd('first', selectedDomino.id); }}
+          onDragOver={canPlay ? (e) => e.preventDefault() : undefined}
+          onDrop={canPlay ? (e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id) onDropOnEnd('first', id); } : undefined}
+          onClick={canPlay ? () => { if (selectedDomino) onDropOnEnd('first', selectedDomino.id); } : undefined}
           style={{
             width: W * 2 + 16, height: W + 16, borderRadius: 10,
             border: canPlay ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.15)',
@@ -94,67 +123,109 @@ export default function TXDBoard({
     );
   }
 
-  // ── Split board into arms — trust stored side, never reclassify ─────────────
+  const layout = buildLayout(board);
+  const { tiles, w, h, originX, originY, openEnds: oe } = layout;
+
   const firstPiece = board[0];
   const isFirstDouble = firstPiece?.top === firstPiece?.bottom;
   const hasSpinnerArms = isFirstDouble || spinnerActive;
 
-  const leftArm   = board.filter(p => p.side === 'left');
-  const rightArm  = board.filter(p => p.side === 'right');
-  const topArm    = board.filter(p => p.side === 'top');
-  const bottomArm = board.filter(p => p.side === 'bottom');
+  // Drop zone sizes
+  const DZ_HORIZ_W = W * 2, DZ_HORIZ_H = W;
+  const DZ_VERT_W  = W * 2, DZ_VERT_H  = W * 2;
 
-  const leftVal      = leftEnd  ?? firstPiece?.top;
-  const rightVal     = rightEnd ?? firstPiece?.bottom;
-  const spinVal      = firstPiece?.top;
-  const topEndVal    = topArm.length    > 0 ? (topArm[topArm.length - 1].exposedValue    ?? spinVal) : spinVal;
-  const bottomEndVal = bottomArm.length > 0 ? (bottomArm[bottomArm.length - 1].exposedValue ?? spinVal) : spinVal;
+  const spinnerVal = firstPiece?.top ?? 0;
+  const topLastPiece    = [...board].reverse().find(p => p.side === 'top');
+  const bottomLastPiece = [...board].reverse().find(p => p.side === 'bottom');
+  const topEndVal    = topLastPiece    ? (topLastPiece.exposedValue    ?? spinnerVal) : spinnerVal;
+  const bottomEndVal = bottomLastPiece ? (bottomLastPiece.exposedValue ?? spinnerVal) : spinnerVal;
 
-  const dzProps = (endId, value, horiz) => ({
-    endId, value, horiz,
-    isPlayable: playableEndIds.has(endId),
-    dragging: !!draggingDominoId,
-    selectedDomino,
-    onDropOnEnd,
-  });
+  function DropZone({ endId, value, px, py, dw, dh }) {
+    const isPlayable = playableEndIds.has(endId);
+    const active = isPlayable || !!draggingDominoId;
+    return (
+      <div
+        onDragOver={active ? (e) => e.preventDefault() : undefined}
+        onDrop={active ? (e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd(endId, id); } : undefined}
+        onClick={isPlayable ? () => { if (selectedDomino && onDropOnEnd) onDropOnEnd(endId, selectedDomino.id); } : undefined}
+        style={{
+          position: 'absolute',
+          left: originX + px,
+          top: originY + py,
+          width: dw,
+          height: dh,
+          borderRadius: 8,
+          border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.12)',
+          background: isPlayable ? 'rgba(0,255,120,0.15)' : 'transparent',
+          boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.6)' : 'none',
+          cursor: isPlayable ? 'pointer' : 'default',
+          pointerEvents: active ? 'auto' : 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2,
+        }}
+      >
+        <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)' }}>
+          {value ?? '?'}
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', overflow: 'auto', position: 'relative', scrollbarWidth: 'none' }}
+    >
+      {/* Virtual canvas — sized to fit all tiles */}
+      <div style={{ position: 'relative', width: w, height: h, margin: 'auto' }}>
 
-        {/* Top arm */}
-        {hasSpinnerArms && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
-            {onDropOnEnd && <DropZone {...dzProps('top', topEndVal, false)} />}
-            {[...topArm].reverse().map((p) => <Tile key={p.id} piece={p} />)}
-          </div>
+        {/* Render each tile at its fixed pixel position */}
+        {tiles.map((t) => {
+          const orientation = t.placedOrientation
+            || ((['top', 'bottom'].includes(t.side) || t.top === t.bottom) ? 'vertical' : 'horizontal');
+          return (
+            <div
+              key={t.id}
+              style={{
+                position: 'absolute',
+                left: originX + t.px,
+                top: originY + t.py,
+                zIndex: 1,
+                filter: t.isSpinner
+                  ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))'
+                  : undefined,
+              }}
+            >
+              <TXDDomino top={t.top} bottom={t.bottom} width={W} orientation={orientation} />
+            </div>
+          );
+        })}
+
+        {/* Drop zones — only rendered when onDropOnEnd is provided */}
+        {onDropOnEnd && oe && (
+          <>
+            {/* Left */}
+            <DropZone endId="left" value={leftEnd ?? firstPiece?.top}
+              px={oe.lx - DZ_HORIZ_W} py={-DZ_HORIZ_H / 2}
+              dw={DZ_HORIZ_W} dh={DZ_HORIZ_H} />
+            {/* Right */}
+            <DropZone endId="right" value={rightEnd ?? firstPiece?.bottom}
+              px={oe.rx} py={-DZ_HORIZ_H / 2}
+              dw={DZ_HORIZ_W} dh={DZ_HORIZ_H} />
+            {/* Top */}
+            {hasSpinnerArms && (
+              <DropZone endId="top" value={topEndVal}
+                px={oe.spinX - DZ_VERT_W / 2} py={oe.ty - DZ_VERT_H}
+                dw={DZ_VERT_W} dh={DZ_VERT_H} />
+            )}
+            {/* Bottom */}
+            {hasSpinnerArms && (
+              <DropZone endId="bottom" value={bottomEndVal}
+                px={oe.spinX - DZ_VERT_W / 2} py={oe.by}
+                dw={DZ_VERT_W} dh={DZ_VERT_H} />
+            )}
+          </>
         )}
-
-        {/* Horizontal row: left zone → left arm → spinner → right arm → right zone */}
-        <div
-          ref={scrollRef}
-          style={{
-            display: 'flex', flexDirection: 'row', alignItems: 'center', gap: GAP,
-            overflowX: 'auto', overflowY: 'visible',
-            maxWidth: '100%', padding: '4px 6px', boxSizing: 'border-box',
-            scrollbarWidth: 'none',
-          }}
-        >
-          {onDropOnEnd && <DropZone {...dzProps('left', leftVal, true)} />}
-          {[...leftArm].reverse().map((p) => <Tile key={p.id} piece={p} />)}
-          {firstPiece && <Tile piece={firstPiece} />}
-          {rightArm.map((p) => <Tile key={p.id} piece={p} />)}
-          {onDropOnEnd && <DropZone {...dzProps('right', rightVal, true)} />}
-        </div>
-
-        {/* Bottom arm */}
-        {hasSpinnerArms && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
-            {bottomArm.map((p) => <Tile key={p.id} piece={p} />)}
-            {onDropOnEnd && <DropZone {...dzProps('bottom', bottomEndVal, false)} />}
-          </div>
-        )}
-
       </div>
     </div>
   );
