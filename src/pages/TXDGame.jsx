@@ -2,11 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
-import TXDBoard from '@/components/domino/TXDBoard';
+import TXDBoard from '@/components/domino/TXDBoard.jsx';
 import Header from '@/components/home/Header';
 import {
   playDomino, calculateRoundScores, aiChoosePlay, findHighestDoubleStarter,
-  getLegalMoves, getPlayableEndsForDomino, deal, DOMINO_SET,
+  getLegalMoves, getPlayableEndsForDomino, computeOpenEnds, deal, DOMINO_SET,
 } from '@/lib/txdDominoEngine';
 
 const HAND_TILE_W = 54;
@@ -57,7 +57,10 @@ export default function TXDGame() {
   const myPlayer = myIndex >= 0 ? game?.players?.[myIndex] : null;
   const isMyTurn = game?.phase === 'playing' && game?.currentPlayerIndex === myIndex;
   const myHand = myPlayer?.hand || [];
-  const openEnds = game?.openEnds || null;
+  // Derive open ends from board state — never trust stored coordinates
+  const openEnds = game?.board?.length > 0
+    ? computeOpenEnds(game.board, game?.leftEnd ?? null, game?.rightEnd ?? null, game?.spinnerActive || false)
+    : null;
   const legalMoves = isMyTurn ? getLegalMoves(myHand, openEnds, game?.leftEnd ?? null, game?.rightEnd ?? null) : [];
   const playableDominoIds = new Set(legalMoves.map(m => m.dominoId));
   const hasLegalMove = legalMoves.length > 0;
@@ -114,12 +117,13 @@ export default function TXDGame() {
     } else {
       const { domino, side } = choice;
       const isFirstPlay = (g.board?.length || 0) === 0;
-      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
+      const aiOpenEnds = g.board?.length > 0 ? computeOpenEnds(g.board, g.leftEnd ?? null, g.rightEnd ?? null, g.spinnerActive || false) : null;
+      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, aiOpenEnds);
+      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
       const boardEntry = {
         top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-        x: placedX ?? 50, y: placedY ?? 50,
+        exposedValue: result.exposedValue,
         placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
       };
       const newBoard = [...(g.board || []), boardEntry];
@@ -131,7 +135,7 @@ export default function TXDGame() {
       feed.unshift(`🤖 ${aiPlayer.playerName} played ${domino.top}-${domino.bottom}`);
       updated = {
         ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-        openEnds: newOpenEnds || g.openEnds, players,
+        players,
         currentPlayerIndex: roundOver ? aiIdx : next,
         phase: roundOver ? 'round_over' : 'playing',
         roundWinner: roundOver ? { playerName: aiPlayer.playerName, playerId: aiPlayer.playerId, points: pts } : null,
@@ -180,9 +184,7 @@ export default function TXDGame() {
     }
 
     if (!isFirstPlay) {
-      // Validate the domino fits the chosen end
-      const end = g.openEnds?.[endId];
-      const endValue = end?.active ? end.value : (endId === 'left' ? g.leftEnd : g.rightEnd);
+      const endValue = openEnds?.[endId]?.value ?? (endId === 'left' ? g.leftEnd : g.rightEnd);
       if (endValue !== null && endValue !== undefined) {
         if (domino.top !== endValue && domino.bottom !== endValue) {
           shakeInvalid(domino.id);
@@ -192,13 +194,12 @@ export default function TXDGame() {
       }
     }
 
-    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
+    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, openEnds);
+    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
     const newHand = myPlayer.hand.filter(d => d.id !== domino.id);
     const boardEntry = {
       top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-      x: placedX ?? 50,
-      y: placedY ?? 50,
+      exposedValue: result.exposedValue,
       placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
     };
     const newBoard = [...(g.board || []), boardEntry];
@@ -212,7 +213,7 @@ export default function TXDGame() {
     feed.unshift(`${myPlayer.playerName} played ${domino.top}-${domino.bottom}`);
     const updated = {
       ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-      openEnds: newOpenEnds || g.openEnds, players,
+      players,
       currentPlayerIndex: roundOver ? myIndex : ni,
       phase: roundOver ? 'round_over' : 'playing',
       roundWinner: roundOver ? { playerName: myPlayer.playerName, playerId: myPlayer.playerId, points: pts } : null,
@@ -382,10 +383,12 @@ export default function TXDGame() {
           <div className="absolute inset-0 z-10">
             <TXDBoard
               board={game.board || []}
-              openEnds={isMyTurn ? openEnds : null}
+              leftEnd={game.leftEnd ?? null}
+              rightEnd={game.rightEnd ?? null}
+              spinnerActive={game.spinnerActive || false}
               selectedDomino={selectedDomino}
               playableEndIds={isMyTurn ? playableEndIds : new Set()}
-              onDropOnEnd={doPlayOnEnd}
+              onDropOnEnd={isMyTurn ? doPlayOnEnd : null}
               draggingDominoId={draggingId}
             />
           </div>

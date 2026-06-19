@@ -2,12 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import TXDDomino from '@/components/domino/TXDDomino';
-import TXDBoard from '@/components/domino/TXDBoard';
+import TXDBoard from '@/components/domino/TXDBoard.jsx';
 import Header from '@/components/home/Header';
 import {
   DOMINO_SET, generateRoomCode, deal, findHighestDoubleStarter,
   playDomino, calculateRoundScores, aiChoosePlay,
-  getLegalMoves, getPlayableEndsForDomino,
+  getLegalMoves, getPlayableEndsForDomino, computeOpenEnds,
 } from '@/lib/txdDominoEngine';
 
 const HAND_TILE_W = 50;
@@ -79,7 +79,9 @@ export default function TXDHostPanel() {
   const hostPlayer = hostIndex >= 0 ? game?.players?.[hostIndex] : null;
   const isHostTurn = game?.phase === 'playing' && game?.currentPlayerIndex === hostIndex;
   const hostHand = hostPlayer?.hand || [];
-  const openEnds = game?.openEnds || null;
+  const openEnds = game?.board?.length > 0
+    ? computeOpenEnds(game.board, game?.leftEnd ?? null, game?.rightEnd ?? null, game?.spinnerActive || false)
+    : null;
   const legalMoves = isHostTurn ? getLegalMoves(hostHand, openEnds, game?.leftEnd ?? null, game?.rightEnd ?? null) : [];
   const playableIds = new Set(legalMoves.map(m => m.dominoId));
   const hasLegalMove = legalMoves.length > 0;
@@ -125,12 +127,13 @@ export default function TXDHostPanel() {
     } else {
       const { domino, side } = choice;
       const isFirstPlay = (g.board?.length || 0) === 0;
-      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
+      const aiOpenEnds = g.board?.length > 0 ? computeOpenEnds(g.board, g.leftEnd ?? null, g.rightEnd ?? null, g.spinnerActive || false) : null;
+      const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, aiOpenEnds);
+      const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
       const newHand = aiPlayer.hand.filter(d => d.id !== domino.id);
       const boardEntry = {
         top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-        x: placedX ?? 50, y: placedY ?? 50,
+        exposedValue: result.exposedValue,
         placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
       };
       const newBoard = [...(g.board || []), boardEntry];
@@ -142,7 +145,7 @@ export default function TXDHostPanel() {
       feed.unshift(`🤖 ${aiPlayer.playerName} played ${domino.top}-${domino.bottom}`);
       updated = {
         ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-        openEnds: newOpenEnds || g.openEnds, players,
+        players,
         currentPlayerIndex: roundOver ? aiIdx : next,
         phase: roundOver ? 'round_over' : 'playing',
         roundWinner: roundOver ? { playerName: aiPlayer.playerName, playerId: aiPlayer.playerId, points: pts } : null,
@@ -363,8 +366,7 @@ export default function TXDHostPanel() {
     }
 
     if (!isFirstPlay) {
-      const end = g.openEnds?.[endId];
-      const endValue = end?.active ? end.value : (endId === 'left' ? g.leftEnd : g.rightEnd);
+      const endValue = openEnds?.[endId]?.value ?? (endId === 'left' ? g.leftEnd : g.rightEnd);
       if (endValue !== null && endValue !== undefined) {
         if (domino.top !== endValue && domino.bottom !== endValue) {
           flash(`[${domino.id}] doesn't match end value ${endValue}`, 'error');
@@ -373,13 +375,12 @@ export default function TXDHostPanel() {
       }
     }
 
-    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, g.openEnds || null);
-    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, newOpenEnds, placedX, placedY, placedOrientation } = result;
+    const result = playDomino(domino, g.leftEnd ?? null, g.rightEnd ?? null, side, g.spinnerActive || false, openEnds);
+    const { newLeftEnd, newRightEnd, isSpinner, newSpinnerActive, orientedTop, orientedBottom, placedOrientation } = result;
     const newHand = hostPlayer.hand.filter(d => d.id !== domino.id);
     const boardEntry = {
       top: orientedTop, bottom: orientedBottom, id: domino.id, side, isSpinner,
-      x: placedX ?? 50,
-      y: placedY ?? 50,
+      exposedValue: result.exposedValue,
       placedOrientation: placedOrientation ?? (domino.top === domino.bottom ? 'vertical' : 'horizontal'),
     };
     const newBoard = [...(g.board || []), boardEntry];
@@ -393,7 +394,7 @@ export default function TXDHostPanel() {
     feed.unshift(`👑 Host played ${domino.top}-${domino.bottom}`);
     const updated = {
       ...g, board: newBoard, leftEnd: newLeftEnd, rightEnd: newRightEnd,
-      openEnds: newOpenEnds || g.openEnds, players,
+      players,
       currentPlayerIndex: roundOver ? hostIndex : ni,
       phase: roundOver ? 'round_over' : 'playing',
       roundWinner: roundOver ? { playerName: 'Host', playerId: hostPlayer.playerId, points: pts } : null,
@@ -674,10 +675,12 @@ export default function TXDHostPanel() {
               <div className="absolute inset-0 z-10">
                 <TXDBoard
                   board={game.board || []}
-                  openEnds={isHostTurn ? openEnds : null}
+                  leftEnd={game.leftEnd ?? null}
+                  rightEnd={game.rightEnd ?? null}
+                  spinnerActive={game.spinnerActive || false}
                   selectedDomino={selectedDomino}
                   playableEndIds={isHostTurn ? playableEndIds : new Set()}
-                  onDropOnEnd={doPlayOnEnd}
+                  onDropOnEnd={isHostTurn ? doPlayOnEnd : null}
                 />
               </div>
               <div className="absolute bottom-2 right-3 z-20 flex items-center gap-2 text-[9px] font-body">

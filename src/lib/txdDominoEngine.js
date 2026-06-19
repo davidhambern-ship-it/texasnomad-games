@@ -1,6 +1,5 @@
 // TXD Domino Engine — core game logic for Texas Dominoes
 
-// Build the full double-6 set with IDs
 export const DOMINO_SET = [];
 for (let i = 0; i <= 6; i++) {
   for (let j = i; j <= 6; j++) {
@@ -22,7 +21,6 @@ function shuffle(arr) {
   return a;
 }
 
-// Deal tiles — 7 each, remainder is boneyard
 export function deal(set, playerCount) {
   const shuffled = shuffle(set);
   const handSize = 7;
@@ -30,17 +28,14 @@ export function deal(set, playerCount) {
   for (let i = 0; i < playerCount; i++) {
     hands.push(shuffled.slice(i * handSize, (i + 1) * handSize));
   }
-  const boneyard = shuffled.slice(playerCount * handSize);
-  return { hands, boneyard };
+  return { hands, boneyard: shuffled.slice(playerCount * handSize) };
 }
 
 export function findHighestDoubleStarter(hands) {
   const doubleRank = ['6-6', '5-5', '4-4', '3-3', '2-2', '1-1', '0-0'];
   for (const doubleId of doubleRank) {
     for (let i = 0; i < hands.length; i++) {
-      if (hands[i].some(d => d.id === doubleId)) {
-        return { playerIndex: i, dominoId: doubleId };
-      }
+      if (hands[i].some(d => d.id === doubleId)) return { playerIndex: i, dominoId: doubleId };
     }
   }
   return null;
@@ -53,117 +48,193 @@ export function findDoubleSixHolder(hands) {
   return -1;
 }
 
-// ── Board placement engine ────────────────────────────────────────────────────
+// ── Board layout engine ───────────────────────────────────────────────────────
 //
-// Coordinate system: percentages (0-100) of the board container.
-// STEP_H / STEP_V = how far to advance the center point per tile placed.
+// Instead of storing x/y positions in the DB (fragile with JSON round-trips),
+// we COMPUTE positions from the board array at render time.
+//
+// Each board entry has: { id, top, bottom, side, placedOrientation }
+// We track 4 "cursors" (left/right/top/bottom) starting from center.
 
-const STEP_H = 18; // % board width per horizontal step
-const STEP_V = 18; // % board height per vertical step
+const STEP = 18; // % of board dimension per tile
+const CX = 50, CY = 50; // center
 
-const TABLE_BOUNDS = { minX: 14, maxX: 86, minY: 16, maxY: 84 };
+/**
+ * Compute the {x, y} position for every tile on the board, derived purely
+ * from the sequence of plays (no stored coordinates needed).
+ *
+ * Returns an array of { ...piece, x, y } in the same order as board[].
+ */
+export function computeBoardLayout(board) {
+  if (!board || board.length === 0) return [];
 
-// Given an open end, advance its position one step in the arm's direction.
-// Turns at table boundaries so tiles wrap around the edge.
-function advanceEnd(end) {
-  let dir = end.direction;
-  let nx = end.x + (dir === 'left' ? -STEP_H : dir === 'right' ? STEP_H : 0);
-  let ny = end.y + (dir === 'up' ? -STEP_V : dir === 'down' ? STEP_V : 0);
+  // Cursors track the NEXT available position in each arm.
+  // After placing a tile at cursor, advance cursor by STEP in that direction.
+  const cursors = {
+    first: { x: CX, y: CY },
+    left:  { x: CX - STEP, y: CY,      dx: -STEP, dy: 0 },
+    right: { x: CX + STEP, y: CY,      dx:  STEP, dy: 0 },
+    top:   { x: CX,        y: CY - STEP, dx: 0, dy: -STEP },
+    bottom:{ x: CX,        y: CY + STEP, dx: 0, dy:  STEP },
+  };
 
-  // Boundary wrap: turn the arm
-  if (nx < TABLE_BOUNDS.minX || nx > TABLE_BOUNDS.maxX) {
-    dir = end.y <= 50 ? 'down' : 'up';
-    nx = end.x;
-    ny = end.y + (dir === 'down' ? STEP_V : -STEP_V);
-  }
-  if (ny < TABLE_BOUNDS.minY || ny > TABLE_BOUNDS.maxY) {
-    dir = end.x <= 50 ? 'right' : 'left';
-    ny = end.y;
-    nx = end.x + (dir === 'right' ? STEP_H : -STEP_H);
-  }
+  const result = [];
 
-  return { ...end, x: nx, y: ny, direction: dir };
+  board.forEach((piece) => {
+    const side = piece.side || 'first';
+
+    if (side === 'first') {
+      result.push({ ...piece, x: CX, y: CY });
+      // First tile occupies center — arms start at ±STEP from center
+      // (cursors already initialized correctly above)
+      return;
+    }
+
+    const cursor = cursors[side];
+    if (!cursor) {
+      result.push({ ...piece, x: CX, y: CY });
+      return;
+    }
+
+    // Clamp to table bounds
+    const bx = Math.max(10, Math.min(90, cursor.x));
+    const by = Math.max(12, Math.min(88, cursor.y));
+    result.push({ ...piece, x: bx, y: by });
+
+    // Advance cursor
+    cursor.x += cursor.dx;
+    cursor.y += cursor.dy;
+
+    // Simple wrap: if we hit a wall, turn 90° inward
+    if (cursor.x < 10 || cursor.x > 90) {
+      cursor.dx = 0;
+      cursor.dy = STEP * (cursor.y < 50 ? 1 : -1);
+      cursor.x = Math.max(10, Math.min(90, cursor.x));
+    }
+    if (cursor.y < 12 || cursor.y > 88) {
+      cursor.dy = 0;
+      cursor.dx = STEP * (cursor.x < 50 ? 1 : -1);
+      cursor.y = Math.max(12, Math.min(88, cursor.y));
+    }
+  });
+
+  return result;
 }
 
 /**
- * Build open-ends for the first domino (always placed at center).
- * A double (spinner) opens 4 arms. A non-double opens left + right only.
- * Each open end represents where the NEXT tile in that arm will land.
+ * Compute where the open-end drop zones should appear, based on the current
+ * cursor positions AFTER all tiles have been placed.
+ * Returns { left, right, top, bottom } — same shape as before, but derived
+ * from board state, not stored in DB.
  */
-export function buildOpenEndsForOpening(domino) {
-  const isDouble = domino.top === domino.bottom;
-  const cx = 50, cy = 50;
+export function computeOpenEnds(board, leftEnd, rightEnd, spinnerActive) {
+  if (!board || board.length === 0) return null;
 
-  if (isDouble) {
-    return {
-      left:   { id: 'left',   value: domino.top, x: cx - STEP_H, y: cy,          direction: 'left',  active: true },
-      right:  { id: 'right',  value: domino.top, x: cx + STEP_H, y: cy,          direction: 'right', active: true },
-      top:    { id: 'top',    value: domino.top, x: cx,          y: cy - STEP_V, direction: 'up',    active: true },
-      bottom: { id: 'bottom', value: domino.top, x: cx,          y: cy + STEP_V, direction: 'down',  active: true },
-    };
+  // Re-run the cursor simulation to find where each arm is now
+  const cursors = {
+    left:   { x: CX - STEP, y: CY,       dx: -STEP, dy: 0 },
+    right:  { x: CX + STEP, y: CY,       dx:  STEP, dy: 0 },
+    top:    { x: CX,        y: CY - STEP, dx: 0, dy: -STEP },
+    bottom: { x: CX,        y: CY + STEP, dx: 0, dy:  STEP },
+  };
+
+  // Track which arms are active
+  let topActive = false;
+  let bottomActive = false;
+
+  board.forEach((piece) => {
+    const side = piece.side || 'first';
+    if (side === 'first') {
+      // First tile is a spinner → all 4 arms active
+      if (piece.top === piece.bottom) {
+        topActive = true;
+        bottomActive = true;
+      }
+      return;
+    }
+    if (side === 'top') topActive = true;
+    if (side === 'bottom') bottomActive = true;
+
+    const cursor = cursors[side];
+    if (!cursor) return;
+    cursor.x += cursor.dx;
+    cursor.y += cursor.dy;
+    if (cursor.x < 10 || cursor.x > 90) {
+      cursor.dx = 0;
+      cursor.dy = STEP * (cursor.y < 50 ? 1 : -1);
+      cursor.x = Math.max(10, Math.min(90, cursor.x));
+    }
+    if (cursor.y < 12 || cursor.y > 88) {
+      cursor.dy = 0;
+      cursor.dx = STEP * (cursor.x < 50 ? 1 : -1);
+      cursor.y = Math.max(12, Math.min(88, cursor.y));
+    }
+  });
+
+  // Determine open end values from board edges
+  // leftEnd/rightEnd from game state are the authoritative values
+  const firstPiece = board[0];
+  const isFirstDouble = firstPiece && firstPiece.top === firstPiece.bottom;
+
+  // Find the last tile played on each arm to get its exposed value
+  function lastOnSide(s) {
+    const pieces = board.filter(p => p.side === s);
+    return pieces.length > 0 ? pieces[pieces.length - 1] : null;
   }
-  // Non-double: left arm value = top pip (left half), right arm value = bottom pip (right half)
-  return {
-    left:   { id: 'left',   value: domino.top,    x: cx - STEP_H, y: cy, direction: 'left',  active: true },
-    right:  { id: 'right',  value: domino.bottom, x: cx + STEP_H, y: cy, direction: 'right', active: true },
+
+  // Exposed value = the "outer" pip of the last tile on that arm
+  // We use leftEnd/rightEnd from game state as the authoritative source
+  const openEnds = {
+    left:   { id: 'left',   value: leftEnd,  x: Math.max(10, Math.min(90, cursors.left.x)),   y: Math.max(12, Math.min(88, cursors.left.y)),   active: true },
+    right:  { id: 'right',  value: rightEnd, x: Math.max(10, Math.min(90, cursors.right.x)),  y: Math.max(12, Math.min(88, cursors.right.y)),  active: true },
     top:    null,
     bottom: null,
   };
-}
 
-export function activateSpinnerEnds(openEnds, spinnerValue) {
-  const updated = { ...openEnds };
-  if (!updated.top) {
-    updated.top    = { id: 'top',    value: spinnerValue, x: 50, y: 50 - STEP_V, direction: 'up',   active: true };
-    updated.bottom = { id: 'bottom', value: spinnerValue, x: 50, y: 50 + STEP_V, direction: 'down', active: true };
+  // Top/bottom arms open if spinner played
+  if (spinnerActive || topActive || isFirstDouble) {
+    // Get the value exposed at top/bottom — it's the spinner's value if nothing played there yet
+    const topLast = lastOnSide('top');
+    const bottomLast = lastOnSide('bottom');
+    const spinnerVal = firstPiece?.top ?? leftEnd;
+
+    openEnds.top    = { id: 'top',    value: topLast    ? topLast.exposedValue    ?? spinnerVal : spinnerVal, x: Math.max(10, Math.min(90, cursors.top.x)),    y: Math.max(12, Math.min(88, cursors.top.y)),    active: true };
+    openEnds.bottom = { id: 'bottom', value: bottomLast ? bottomLast.exposedValue ?? spinnerVal : spinnerVal, x: Math.max(10, Math.min(90, cursors.bottom.x)), y: Math.max(12, Math.min(88, cursors.bottom.y)), active: true };
   }
-  return updated;
+
+  return openEnds;
 }
 
-/**
- * Orient a domino so the matching pip faces the chain (inward)
- * and returns what value is now exposed outward.
- */
+// ── Orient a domino for a given end ──────────────────────────────────────────
+
 export function orientDominoForEnd(domino, side, endValue) {
   const { top, bottom } = domino;
   if (side === 'first' || endValue === null) {
     return { connectingValue: null, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
   }
-  // Doubles always expose the same pip regardless of direction
   if (top === bottom) {
     return { connectingValue: top, exposedValue: top, orientedTop: top, orientedBottom: bottom };
   }
   if (side === 'left') {
-    // Left arm grows left; the tile's right (bottom) side connects inward
-    if (bottom === endValue) {
-      return { connectingValue: bottom, exposedValue: top, orientedTop: top, orientedBottom: bottom };
-    } else {
-      return { connectingValue: top, exposedValue: bottom, orientedTop: bottom, orientedBottom: top };
-    }
+    if (bottom === endValue) return { connectingValue: bottom, exposedValue: top,    orientedTop: top,    orientedBottom: bottom };
+    else                     return { connectingValue: top,    exposedValue: bottom, orientedTop: bottom, orientedBottom: top };
   }
-  // right / top / bottom: tile's left (top) side connects inward
-  if (top === endValue) {
-    return { connectingValue: top, exposedValue: bottom, orientedTop: top, orientedBottom: bottom };
-  } else {
-    return { connectingValue: bottom, exposedValue: top, orientedTop: bottom, orientedBottom: top };
-  }
+  if (top === endValue) return { connectingValue: top,    exposedValue: bottom, orientedTop: top,    orientedBottom: bottom };
+  else                  return { connectingValue: bottom, exposedValue: top,    orientedTop: bottom, orientedBottom: top };
 }
 
-function getTileOrientation(isDouble, direction) {
+function getTileOrientation(isDouble, side) {
   if (isDouble) return 'vertical';
-  if (direction === 'left' || direction === 'right') return 'horizontal';
+  if (side === 'left' || side === 'right') return 'horizontal';
   return 'vertical';
 }
 
-/**
- * Apply a domino play. Returns updated openEnds + board-entry data.
- * side = 'first' | 'left' | 'right' | 'top' | 'bottom'
- */
+// ── Apply a domino play ───────────────────────────────────────────────────────
+
 export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = false, openEnds = null) {
-  // ── First play ──
+  // First play
   if (side === 'first' || leftEnd === null || rightEnd === null) {
     const isDouble = domino.top === domino.bottom;
-    const newOpenEnds = buildOpenEndsForOpening(domino);
     return {
       newLeftEnd: domino.top,
       newRightEnd: domino.bottom,
@@ -172,17 +243,12 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
       orientedTop: domino.top,
       orientedBottom: domino.bottom,
       exposedValue: isDouble ? domino.top : domino.bottom,
-      newOpenEnds,
-      placedX: 50,
-      placedY: 50,
       placedOrientation: isDouble ? 'vertical' : 'horizontal',
     };
   }
 
-  // ── Subsequent play ──
-  // Resolve the end object and its required match value
-  const endObj = openEnds?.[side] || null;
-  const endValue = endObj?.value ?? (side === 'left' ? leftEnd : rightEnd);
+  // Subsequent plays — resolve end value
+  const endValue = openEnds?.[side]?.value ?? (side === 'left' ? leftEnd : rightEnd);
 
   if (domino.top !== endValue && domino.bottom !== endValue) {
     throw new Error(`Invalid play: ${domino.id} cannot connect to end value ${endValue} on side ${side}`);
@@ -192,26 +258,11 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
   const becomesSpinner = isDouble && !spinnerActive;
   const oriented = orientDominoForEnd(domino, side, endValue);
 
-  // Tile is placed at the open end's current position
-  const placedX = endObj?.x ?? 50;
-  const placedY = endObj?.y ?? 50;
-  const placedOrientation = getTileOrientation(isDouble, endObj?.direction || side);
-
-  // Advance the open end one step forward
-  let newOpenEnds = openEnds ? { ...openEnds } : {
-    left:   { id: 'left',   value: leftEnd,  x: 50 - STEP_H, y: 50, direction: 'left',  active: true },
-    right:  { id: 'right',  value: rightEnd, x: 50 + STEP_H, y: 50, direction: 'right', active: true },
-    top:    null,
-    bottom: null,
-  };
-
-  if (newOpenEnds[side]) {
-    const advanced = advanceEnd({ ...newOpenEnds[side], value: oriented.exposedValue });
-    newOpenEnds[side] = { ...advanced, value: oriented.exposedValue, active: true };
-  }
-
-  const newLeftEnd  = newOpenEnds.left?.active  ? newOpenEnds.left.value  : leftEnd;
-  const newRightEnd = newOpenEnds.right?.active ? newOpenEnds.right.value : rightEnd;
+  // Update left/right end values
+  let newLeftEnd = leftEnd;
+  let newRightEnd = rightEnd;
+  if (side === 'left')   newLeftEnd  = oriented.exposedValue;
+  if (side === 'right')  newRightEnd = oriented.exposedValue;
 
   return {
     newLeftEnd,
@@ -221,10 +272,7 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
     orientedTop: oriented.orientedTop,
     orientedBottom: oriented.orientedBottom,
     exposedValue: oriented.exposedValue,
-    newOpenEnds,
-    placedX,
-    placedY,
-    placedOrientation,
+    placedOrientation: getTileOrientation(isDouble, side),
   };
 }
 
@@ -236,32 +284,22 @@ export function pipTotal(hand) {
 
 export function calculateRoundScores(players, winnerIndex) {
   let total = 0;
-  players.forEach((p, i) => {
-    if (i !== winnerIndex) total += pipTotal(p.hand || []);
-  });
+  players.forEach((p, i) => { if (i !== winnerIndex) total += pipTotal(p.hand || []); });
   return total;
 }
 
 // ── Legal move detection ──────────────────────────────────────────────────────
 
-/**
- * Returns all valid moves for a hand given the current open ends.
- * Each move: { dominoId, endId, requiredValue, domino }
- */
 export function getLegalMoves(hand, openEnds, leftEnd = null, rightEnd = null) {
-  // No board yet — any tile can start
   if (!openEnds && leftEnd === null) {
     return hand.map(domino => ({ dominoId: domino.id, endId: 'first', requiredValue: null, domino }));
   }
-
-  // openEnds is the primary source; fall back to leftEnd/rightEnd if openEnds is missing
   const activeEnds = openEnds
     ? Object.entries(openEnds).filter(([, end]) => end && end.active)
     : [
         ...(leftEnd  !== null ? [['left',  { value: leftEnd  }]] : []),
         ...(rightEnd !== null ? [['right', { value: rightEnd }]] : []),
       ];
-
   const moves = [];
   hand.forEach(domino => {
     activeEnds.forEach(([endId, end]) => {
@@ -273,9 +311,6 @@ export function getLegalMoves(hand, openEnds, leftEnd = null, rightEnd = null) {
   return moves;
 }
 
-/**
- * Returns which end IDs a given domino can legally play on.
- */
 export function getPlayableEndsForDomino(domino, openEnds) {
   if (!openEnds) return ['first'];
   return Object.entries(openEnds)
@@ -283,7 +318,7 @@ export function getPlayableEndsForDomino(domino, openEnds) {
     .map(([endId]) => endId);
 }
 
-// ── Legacy helpers (used by AI and blocking checks) ───────────────────────────
+// ── Legacy helpers ────────────────────────────────────────────────────────────
 
 export function canPlay(domino, leftEnd, rightEnd) {
   if (leftEnd === null || rightEnd === null) return true;
@@ -294,10 +329,10 @@ export function canPlay(domino, leftEnd, rightEnd) {
 export function getPlaySide(domino, leftEnd, rightEnd, openEnds = null) {
   if (leftEnd === null || rightEnd === null) return 'first';
   if (openEnds) {
-    const playableEnds = getPlayableEndsForDomino(domino, openEnds);
-    if (playableEnds.length === 0) return null;
-    if (playableEnds.length > 1) return 'both';
-    return playableEnds[0];
+    const ends = getPlayableEndsForDomino(domino, openEnds);
+    if (ends.length === 0) return null;
+    if (ends.length > 1) return 'both';
+    return ends[0];
   }
   const fitsLeft  = domino.top === leftEnd  || domino.bottom === leftEnd;
   const fitsRight = domino.top === rightEnd || domino.bottom === rightEnd;
@@ -317,7 +352,6 @@ export function checkBlocked(players, leftEnd, rightEnd, boneyardCount) {
 }
 
 export function aiChoosePlay(hand, leftEnd, rightEnd, startingDominoLocked = null, openEnds = null) {
-  // First play of the round
   if (leftEnd === null && rightEnd === null) {
     if (startingDominoLocked) {
       const locked = hand.find(d => d.id === startingDominoLocked);
@@ -328,16 +362,12 @@ export function aiChoosePlay(hand, leftEnd, rightEnd, startingDominoLocked = nul
     const sorted = [...hand].sort((a, b) => (b.top + b.bottom) - (a.top + a.bottom));
     return sorted.length ? { domino: sorted[0], side: 'first' } : null;
   }
-
-  // Use openEnds when available (preferred — accurate legal move detection)
   if (openEnds) {
     const moves = getLegalMoves(hand, openEnds);
     if (moves.length === 0) return null;
     const sorted = [...moves].sort((a, b) => (b.domino.top + b.domino.bottom) - (a.domino.top + a.domino.bottom));
     return { domino: sorted[0].domino, side: sorted[0].endId };
   }
-
-  // Fallback: use leftEnd/rightEnd directly
   const playable = getPlayableDominoes(hand, leftEnd, rightEnd);
   if (playable.length === 0) return null;
   const sorted = [...playable].sort((a, b) => (b.top + b.bottom) - (a.top + a.bottom));
