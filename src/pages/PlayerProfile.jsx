@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import Header from '@/components/home/Header';
@@ -53,6 +53,8 @@ export default function PlayerProfilePage() {
   const [saving, setSaving] = useState(false);
   const navigate = useNavigate();
 
+  const profileIdRef = useRef(null);
+
   useEffect(() => {
     async function load() {
       try {
@@ -61,6 +63,7 @@ export default function PlayerProfilePage() {
         const profiles = await base44.entities.PlayerProfile.filter({ user_id: u.id });
         if (profiles.length > 0) {
           setProfile(profiles[0]);
+          profileIdRef.current = profiles[0].id;
           setEditData({
             username: profiles[0].username || '',
             bio: profiles[0].bio || '',
@@ -75,6 +78,16 @@ export default function PlayerProfilePage() {
       }
     }
     load();
+  }, []);
+
+  // Real-time subscription — refresh profile when game stats update
+  useEffect(() => {
+    const unsubscribe = base44.entities.PlayerProfile.subscribe((event) => {
+      if (event.type === 'update' && event.id === profileIdRef.current && event.data) {
+        setProfile(prev => prev ? { ...prev, ...event.data } : event.data);
+      }
+    });
+    return unsubscribe;
   }, []);
 
   const saveProfile = async () => {
@@ -101,7 +114,11 @@ export default function PlayerProfilePage() {
   const gameStats = profile.game_stats || {};
   const badges = profile.badges || [];
   const memberSince = profile.member_since ? new Date(profile.member_since).toLocaleDateString('en-US', { year: 'numeric', month: 'long' }) : 'Unknown';
-  const topGames = Object.entries(gameStats).sort((a, b) => (b[1].times_played || 0) - (a[1].times_played || 0)).slice(0, 5);
+  const topGames = Object.entries(gameStats).sort((a, b) => (b[1].times_played || 0) - (a[1].times_played || 0)).slice(0, 10);
+  // High scores: all games sorted by high_score desc
+  const highScores = Object.entries(gameStats)
+    .filter(([, s]) => (s.high_score || 0) > 0)
+    .sort((a, b) => (b[1].high_score || 0) - (a[1].high_score || 0));
 
   return (
     <div style={{ minHeight: '100vh', background: theme.bg, color: 'white' }}>
@@ -217,9 +234,8 @@ export default function PlayerProfilePage() {
           )}
 
           {/* Stats strip */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8, paddingBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, paddingBottom: 16 }}>
             <StatCard label="GAMES PLAYED" value={profile.total_games_played || 0} color={theme.accent} />
-            <StatCard label="PLAY TIME" value={`${Math.floor((profile.total_play_time_minutes || 0) / 60)}h`} color={theme.secondary} />
             <StatCard label="BADGES" value={badges.length} color="#FFD700" />
             <StatCard label="REFERRALS" value={profile.referral_count || 0} color="#4ade80" />
           </div>
@@ -252,6 +268,31 @@ export default function PlayerProfilePage() {
                       <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
                       <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
                     </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* High Scores */}
+        <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,215,0,0.25)', background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
+          <div style={{ ...PS2, fontSize: 8, color: '#FFD700', marginBottom: 12 }}>🥇 HIGH SCORES</div>
+          {highScores.length === 0 ? (
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>Play some games to set high scores!</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {highScores.map(([gameId, stats], i) => (
+                <div key={gameId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px', borderRadius: 8, background: i === 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${i === 0 ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}` }}>
+                  <div style={{ ...PS2, fontSize: 8, color: i === 0 ? '#FFD700' : i === 1 ? '#C0C0C0' : i === 2 ? '#CD7F32' : 'rgba(255,255,255,0.3)', width: 20, textAlign: 'center', flexShrink: 0 }}>
+                    {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i + 1}`}
+                  </div>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', flex: 1 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 26, color: '#FFD700', lineHeight: 1, textShadow: i === 0 ? '0 0 12px rgba(255,215,0,0.6)' : 'none' }}>
+                    {stats.high_score.toLocaleString()}
+                  </div>
+                  <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', textAlign: 'right', minWidth: 40 }}>
+                    {stats.wins || 0}W / {stats.times_played || 0}P
                   </div>
                 </div>
               ))}
