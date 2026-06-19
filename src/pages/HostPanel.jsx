@@ -4,6 +4,8 @@ import HostPasswordGate from '@/components/host/HostPasswordGate';
 import HostAccountGate from '@/components/host/HostAccountGate';
 import HostGameSelect from '@/components/host/HostGameSelect';
 import HostConsole from '@/components/host/HostConsole';
+import LivePlayersPanel from '@/components/host/admin/LivePlayersPanel.jsx';
+import PlayerProfilesPanel from '@/components/host/admin/PlayerProfilesPanel.jsx';
 import useHostSession from '@/hooks/useHostSession';
 
 const HOST_PASSWORD = 'BERNA88@tx';
@@ -15,6 +17,7 @@ export default function HostPanel() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
   const [changingRoom, setChangingRoom] = useState(false);
+  const [adminView, setAdminView] = useState(null); // null | 'live-players' | 'player-profiles'
   const { startHostSession, endHostSession } = useHostSession();
 
   const handlePassword = (pw) => {
@@ -169,10 +172,16 @@ export default function HostPanel() {
           </>
         )}
 
-        {authenticated && (!selectedGame || changingRoom) && (
-          <HostGameSelect onSelect={handleGameSelect} currentGame={selectedGame} />
+        {authenticated && adminView === 'live-players' && (
+          <LivePlayersPanel onBack={() => setAdminView(null)} />
         )}
-        {authenticated && selectedGame && activeRoom && !changingRoom && (
+        {authenticated && adminView === 'player-profiles' && (
+          <PlayerProfilesPanel onBack={() => setAdminView(null)} />
+        )}
+        {authenticated && !adminView && (!selectedGame || changingRoom) && (
+          <HostGameSelect onSelect={handleGameSelect} currentGame={selectedGame} onAdminSelect={setAdminView} />
+        )}
+        {authenticated && !adminView && selectedGame && activeRoom && !changingRoom && (
           <HostConsole game={selectedGame} roomCode={activeRoom} onDisconnect={handleDisconnect} />
         )}
       </main>

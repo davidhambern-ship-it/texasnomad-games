@@ -63,7 +63,12 @@ export const ALL_GAMES = [
   },
 ];
 
-export default function HostGameSelect({ onSelect, currentGame }) {
+const ADMIN_TOOLS = [
+  { id: 'live-players', title: 'LIVE PLAYERS', subtitle: 'WHO\'S ON RIGHT NOW', color: '#4ade80', emoji: '📡' },
+  { id: 'player-profiles', title: 'PLAYER PROFILES', subtitle: 'ALL REGISTERED PLAYERS', color: '#BC13FE', emoji: '👥' },
+];
+
+export default function HostGameSelect({ onSelect, currentGame, onAdminSelect }) {
   const [pendingGame, setPendingGame] = useState(currentGame || null);
   const [roomCode, setRoomCode] = useState('');
   const [error, setError] = useState('');
@@ -180,7 +185,38 @@ export default function HostGameSelect({ onSelect, currentGame }) {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
+    <div className="flex-1 flex flex-col items-center px-4 py-12">
+
+      {/* ADMIN SECTION */}
+      <div className="w-full max-w-2xl mb-12">
+        <div className="flex items-center gap-4 mb-5">
+          <div className="h-px flex-1 bg-white/10" />
+          <span className="text-[8px] tracking-[0.3em] text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>⚙ ADMIN</span>
+          <div className="h-px flex-1 bg-white/10" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {ADMIN_TOOLS.map((tool) => (
+            <button
+              key={tool.id}
+              onClick={() => onAdminSelect(tool.id)}
+              className="group flex flex-col items-center p-6 border-2 rounded-xl bg-black/60 hover:scale-105 transition-all duration-200 focus:outline-none"
+              style={{ borderColor: `${tool.color}40` }}
+              onMouseEnter={(e) => { e.currentTarget.style.borderColor = tool.color; e.currentTarget.style.boxShadow = `0 0 25px ${tool.color}40`; }}
+              onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${tool.color}40`; e.currentTarget.style.boxShadow = 'none'; }}
+            >
+              <span className="text-5xl mb-3">{tool.emoji}</span>
+              <span className="text-lg tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: tool.color, textShadow: `0 0 15px ${tool.color}60` }}>
+                {tool.title}
+              </span>
+              <span className="text-[7px] tracking-[0.2em] text-white/50 uppercase mt-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                {tool.subtitle}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* GAMES SECTION */}
       <h2 className="text-2xl md:text-3xl tracking-[0.15em] text-[#FFD700] uppercase mb-2" style={{ fontFamily: "'Monoton', cursive", textShadow: '0 0 15px #FFD700' }}>
         Select Game
       </h2>
@@ -194,24 +230,12 @@ export default function HostGameSelect({ onSelect, currentGame }) {
             key={game.id}
             onClick={() => handleGameClick(game)}
             className="group flex flex-col items-center p-6 border-2 rounded-xl bg-black/60 hover:scale-105 transition-all duration-200 focus:outline-none"
-            style={{
-              borderColor: `${game.color}40`,
-              boxShadow: `0 0 0 0 ${game.color}00`,
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.borderColor = game.color;
-              e.currentTarget.style.boxShadow = `0 0 25px ${game.color}40`;
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.borderColor = `${game.color}40`;
-              e.currentTarget.style.boxShadow = `0 0 0 0 ${game.color}00`;
-            }}
+            style={{ borderColor: `${game.color}40` }}
+            onMouseEnter={(e) => { e.currentTarget.style.borderColor = game.color; e.currentTarget.style.boxShadow = `0 0 25px ${game.color}40`; }}
+            onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${game.color}40`; e.currentTarget.style.boxShadow = 'none'; }}
           >
             <span className="text-5xl mb-3">{game.emoji}</span>
-            <span
-              className="text-xl tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}
-              style={{ color: game.color, textShadow: `0 0 15px ${game.color}60` }}
-            >
+            <span className="text-xl tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: game.color, textShadow: `0 0 15px ${game.color}60` }}>
               {game.title}
             </span>
             <span className="text-[8px] tracking-[0.2em] text-white/50 uppercase mt-1" style={{ fontFamily: "'Press Start 2P', monospace" }}>
