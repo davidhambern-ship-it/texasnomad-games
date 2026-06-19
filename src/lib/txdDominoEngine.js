@@ -237,8 +237,8 @@ export function orientDominoForEnd(domino, side, endValue) {
 
 function getTileOrientation(isDouble, side) {
   if (isDouble) return 'vertical';
-  if (side === 'left' || side === 'right') return 'horizontal';
-  return 'vertical';
+  if (side === 'top' || side === 'bottom') return 'vertical';
+  return 'horizontal'; // left, right
 }
 
 // ── Apply a domino play ───────────────────────────────────────────────────────
@@ -262,7 +262,18 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
   }
 
   // Subsequent plays — resolve end value
-  const endValue = openEnds?.[side]?.value ?? (side === 'left' ? leftEnd : rightEnd);
+  // top/bottom arms connect to the spinner's value; left/right use their respective ends
+  let endValue;
+  if (openEnds?.[side]?.value !== undefined && openEnds[side].value !== null) {
+    endValue = openEnds[side].value;
+  } else if (side === 'left') {
+    endValue = leftEnd;
+  } else if (side === 'right') {
+    endValue = rightEnd;
+  } else {
+    // top or bottom arm — connect to spinner value (first tile's pip value)
+    endValue = leftEnd; // spinner value stored as leftEnd initially; openEnds should always be passed for top/bottom
+  }
 
   if (domino.top !== endValue && domino.bottom !== endValue) {
     throw new Error(`Invalid play: ${domino.id} cannot connect to end value ${endValue} on side ${side}`);
@@ -270,22 +281,27 @@ export function playDomino(domino, leftEnd, rightEnd, side, spinnerActive = fals
 
   const isDouble = domino.top === domino.bottom;
   const becomesSpinner = isDouble && !spinnerActive;
-  const oriented = orientDominoForEnd(domino, side, endValue);
 
-  // Update left/right end values
+  // Orient: connecting end faces the spinner, exposed end faces outward
+  const connectsWithTop = domino.top === endValue;
+  const orientedTop    = connectsWithTop ? domino.top    : domino.bottom;
+  const orientedBottom = connectsWithTop ? domino.bottom : domino.top;
+  const exposedValue   = isDouble ? domino.top : (connectsWithTop ? domino.bottom : domino.top);
+
+  // Update left/right end values (top/bottom plays don't change left/right ends)
   let newLeftEnd = leftEnd;
   let newRightEnd = rightEnd;
-  if (side === 'left')   newLeftEnd  = oriented.exposedValue;
-  if (side === 'right')  newRightEnd = oriented.exposedValue;
+  if (side === 'left')  newLeftEnd  = exposedValue;
+  if (side === 'right') newRightEnd = exposedValue;
 
   return {
     newLeftEnd,
     newRightEnd,
     isSpinner: becomesSpinner,
     newSpinnerActive: spinnerActive || becomesSpinner,
-    orientedTop: oriented.orientedTop,
-    orientedBottom: oriented.orientedBottom,
-    exposedValue: oriented.exposedValue,
+    orientedTop,
+    orientedBottom,
+    exposedValue,
     placedOrientation: getTileOrientation(isDouble, side),
   };
 }
