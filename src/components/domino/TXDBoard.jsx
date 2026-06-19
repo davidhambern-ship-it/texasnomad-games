@@ -1,9 +1,54 @@
 import React, { useRef, useEffect } from 'react';
 import TXDDomino from './TXDDomino';
 
-// Tile dimensions on the board
-const W = 32;  // narrow dimension in px
-const GAP = 3; // gap between tiles
+const W = 32;
+const GAP = 3;
+
+function Tile({ piece }) {
+  const orientation = piece.placedOrientation
+    || ((['top', 'bottom'].includes(piece.side) || piece.top === piece.bottom) ? 'vertical' : 'horizontal');
+  return (
+    <div style={{
+      flexShrink: 0,
+      filter: piece.isSpinner
+        ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))'
+        : undefined,
+    }}>
+      <TXDDomino
+        top={piece.top}
+        bottom={piece.bottom}
+        width={W}
+        orientation={orientation}
+      />
+    </div>
+  );
+}
+
+function DropZone({ endId, value, horiz, isPlayable, dragging, selectedDomino, onDropOnEnd }) {
+  const active = isPlayable || dragging;
+  const zW = W * 2;
+  const zH = horiz ? W : W * 2;
+  return (
+    <div
+      onDragOver={(e) => { if (active) e.preventDefault(); }}
+      onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd(endId, id); }}
+      onClick={() => { if (isPlayable && selectedDomino && onDropOnEnd) onDropOnEnd(endId, selectedDomino.id); }}
+      style={{
+        width: zW, height: zH, flexShrink: 0, borderRadius: 8,
+        border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.12)',
+        background: isPlayable ? 'rgba(0,255,120,0.15)' : 'transparent',
+        boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.6)' : 'none',
+        cursor: isPlayable ? 'pointer' : 'default',
+        pointerEvents: active ? 'auto' : 'none',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}
+    >
+      <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)' }}>
+        {value ?? '?'}
+      </span>
+    </div>
+  );
+}
 
 export default function TXDBoard({
   board = [],
@@ -20,12 +65,10 @@ export default function TXDBoard({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    setTimeout(() => {
-      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
-    }, 30);
+    setTimeout(() => { el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2; }, 30);
   }, [board.length]);
 
-  // ── Empty board ────────────────────────────────────────────────────────────
+  // ── Empty board ─────────────────────────────────────────────────────────────
   if (board.length === 0) {
     const canPlay = !!onDropOnEnd;
     return (
@@ -51,7 +94,7 @@ export default function TXDBoard({
     );
   }
 
-  // ── Split board into arms using stored side — never reclassify ────────────
+  // ── Split board into arms — trust stored side, never reclassify ─────────────
   const firstPiece = board[0];
   const isFirstDouble = firstPiece?.top === firstPiece?.bottom;
   const hasSpinnerArms = isFirstDouble || spinnerActive;
@@ -61,82 +104,33 @@ export default function TXDBoard({
   const topArm    = board.filter(p => p.side === 'top');
   const bottomArm = board.filter(p => p.side === 'bottom');
 
-  // Open end values
-  const leftVal   = leftEnd   ?? firstPiece?.top;
-  const rightVal  = rightEnd  ?? firstPiece?.bottom;
-  const spinVal   = firstPiece?.top; // spinner always shows the double's value on top/bottom
+  const leftVal      = leftEnd  ?? firstPiece?.top;
+  const rightVal     = rightEnd ?? firstPiece?.bottom;
+  const spinVal      = firstPiece?.top;
+  const topEndVal    = topArm.length    > 0 ? (topArm[topArm.length - 1].exposedValue    ?? spinVal) : spinVal;
+  const bottomEndVal = bottomArm.length > 0 ? (bottomArm[bottomArm.length - 1].exposedValue ?? spinVal) : spinVal;
 
-  const topEndVal    = topArm.length    > 0 ? (topArm[topArm.length-1].exposedValue    ?? spinVal) : spinVal;
-  const bottomEndVal = bottomArm.length > 0 ? (bottomArm[bottomArm.length-1].exposedValue ?? spinVal) : spinVal;
+  const dzProps = (endId, value, horiz) => ({
+    endId, value, horiz,
+    isPlayable: playableEndIds.has(endId),
+    dragging: !!draggingDominoId,
+    selectedDomino,
+    onDropOnEnd,
+  });
 
-  // ── Subcomponents ──────────────────────────────────────────────────────────
-  const Tile = ({ piece, flip = false }) => {
-    const orientation = piece.placedOrientation || ((['top','bottom'].includes(piece.side) || piece.top === piece.bottom) ? 'vertical' : 'horizontal');
-    return (
-      <div style={{
-        flexShrink: 0,
-        filter: piece.isSpinner
-          ? 'drop-shadow(0 0 8px rgba(0,255,120,0.9)) drop-shadow(0 0 12px rgba(255,95,31,0.7))'
-          : undefined,
-      }}>
-        <TXDDomino
-          top={flip ? piece.bottom : piece.top}
-          bottom={flip ? piece.top  : piece.bottom}
-          width={W}
-          orientation={orientation}
-        />
-      </div>
-    );
-  };
-
-  const DropZone = ({ endId, value, horiz = false }) => {
-    const isPlayable = playableEndIds.has(endId);
-    const active = isPlayable || !!draggingDominoId;
-    // horiz=true → zone is placed in the horizontal row (left/right ends)
-    // horiz=false → zone is placed in vertical column (top/bottom ends)
-    const zW = horiz ? W * 2 : W * 2;
-    const zH = horiz ? W     : W * 2;
-    return (
-      <div
-        onDragOver={(e) => { if (active) e.preventDefault(); }}
-        onDrop={(e) => { e.preventDefault(); const id = e.dataTransfer.getData('dominoId'); if (id && onDropOnEnd) onDropOnEnd(endId, id); }}
-        onClick={() => { if (isPlayable && selectedDomino && onDropOnEnd) onDropOnEnd(endId, selectedDomino.id); }}
-        style={{
-          width: zW, height: zH, flexShrink: 0, borderRadius: 8,
-          border: isPlayable ? '2px dashed #00ff78' : '1px dashed rgba(255,255,255,0.12)',
-          background: isPlayable ? 'rgba(0,255,120,0.15)' : 'transparent',
-          boxShadow: isPlayable ? '0 0 14px rgba(0,255,120,0.6)' : 'none',
-          cursor: isPlayable ? 'pointer' : 'default',
-          pointerEvents: active ? 'auto' : 'none',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 'bold', fontFamily: 'monospace', color: isPlayable ? '#00ff78' : 'rgba(255,255,255,0.2)' }}>
-          {value ?? '?'}
-        </span>
-      </div>
-    );
-  };
-
-  // ── Render — cross layout centered in the table ────────────────────────────
   return (
-    <div style={{
-      width: '100%', height: '100%',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      overflow: 'hidden',
-    }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
 
-        {/* Top arm + drop zone (only if spinner active) */}
+        {/* Top arm */}
         {hasSpinnerArms && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
-            {onDropOnEnd && <DropZone endId="top" value={topEndVal} horiz={false} />}
-            {/* Top arm tiles — first played is closest to spinner, render reversed */}
-            {[...topArm].reverse().map((p, i) => <Tile key={p.id || i} piece={p} />)}
+            {onDropOnEnd && <DropZone {...dzProps('top', topEndVal, false)} />}
+            {[...topArm].reverse().map((p) => <Tile key={p.id} piece={p} />)}
           </div>
         )}
 
-        {/* Horizontal row: left drop zone → left arm → spinner → right arm → right drop zone */}
+        {/* Horizontal row: left zone → left arm → spinner → right arm → right zone */}
         <div
           ref={scrollRef}
           style={{
@@ -146,27 +140,18 @@ export default function TXDBoard({
             scrollbarWidth: 'none',
           }}
         >
-          {/* Left drop zone */}
-          {onDropOnEnd && <DropZone endId="left" value={leftVal} horiz />}
-
-          {/* Left arm — outermost tile first (leftArm[0] is oldest/outermost) */}
-          {[...leftArm].reverse().map((p, i) => <Tile key={p.id || i} piece={p} flip />)}
-
-          {/* Spinner / first tile */}
+          {onDropOnEnd && <DropZone {...dzProps('left', leftVal, true)} />}
+          {[...leftArm].reverse().map((p) => <Tile key={p.id} piece={p} />)}
           {firstPiece && <Tile piece={firstPiece} />}
-
-          {/* Right arm */}
-          {rightArm.map((p, i) => <Tile key={p.id || i} piece={p} />)}
-
-          {/* Right drop zone */}
-          {onDropOnEnd && <DropZone endId="right" value={rightVal} horiz />}
+          {rightArm.map((p) => <Tile key={p.id} piece={p} />)}
+          {onDropOnEnd && <DropZone {...dzProps('right', rightVal, true)} />}
         </div>
 
-        {/* Bottom arm + drop zone */}
+        {/* Bottom arm */}
         {hasSpinnerArms && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: GAP }}>
-            {bottomArm.map((p, i) => <Tile key={p.id || i} piece={p} />)}
-            {onDropOnEnd && <DropZone endId="bottom" value={bottomEndVal} horiz={false} />}
+            {bottomArm.map((p) => <Tile key={p.id} piece={p} />)}
+            {onDropOnEnd && <DropZone {...dzProps('bottom', bottomEndVal, false)} />}
           </div>
         )}
 
