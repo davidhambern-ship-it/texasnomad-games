@@ -251,42 +251,40 @@ export default function PlayerProfilePage() {
         .hs-track { animation: hs-scroll ${Math.max(highScores.length * 3, 8)}s linear infinite; }
         .hs-track:hover { animation-play-state: paused; }
       `}</style>
-      <div style={{ maxWidth: 1000, margin: '0 auto', padding: '20px 16px', display: 'grid', gridTemplateColumns: '1fr 220px', gap: 16, alignItems: 'start' }}>
+      <div style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-        {/* Left column — all content */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        {/* Row 1: High Scores (portrait) + Badge Case side by side */}
+        <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 16, alignItems: 'start' }}>
 
-          {/* Game Stats */}
-          <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)', gridColumn: '1 / -1' }}>
-            <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🎮 GAME HISTORY</div>
-            {topGames.length === 0 ? (
-              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No games played yet. Jump into the arcade!</p>
+          {/* Portrait High Scores ticker */}
+          <div style={{ padding: 14, borderRadius: 12, border: '1px solid rgba(255,215,0,0.3)', background: 'rgba(0,0,0,0.4)', boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
+            <div style={{ ...PS2, fontSize: 7, color: '#FFD700', marginBottom: 10, textAlign: 'center', letterSpacing: '0.1em' }}>🥇 HIGH SCORES</div>
+            {highScores.length === 0 ? (
+              <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Play games to set scores!</p>
             ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
-                {topGames.map(([gameId, stats]) => (
-                  <div key={gameId} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.accent}20`, background: `${theme.accent}06` }}>
-                    <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', marginBottom: 6 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
-                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>HIGH SCORE</div>
-                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score || 0}</div>
+              <div style={{ height: 320, overflow: 'hidden', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+                <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 28, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
+                <div className="hs-track">
+                  {[...highScores, ...highScores].map(([gameId, stats], i) => {
+                    const rank = i % highScores.length;
+                    return (
+                      <div key={`${gameId}-${i}`} style={{ padding: '10px 8px', marginBottom: 6, borderRadius: 8, background: rank === 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rank === 0 ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}`, textAlign: 'center' }}>
+                        <div style={{ fontSize: 18, marginBottom: 4 }}>
+                          {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
+                        </div>
+                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 15, color: 'white', lineHeight: 1.1, marginBottom: 4 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 28, color: '#FFD700', lineHeight: 1, textShadow: rank === 0 ? '0 0 10px rgba(255,215,0,0.5)' : 'none' }}>{stats.high_score.toLocaleString()}</div>
+                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{stats.wins || 0}W · {stats.times_played || 0}P</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>PLAYED</div>
-                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: theme.accent, lineHeight: 1 }}>{stats.times_played || 0}×</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
-                        <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
 
-          {/* Badges */}
+          {/* Badge Case */}
           <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)' }}>
             <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🏆 BADGE CASE</div>
             {badges.length === 0 ? (
@@ -297,8 +295,40 @@ export default function PlayerProfilePage() {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Playstyle */}
+        {/* Row 2: Game History */}
+        <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.accent}20`, background: 'rgba(0,0,0,0.3)' }}>
+          <div style={{ ...PS2, fontSize: 8, color: theme.accent, marginBottom: 12 }}>🎮 GAME HISTORY</div>
+          {topGames.length === 0 ? (
+            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>No games played yet. Jump into the arcade!</p>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+              {topGames.map(([gameId, stats]) => (
+                <div key={gameId} style={{ padding: '10px 12px', borderRadius: 10, border: `1px solid ${theme.accent}20`, background: `${theme.accent}06` }}>
+                  <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 18, color: 'white', marginBottom: 6 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>HIGH SCORE</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 24, color: '#FFD700', lineHeight: 1 }}>{stats.high_score || 0}</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>PLAYED</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: theme.accent, lineHeight: 1 }}>{stats.times_played || 0}×</div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginBottom: 2 }}>WINS</div>
+                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 20, color: '#4ade80', lineHeight: 1 }}>{stats.wins || 0}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Row 3: Playstyle + other */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           {(profile.playstyle_tags || []).length > 0 && (
             <div style={{ padding: 16, borderRadius: 12, border: `1px solid ${theme.secondary}20`, background: 'rgba(0,0,0,0.3)' }}>
               <div style={{ ...PS2, fontSize: 8, color: theme.secondary, marginBottom: 12 }}>⚡ PLAYSTYLE</div>
@@ -310,12 +340,6 @@ export default function PlayerProfilePage() {
             </div>
           )}
 
-          {/* Friends */}
-          <div style={{ gridColumn: '1 / -1' }}>
-            <FriendsList userId={user?.id} theme={theme} />
-          </div>
-
-          {/* Host Stats */}
           {profile.host_stats && (profile.host_stats.total_sessions > 0) && (
             <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(255,95,31,0.25)', background: 'rgba(0,0,0,0.3)' }}>
               <div style={{ ...PS2, fontSize: 8, color: '#FF5F1F', marginBottom: 12 }}>🎛 HOST ACTIVITY</div>
@@ -331,7 +355,6 @@ export default function PlayerProfilePage() {
             </div>
           )}
 
-          {/* Referral */}
           <div style={{ padding: 16, borderRadius: 12, border: '1px solid rgba(74,222,128,0.2)', background: 'rgba(0,0,0,0.3)' }}>
             <div style={{ ...PS2, fontSize: 8, color: '#4ade80', marginBottom: 12 }}>🔗 REFERRAL CODE</div>
             <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(74,222,128,0.2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -347,32 +370,9 @@ export default function PlayerProfilePage() {
           </div>
         </div>
 
-        {/* Right column — portrait High Scores ticker */}
-        <div style={{ position: 'sticky', top: 80, padding: 14, borderRadius: 12, border: '1px solid rgba(255,215,0,0.3)', background: 'rgba(0,0,0,0.4)', boxShadow: '0 0 20px rgba(255,215,0,0.08)' }}>
-          <div style={{ ...PS2, fontSize: 7, color: '#FFD700', marginBottom: 10, textAlign: 'center', letterSpacing: '0.1em' }}>🥇 HIGH SCORES</div>
-          {highScores.length === 0 ? (
-            <p style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: 'rgba(255,255,255,0.3)', textAlign: 'center' }}>Play games to set scores!</p>
-          ) : (
-            <div style={{ height: 480, overflow: 'hidden', position: 'relative' }}>
-              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 30, background: 'linear-gradient(to bottom, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 30, background: 'linear-gradient(to top, rgba(0,0,0,0.7), transparent)', zIndex: 2, pointerEvents: 'none' }} />
-              <div className="hs-track">
-                {[...highScores, ...highScores].map(([gameId, stats], i) => {
-                  const rank = i % highScores.length;
-                  return (
-                    <div key={`${gameId}-${i}`} style={{ padding: '10px 8px', marginBottom: 6, borderRadius: 8, background: rank === 0 ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rank === 0 ? 'rgba(255,215,0,0.3)' : 'rgba(255,255,255,0.06)'}`, textAlign: 'center' }}>
-                      <div style={{ fontSize: 18, marginBottom: 4 }}>
-                        {rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : `#${rank + 1}`}
-                      </div>
-                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 15, color: 'white', lineHeight: 1.1, marginBottom: 4 }}>{GAME_LABELS[gameId] || gameId.toUpperCase()}</div>
-                      <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 28, color: '#FFD700', lineHeight: 1, textShadow: rank === 0 ? '0 0 10px rgba(255,215,0,0.5)' : 'none' }}>{stats.high_score.toLocaleString()}</div>
-                      <div style={{ ...PS2, fontSize: 5, color: 'rgba(255,255,255,0.3)', marginTop: 4 }}>{stats.wins || 0}W · {stats.times_played || 0}P</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+        {/* Friends */}
+        <div>
+          <FriendsList userId={user?.id} theme={theme} />
         </div>
 
       </div>
