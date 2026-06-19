@@ -18,8 +18,10 @@ export default function TXDBoard({
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    // Scroll to center so chain is always visible
-    el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    // Center the scroll position so the chain is always in view
+    setTimeout(() => {
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    }, 0);
   }, [board.length]);
 
   // ── Empty board ────────────────────────────────────────────────────────────
@@ -183,6 +185,7 @@ export default function TXDBoard({
         ref={scrollRef}
         style={{
           display: 'flex', flexDirection: 'row', alignItems: 'center',
+          justifyContent: 'center',
           gap: 2, overflowX: 'auto', overflowY: 'visible',
           width: '100%', padding: '4px 8px', boxSizing: 'border-box',
           scrollbarWidth: 'none',
