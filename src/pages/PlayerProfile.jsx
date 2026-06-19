@@ -18,7 +18,7 @@ const GAME_LABELS = {
   bff: 'BFF', 'square-biz': 'SQUARE BIZ', hangman: 'HANGMAN', spades: 'SPADES',
   'word-search': 'WORD SEARCH', sudoku: 'SUDOKU', viral: 'VIRAL',
   'see-that': 'SEE THAT!', txd: 'TXD DOMINOES', 'name-that-track': 'NAME THAT TRACK',
-  'word-wrangler': 'WORD WRANGLER',
+  'word-wrangler': 'WORD WRANGLER', 'word-wrangler-game': 'WORD WRANGLER',
 };
 
 function StatCard({ label, value, color }) {

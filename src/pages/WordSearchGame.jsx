@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
+import useGameStats from '@/hooks/useGameStats';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
@@ -123,6 +124,8 @@ function WordSearchViewer({ roomCode, cpuId }) {
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'word-search', 'viewer');
   const gs = room?.game_state || {};
   const isSinglePlayer = !!(cpuId || gs.single_player);
+  const { recordStat, resetStat } = useGameStats('word-search');
+  const statRecordedRef = useRef(false);
 
   const { playerId, seatNumber, isSeated } = usePlayerSeat(room, roomCode, 'word-search', updateState, false, null, registerUser);
 
@@ -280,6 +283,18 @@ function WordSearchViewer({ roomCode, cpuId }) {
 
 
 
+  // Record stat when game ends
+  useEffect(() => {
+    if (gs.running || !gs.message || statRecordedRef.current) return;
+    const players = gs.players || [];
+    const myPlayer = players.find(p => p.seatNumber === seatNumber);
+    if (!myPlayer) return;
+    statRecordedRef.current = true;
+    const sorted = [...players].sort((a, b) => b.score - a.score);
+    const won = sorted[0]?.seatNumber === seatNumber;
+    recordStat({ score: Math.max(0, myPlayer.score || 0), won });
+  }, [gs.running, gs.message]);
+
   const handleEnd = async (msg) => {
     const players = gs.players || [];
     const winner = [...players].sort((a, b) => b.score - a.score)[0];
@@ -404,7 +419,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
     });
   };
 
-  const handleReset = () => handleStartGame({ mode: gs.mode || 'single', difficulty: gs.difficulty || 'simpleton', category: gs.category || 'random' });
+  const handleReset = () => { statRecordedRef.current = false; resetStat(); handleStartGame({ mode: gs.mode || 'single', difficulty: gs.difficulty || 'simpleton', category: gs.category || 'random' }); };
 
   const grid = gs.grid || [];
   const words = gs.words || [];
