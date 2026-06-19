@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link } from 'react-router-dom';
 import SaloonBackground from '@/components/seeThis/SaloonBackground';
-import ArcadeCabinetShell from '@/components/arcade/ArcadeCabinetShell';
+import ArcadeMachine from '@/components/ArcadeMachine';
 
 // ─── Object Definitions ───────────────────────────────────────────────────────
 // Objects are small and semi-transparent so they blend into the cluttered scene
@@ -240,66 +239,22 @@ export default function SeeThatGame() {
     setTimeout(() => setRipples(r => r.filter(rp => rp.id !== id)), 700);
   }, [phase, allObjects, targets]);
 
-  const timerPct = timeLeft / GAME_DURATION;
-  const timerColor = timeLeft <= 10 ? '#ef4444' : timeLeft <= 20 ? '#FF5F1F' : '#4ade80';
-
-  const cabinetHeader = (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 14px', height: 44, gap: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <Link to="/" style={{ textDecoration: 'none', flexShrink: 0 }}>
-          <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/30f43cf4a_logoimage-1.png" alt="TN" style={{ width: 26, height: 26, objectFit: 'contain' }} />
-        </Link>
-        <span style={{ ...PS2, fontSize: 9, color: '#f43f5e', textShadow: '0 0 10px #f43f5e' }}>SEE THAT!</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(244,63,94,0.4)', background: 'rgba(244,63,94,0.08)' }}>
-          <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#f43f5e', boxShadow: '0 0 6px #f43f5e', animation: 'pulse 1.5s ease-in-out infinite' }} />
-          <span style={{ ...PS2, fontSize: 6, color: '#f43f5e' }}>LIVE</span>
-        </div>
-        {phase === 'playing' && (
-          <div style={{ padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(74,222,128,0.4)', background: 'rgba(74,222,128,0.08)' }}>
-            <span style={{ ...PS2, fontSize: 6, color: '#4ade80' }}>PLAYING • {foundCount}/{TARGETS_COUNT} FOUND</span>
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <Link to="/games" style={{ ...PS2, fontSize: 6, padding: '3px 8px', border: '1px solid rgba(255,215,0,0.4)', color: 'rgba(255,215,0,0.8)', borderRadius: 4, textDecoration: 'none' }}>← LOBBY</Link>
-      </div>
-    </div>
-  );
-
-  const deckCenter = (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-      {phase === 'playing' && (
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ ...PS2, fontSize: 6, color: 'rgba(74,222,128,0.6)' }}>FOUND</div>
-            <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 22, color: '#4ade80', lineHeight: 1 }}>{foundCount}/{TARGETS_COUNT}</div>
-          </div>
-          <div style={{ textAlign: 'center', padding: '2px 10px', border: `1px solid ${timerColor}60`, borderRadius: 6 }}>
-            <div style={{ ...PS2, fontSize: 6, color: `${timerColor}80` }}>TIME</div>
-            <div style={{ ...PS2, fontSize: 14, color: timerColor, textShadow: `0 0 10px ${timerColor}` }}>{String(Math.floor(timeLeft / 60)).padStart(2,'0')}:{String(timeLeft % 60).padStart(2,'0')}</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.6)' }}>SCORE</div>
-            <div style={{ fontFamily: "'Teko', sans-serif", fontSize: 22, color: score < 0 ? '#ef4444' : '#FFD700', lineHeight: 1 }}>{score}</div>
-          </div>
-        </div>
-      )}
-      {phase === 'lobby' && <div style={{ ...PS2, fontSize: 7, color: 'rgba(255,255,255,0.3)' }}>HIDDEN OBJECT</div>}
-    </div>
-  );
-
-  const deckControls = [
-    ...(phase === 'lobby' ? [{ label: '▶ START', action: startGame }] : []),
+  const arcadeControls = [
+    ...(phase === 'lobby' ? [{ label: '▶ START', onClick: startGame }] : []),
     ...(phase === 'playing' ? [
-      { label: '🔄 NEW', action: startGame },
-      { label: 'HITBOX', action: () => setShowHitbox(h => !h), variant: showHitbox ? 'primary' : 'secondary' },
-      { label: '↩ QUIT', action: () => setPhase('lobby'), variant: 'secondary' },
+      { label: '🔄 NEW', onClick: startGame },
+      { label: 'HITBOX', onClick: () => setShowHitbox(h => !h), variant: showHitbox ? '' : 'secondary' },
+      { label: '↩ QUIT', onClick: () => setPhase('lobby'), variant: 'secondary' },
     ] : []),
     ...((phase === 'win' || phase === 'lose') ? [
-      { label: '▶ AGAIN', action: startGame },
-      { label: '↩ LOBBY', action: () => setPhase('lobby'), variant: 'secondary' },
+      { label: '▶ AGAIN', onClick: startGame },
+      { label: '↩ LOBBY', onClick: () => setPhase('lobby'), variant: 'secondary' },
     ] : []),
   ];
+
+  const statusText = phase === 'playing'
+    ? `${foundCount}/${TARGETS_COUNT} FOUND • ${String(Math.floor(timeLeft / 60)).padStart(2,'0')}:${String(timeLeft % 60).padStart(2,'0')} • ${score} PTS`
+    : phase === 'win' ? 'YOU WIN!' : phase === 'lose' ? "TIME'S UP" : 'READY';
 
   return (
     <>
@@ -312,12 +267,10 @@ export default function SeeThatGame() {
         @keyframes winPop { 0% { transform:scale(0.5); opacity:0; } 70% { transform:scale(1.05); opacity:1; } 100% { transform:scale(1); opacity:1; } }
       `}</style>
 
-      <ArcadeCabinetShell
-        gameId="see-that"
-        gameTitle="SEE THAT!"
-        controls={deckControls}
-        centerInfo={deckCenter}
-        header={cabinetHeader}
+      <ArcadeMachine
+        game="hiddenobject"
+        controls={arcadeControls}
+        status={statusText}
       >
         {/* Scene row */}
         <div style={{ display: 'flex', gap: 8, padding: 8 }}>
@@ -422,7 +375,7 @@ export default function SeeThatGame() {
             )}
           </div>
         </div>
-      </ArcadeCabinetShell>
+      </ArcadeMachine>
     </>
   );
 }
