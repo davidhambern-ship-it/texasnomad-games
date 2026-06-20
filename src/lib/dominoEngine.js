@@ -170,10 +170,12 @@ export function buildEntry(domino, side, board) {
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
   if (side === 'left') {
+    // a=outerPip (left/exposed), b=innerPip (right/connecting) — matches visual rendering
     return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: isDouble ? 'v' : 'h',
-      leftPip:  isDouble ? innerPip : outerPip,
+      id: domino.id,
+      a: outerPip, b: innerPip,
+      side, orientation: isDouble ? 'v' : 'h',
+      leftPip:  outerPip,
       rightPip: innerPip,
       topPip:   isDouble ? innerPip : null,
       botPip:   isDouble ? innerPip : null,
@@ -181,34 +183,38 @@ export function buildEntry(domino, side, board) {
     };
   }
   if (side === 'right') {
+    // a=innerPip (left/connecting), b=outerPip (right/exposed) — matches visual rendering
     return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: isDouble ? 'v' : 'h',
+      id: domino.id,
+      a: innerPip, b: outerPip,
+      side, orientation: isDouble ? 'v' : 'h',
       leftPip:  innerPip,
-      rightPip: isDouble ? innerPip : outerPip,
+      rightPip: outerPip,
       topPip:   isDouble ? innerPip : null,
       botPip:   isDouble ? innerPip : null,
       isSpinner,
     };
   }
-  // top / bottom — always vertical
+  // top: a=outerPip (top/exposed), b=innerPip (bottom/connecting)
   if (side === 'top') {
     return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: 'v',
+      id: domino.id,
+      a: outerPip, b: innerPip,
+      side, orientation: 'v',
       leftPip: null, rightPip: null,
-      topPip:  isDouble ? innerPip : outerPip,
+      topPip:  outerPip,
       botPip:  innerPip,
       isSpinner: false,
     };
   }
-  // bottom
+  // bottom: a=innerPip (top/connecting), b=outerPip (bottom/exposed)
   return {
-    id: domino.id, a: domino.a, b: domino.b, side,
-    orientation: 'v',
+    id: domino.id,
+    a: innerPip, b: outerPip,
+    side, orientation: 'v',
     leftPip: null, rightPip: null,
     topPip:  innerPip,
-    botPip:  isDouble ? innerPip : outerPip,
+    botPip:  outerPip,
     isSpinner: false,
   };
 }
