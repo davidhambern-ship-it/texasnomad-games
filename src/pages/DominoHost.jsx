@@ -182,10 +182,11 @@ export default function DominoHost() {
 
   const addAI = async (seat) => {
     if (!game || game.players[seat].playerId) return;
-    // Pick a TN character not already used
+    // Pick a TN character not already used in this game
     const usedIds = game.players.filter(p => p.aiCharacterId).map(p => p.aiCharacterId);
     const available = TEXASNOMAD_CHARACTERS.filter(c => !usedIds.includes(c.id));
-    const char = available[0] || TEXASNOMAD_CHARACTERS[0];
+    const pool = available.length > 0 ? available : TEXASNOMAD_CHARACTERS;
+    const char = pool[Math.floor(Math.random() * pool.length)];
     const players = game.players.map((p, i) => i === seat
       ? { ...p, playerId: `ai_${seat}_${char.id}`, playerName: char.name, isAI: true, connected: true, aiCharacterId: char.id }
       : p);
@@ -216,12 +217,18 @@ export default function DominoHost() {
 
   const startGame = async () => {
     if (!game) return;
-    // Fill empty seats with TN AI characters
+    // Fill empty seats with unique TN AI characters
     const usedIds = game.players.filter(p => p.aiCharacterId).map(p => p.aiCharacterId);
-    let available = TEXASNOMAD_CHARACTERS.filter(c => !usedIds.includes(c.id));
+    // Shuffle remaining characters so seat assignment is random each game
+    const available = TEXASNOMAD_CHARACTERS
+      .filter(c => !usedIds.includes(c.id))
+      .sort(() => Math.random() - 0.5);
+    let pickIdx = 0;
     const players = game.players.map(p => {
       if (p.playerId) return p;
-      const char = available.shift() || TEXASNOMAD_CHARACTERS[0];
+      // Cycle through available pool (if somehow more empty seats than chars)
+      const char = available[pickIdx % available.length] || TEXASNOMAD_CHARACTERS[pickIdx % TEXASNOMAD_CHARACTERS.length];
+      pickIdx++;
       return { ...p, playerId: `ai_${p.seat}_${char.id}`, playerName: char.name, isAI: true, connected: true, aiCharacterId: char.id };
     });
     const { hands, boneyard } = dealHands();
