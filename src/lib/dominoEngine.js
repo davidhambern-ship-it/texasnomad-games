@@ -175,12 +175,14 @@ export function buildEntry(domino, side, board) {
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
   if (side === 'left') {
-    // Outer pip faces LEFT. DominoTile horizontal: a=left, b=right.
-    // flip=true means swap: render b on left, a on right.
-    // We need outerPip on LEFT. outerPip = connectingIsA ? b : a.
-    // If outerPip = a (connectingIsA=false): no flip needed (a already on left).
-    // If outerPip = b (connectingIsA=true): flip needed so b shows on left.
-    const flip = connectingIsA;
+    // DominoTile horizontal uses rotate(90deg): a(top→RIGHT), b(bottom→LEFT) visually.
+    // So visually: LEFT=b, RIGHT=a.
+    // We need outerPip on the LEFT (exposed) side, innerPip on the RIGHT (connecting) side.
+    // outerPip on LEFT means outerPip must equal b visually.
+    // outerPip = connectingIsA ? domino.b : domino.a
+    // If outerPip = domino.b (connectingIsA=true): no flip needed (b already maps to LEFT).
+    // If outerPip = domino.a (connectingIsA=false): flip needed so a swaps to LEFT position.
+    const flip = !connectingIsA;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
       orientation: isDouble ? 'v' : 'h', flip,
@@ -192,9 +194,13 @@ export function buildEntry(domino, side, board) {
     };
   }
   if (side === 'right') {
-    // Outer pip faces RIGHT. DominoTile horizontal: a=left, b=right.
-    // flip=true means render b on left, a on right (b=outer on right).
-    const flip = !connectingIsA; // if b connects (faces left/inner), flip so a (outer) shows right
+    // DominoTile horizontal: visually LEFT=b, RIGHT=a.
+    // We need outerPip on the RIGHT (exposed) side.
+    // outerPip on RIGHT means outerPip must equal a visually.
+    // outerPip = connectingIsA ? domino.b : domino.a
+    // If outerPip = domino.a (connectingIsA=false): no flip needed (a already maps to RIGHT).
+    // If outerPip = domino.b (connectingIsA=true): flip needed so b swaps to RIGHT position.
+    const flip = connectingIsA;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
       orientation: isDouble ? 'v' : 'h', flip,
@@ -206,9 +212,12 @@ export function buildEntry(domino, side, board) {
     };
   }
   if (side === 'top') {
-    // Outer pip faces TOP. DominoTile vertical: a=top, b=bottom.
-    // flip=true means render b on top (outer), a on bottom (inner).
-    const flip = connectingIsA; // if a connects (faces bottom/inner), flip so b (outer) shows top
+    // DominoTile vertical: a=TOP, b=BOTTOM. No rotation.
+    // We need outerPip on TOP (exposed away from chain).
+    // outerPip = connectingIsA ? domino.b : domino.a
+    // If outerPip = domino.a (connectingIsA=false): no flip needed.
+    // If outerPip = domino.b (connectingIsA=true): flip needed.
+    const flip = connectingIsA;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
       orientation: 'v', flip,
@@ -218,9 +227,12 @@ export function buildEntry(domino, side, board) {
       isSpinner: false,
     };
   }
-  // bottom: outer pip faces BOTTOM. DominoTile vertical: a=top, b=bottom.
-  // flip=true means render b on top (inner), a on bottom (outer).
-  const flip = !connectingIsA; // if b connects (faces top/inner), flip so a (outer) shows bottom
+  // bottom: DominoTile vertical: a=TOP, b=BOTTOM.
+  // We need outerPip on BOTTOM (exposed away from chain).
+  // outerPip = connectingIsA ? domino.b : domino.a
+  // If outerPip = domino.b (connectingIsA=true): no flip needed (b already on bottom).
+  // If outerPip = domino.a (connectingIsA=false): flip needed.
+  const flip = !connectingIsA;
   return {
     id: domino.id, a: domino.a, b: domino.b, side,
     orientation: 'v', flip,
