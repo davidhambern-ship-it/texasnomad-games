@@ -403,7 +403,7 @@ const GAMES = [
     screenText: '🁣 DOMINOES',
     description: 'Classic Texas-style dominoes for 2–4 players. Match pips, drain your hand, and score big. First to 100 wins the table.',
     tags: ['2-4 Players', 'Dominoes', 'Strategy'],
-    path: '/games/txd',
+    path: '/games/dominoes',
     featured: false,
   },
 ];
@@ -439,7 +439,7 @@ export default function Games() {
     }
     // TXD Dominoes — goes to dedicated host panel
     if (gameId === 'txd') {
-      navigate('/games/txd/host');
+      navigate('/games/dominoes/host');
       return;
     }
     setCreating(gameId);
@@ -526,7 +526,7 @@ export default function Games() {
     }
     // TXD Dominoes — goes to host panel with CPU auto-added
     if (game.id === 'txd') {
-      navigate('/games/txd/host');
+      navigate('/games/dominoes/host');
       return;
     }
     // VIRAL! uses in-game AI selector - create room with default AI
