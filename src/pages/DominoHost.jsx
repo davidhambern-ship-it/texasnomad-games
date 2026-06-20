@@ -141,9 +141,10 @@ export default function DominoHost() {
         if (blocked) {
           const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
           const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;
-          const pts = teamPips[1 - winTeam];
+          const pts = Math.round(teamPips[1 - winTeam] / 5) * 5;
           const teamScores = { teamA: (g.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (g.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
-          updated = { ...g, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts } };
+          const winnerSeat = winTeam === 0 ? players.findIndex((p, i) => i % 2 === 0) : players.findIndex((p, i) => i % 2 === 1);
+          updated = { ...g, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, winnerSeat } };
         } else {
           updated = { ...g, currentSeat: nextSeat };
         }
@@ -164,7 +165,7 @@ export default function DominoHost() {
         const pts = calcRoundPoints(players, seat);
         const winTeam = getTeam(seat);
         const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
-        updated = { ...g, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: player.playerName } };
+        updated = { ...g, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: player.playerName, winnerSeat: seat } };
       } else {
         updated = { ...g, board: newBoard, players, currentSeat: nextSeat, teamScores: baseScores };
       }
@@ -263,10 +264,13 @@ export default function DominoHost() {
     if (!game) return;
     const { hands, boneyard } = dealHands();
     const players = game.players.map((p, i) => ({ ...p, hand: hands[i] }));
-    const starter = findStarter(players.map(p => p.hand));
+    // Winner of last round starts first; if no roundWinner yet (round 1), use findStarter
+    const starterSeat = game.roundWinner?.winnerSeat !== undefined
+      ? game.roundWinner.winnerSeat
+      : findStarter(players.map(p => p.hand)).playerIndex;
     const updated = {
       ...game, phase: 'playing', board: [], boneyard,
-      players, currentSeat: starter.playerIndex,
+      players, currentSeat: starterSeat,
       roundNumber: (game.roundNumber || 1) + 1, roundWinner: null,
     };
     await base44.entities.DominoGame.update(game.id, updated);
@@ -298,16 +302,18 @@ export default function DominoHost() {
     };
 
     if (newHand.length === 0) {
-      const pts = calcRoundPoints(players, 0);
-      const winTeam = getTeam(0);
-      const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
-      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: game.players[0].playerName } };
+    const pts = calcRoundPoints(players, 0);
+    const winTeam = getTeam(0);
+    const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
+    updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: game.players[0].playerName, winnerSeat: 0 } };
     } else if (isBlocked(players, newBoard)) {
       const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
       const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;
       const pts = Math.round(teamPips[1 - winTeam] / 5) * 5;
       const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
-      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts } };
+      // For blocked games, the team with lowest pips wins - pick first player from winning team as starter
+      const winnerSeat = winTeam === 0 ? players.findIndex((p, i) => i % 2 === 0) : players.findIndex((p, i) => i % 2 === 1);
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, winnerSeat } };
     } else {
       updated = { ...game, board: newBoard, players, currentSeat: nextSeat, teamScores: baseScores };
     }

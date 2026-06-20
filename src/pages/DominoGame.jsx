@@ -171,7 +171,7 @@ export default function DominoGame() {
       const pts = calcRoundPoints(players, mySeat);
       const winTeam = getTeam(mySeat);
       const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
-      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: myPlayer.playerName } };
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: myPlayer.playerName, winnerSeat: mySeat } };
     } else if (isBlocked(players, newBoard)) {
       const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
       const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;

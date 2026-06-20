@@ -40,7 +40,7 @@ export function getTeam(seatIndex) {
   return seatIndex % 2; // 0 = Team A, 1 = Team B
 }
 
-// Find who holds the highest double (goes first)
+// Find who holds the highest double (goes first in round 1)
 export function findStarter(hands) {
   const doubles = ['6-6','5-5','4-4','3-3','2-2','1-1','0-0'];
   for (const id of doubles) {
@@ -55,6 +55,11 @@ export function findStarter(hands) {
     if (total > best) { best = total; bestIdx = i; }
   });
   return { playerIndex: bestIdx, dominoId: null };
+}
+
+// Find the player who dominoed out (won the last round) — they start next round
+export function findRoundWinnerSeat(players, winnerSeat) {
+  return winnerSeat;
 }
 
 // ── Board state ────────────────────────────────────────────────────────────
