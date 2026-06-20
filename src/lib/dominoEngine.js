@@ -9,7 +9,7 @@ for (let i = 0; i <= 6; i++)
 
 export function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return 'DOM' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
 function shuffle(arr) {

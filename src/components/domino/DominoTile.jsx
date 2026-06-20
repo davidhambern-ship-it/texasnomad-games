@@ -1,6 +1,6 @@
 import React from 'react';
 
-// Pip dot positions in a 3x3 grid (col%, row%)
+// Pip dot positions in a 3x3 grid (col%, row%) — designed for vertical layout
 const PIP_POS = {
   0: [],
   1: [[50, 50]],
@@ -34,10 +34,10 @@ function Half({ value, size }) {
 }
 
 /**
- * DominoTile
- * unit     — px, the "narrow" dimension of one half (default 40)
+ * DominoTile — always rendered vertically, rotated 90° for horizontal placement.
+ * unit     — px, the narrow dimension of one half (default 40)
  * a, b     — pip values 0-6
- * vertical — boolean (default false = horizontal)
+ * vertical — boolean (default true)
  * faceDown — boolean
  * selected — glows gold, lifts
  * playable — glows green
@@ -45,15 +45,17 @@ function Half({ value, size }) {
  */
 export default function DominoTile({
   a = 0, b = 0, unit = 40,
-  vertical = false,
+  vertical = true,
   faceDown = false,
   selected = false,
   playable = false,
   onClick,
   style = {},
 }) {
-  const w = vertical ? unit       : unit * 2;
-  const h = vertical ? unit * 2   : unit;
+  // Always render as a vertical domino (unit wide, unit*2 tall)
+  // For horizontal placement, we rotate the whole thing 90deg
+  const tileW = unit;
+  const tileH = unit * 2;
 
   const glow = selected
     ? 'drop-shadow(0 0 8px #FFD700) drop-shadow(0 0 3px #FFD700)'
@@ -61,45 +63,56 @@ export default function DominoTile({
     ? 'drop-shadow(0 0 7px #10b981)'
     : 'none';
 
-  const wrapStyle = {
-    width: w, height: h, position: 'relative', flexShrink: 0,
+  // When horizontal: rotate 90deg; the rendered box becomes tileH wide × tileW tall
+  const outerW = vertical ? tileW  : tileH;
+  const outerH = vertical ? tileH  : tileW;
+
+  const liftTransform = selected ? (vertical ? 'translateY(-10px) scale(1.07)' : 'translateX(-10px) scale(1.07)') : 'none';
+
+  const outerStyle = {
+    width: outerW, height: outerH,
+    position: 'relative', flexShrink: 0,
     filter: glow,
-    transform: selected ? 'translateY(-10px) scale(1.07)' : 'none',
+    transform: liftTransform,
     transition: 'transform 0.12s, filter 0.12s',
     cursor: onClick ? 'pointer' : 'default',
     ...style,
   };
 
+  // Inner tile: always vertical layout, rotated if horizontal
+  const innerRotate = vertical ? 'none' : 'rotate(90deg)';
+  const innerStyle = {
+    position: 'absolute',
+    width: tileW, height: tileH,
+    top: vertical ? 0 : (outerH - tileH) / 2,
+    left: vertical ? 0 : (outerW - tileW) / 2,
+    transform: innerRotate,
+    transformOrigin: 'center center',
+  };
+
   if (faceDown) {
     return (
-      <div style={wrapStyle} onClick={onClick}>
-        <img src={BACK} alt="domino" style={{ width: '100%', height: '100%', objectFit: 'fill', display: 'block' }} />
+      <div style={outerStyle} onClick={onClick}>
+        <div style={innerStyle}>
+          <img src={BACK} alt="domino" style={{ width: tileW, height: tileH, objectFit: 'fill', display: 'block' }} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div style={wrapStyle} onClick={onClick}>
-      <img src={FRONT} alt="domino" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }} />
-      {vertical ? (
-        <>
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '50%' }}>
-            <Half value={a} size={unit} />
-          </div>
-          <div style={{ position: 'absolute', top: '50%', left: 0, width: '100%', height: '50%' }}>
-            <Half value={b} size={unit} />
-          </div>
-        </>
-      ) : (
-        <>
-          <div style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: '100%' }}>
-            <Half value={a} size={unit} />
-          </div>
-          <div style={{ position: 'absolute', top: 0, left: '50%', width: '50%', height: '100%' }}>
-            <Half value={b} size={unit} />
-          </div>
-        </>
-      )}
+    <div style={outerStyle} onClick={onClick}>
+      <div style={innerStyle}>
+        <img src={FRONT} alt="domino" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'fill' }} />
+        {/* Top half = a */}
+        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '50%' }}>
+          <Half value={a} size={unit} />
+        </div>
+        {/* Bottom half = b */}
+        <div style={{ position: 'absolute', top: '50%', left: 0, width: '100%', height: '50%' }}>
+          <Half value={b} size={unit} />
+        </div>
+      </div>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { base44 } from '@/api/base44Client';
 import Header from '@/components/home/Header';
 import DominoBoard from '@/components/domino/DominoBoard';
 import DominoTile from '@/components/domino/DominoTile';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import {
   getTeam, getLegalMoves, getPlayableEnds, buildEntry,
   getOpenEnds, calcRoundPoints, pipCount, isBlocked,
@@ -12,6 +13,62 @@ import {
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const TEAM_COLORS = ['#BC13FE', '#FF5F1F'];
 const TEAM_NAMES  = ['Team A', 'Team B'];
+
+// Seat 0 = bottom, 1 = left, 2 = top, 3 = right (relative to the current player)
+// We rotate this so MY seat is always at the bottom
+function getRelativePosition(mySeat, targetSeat) {
+  const offset = (targetSeat - mySeat + 4) % 4;
+  return ['bottom', 'left', 'top', 'right'][offset];
+}
+
+function OpponentSeat({ player, seat, isTurn, position }) {
+  const team = getTeam(seat);
+  const color = TEAM_COLORS[team];
+  const char = TEXASNOMAD_CHARACTERS.find(c => c.id === player?.aiCharacterId);
+
+  const posClass = {
+    top:   'absolute top-2 left-1/2 -translate-x-1/2',
+    left:  'absolute left-2 top-1/2 -translate-y-1/2',
+    right: 'absolute right-2 top-1/2 -translate-y-1/2',
+  }[position] || '';
+
+  const isHoriz = position === 'left' || position === 'right';
+
+  return (
+    <div className={posClass}>
+      <div className={`flex ${isHoriz ? 'flex-col' : 'flex-row'} items-center gap-1.5 px-2 py-1.5 rounded-xl border transition-all`}
+        style={{
+          borderColor: isTurn ? '#4ade80' : `${color}40`,
+          background: isTurn ? 'rgba(74,222,128,0.1)' : `${color}08`,
+          boxShadow: isTurn ? '0 0 12px rgba(74,222,128,0.3)' : 'none',
+        }}>
+        {char ? (
+          <img src={char.avatar} alt={char.name} style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${color}`, flexShrink: 0 }} />
+        ) : (
+          <div style={{ width: 32, height: 32, borderRadius: '50%', border: `2px solid ${color}40`, background: `${color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 14 }}>{player?.playerId ? '👤' : '○'}</span>
+          </div>
+        )}
+        <div>
+          <div className="text-[10px] font-body font-bold truncate max-w-[90px]" style={{ color: player?.playerId ? 'white' : 'rgba(255,255,255,0.25)' }}>
+            {player?.playerName || `Seat ${seat + 1}`}
+          </div>
+          <div style={{ ...PS2, fontSize: 5, color }}>{TEAM_NAMES[team]}</div>
+          <div className="text-[9px] font-mono" style={{ color: isTurn ? '#4ade80' : 'rgba(255,255,255,0.3)' }}>
+            {isTurn && <span className="animate-pulse">▶ </span>}{player?.hand?.length ?? 0} tiles
+          </div>
+          {/* Face-down tile strip */}
+          <div className="flex gap-0.5 mt-1 overflow-hidden max-w-[100px]">
+            {(player?.hand || []).slice(0, 5).map((_, ti) => (
+              <DominoTile key={ti} a={0} b={0} unit={10} vertical faceDown />
+            ))}
+            {(player?.hand?.length || 0) > 5 && <span className="text-white/30 text-[9px] self-end">+{player.hand.length - 5}</span>}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DominoGame() {
   const [searchParams] = useSearchParams();
@@ -37,13 +94,13 @@ export default function DominoGame() {
   const hasLegalMove = legalMoves.length > 0;
   const playableEnds = selectedDomino ? new Set(getPlayableEnds(selectedDomino, board)) : new Set();
   const gameOver    = (game?.teamScores?.teamA || 0) >= (game?.scoreLimit || 100) || (game?.teamScores?.teamB || 0) >= (game?.scoreLimit || 100);
+  const myTeam = mySeat !== null ? getTeam(mySeat) : 0;
 
   const flash = (msg, type = 'error') => {
     setFeedback({ msg, type });
     setTimeout(() => setFeedback(null), 2800);
   };
 
-  // Fetch + poll
   useEffect(() => {
     if (!roomCode) { setLoading(false); return; }
     fetchGame();
@@ -59,7 +116,7 @@ export default function DominoGame() {
     } catch (_) { setLoading(false); }
   };
 
-  // Rejoin if we have a saved seat
+  // Rejoin
   useEffect(() => {
     if (!game || mySeat !== null) return;
     const saved = localStorage.getItem(`dom_seat_${roomCode}`);
@@ -73,18 +130,19 @@ export default function DominoGame() {
 
   const joinGame = async () => {
     if (!nameInput.trim() || !game) return;
-    // Find first empty human seat
-    const emptySeat = game.players?.findIndex(p => !p.playerId);
-    if (emptySeat < 0) { flash('Room is full'); return; }
+    // Find first empty non-host seat (host takes seat 0, players take 1-3)
+    const emptySeat = game.players?.slice(1).findIndex(p => !p.playerId);
+    const actualSeat = emptySeat >= 0 ? emptySeat + 1 : -1;
+    if (actualSeat < 0) { flash('Room is full'); return; }
     const pid = `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const players = game.players.map((p, i) => i === emptySeat
+    const players = game.players.map((p, i) => i === actualSeat
       ? { ...p, playerId: pid, playerName: nameInput.trim(), isAI: false, connected: true }
       : p);
     const updated = { ...game, players };
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
-    setMySeat(emptySeat);
-    localStorage.setItem(`dom_seat_${roomCode}`, emptySeat);
+    setMySeat(actualSeat);
+    localStorage.setItem(`dom_seat_${roomCode}`, actualSeat);
     localStorage.setItem(`dom_pid_${roomCode}`, pid);
   };
 
@@ -100,28 +158,21 @@ export default function DominoGame() {
     const newHand  = myHand.filter(d => d.id !== domino.id);
     const nextSeat = (mySeat + 1) % 4;
     let players = game.players.map((p, i) => i === mySeat ? { ...p, hand: newHand } : p);
-    const log = [`${myPlayer.playerName} played [${domino.id}]`, ...(game.activityLog || [])].slice(0, 30);
     let updated;
 
     if (newHand.length === 0) {
       const pts = calcRoundPoints(players, mySeat);
       const winTeam = getTeam(mySeat);
-      const teamScores = {
-        teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0),
-        teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0),
-      };
-      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: myPlayer.playerName }, activityLog: log };
+      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: myPlayer.playerName } };
     } else if (isBlocked(players, newBoard)) {
       const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
       const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;
       const pts = teamPips[1 - winTeam];
-      const teamScores = {
-        teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0),
-        teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0),
-      };
-      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts }, activityLog: [`🔒 Blocked! ${TEAM_NAMES[winTeam]} wins round`, ...log] };
+      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts } };
     } else {
-      updated = { ...game, board: newBoard, players, currentSeat: nextSeat, activityLog: log };
+      updated = { ...game, board: newBoard, players, currentSeat: nextSeat };
     }
 
     await base44.entities.DominoGame.update(game.id, updated);
@@ -129,15 +180,13 @@ export default function DominoGame() {
     setSelectedDomino(null);
   };
 
-  // First play with no choice of side
   const playFirst = async (domino) => {
     if (!isMyTurn || board.length !== 0) return;
     const entry = buildEntry(domino, 'first', []);
     const newHand = myHand.filter(d => d.id !== domino.id);
     const nextSeat = (mySeat + 1) % 4;
     const players = game.players.map((p, i) => i === mySeat ? { ...p, hand: newHand } : p);
-    const log = [`${myPlayer.playerName} played first: [${domino.id}]`, ...(game.activityLog || [])].slice(0, 30);
-    const updated = { ...game, board: [entry], players, currentSeat: nextSeat, activityLog: log };
+    const updated = { ...game, board: [entry], players, currentSeat: nextSeat };
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
     setSelectedDomino(null);
@@ -149,8 +198,7 @@ export default function DominoGame() {
     if (boneyard.length === 0) { flash('Boneyard is empty — knock instead'); return; }
     const drawn = boneyard.pop();
     const players = game.players.map((p, i) => i === mySeat ? { ...p, hand: [...p.hand, drawn] } : p);
-    const log = [`${myPlayer.playerName} drew from boneyard`, ...(game.activityLog || [])].slice(0, 30);
-    const updated = { ...game, boneyard, players, activityLog: log };
+    const updated = { ...game, boneyard, players };
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
   };
@@ -159,8 +207,7 @@ export default function DominoGame() {
     if (!isMyTurn || !game) return;
     if (hasLegalMove) { flash("You have playable tiles!"); return; }
     const nextSeat = (mySeat + 1) % 4;
-    const log = [`${myPlayer.playerName} knocked`, ...(game.activityLog || [])].slice(0, 30);
-    const updated = { ...game, currentSeat: nextSeat, activityLog: log };
+    const updated = { ...game, currentSeat: nextSeat };
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
     flash('You knocked — turn passed', 'info');
@@ -168,13 +215,8 @@ export default function DominoGame() {
 
   const handleTileClick = (domino) => {
     if (!isMyTurn) return;
-    const fits = playableDominoIds.has(domino.id);
-    if (!fits) { flash("That tile doesn't fit any open end"); return; }
-    if (board.length === 0) {
-      // First play — no end choice needed, play immediately
-      playFirst(domino);
-      return;
-    }
+    if (!playableDominoIds.has(domino.id)) { flash("That tile doesn't fit any open end"); return; }
+    if (board.length === 0) { playFirst(domino); return; }
     setSelectedDomino(prev => prev?.id === domino.id ? null : domino);
   };
 
@@ -196,7 +238,7 @@ export default function DominoGame() {
 
   // ── Join screen ────────────────────────────────────────────────────────────
   if (mySeat === null) {
-    const openSeats = game.players?.filter(p => !p.playerId).length || 0;
+    const openSeats = game.players?.slice(1).filter(p => !p.playerId).length || 0;
     return (
       <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'radial-gradient(ellipse at 50% 0%,#0d0518,#050505)' }}>
         <div className="max-w-sm w-full text-center">
@@ -206,25 +248,26 @@ export default function DominoGame() {
             <span className="text-white/40 text-sm font-body">Room</span>
             <span className="px-3 py-1 rounded-lg bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple font-mono tracking-widest">{roomCode}</span>
           </div>
-
-          {/* Seat map */}
           <div className="grid grid-cols-2 gap-2 mb-6">
             {game.players?.map((p, i) => {
               const team = getTeam(i);
               const color = TEAM_COLORS[team];
+              const char = TEXASNOMAD_CHARACTERS.find(c => c.id === p?.aiCharacterId);
               return (
                 <div key={i} className="rounded-xl p-2 border text-center" style={{ borderColor: `${color}30`, background: `${color}08` }}>
-                  <div style={{ ...PS2, fontSize: 5, color: `${color}60` }}>Seat {i + 1} · {TEAM_NAMES[team]}</div>
-                  <div className="text-xs font-body mt-1" style={{ color: p.playerId ? 'white' : 'rgba(255,255,255,0.2)' }}>
-                    {p.isAI ? '🤖' : p.playerId ? '👤' : '○'} {p.playerName || 'Open'}
+                  <div style={{ ...PS2, fontSize: 5, color: `${color}60` }}>Seat {i + 1}{i === 0 ? ' · HOST' : ''} · {TEAM_NAMES[team]}</div>
+                  <div className="flex items-center justify-center gap-1 mt-1">
+                    {char && <img src={char.avatar} alt={char.name} style={{ width: 20, height: 20, borderRadius: '50%' }} />}
+                    <span className="text-xs font-body" style={{ color: p.playerId ? 'white' : 'rgba(255,255,255,0.2)' }}>
+                      {p.isAI ? '🤖' : p.playerId ? '👤' : '○'} {p.playerName || 'Open'}
+                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
-
           {openSeats === 0
-            ? <p className="text-red-400 font-body mb-4">Room is full</p>
+            ? <p className="text-red-400 font-body mb-4">No seats available</p>
             : (
               <div className="border-2 border-cyber-purple/40 rounded-2xl p-5 bg-black/60">
                 <input type="text" value={nameInput} onChange={e => setNameInput(e.target.value)}
@@ -244,10 +287,6 @@ export default function DominoGame() {
   }
 
   // ── Main game view ─────────────────────────────────────────────────────────
-  const myTeam = getTeam(mySeat);
-  const partnerSeat = (mySeat + 2) % 4;
-  const partner = game.players?.[partnerSeat];
-
   return (
     <div className="min-h-screen flex flex-col text-white" style={{ background: 'radial-gradient(ellipse at 50% 0%,#0d0518,#050505)' }}>
       <Header />
@@ -256,12 +295,11 @@ export default function DominoGame() {
       <div className="border-b border-cyber-purple/30 bg-black/60 px-4 py-2">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-3">
-            <span className="font-heading text-outlaw-gold tracking-widest text-lg">DOMINOES</span>
+            <span className="font-heading text-outlaw-gold tracking-widest">DOMINOES</span>
             <span className="px-2 py-0.5 rounded bg-cyber-purple/20 border border-cyber-purple/40 text-cyber-purple font-mono text-xs">{roomCode}</span>
             <span className="text-white/30 text-xs font-body">R{game.roundNumber || 1}</span>
           </div>
           <div className="flex items-center gap-3">
-            {/* Score pills */}
             {[0, 1].map(t => (
               <span key={t} className="text-xs font-mono font-bold" style={{ color: TEAM_COLORS[t] }}>
                 {TEAM_NAMES[t]}: {t === 0 ? (game.teamScores?.teamA || 0) : (game.teamScores?.teamB || 0)}
@@ -272,61 +310,28 @@ export default function DominoGame() {
       </div>
 
       {/* Turn banner */}
-      <div className={`border-b px-4 py-1.5 text-center transition-all ${isMyTurn ? 'border-emerald-600/40 bg-emerald-900/20' : 'border-white/5 bg-transparent'}`}>
-        <span className={`text-xs font-body ${isMyTurn ? 'text-emerald-400 animate-pulse font-bold' : 'text-white/40'}`}>
-          {game.phase === 'waiting'
-            ? '⏳ Waiting for host to start…'
-            : isMyTurn
-              ? hasLegalMove
-                ? '⚡ YOUR TURN — tap a tile to select it, then tap where to play'
-                : (game.boneyard?.length > 0 ? '⚡ No moves — DRAW a tile' : '⚡ No moves — KNOCK to pass')
-              : game.phase === 'playing'
-                ? `${currentPlayer?.playerName || '…'} is playing…`
-                : game.phase?.replace('_', ' ')}
+      <div className={`border-b px-4 py-1.5 text-center ${isMyTurn ? 'border-emerald-600/40 bg-emerald-900/20' : 'border-white/5'}`}>
+        <span className={`text-xs font-body ${isMyTurn ? 'text-emerald-400 font-bold animate-pulse' : 'text-white/40'}`}>
+          {game.phase === 'waiting' ? '⏳ Waiting for host to start…'
+            : isMyTurn ? (hasLegalMove ? '⚡ YOUR TURN — tap a tile, then tap the board end' : (game.boneyard?.length > 0 ? '⚡ No moves — DRAW a tile' : '⚡ No moves — KNOCK to pass'))
+            : game.phase === 'playing' ? `${currentPlayer?.playerName || '…'} is playing…`
+            : game.phase?.replace('_', ' ')}
         </span>
       </div>
 
       <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full px-2 py-3 gap-3">
 
-        {/* Opponents strip */}
-        <div className="flex gap-2 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-          {game.players?.filter((_, i) => i !== mySeat).map((p, _, arr) => {
-            const seat = game.players.indexOf(p);
-            const isTurn = game.currentSeat === seat && game.phase === 'playing';
-            const isPartner = seat === partnerSeat;
-            const color = TEAM_COLORS[getTeam(seat)];
-            return (
-              <div key={p.seat} className={`flex-1 min-w-0 rounded-xl px-3 py-2 border transition-all ${isTurn ? 'border-emerald-600/50 bg-emerald-900/20' : isPartner ? `border-[${color}]/30` : 'border-white/10 bg-black/30'}`}
-                style={{ borderColor: isTurn ? undefined : `${color}30` }}>
-                <div className="flex items-center gap-1.5 mb-1">
-                  {isTurn && <span className="text-emerald-400 text-xs">▶</span>}
-                  <span className="text-xs font-body font-bold" style={{ color }}>{p.isAI ? '🤖' : '👤'} {p.playerName || `Seat ${seat + 1}`}</span>
-                  {isPartner && <span style={{ ...PS2, fontSize: 5, color }} className="ml-1">PARTNER</span>}
-                </div>
-                <div className="flex gap-0.5 overflow-hidden">
-                  {(p.hand || []).slice(0, 12).map(d => (
-                    <DominoTile key={d.id} a={d.a} b={d.b} unit={14} faceDown />
-                  ))}
-                  {(p.hand?.length || 0) > 12 && <span className="text-white/30 text-xs self-end">+{p.hand.length - 12}</span>}
-                </div>
-                <div className="text-[9px] font-mono text-white/40 mt-1">{p.hand?.length ?? 0} tiles</div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Board */}
-        <div className="relative rounded-3xl overflow-hidden"
+        {/* Table */}
+        <div className="relative rounded-3xl overflow-hidden flex-1"
           style={{
-            flex: '1 1 auto', minHeight: 180,
+            minHeight: 300, aspectRatio: '4/3',
             background: 'radial-gradient(ellipse at center,rgba(255,140,30,0.5) 0%,rgba(200,80,10,0.4) 50%,rgba(120,40,0,0.55) 100%)',
             border: '4px solid rgba(255,160,50,0.5)',
             boxShadow: 'inset 0 0 60px rgba(255,120,20,0.12)',
           }}>
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ zIndex: 0 }}>
-            <img src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png" alt="" style={{ opacity: 0.1, width: 80 }} />
-          </div>
-          <div className="absolute inset-0" style={{ zIndex: 1 }}>
+
+          {/* Board in center */}
+          <div className="absolute inset-20 sm:inset-24" style={{ zIndex: 1 }}>
             <DominoBoard
               board={board}
               openEnds={openEnds}
@@ -335,37 +340,49 @@ export default function DominoGame() {
               interactive={isMyTurn && !!selectedDomino}
             />
           </div>
-          {board.length > 0 && (
-            <div className="absolute bottom-2 right-3 z-10 text-[8px] font-mono text-white/40">
-              ← {openEnds.left ?? '—'} &nbsp;|&nbsp; {openEnds.right ?? '—'} →
-              {openEnds.hasSpinner && ` | ↕ ${openEnds.top ?? '—'}`}
+
+          {/* Opponent seats (all seats except mine) */}
+          {game.players?.map((p, seat) => {
+            if (seat === mySeat) return null;
+            const pos = getRelativePosition(mySeat, seat);
+            return (
+              <OpponentSeat
+                key={seat}
+                player={p}
+                seat={seat}
+                isTurn={game.currentSeat === seat && game.phase === 'playing'}
+                position={pos}
+              />
+            );
+          })}
+
+          {/* My seat label at bottom */}
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10">
+            <div className="px-3 py-1 rounded-lg border text-xs font-body font-bold"
+              style={{ borderColor: `${TEAM_COLORS[myTeam]}50`, background: `${TEAM_COLORS[myTeam]}15`, color: TEAM_COLORS[myTeam] }}>
+              {myPlayer?.playerName} · {TEAM_NAMES[myTeam]}
+              {isMyTurn && <span className="text-emerald-400 animate-pulse ml-2">▶ YOUR TURN</span>}
             </div>
-          )}
+          </div>
         </div>
 
         {/* My hand */}
-        <div className="rounded-2xl p-3 sm:p-4"
-          style={{
-            background: 'rgba(12,6,30,0.94)',
-            border: `2px solid ${TEAM_COLORS[myTeam]}60`,
-            boxShadow: `0 0 20px ${TEAM_COLORS[myTeam]}18`,
-          }}>
+        <div className="rounded-2xl p-3"
+          style={{ background: 'rgba(12,6,30,0.94)', border: `2px solid ${TEAM_COLORS[myTeam]}60` }}>
           <div className="flex items-center justify-between mb-2">
-            <span style={{ ...PS2, fontSize: 7, color: TEAM_COLORS[myTeam] }}>
-              YOUR HAND · {TEAM_NAMES[myTeam]} · {myHand.length} tiles
-            </span>
+            <span style={{ ...PS2, fontSize: 6, color: TEAM_COLORS[myTeam] }}>YOUR HAND · {myHand.length} tiles</span>
             <span className="text-[9px] font-body text-white/30">Boneyard: {game.boneyard?.length || 0}</span>
           </div>
 
-          <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'thin', scrollbarColor: `${TEAM_COLORS[myTeam]}40 transparent` }}>
+          <div className="flex gap-2 overflow-x-auto pb-2 mb-2" style={{ scrollbarWidth: 'thin' }}>
             {myHand.map(d => {
               const isPlayable = isMyTurn && playableDominoIds.has(d.id);
               const isSelected = selectedDomino?.id === d.id;
               return (
-                <div key={d.id} className="flex-shrink-0 transition-all duration-150"
+                <div key={d.id} className="flex-shrink-0"
                   style={{ opacity: isMyTurn && !isPlayable ? 0.3 : 1, cursor: isMyTurn ? 'pointer' : 'default' }}
                   onClick={() => handleTileClick(d)}>
-                  <DominoTile a={d.a} b={d.b} unit={44} playable={isPlayable} selected={isSelected} />
+                  <DominoTile a={d.a} b={d.b} unit={40} vertical playable={isPlayable} selected={isSelected} />
                 </div>
               );
             })}
@@ -381,21 +398,18 @@ export default function DominoGame() {
               {selectedDomino && (
                 <span className="text-xs font-body">
                   {playableEnds.size > 0
-                    ? <span className="text-emerald-400">Tap a glowing zone on the board to place [{selectedDomino.id}]</span>
-                    : <span className="text-red-400">No open end matches [{selectedDomino.id}]</span>}
+                    ? <span className="text-emerald-400">Tap a glowing zone on the board ↑</span>
+                    : <span className="text-red-400">Tile [{selectedDomino.id}] has no matching end</span>}
                 </span>
               )}
               {!hasLegalMove && (game.boneyard?.length || 0) > 0 && (
-                <button onClick={doDraw}
-                  className="px-4 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white border-2 border-emerald-500 hover:bg-emerald-500/20"
-                  style={{ boxShadow: '0 0 10px rgba(16,185,129,0.3)' }}>
+                <button onClick={doDraw} className="px-4 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-white border-2 border-emerald-500 hover:bg-emerald-500/20">
                   📦 DRAW
                 </button>
               )}
               {!hasLegalMove && (game.boneyard?.length || 0) === 0 && (
-                <button onClick={doKnock}
-                  className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-black font-bold"
-                  style={{ background: 'linear-gradient(135deg,#FFD700,#f59e0b)', boxShadow: '0 0 12px rgba(255,215,0,0.4)' }}>
+                <button onClick={doKnock} className="px-5 py-2 rounded-xl font-heading text-sm tracking-widest uppercase text-black font-bold"
+                  style={{ background: 'linear-gradient(135deg,#FFD700,#f59e0b)' }}>
                   🤜 KNOCK
                 </button>
               )}
@@ -428,7 +442,7 @@ export default function DominoGame() {
             )}
             <div className="flex gap-6 justify-center mb-4">
               {[0, 1].map(t => (
-                <div key={t} className="text-center" style={{ border: myTeam === t ? `1px solid ${TEAM_COLORS[t]}50` : undefined, borderRadius: 10, padding: '8px 16px' }}>
+                <div key={t} className="text-center p-3 rounded-xl" style={{ border: myTeam === t ? `1px solid ${TEAM_COLORS[t]}50` : undefined }}>
                   <div style={{ ...PS2, fontSize: 7, color: TEAM_COLORS[t] }}>{TEAM_NAMES[t]}{myTeam === t ? ' (You)' : ''}</div>
                   <div className="font-mono text-2xl font-bold mt-1" style={{ color: TEAM_COLORS[t] }}>
                     {t === 0 ? (game.teamScores?.teamA || 0) : (game.teamScores?.teamB || 0)}
@@ -436,16 +450,16 @@ export default function DominoGame() {
                 </div>
               ))}
             </div>
-            {gameOver
-              ? (
-                <>
-                  <p className="text-2xl font-heading mb-4" style={{ color: TEAM_COLORS[game.teamScores?.teamA >= game.scoreLimit ? 0 : 1] }}>
-                    {TEAM_NAMES[game.teamScores?.teamA >= game.scoreLimit ? 0 : 1] === TEAM_NAMES[myTeam] ? '🏆 YOUR TEAM WINS!' : '😔 YOUR TEAM LOST'}
-                  </p>
-                  <button onClick={() => navigate('/games')} className="w-full py-3 rounded-xl border border-white/30 text-white font-heading hover:bg-white/10">← BACK TO GAMES</button>
-                </>
-              )
-              : <p className="text-white/40 font-body text-sm">Waiting for host to start next round…</p>}
+            {gameOver ? (
+              <>
+                <p className="text-2xl font-heading mb-4" style={{ color: TEAM_COLORS[game.teamScores?.teamA >= game.scoreLimit ? 0 : 1] }}>
+                  {TEAM_NAMES[game.teamScores?.teamA >= game.scoreLimit ? 0 : 1] === TEAM_NAMES[myTeam] ? '🏆 YOUR TEAM WINS!' : '😔 YOUR TEAM LOST'}
+                </p>
+                <button onClick={() => navigate('/games')} className="w-full py-3 rounded-xl border border-white/30 text-white font-heading hover:bg-white/10">← BACK TO GAMES</button>
+              </>
+            ) : (
+              <p className="text-white/40 font-body text-sm">Waiting for host to start next round…</p>
+            )}
           </div>
         </div>
       )}
