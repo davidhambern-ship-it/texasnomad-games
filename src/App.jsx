@@ -23,9 +23,8 @@ import NameThatTrackGame from '@/pages/NameThatTrackGame';
 import SudokuGame from '@/pages/SudokuGame';
 import SeeThatGame from '@/pages/SeeThatGame';
 import WordWranglerGame from '@/pages/WordWranglerGame';
-import TXDDominoDemo from '@/pages/TXDDominoDemo';
-import TXDGame from '@/pages/TXDGame.jsx';
-import TXDHostPanel from '@/pages/TXDHostPanel.jsx';
+import DominoHost from '@/pages/DominoHost';
+import DominoGame from '@/pages/DominoGame';
 import PlayerProfile from '@/pages/PlayerProfile';
 import Register from '@/pages/Register';
 import Login from '@/pages/Login';
@@ -85,9 +84,8 @@ const AuthenticatedApp = () => {
       <Route path="/games/sudoku" element={<SudokuGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
-      <Route path="/txd-dominoes" element={<TXDDominoDemo />} />
-      <Route path="/games/txd" element={<TXDGame />} />
-      <Route path="/games/txd/host" element={<TXDHostPanel />} />
+      <Route path="/games/dominoes/host" element={<DominoHost />} />
+      <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/profile" element={<PlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />

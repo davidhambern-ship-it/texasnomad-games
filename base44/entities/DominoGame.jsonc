@@ -1,0 +1,105 @@
+{
+  "name": "DominoGame",
+  "type": "object",
+  "properties": {
+    "room_code": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "finished"
+      ],
+      "default": "waiting"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "playing",
+        "round_over",
+        "game_over"
+      ],
+      "default": "waiting"
+    },
+    "players": {
+      "type": "array",
+      "description": "4 player slots ordered by seat (0-3). Seats 0&2 = Team A, Seats 1&3 = Team B.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "seat": {
+            "type": "number"
+          },
+          "playerId": {
+            "type": "string"
+          },
+          "playerName": {
+            "type": "string"
+          },
+          "hand": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "isAI": {
+            "type": "boolean",
+            "default": false
+          },
+          "connected": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    },
+    "board": {
+      "type": "array",
+      "description": "Played tiles in chain order",
+      "items": {
+        "type": "object"
+      }
+    },
+    "boneyard": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "currentSeat": {
+      "type": "number",
+      "default": 0
+    },
+    "roundNumber": {
+      "type": "number",
+      "default": 1
+    },
+    "teamScores": {
+      "type": "object",
+      "description": "{ teamA: number, teamB: number }"
+    },
+    "roundWinner": {
+      "type": "object",
+      "description": "{ team, points, playerName }"
+    },
+    "scoreLimit": {
+      "type": "number",
+      "default": 100
+    },
+    "activityLog": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "created_by_user_id": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "room_code"
+  ]
+}
