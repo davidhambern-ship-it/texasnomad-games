@@ -65,24 +65,47 @@ export function findStarter(hands) {
 
 export function getOpenEnds(board) {
   if (board.length === 0) return { left: null, right: null, top: null, bottom: null };
-  const leftTile  = board[0];
-  const rightTile = board[board.length - 1];
-  // Find spinner (first double after first play)
-  const spinnerIdx = board.findIndex((t, i) => i > 0 && t.a === t.b);
+
+  // Spinner = first double played anywhere in the chain (including as the opening tile)
+  const spinnerIdx = board.findIndex(t => t.isSpinner);
   const spinner    = spinnerIdx >= 0 ? board[spinnerIdx] : null;
 
-  // Top/bottom ends: last tile played on top/bottom arms
+  // Left end: last tile played to the left (or the first tile if none)
+  const leftTiles  = board.filter(t => t.side === 'left');
+  const rightTiles = board.filter(t => t.side === 'right');
+  const firstTile  = board[0];
+  const leftTile   = leftTiles.length  ? leftTiles[leftTiles.length - 1]   : firstTile;
+  const rightTile  = rightTiles.length ? rightTiles[rightTiles.length - 1] : firstTile;
+
+  // Top/bottom ends: last tile played on each arm
   const topTiles    = board.filter(t => t.side === 'top');
   const bottomTiles = board.filter(t => t.side === 'bottom');
   const topTile    = topTiles.length    ? topTiles[topTiles.length - 1]       : null;
   const bottomTile = bottomTiles.length ? bottomTiles[bottomTiles.length - 1] : null;
 
+  // Top/bottom arms open only after the spinner has tiles on both left AND right
+  // (standard spinner rule: must close left & right before playing top/bottom)
+  const spinnerPlayedOn = { left: false, right: false };
+  if (spinner) {
+    board.forEach(t => {
+      if (t.side === 'left')  spinnerPlayedOn.left  = true;
+      if (t.side === 'right') spinnerPlayedOn.right = true;
+    });
+    // If spinner IS the first tile, left/right are already "open"
+    if (spinner.side === 'first') {
+      spinnerPlayedOn.left  = board.some(t => t.side === 'left');
+      spinnerPlayedOn.right = board.some(t => t.side === 'right');
+    }
+  }
+  const armsOpen = spinner && spinnerPlayedOn.left && spinnerPlayedOn.right;
+
   return {
-    left:   leftTile.leftPip,
-    right:  rightTile.rightPip,
-    top:    spinner ? (topTile    ? topTile.topPip    : spinner.a) : null,
-    bottom: spinner ? (bottomTile ? bottomTile.botPip : spinner.a) : null,
+    left:       leftTile.leftPip,
+    right:      rightTile.rightPip,
+    top:        armsOpen ? (topTile    ? topTile.topPip    : spinner.a) : null,
+    bottom:     armsOpen ? (bottomTile ? bottomTile.botPip : spinner.a) : null,
     hasSpinner: !!spinner,
+    armsOpen,
   };
 }
 
@@ -124,12 +147,13 @@ export function buildEntry(domino, side, board) {
   const ends = getOpenEnds(board);
 
   if (side === 'first') {
+    // First tile: if it's a double it becomes the spinner immediately
     const orientation = isDouble ? 'v' : 'h';
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
       orientation,
       leftPip:  domino.a,
-      rightPip: domino.b,
+      rightPip: isDouble ? domino.a : domino.b,
       topPip:   isDouble ? domino.a : null,
       botPip:   isDouble ? domino.a : null,
       isSpinner: isDouble,
@@ -142,6 +166,7 @@ export function buildEntry(domino, side, board) {
   const innerPip = connectingIsA ? domino.a : domino.b;
   const outerPip = connectingIsA ? domino.b : domino.a;
 
+  // A double becomes the spinner if there isn't one yet (first tile already handled above)
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
   if (side === 'left') {
