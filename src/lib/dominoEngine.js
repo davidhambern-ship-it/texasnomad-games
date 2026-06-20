@@ -174,73 +174,41 @@ export function buildEntry(domino, side, board) {
 
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
-  if (side === 'left') {
+  if (side === 'left' || side === 'right') {
+    // Chain runs horizontally — doubles should be vertical (perpendicular to chain).
+    const orientation = isDouble ? 'v' : 'h';
     // DominoTile horizontal uses rotate(90deg): a(top→RIGHT), b(bottom→LEFT) visually.
     // So visually: LEFT=b, RIGHT=a.
-    // We need outerPip on the LEFT (exposed) side, innerPip on the RIGHT (connecting) side.
-    // outerPip on LEFT means outerPip must equal b visually.
-    // outerPip = connectingIsA ? domino.b : domino.a
-    // If outerPip = domino.b (connectingIsA=true): no flip needed (b already maps to LEFT).
-    // If outerPip = domino.a (connectingIsA=false): flip needed so a swaps to LEFT position.
-    const flip = !connectingIsA;
+    // We need outerPip on the exposed side, innerPip on the connecting side.
+    // For left side: outerPip on LEFT means outerPip must equal b visually.
+    // For right side: outerPip on RIGHT means outerPip must equal a visually.
+    const flip = side === 'left' ? !connectingIsA : connectingIsA;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: isDouble ? 'v' : 'h', flip,
-      leftPip:  outerPip,
-      rightPip: innerPip,
+      orientation, flip,
+      leftPip:  side === 'left' ? outerPip : innerPip,
+      rightPip: side === 'left' ? innerPip : outerPip,
       topPip:   isDouble ? outerPip : null,
       botPip:   isDouble ? outerPip : null,
       isSpinner,
     };
   }
-  if (side === 'right') {
-    // DominoTile horizontal: visually LEFT=b, RIGHT=a.
-    // We need outerPip on the RIGHT (exposed) side.
-    // outerPip on RIGHT means outerPip must equal a visually.
-    // outerPip = connectingIsA ? domino.b : domino.a
-    // If outerPip = domino.a (connectingIsA=false): no flip needed (a already maps to RIGHT).
-    // If outerPip = domino.b (connectingIsA=true): flip needed so b swaps to RIGHT position.
-    const flip = connectingIsA;
-    return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: isDouble ? 'v' : 'h', flip,
-      leftPip:  innerPip,
-      rightPip: outerPip,
-      topPip:   isDouble ? outerPip : null,
-      botPip:   isDouble ? outerPip : null,
-      isSpinner,
-    };
-  }
-  if (side === 'top') {
+  if (side === 'top' || side === 'bottom') {
+    // Chain runs vertically — doubles should be horizontal (perpendicular to chain).
+    const orientation = isDouble ? 'h' : 'v';
     // DominoTile vertical: a=TOP, b=BOTTOM. No rotation.
-    // We need outerPip on TOP (exposed away from chain).
-    // outerPip = connectingIsA ? domino.b : domino.a
-    // If outerPip = domino.a (connectingIsA=false): no flip needed.
-    // If outerPip = domino.b (connectingIsA=true): flip needed.
-    const flip = connectingIsA;
+    // For top side: outerPip on TOP means outerPip must equal a.
+    // For bottom side: outerPip on BOTTOM means outerPip must equal b.
+    const flip = side === 'top' ? connectingIsA : !connectingIsA;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
-      orientation: 'v', flip,
+      orientation, flip,
       leftPip: null, rightPip: null,
-      topPip:  outerPip,
-      botPip:  innerPip,
+      topPip:  side === 'top' ? outerPip : innerPip,
+      botPip:  side === 'top' ? innerPip : outerPip,
       isSpinner: false,
     };
   }
-  // bottom: DominoTile vertical: a=TOP, b=BOTTOM.
-  // We need outerPip on BOTTOM (exposed away from chain).
-  // outerPip = connectingIsA ? domino.b : domino.a
-  // If outerPip = domino.b (connectingIsA=true): no flip needed (b already on bottom).
-  // If outerPip = domino.a (connectingIsA=false): flip needed.
-  const flip = !connectingIsA;
-  return {
-    id: domino.id, a: domino.a, b: domino.b, side,
-    orientation: 'v', flip,
-    leftPip: null, rightPip: null,
-    topPip:  innerPip,
-    botPip:  outerPip,
-    isSpinner: false,
-  };
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
