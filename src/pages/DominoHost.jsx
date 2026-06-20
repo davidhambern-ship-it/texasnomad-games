@@ -89,6 +89,8 @@ export default function DominoHost() {
   const [selectedDomino, setSelectedDomino] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const pollRef = useRef(null);
+  const gameRef = useRef(null);
+  useEffect(() => { gameRef.current = game; }, [game]);
 
   const flash = (msg, type = 'error') => {
     setFeedback({ msg, type });
@@ -109,13 +111,13 @@ export default function DominoHost() {
     return () => { unsub(); clearInterval(pollRef.current); };
   }, [game?.id]);
 
-  // AI auto-play
+  // AI auto-play — always use latest game from ref to avoid stale closures
   useEffect(() => {
     if (!game || game.phase !== 'playing') return;
     const seat = game.currentSeat;
     const player = game.players?.[seat];
     if (!player?.isAI) return;
-    const t = setTimeout(() => doAITurn(game), 1400);
+    const t = setTimeout(() => doAITurn(gameRef.current), 1400);
     return () => clearTimeout(t);
   }, [game?.currentSeat, game?.phase, game?.board?.length]);
 

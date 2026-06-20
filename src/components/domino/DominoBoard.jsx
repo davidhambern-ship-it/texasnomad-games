@@ -145,7 +145,12 @@ export default function DominoBoard({ board = [], openEnds = {}, playableEnds = 
             position: 'absolute', left: ox + t._px, top: oy + t._py, zIndex: 1,
             filter: t.isSpinner ? 'drop-shadow(0 0 8px rgba(0,255,120,0.7)) drop-shadow(0 0 12px rgba(255,160,20,0.5))' : undefined,
           }}>
-            <DominoTile a={t.a} b={t.b} unit={U} vertical={t.orientation === 'v'} />
+            <DominoTile
+              a={t.flip ? t.b : t.a}
+              b={t.flip ? t.a : t.b}
+              unit={U}
+              vertical={t.orientation === 'v'}
+            />
           </div>
         ))}
 
