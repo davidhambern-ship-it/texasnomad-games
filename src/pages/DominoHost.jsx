@@ -85,6 +85,7 @@ export default function DominoHost() {
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(false);
   const [scoreLimit, setScoreLimit] = useState(100);
+  const [hostName, setHostName] = useState('');
   const pollRef = useRef(null);
 
   useEffect(() => {
@@ -159,12 +160,15 @@ export default function DominoHost() {
   };
 
   const createRoom = async () => {
+    if (!hostName.trim()) return;
     setLoading(true);
     const code = generateRoomCode();
-    // Host is always seat 0
-    const slots = Array.from({ length: 4 }, (_, i) => ({
-      seat: i, playerId: null, playerName: null, hand: [], isAI: false, connected: false,
-    }));
+    const hostPid = `host_${Date.now()}`;
+    // Host sits in seat 0
+    const slots = Array.from({ length: 4 }, (_, i) => i === 0
+      ? { seat: 0, playerId: hostPid, playerName: hostName.trim(), hand: [], isAI: false, connected: true, isHost: true }
+      : { seat: i, playerId: null, playerName: null, hand: [], isAI: false, connected: false }
+    );
     const created = await base44.entities.DominoGame.create({
       room_code: code, status: 'waiting', phase: 'waiting',
       players: slots, board: [], boneyard: [],
@@ -261,7 +265,18 @@ export default function DominoHost() {
         <div className="max-w-md mx-auto px-4 py-16 text-center">
           <div className="inline-block px-3 py-1 rounded mb-4 border border-cyber-purple/40 bg-cyber-purple/10 text-cyber-purple text-[7px] tracking-widest" style={PS2}>🎛 HOST PANEL</div>
           <h1 className="text-5xl font-heading text-outlaw-gold tracking-widest mb-2">DOMINOES</h1>
-          <p className="text-white/40 font-body text-sm mb-10">Draw Dominoes · 2v2 Partners</p>
+          <p className="text-white/40 font-body text-sm mb-8">Draw Dominoes · 2v2 Partners</p>
+
+          <div className="p-4 rounded-xl border border-outlaw-gold/30 bg-black/40 mb-4">
+            <p className="text-[7px] text-white/40 uppercase tracking-widest mb-3" style={PS2}>Your Name (Host · Seat 1)</p>
+            <input
+              type="text" value={hostName} onChange={e => setHostName(e.target.value)}
+              placeholder="ENTER YOUR NAME" maxLength={20}
+              className="w-full px-4 py-3 rounded-lg bg-black/60 border-2 border-outlaw-gold/50 text-white font-body text-lg text-center tracking-wider focus:outline-none focus:border-outlaw-gold"
+              onKeyDown={e => e.key === 'Enter' && createRoom()}
+            />
+          </div>
+
           <div className="p-4 rounded-xl border border-cyber-purple/30 bg-black/40 mb-6">
             <p className="text-[7px] text-white/40 uppercase tracking-widest mb-3" style={PS2}>Score Limit</p>
             <div className="flex gap-2 justify-center">
@@ -273,10 +288,10 @@ export default function DominoHost() {
               ))}
             </div>
           </div>
-          <button onClick={createRoom} disabled={loading}
+          <button onClick={createRoom} disabled={loading || !hostName.trim()}
             className="w-full py-4 rounded-xl font-heading text-xl tracking-widest uppercase text-white disabled:opacity-40"
             style={{ background: 'linear-gradient(135deg,#BC13FE,#7c3aed)', boxShadow: '0 0 24px rgba(188,19,254,0.4)' }}>
-            {loading ? '⚙ Creating…' : '⚡ CREATE ROOM'}
+            {loading ? '⚙ Creating…' : '⚡ CREATE ROOM & SIT DOWN'}
           </button>
         </div>
       </div>
