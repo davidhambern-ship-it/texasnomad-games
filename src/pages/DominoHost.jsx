@@ -7,7 +7,7 @@ import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import {
   generateRoomCode, dealHands, findStarter, getTeam,
   getLegalMoves, buildEntry, getOpenEnds, getPlayableEnds,
-  calcRoundPoints, pipCount, isBlocked,
+  calcRoundPoints, calcEndScore, pipCount, isBlocked,
 } from '@/lib/dominoEngine';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -152,13 +152,19 @@ export default function DominoHost() {
       const newBoard = [...board, entry];
       const newHand = player.hand.filter(d => d.id !== best.domino.id);
       const players = g.players.map((p, i) => i === seat ? { ...p, hand: newHand } : p);
+      const endPts = calcEndScore(newBoard);
+      const playTeam = getTeam(seat);
+      const baseScores = {
+        teamA: (g.teamScores?.teamA || 0) + (playTeam === 0 ? endPts : 0),
+        teamB: (g.teamScores?.teamB || 0) + (playTeam === 1 ? endPts : 0),
+      };
       if (newHand.length === 0) {
         const pts = calcRoundPoints(players, seat);
         const winTeam = getTeam(seat);
-        const teamScores = { teamA: (g.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (g.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+        const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
         updated = { ...g, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: player.playerName } };
       } else {
-        updated = { ...g, board: newBoard, players, currentSeat: nextSeat };
+        updated = { ...g, board: newBoard, players, currentSeat: nextSeat, teamScores: baseScores };
       }
     }
 
@@ -282,19 +288,26 @@ export default function DominoHost() {
     let players = game.players.map((p, i) => i === 0 ? { ...p, hand: newHand } : p);
     let updated;
 
+    const endPts = calcEndScore(newBoard);
+    const playTeam = getTeam(0);
+    const baseScores = {
+      teamA: (game.teamScores?.teamA || 0) + (playTeam === 0 ? endPts : 0),
+      teamB: (game.teamScores?.teamB || 0) + (playTeam === 1 ? endPts : 0),
+    };
+
     if (newHand.length === 0) {
       const pts = calcRoundPoints(players, 0);
       const winTeam = getTeam(0);
-      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
       updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: game.players[0].playerName } };
     } else if (isBlocked(players, newBoard)) {
       const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
       const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;
-      const pts = teamPips[1 - winTeam];
-      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      const pts = Math.round(teamPips[1 - winTeam] / 5) * 5;
+      const teamScores = { teamA: baseScores.teamA + (winTeam === 0 ? pts : 0), teamB: baseScores.teamB + (winTeam === 1 ? pts : 0) };
       updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts } };
     } else {
-      updated = { ...game, board: newBoard, players, currentSeat: nextSeat };
+      updated = { ...game, board: newBoard, players, currentSeat: nextSeat, teamScores: baseScores };
     }
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
@@ -305,9 +318,16 @@ export default function DominoHost() {
     if (!game || game.currentSeat !== 0 || game.phase !== 'playing' || (game.board || []).length !== 0) return;
     const board = game.board || [];
     const entry = buildEntry(domino, 'first', board);
+    const newBoard = [entry];
     const newHand = game.players[0].hand.filter(d => d.id !== domino.id);
     const players = game.players.map((p, i) => i === 0 ? { ...p, hand: newHand } : p);
-    const updated = { ...game, board: [entry], players, currentSeat: 1 };
+    const endPts = calcEndScore(newBoard);
+    const playTeam = getTeam(0);
+    const teamScores = {
+      teamA: (game.teamScores?.teamA || 0) + (playTeam === 0 ? endPts : 0),
+      teamB: (game.teamScores?.teamB || 0) + (playTeam === 1 ? endPts : 0),
+    };
+    const updated = { ...game, board: newBoard, players, currentSeat: 1, teamScores };
     await base44.entities.DominoGame.update(game.id, updated);
     setGame(updated);
     setSelectedDomino(null);

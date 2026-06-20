@@ -225,12 +225,25 @@ export function pipCount(hand) {
   return hand.reduce((s, d) => s + d.a + d.b, 0);
 }
 
-// Returns points earned by the winning team this round
+// Points scored after placing a tile: sum of all open ends, rounded to nearest 5.
+// Returns 0 if not a multiple of 5.
+export function calcEndScore(board) {
+  const ends = getOpenEnds(board);
+  let total = 0;
+  if (ends.left   !== null) total += ends.left;
+  if (ends.right  !== null) total += ends.right;
+  if (ends.top    !== null) total += ends.top;
+  if (ends.bottom !== null) total += ends.bottom;
+  return total % 5 === 0 ? total : 0;
+}
+
+// Returns points earned by the winning team at round end (loser pips, rounded to nearest 5)
 export function calcRoundPoints(players, winnerSeat) {
   const losingTeam = 1 - getTeam(winnerSeat);
-  return players
+  const raw = players
     .filter((_, i) => getTeam(i) === losingTeam)
     .reduce((s, p) => s + pipCount(p.hand || []), 0);
+  return Math.round(raw / 5) * 5;
 }
 
 // Check if game is blocked (no one can play, boneyard empty)
