@@ -6,7 +6,7 @@ import DominoTile from '@/components/domino/DominoTile';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import {
   generateRoomCode, dealHands, findStarter, getTeam,
-  getLegalMoves, buildEntry, getOpenEnds,
+  getLegalMoves, buildEntry, getOpenEnds, getPlayableEnds,
   calcRoundPoints, pipCount, isBlocked,
 } from '@/lib/dominoEngine';
 
@@ -86,7 +86,14 @@ export default function DominoHost() {
   const [loading, setLoading] = useState(false);
   const [scoreLimit, setScoreLimit] = useState(100);
   const [hostName, setHostName] = useState('');
+  const [selectedDomino, setSelectedDomino] = useState(null);
+  const [feedback, setFeedback] = useState(null);
   const pollRef = useRef(null);
+
+  const flash = (msg, type = 'error') => {
+    setFeedback({ msg, type });
+    setTimeout(() => setFeedback(null), 2800);
+  };
 
   useEffect(() => {
     if (!game?.id) return;
@@ -258,6 +265,87 @@ export default function DominoHost() {
     setGame(updated);
   };
 
+  // ── Host play actions (seat 0) ────────────────────────────────────────────
+  const hostPlayOnEnd = async (side) => {
+    if (!game || game.currentSeat !== 0 || game.phase !== 'playing' || !selectedDomino) return;
+    const hostHand = game.players[0].hand;
+    const domino = hostHand.find(d => d.id === selectedDomino.id);
+    if (!domino) return;
+    const board = game.board || [];
+    const ends = getPlayableEnds(domino, board);
+    if (!ends.includes(side)) { flash("That tile doesn't fit there"); return; }
+
+    const entry = buildEntry(domino, side, board);
+    const newBoard = [...board, entry];
+    const newHand = hostHand.filter(d => d.id !== domino.id);
+    const nextSeat = 1;
+    let players = game.players.map((p, i) => i === 0 ? { ...p, hand: newHand } : p);
+    let updated;
+
+    if (newHand.length === 0) {
+      const pts = calcRoundPoints(players, 0);
+      const winTeam = getTeam(0);
+      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts, playerName: game.players[0].playerName } };
+    } else if (isBlocked(players, newBoard)) {
+      const teamPips = [0, 1].map(team => players.filter((_, i) => getTeam(i) === team).reduce((s, p) => s + pipCount(p.hand), 0));
+      const winTeam = teamPips[0] <= teamPips[1] ? 0 : 1;
+      const pts = teamPips[1 - winTeam];
+      const teamScores = { teamA: (game.teamScores?.teamA || 0) + (winTeam === 0 ? pts : 0), teamB: (game.teamScores?.teamB || 0) + (winTeam === 1 ? pts : 0) };
+      updated = { ...game, board: newBoard, players, phase: 'round_over', teamScores, roundWinner: { team: winTeam, points: pts } };
+    } else {
+      updated = { ...game, board: newBoard, players, currentSeat: nextSeat };
+    }
+    await base44.entities.DominoGame.update(game.id, updated);
+    setGame(updated);
+    setSelectedDomino(null);
+  };
+
+  const hostPlayFirst = async (domino) => {
+    if (!game || game.currentSeat !== 0 || game.phase !== 'playing' || (game.board || []).length !== 0) return;
+    const board = game.board || [];
+    const entry = buildEntry(domino, 'first', board);
+    const newHand = game.players[0].hand.filter(d => d.id !== domino.id);
+    const players = game.players.map((p, i) => i === 0 ? { ...p, hand: newHand } : p);
+    const updated = { ...game, board: [entry], players, currentSeat: 1 };
+    await base44.entities.DominoGame.update(game.id, updated);
+    setGame(updated);
+    setSelectedDomino(null);
+  };
+
+  const hostDraw = async () => {
+    if (!game || game.currentSeat !== 0 || game.phase !== 'playing') return;
+    const boneyard = [...(game.boneyard || [])];
+    if (boneyard.length === 0) { flash('Boneyard is empty'); return; }
+    const drawn = boneyard.pop();
+    const players = game.players.map((p, i) => i === 0 ? { ...p, hand: [...p.hand, drawn] } : p);
+    const updated = { ...game, boneyard, players };
+    await base44.entities.DominoGame.update(game.id, updated);
+    setGame(updated);
+  };
+
+  const hostKnock = async () => {
+    if (!game || game.currentSeat !== 0 || game.phase !== 'playing') return;
+    const hostHand = game.players[0].hand;
+    const board = game.board || [];
+    if (getLegalMoves(hostHand, board).length > 0) { flash("You have playable tiles!"); return; }
+    const updated = { ...game, currentSeat: 1 };
+    await base44.entities.DominoGame.update(game.id, updated);
+    setGame(updated);
+    flash('You knocked — turn passed', 'info');
+  };
+
+  const handleHostTileClick = (domino) => {
+    if (!game || game.currentSeat !== 0 || game.phase !== 'playing') return;
+    const board = game.board || [];
+    const hostHand = game.players[0].hand;
+    const legalMoves = getLegalMoves(hostHand, board);
+    const playableIds = new Set(legalMoves.map(m => m.domino.id));
+    if (!playableIds.has(domino.id)) { flash("That tile doesn't fit any open end"); return; }
+    if (board.length === 0) { hostPlayFirst(domino); return; }
+    setSelectedDomino(prev => prev?.id === domino.id ? null : domino);
+  };
+
   const endGame = async () => {
     const updated = { ...game, phase: 'game_over', status: 'finished' };
     await base44.entities.DominoGame.update(game.id, updated);
@@ -309,6 +397,12 @@ export default function DominoHost() {
   const openEnds = getOpenEnds(game.board || []);
   const currentPlayer = game.players?.[game.currentSeat];
   const gameOver = (game.teamScores?.teamA || 0) >= (game.scoreLimit || 100) || (game.teamScores?.teamB || 0) >= (game.scoreLimit || 100);
+  const isHostTurn = game.phase === 'playing' && game.currentSeat === 0;
+  const hostHand = game.players?.[0]?.hand || [];
+  const hostLegalMoves = isHostTurn ? getLegalMoves(hostHand, game.board || []) : [];
+  const hostPlayableIds = new Set(hostLegalMoves.map(m => m.domino.id));
+  const hostHasLegalMove = hostLegalMoves.length > 0;
+  const hostPlayableEnds = selectedDomino ? new Set(getPlayableEnds(selectedDomino, game.board || [])) : new Set();
 
   return (
     <div className="min-h-screen text-white flex flex-col" style={{ background: 'radial-gradient(ellipse at 50% 0%,#0a0318,#050505)' }}>
@@ -415,7 +509,13 @@ export default function DominoHost() {
 
             {/* Board in center */}
             <div className="absolute inset-16" style={{ zIndex: 1 }}>
-              <DominoBoard board={game.board || []} openEnds={openEnds} interactive={false} />
+              <DominoBoard
+                board={game.board || []}
+                openEnds={openEnds}
+                playableEnds={hostPlayableEnds}
+                onEndClick={isHostTurn && selectedDomino ? hostPlayOnEnd : undefined}
+                interactive={isHostTurn && !!selectedDomino}
+              />
             </div>
 
             {/* Seat overlays */}
@@ -431,23 +531,61 @@ export default function DominoHost() {
             ))}
           </div>
 
-          {/* Host hand (seat 0) — full view for host */}
+          {/* Host hand (seat 0) — interactive when it's host's turn */}
           <div className="rounded-2xl p-3"
-            style={{ background: 'rgba(12,6,30,0.94)', border: `2px solid ${TEAM_COLORS[0]}60` }}>
+            style={{ background: 'rgba(12,6,30,0.94)', border: `2px solid ${isHostTurn ? '#4ade80' : TEAM_COLORS[0]}60`, boxShadow: isHostTurn ? '0 0 14px rgba(74,222,128,0.2)' : 'none' }}>
             <div className="flex items-center justify-between mb-2">
-              <span style={{ ...PS2, fontSize: 6, color: TEAM_COLORS[0] }}>HOST HAND (Seat 1) · {game.players?.[0]?.hand?.length || 0} tiles</span>
+              <span style={{ ...PS2, fontSize: 6, color: isHostTurn ? '#4ade80' : TEAM_COLORS[0] }}>
+                YOUR HAND (Seat 1) · {hostHand.length} tiles
+                {isHostTurn && <span className="animate-pulse ml-2">▶ YOUR TURN</span>}
+              </span>
+              <span className="text-[9px] font-body text-white/30">Boneyard: {game.boneyard?.length || 0}</span>
             </div>
-            <div className="flex flex-wrap gap-1">
-              {(game.players?.[0]?.hand || []).map(d => (
-                <DominoTile key={d.id} a={d.a} b={d.b} unit={28} vertical />
-              ))}
-              {(!game.players?.[0]?.hand?.length) && (
-                <span className="text-white/20 text-xs font-body">Tiles dealt when game starts</span>
+            <div className="flex flex-wrap gap-1 mb-2">
+              {hostHand.map(d => {
+                const isPlayable = isHostTurn && hostPlayableIds.has(d.id);
+                const isSelected = selectedDomino?.id === d.id;
+                return (
+                  <div key={d.id} style={{ opacity: isHostTurn && !isPlayable ? 0.35 : 1, cursor: isHostTurn ? 'pointer' : 'default' }}
+                    onClick={() => handleHostTileClick(d)}>
+                    <DominoTile a={d.a} b={d.b} unit={32} vertical playable={isPlayable} selected={isSelected} />
+                  </div>
+                );
+              })}
+              {!hostHand.length && (
+                <span className="text-white/20 text-xs font-body">{game.phase === 'waiting' ? 'Tiles dealt when game starts' : 'No tiles'}</span>
               )}
             </div>
+            {isHostTurn && (
+              <div className="flex flex-wrap gap-2 items-center">
+                {selectedDomino && (
+                  <span className="text-xs font-body">
+                    {hostPlayableEnds.size > 0
+                      ? <span className="text-emerald-400">Tap a glowing zone on the board ↑</span>
+                      : <span className="text-red-400">No matching end for this tile</span>}
+                  </span>
+                )}
+                {!hostHasLegalMove && (game.boneyard?.length || 0) > 0 && (
+                  <button onClick={hostDraw} className="px-4 py-1.5 rounded-xl font-heading text-sm tracking-widest uppercase text-white border-2 border-emerald-500 hover:bg-emerald-500/20">📦 DRAW</button>
+                )}
+                {!hostHasLegalMove && (game.boneyard?.length || 0) === 0 && (
+                  <button onClick={hostKnock} className="px-4 py-1.5 rounded-xl font-heading text-sm tracking-widest uppercase text-black font-bold" style={{ background: 'linear-gradient(135deg,#FFD700,#f59e0b)' }}>🤜 KNOCK</button>
+                )}
+                {selectedDomino && (
+                  <button onClick={() => setSelectedDomino(null)} className="px-3 py-1.5 rounded-xl font-heading text-sm uppercase text-white/40 border border-white/15 hover:border-white/30">CANCEL</button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Feedback toast */}
+      {feedback && (
+        <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-xl font-body text-sm z-50 pointer-events-none border ${feedback.type === 'error' ? 'bg-red-950 border-red-500 text-red-200' : 'bg-black/90 border-emerald-500/50 text-emerald-300'}`}>
+          {feedback.msg}
+        </div>
+      )}
 
       {/* Round over overlay */}
       {game.phase === 'round_over' && (
