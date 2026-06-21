@@ -103,17 +103,16 @@ export function getOpenEnds(board) {
   const armsOpen = spinner && spinnerPlayedOn.left && spinnerPlayedOn.right;
 
   // Helper: pip score for an end tile on a given side.
-  // - Doubles count both pips (a + b = pip * 2).
-  // - The spinner only counts as a left/right end when it IS the outermost tile
-  //   AND arms are not yet open. Once arms are open it's fully interior — don't count it.
+  // - Doubles on an open end count both pips (e.g. 6-6 = 12).
+  // - The spinner is interior once arms are open — don't count it for left/right.
   const endScore = (tile, side) => {
     if (!tile) return null;
     const isDouble = tile.a === tile.b;
-    // If this tile is the spinner and arms are open, it's interior — skip
+    // Spinner with arms open is fully interior — not an open end
     if (tile.isSpinner && armsOpen) return null;
-    // Doubles on end count both halves
+    // Doubles count both halves
     if (isDouble) return tile.a * 2;
-    // Normal tile: return the exposed pip on the relevant side
+    // Normal tile: exposed pip on the relevant side
     if (side === 'left')   return tile.leftPip;
     if (side === 'right')  return tile.rightPip;
     if (side === 'top')    return tile.topPip;
@@ -121,11 +120,10 @@ export function getOpenEnds(board) {
     return null;
   };
 
-  // Arm end pip: the outermost tile on an arm, or the spinner pip if arm is empty
+  // Arm end: outermost tile on arm, or spinner itself (a double = both pips) if arm empty
   const armScore = (tile, side) => {
     if (tile) return endScore(tile, side);
-    // No tile on this arm yet — spinner pip is the open end
-    return spinner ? spinner.a * 2 : null; // spinner is a double so count both halves
+    return spinner ? spinner.a * 2 : null;
   };
 
   return {
