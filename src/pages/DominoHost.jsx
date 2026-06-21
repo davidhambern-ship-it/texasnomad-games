@@ -532,6 +532,19 @@ export default function DominoHost() {
                   <span>↓ <span className="text-outlaw-gold font-bold">{openEnds.bottom ?? '—'}</span></span>
                 </>}
               </div>
+              {/* Board count */}
+              {(() => {
+                const boardCount = calcEndScore(game.board || []);
+                const total = (openEnds.left ?? 0) + (openEnds.right ?? 0) + (openEnds.top ?? 0) + (openEnds.bottom ?? 0);
+                return (
+                  <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
+                    <span style={{ ...PS2, fontSize: 5 }} className="text-white/40 uppercase tracking-widest">Board Count</span>
+                    <span className="font-mono font-bold text-base" style={{ color: boardCount > 0 ? '#FFD700' : 'rgba(255,255,255,0.4)' }}>
+                      {total}{boardCount > 0 && <span className="text-emerald-400 text-xs ml-1">+{boardCount}pts</span>}
+                    </span>
+                  </div>
+                );
+              })()}
               <p className="text-[9px] font-body text-white/30 mt-1">Boneyard: {game.boneyard?.length || 0}</p>
             </div>
           )}

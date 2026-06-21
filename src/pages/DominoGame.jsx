@@ -329,6 +329,15 @@ export default function DominoGame() {
                 {TEAM_NAMES[t]}: {t === 0 ? (game.teamScores?.teamA || 0) : (game.teamScores?.teamB || 0)}
               </span>
             ))}
+            {board.length > 0 && (() => {
+              const total = (openEnds.left ?? 0) + (openEnds.right ?? 0) + (openEnds.top ?? 0) + (openEnds.bottom ?? 0);
+              const pts = calcEndScore(board);
+              return (
+                <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ borderColor: pts > 0 ? '#FFD70060' : 'rgba(255,255,255,0.1)', color: pts > 0 ? '#FFD700' : 'rgba(255,255,255,0.3)' }}>
+                  Board: {total}{pts > 0 && <span className="text-emerald-400 ml-1">✓</span>}
+                </span>
+              );
+            })()}
           </div>
         </div>
       </div>
