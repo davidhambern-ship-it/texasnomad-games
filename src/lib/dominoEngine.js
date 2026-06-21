@@ -89,14 +89,12 @@ export function getOpenEnds(board) {
   const bottomTile = bottomTiles.length ? bottomTiles[bottomTiles.length - 1] : null;
 
   // Top/bottom arms open only after the spinner has tiles on both left AND right
-  // (standard spinner rule: must close left & right before playing top/bottom)
   const spinnerPlayedOn = { left: false, right: false };
   if (spinner) {
     board.forEach(t => {
       if (t.side === 'left')  spinnerPlayedOn.left  = true;
       if (t.side === 'right') spinnerPlayedOn.right = true;
     });
-    // If spinner IS the first tile, left/right are already "open"
     if (spinner.side === 'first') {
       spinnerPlayedOn.left  = board.some(t => t.side === 'left');
       spinnerPlayedOn.right = board.some(t => t.side === 'right');
@@ -104,11 +102,37 @@ export function getOpenEnds(board) {
   }
   const armsOpen = spinner && spinnerPlayedOn.left && spinnerPlayedOn.right;
 
+  // Helper: pip score for an end tile on a given side.
+  // - Doubles count both pips (a + b = pip * 2).
+  // - The spinner only counts as a left/right end when it IS the outermost tile
+  //   AND arms are not yet open. Once arms are open it's fully interior — don't count it.
+  const endScore = (tile, side) => {
+    if (!tile) return null;
+    const isDouble = tile.a === tile.b;
+    // If this tile is the spinner and arms are open, it's interior — skip
+    if (tile.isSpinner && armsOpen) return null;
+    // Doubles on end count both halves
+    if (isDouble) return tile.a * 2;
+    // Normal tile: return the exposed pip on the relevant side
+    if (side === 'left')   return tile.leftPip;
+    if (side === 'right')  return tile.rightPip;
+    if (side === 'top')    return tile.topPip;
+    if (side === 'bottom') return tile.botPip;
+    return null;
+  };
+
+  // Arm end pip: the outermost tile on an arm, or the spinner pip if arm is empty
+  const armScore = (tile, side) => {
+    if (tile) return endScore(tile, side);
+    // No tile on this arm yet — spinner pip is the open end
+    return spinner ? spinner.a * 2 : null; // spinner is a double so count both halves
+  };
+
   return {
-    left:       leftTile.leftPip,
-    right:      rightTile.rightPip,
-    top:        armsOpen ? (topTile    ? topTile.topPip    : spinner.a) : null,
-    bottom:     armsOpen ? (bottomTile ? bottomTile.botPip : spinner.a) : null,
+    left:       endScore(leftTile, 'left'),
+    right:      endScore(rightTile, 'right'),
+    top:        armsOpen ? armScore(topTile, 'top')       : null,
+    bottom:     armsOpen ? armScore(bottomTile, 'bottom') : null,
     hasSpinner: !!spinner,
     armsOpen,
   };
