@@ -102,23 +102,13 @@ export function getOpenEnds(board) {
   }
   const armsOpen = spinner && spinnerPlayedOn.left && spinnerPlayedOn.right;
 
-  // Helper: pip score for an end tile on a given side.
-  // - Doubles on an open end count both pips (e.g. 6-6 = 12).
-  // - The spinner is interior once arms are open — don't count it for left/right.
-  const endScore = (tile, side) => {
+  // Returns the actual pip value exposed at an open end (used for matching).
+  // Doubles expose both halves outward, but the matching pip is still tile.a (same on both sides).
+  const endPip = (tile, side) => {
     if (!tile) return null;
-    const isDouble = tile.a === tile.b;
     // Spinner with arms open is fully interior — not an open end
     if (tile.isSpinner && armsOpen) return null;
-    // Doubles on the end count both pips (perpendicular, both halves face outward).
-    // Spinner: while BOTH sides are still open it contributes one pip per side (left=pip, right=pip).
-    // Once one side is covered, the remaining open side counts the full double (pip*2).
-    if (isDouble && tile.isSpinner) {
-      const bothSidesOpen = !spinnerPlayedOn.left && !spinnerPlayedOn.right;
-      return bothSidesOpen ? tile.a : tile.a * 2;
-    }
-    if (isDouble) return tile.a * 2;
-    // Normal tile: exposed pip on the relevant side
+    if (tile.a === tile.b) return tile.a; // double: both halves show the same pip
     if (side === 'left')   return tile.leftPip;
     if (side === 'right')  return tile.rightPip;
     if (side === 'top')    return tile.topPip;
@@ -126,17 +116,35 @@ export function getOpenEnds(board) {
     return null;
   };
 
-  // Arm end: outermost tile on arm, or spinner itself (a double = both pips) if arm empty
-  const armScore = (tile, side) => {
-    if (tile) return endScore(tile, side);
-    return spinner ? spinner.a : null;
+  // Returns the SCORING value for an end (doubles count both pips).
+  const endScore = (tile, side) => {
+    if (!tile) return null;
+    const pip = endPip(tile, side);
+    if (pip === null) return null;
+    const isDouble = tile.a === tile.b;
+    if (!isDouble) return pip;
+    // Spinner scoring: both sides open → each side scores pip once; one side covered → full double
+    if (tile.isSpinner) {
+      const bothSidesOpen = !spinnerPlayedOn.left && !spinnerPlayedOn.right;
+      return bothSidesOpen ? pip : pip * 2;
+    }
+    return pip * 2; // regular end-double counts both pips
   };
 
+  // Arm end: outermost tile on arm, or spinner pip if arm empty
+  const armPip  = (tile, side) => tile ? endPip(tile, side)   : (spinner ? spinner.a : null);
+  const armScore = (tile, side) => tile ? endScore(tile, side) : (spinner ? spinner.a : null);
+
   return {
-    left:       endScore(leftTile, 'left'),
-    right:      endScore(rightTile, 'right'),
-    top:        armsOpen ? armScore(topTile, 'top')       : null,
-    bottom:     armsOpen ? armScore(bottomTile, 'bottom') : null,
+    left:       endPip(leftTile, 'left'),
+    right:      endPip(rightTile, 'right'),
+    top:        armsOpen ? armPip(topTile, 'top')         : null,
+    bottom:     armsOpen ? armPip(bottomTile, 'bottom')   : null,
+    // Scoring values (used only by calcEndScore)
+    leftScore:  endScore(leftTile, 'left'),
+    rightScore: endScore(rightTile, 'right'),
+    topScore:   armsOpen ? armScore(topTile, 'top')       : null,
+    bottomScore:armsOpen ? armScore(bottomTile, 'bottom') : null,
     hasSpinner: !!spinner,
     armsOpen,
   };
@@ -255,10 +263,10 @@ export function pipCount(hand) {
 export function calcEndScore(board) {
   const ends = getOpenEnds(board);
   let total = 0;
-  if (ends.left   !== null) total += ends.left;
-  if (ends.right  !== null) total += ends.right;
-  if (ends.top    !== null) total += ends.top;
-  if (ends.bottom !== null) total += ends.bottom;
+  if (ends.leftScore   !== null && ends.leftScore   !== undefined) total += ends.leftScore;
+  if (ends.rightScore  !== null && ends.rightScore  !== undefined) total += ends.rightScore;
+  if (ends.topScore    !== null && ends.topScore    !== undefined) total += ends.topScore;
+  if (ends.bottomScore !== null && ends.bottomScore !== undefined) total += ends.bottomScore;
   return total % 5 === 0 ? total : 0;
 }
 

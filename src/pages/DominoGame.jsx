@@ -324,7 +324,7 @@ export default function DominoGame() {
               </span>
             ))}
             {board.length > 0 && (() => {
-              const total = (openEnds.left ?? 0) + (openEnds.right ?? 0) + (openEnds.top ?? 0) + (openEnds.bottom ?? 0);
+              const total = (openEnds.leftScore ?? 0) + (openEnds.rightScore ?? 0) + (openEnds.topScore ?? 0) + (openEnds.bottomScore ?? 0);
               const pts = calcEndScore(board);
               return (
                 <span className="text-xs font-mono px-2 py-0.5 rounded border" style={{ borderColor: pts > 0 ? '#FFD70060' : 'rgba(255,255,255,0.1)', color: pts > 0 ? '#FFD700' : 'rgba(255,255,255,0.3)' }}>

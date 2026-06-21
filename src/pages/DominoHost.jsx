@@ -537,7 +537,7 @@ export default function DominoHost() {
               {/* Board count */}
               {(() => {
                 const boardCount = calcEndScore(game.board || []);
-                const total = (openEnds.left ?? 0) + (openEnds.right ?? 0) + (openEnds.top ?? 0) + (openEnds.bottom ?? 0);
+                const total = (openEnds.leftScore ?? 0) + (openEnds.rightScore ?? 0) + (openEnds.topScore ?? 0) + (openEnds.bottomScore ?? 0);
                 return (
                   <div className="mt-2 pt-2 border-t border-white/10 flex items-center justify-between">
                     <span style={{ ...PS2, fontSize: 5 }} className="text-white/40 uppercase tracking-widest">Board Count</span>
