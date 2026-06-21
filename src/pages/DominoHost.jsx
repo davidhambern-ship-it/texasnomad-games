@@ -240,19 +240,28 @@ export default function DominoHost() {
 
   const startGame = async () => {
     if (!game) return;
-    // Fill empty seats with unique TN AI characters
-    const usedIds = game.players.filter(p => p.aiCharacterId).map(p => p.aiCharacterId);
-    // Shuffle remaining characters so seat assignment is random each game
-    const available = TEXASNOMAD_CHARACTERS
-      .filter(c => !usedIds.includes(c.id))
+    // Build a shuffled pool of all characters, excluding only human players' existing characters
+    const humanCharIds = game.players.filter(p => p.playerId && !p.isAI).map(p => p.aiCharacterId).filter(Boolean);
+    const shuffled = TEXASNOMAD_CHARACTERS
+      .filter(c => !humanCharIds.includes(c.id))
       .sort(() => Math.random() - 0.5);
     let pickIdx = 0;
+    const assignedIds = new Set();
     const players = game.players.map(p => {
-      if (p.playerId) return p;
-      // Cycle through available pool (if somehow more empty seats than chars)
-      const char = available[pickIdx % available.length] || TEXASNOMAD_CHARACTERS[pickIdx % TEXASNOMAD_CHARACTERS.length];
-      pickIdx++;
-      return { ...p, playerId: `ai_${p.seat}_${char.id}`, playerName: char.name, isAI: true, connected: true, aiCharacterId: char.id };
+      if (p.playerId && !p.isAI) return p; // keep human players as-is
+      if (!p.playerId) {
+        // Find next character not already assigned this round
+        let char;
+        while (pickIdx < shuffled.length) {
+          const candidate = shuffled[pickIdx++];
+          if (!assignedIds.has(candidate.id)) { char = candidate; break; }
+        }
+        // Fallback: pick any unused character
+        if (!char) char = TEXASNOMAD_CHARACTERS.find(c => !assignedIds.has(c.id)) || TEXASNOMAD_CHARACTERS[0];
+        assignedIds.add(char.id);
+        return { ...p, playerId: `ai_${p.seat}_${char.id}`, playerName: char.name, isAI: true, connected: true, aiCharacterId: char.id };
+      }
+      return p;
     });
     const { hands, boneyard } = dealHands();
     const playersWithHands = players.map((p, i) => ({ ...p, hand: hands[i] }));
