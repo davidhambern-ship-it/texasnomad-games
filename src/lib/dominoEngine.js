@@ -182,8 +182,10 @@ export function getOpenEnds(board) {
     return pip * 2;
   };
 
+  // Empty arms still expose the spinner pip for MATCHING (you can play on them),
+  // but they do NOT count toward the board score until a tile is placed there.
   const armPip  = (tile, side) => tile ? endPip(tile, side)   : (spinner ? spinner.a : null);
-  const armScore = (tile, side) => tile ? endScore(tile, side) : (spinner ? spinner.a : null);
+  const armScore = (tile, side) => tile ? endScore(tile, side) : null;
 
   // Position (x,y in 0-100 coords + growth direction) for each open end
   const posOf = (tile, fallbackDir) => ({ x: tile.x ?? 50, y: tile.y ?? 50, dir: tile.dir ?? fallbackDir });
