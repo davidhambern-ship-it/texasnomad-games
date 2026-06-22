@@ -282,8 +282,11 @@ export function buildEntry(domino, side, board) {
   const pos = ends[side + 'Pos'] || { x: 50, y: 50, dir: side };
   const next = findNextPosition(board, pos.x, pos.y, pos.dir);
   const nd = next.dir; // actual growth direction after any turn
-  const rot = isSpinner ? 0 : DIRS[nd].rot;
-  const orientation = isSpinner ? 'v' : DIRS[nd].orient;
+  // Doubles are placed perpendicular to the chain (crosswise); the spinner is
+  // always vertical so its arms can branch up/down.
+  const perpDouble = isDouble && !isSpinner;
+  const rot = isSpinner ? 0 : (perpDouble ? (DIRS[nd].rot === 90 ? 0 : 90) : DIRS[nd].rot);
+  const orientation = isSpinner ? 'v' : (perpDouble ? (DIRS[nd].orient === 'h' ? 'v' : 'h') : DIRS[nd].orient);
   const flip = (nd === 'right' || nd === 'top') ? connectingIsA : !connectingIsA;
 
   const entry = {
