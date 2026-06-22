@@ -62,6 +62,60 @@ export function findRoundWinnerSeat(players, winnerSeat) {
   return winnerSeat;
 }
 
+// ── Bounded table placement ─────────────────────────────────────────────────
+// Coordinates are percentages (0-100) inside a fixed square board layer.
+// The renderer maps this square into the table; branches turn at the bounds.
+const TBL = { minX: 12, maxX: 88, minY: 14, maxY: 86 };
+const STEP = 9.5;            // center-to-center step between dominoes (coord units)
+const DOMINO_NARROW = 4.5;  // narrow dimension of a domino (coord units)
+const DOMINO_LONG = 9;      // long dimension of a domino (coord units)
+
+const DIRS = {
+  left:   { dx: -STEP, dy: 0,     rot: 90, orient: 'h' },
+  right:  { dx:  STEP, dy: 0,     rot: 90, orient: 'h' },
+  top:    { dx: 0,     dy: -STEP, rot: 0,  orient: 'v' },
+  bottom: { dx: 0,     dy:  STEP, rot: 0,  orient: 'v' },
+};
+
+function insideTable(x, y) {
+  return x >= TBL.minX && x <= TBL.maxX && y >= TBL.minY && y <= TBL.maxY;
+}
+
+function isOccupied(board, x, y) {
+  return board.some(t => {
+    if (t.x == null) return false;
+    const horiz = t.rot === 90;
+    const halfW = (horiz ? DOMINO_LONG : DOMINO_NARROW) / 2;
+    const halfH = (horiz ? DOMINO_NARROW : DOMINO_LONG) / 2;
+    return Math.abs(t.x - x) < halfW + 0.6 && Math.abs(t.y - y) < halfH + 0.6;
+  });
+}
+
+// Turn a branch inward when it would cross a table edge.
+function turnDirection(dir, x, y) {
+  if (dir === 'left' || dir === 'right') return y < 50 ? 'bottom' : 'top';
+  return x < 50 ? 'right' : 'left';
+}
+
+// Find the next in-bounds, unoccupied position for a domino extending from (ex,ey).
+function findNextPosition(board, ex, ey, edir) {
+  const d = DIRS[edir];
+  let nx = ex + d.dx, ny = ey + d.dy;
+  if (insideTable(nx, ny) && !isOccupied(board, nx, ny)) return { x: nx, y: ny, dir: edir };
+
+  const td = turnDirection(edir, ex, ey);
+  const tdo = DIRS[td];
+  nx = ex + tdo.dx; ny = ey + tdo.dy;
+  if (insideTable(nx, ny) && !isOccupied(board, nx, ny)) return { x: nx, y: ny, dir: td };
+
+  for (const name of ['right', 'bottom', 'left', 'top']) {
+    const o = DIRS[name];
+    const cx = ex + o.dx, cy = ey + o.dy;
+    if (insideTable(cx, cy) && !isOccupied(board, cx, cy)) return { x: cx, y: cy, dir: name };
+  }
+  return { x: ex, y: ey, dir: edir };
+}
+
 // ── Board state ────────────────────────────────────────────────────────────
 
 // A board entry: { id, a, b, side, orientation, leftPip, rightPip }
@@ -103,12 +157,10 @@ export function getOpenEnds(board) {
   const armsOpen = spinner && spinnerPlayedOn.left && spinnerPlayedOn.right;
 
   // Returns the actual pip value exposed at an open end (used for matching).
-  // Doubles expose both halves outward, but the matching pip is still tile.a (same on both sides).
   const endPip = (tile, side) => {
     if (!tile) return null;
-    // Spinner with arms open is fully interior — not an open end
     if (tile.isSpinner && armsOpen) return null;
-    if (tile.a === tile.b) return tile.a; // double: both halves show the same pip
+    if (tile.a === tile.b) return tile.a;
     if (side === 'left')   return tile.leftPip;
     if (side === 'right')  return tile.rightPip;
     if (side === 'top')    return tile.topPip;
@@ -123,28 +175,36 @@ export function getOpenEnds(board) {
     if (pip === null) return null;
     const isDouble = tile.a === tile.b;
     if (!isDouble) return pip;
-    // Spinner scoring: both sides open → each side scores pip once; one side covered → full double
     if (tile.isSpinner) {
       const bothSidesOpen = !spinnerPlayedOn.left && !spinnerPlayedOn.right;
       return bothSidesOpen ? pip : pip * 2;
     }
-    return pip * 2; // regular end-double counts both pips
+    return pip * 2;
   };
 
-  // Arm end: outermost tile on arm, or spinner pip if arm empty
   const armPip  = (tile, side) => tile ? endPip(tile, side)   : (spinner ? spinner.a : null);
   const armScore = (tile, side) => tile ? endScore(tile, side) : (spinner ? spinner.a : null);
+
+  // Position (x,y in 0-100 coords + growth direction) for each open end
+  const posOf = (tile, fallbackDir) => ({ x: tile.x ?? 50, y: tile.y ?? 50, dir: tile.dir ?? fallbackDir });
+  const leftPos  = leftTiles.length  ? posOf(leftTile, 'left')   : posOf(firstTile, 'left');
+  const rightPos = rightTiles.length ? posOf(rightTile, 'right') : posOf(firstTile, 'right');
+  let topPos = null, bottomPos = null;
+  if (armsOpen) {
+    topPos    = topTile    ? posOf(topTile, 'top')        : posOf(spinner, 'top');
+    bottomPos = bottomTile ? posOf(bottomTile, 'bottom') : posOf(spinner, 'bottom');
+  }
 
   return {
     left:       endPip(leftTile, 'left'),
     right:      endPip(rightTile, 'right'),
     top:        armsOpen ? armPip(topTile, 'top')         : null,
     bottom:     armsOpen ? armPip(bottomTile, 'bottom')   : null,
-    // Scoring values (used only by calcEndScore)
     leftScore:  endScore(leftTile, 'left'),
     rightScore: endScore(rightTile, 'right'),
     topScore:   armsOpen ? armScore(topTile, 'top')       : null,
     bottomScore:armsOpen ? armScore(bottomTile, 'bottom') : null,
+    leftPos, rightPos, topPos, bottomPos,
     hasSpinner: !!spinner,
     armsOpen,
   };
@@ -196,9 +256,11 @@ export function buildEntry(domino, side, board) {
 
   if (side === 'first') {
     const orientation = isDouble ? 'v' : 'h';
+    const rot = isDouble ? 0 : 90;
     return {
       id: domino.id, a: domino.a, b: domino.b, side,
-      orientation, flip: false,
+      orientation, flip: false, rot,
+      x: 50, y: 50, dir: null,
       leftPip:  domino.a,
       rightPip: isDouble ? domino.a : domino.b,
       topPip:   isDouble ? domino.a : null,
@@ -208,48 +270,42 @@ export function buildEntry(domino, side, board) {
   }
 
   const endValue = ends[side];
-  // connectingIsA: is domino.a the pip that connects to the open end?
   const connectingIsA = domino.a === endValue;
   const innerPip = connectingIsA ? domino.a : domino.b; // connects to chain
   const outerPip = connectingIsA ? domino.b : domino.a; // exposed outward
 
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
-  if (side === 'left' || side === 'right') {
-    // Chain runs horizontally — doubles should be vertical (perpendicular to chain).
-    const orientation = isDouble ? 'v' : 'h';
-    // DominoTile horizontal uses rotate(90deg): a(top→RIGHT), b(bottom→LEFT) visually.
-    // So visually: LEFT=b, RIGHT=a.
-    // We need outerPip on the exposed side, innerPip on the connecting side.
-    // For left side: outerPip on LEFT means outerPip must equal b visually.
-    // For right side: outerPip on RIGHT means outerPip must equal a visually.
-    const flip = side === 'left' ? !connectingIsA : connectingIsA;
-    return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation, flip,
-      leftPip:  side === 'left' ? outerPip : innerPip,
-      rightPip: side === 'left' ? innerPip : outerPip,
-      topPip:   isDouble ? outerPip : null,
-      botPip:   isDouble ? outerPip : null,
-      isSpinner,
-    };
+  // Route the next position inside the bounded table (turns at edges / around blocks)
+  const pos = ends[side + 'Pos'] || { x: 50, y: 50, dir: side };
+  const next = findNextPosition(board, pos.x, pos.y, pos.dir);
+  const nd = next.dir; // actual growth direction after any turn
+  const rot = isSpinner ? 0 : DIRS[nd].rot;
+  const orientation = isSpinner ? 'v' : DIRS[nd].orient;
+  const flip = (nd === 'right' || nd === 'top') ? connectingIsA : !connectingIsA;
+
+  const entry = {
+    id: domino.id, a: domino.a, b: domino.b, side,
+    orientation, flip, rot,
+    x: next.x, y: next.y, dir: nd,
+    isSpinner,
+  };
+
+  if (isSpinner) {
+    // Spinner (double): perpendicular, all four faces show the same pip
+    entry.leftPip = domino.a; entry.rightPip = domino.a;
+    entry.topPip = domino.a; entry.botPip = domino.a;
+  } else if (nd === 'left' || nd === 'right') {
+    entry.leftPip  = (nd === 'left') ? outerPip : innerPip;
+    entry.rightPip = (nd === 'left') ? innerPip : outerPip;
+    entry.topPip   = isDouble ? outerPip : null;
+    entry.botPip   = isDouble ? outerPip : null;
+  } else { // top / bottom
+    entry.leftPip = null; entry.rightPip = null;
+    entry.topPip = (nd === 'top') ? outerPip : innerPip;
+    entry.botPip = (nd === 'top') ? innerPip : outerPip;
   }
-  if (side === 'top' || side === 'bottom') {
-    // Chain runs vertically — doubles should be horizontal (perpendicular to chain).
-    const orientation = isDouble ? 'h' : 'v';
-    // DominoTile vertical: a=TOP, b=BOTTOM. No rotation.
-    // For top side: outerPip on TOP means outerPip must equal a.
-    // For bottom side: outerPip on BOTTOM means outerPip must equal b.
-    const flip = side === 'top' ? connectingIsA : !connectingIsA;
-    return {
-      id: domino.id, a: domino.a, b: domino.b, side,
-      orientation, flip,
-      leftPip: null, rightPip: null,
-      topPip:  side === 'top' ? outerPip : innerPip,
-      botPip:  side === 'top' ? innerPip : outerPip,
-      isSpinner: false,
-    };
-  }
+  return entry;
 }
 
 // ── Scoring ────────────────────────────────────────────────────────────────
