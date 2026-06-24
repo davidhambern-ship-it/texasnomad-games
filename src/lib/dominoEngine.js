@@ -204,6 +204,23 @@ export function getOpenEnds(board) {
     bottomPos = bottomTile ? posOf(bottomTile, 'bottom') : posOf(spinner, 'bottom');
   }
 
+  // Drop-zone positions: offset just past the end tile's edge so the indicator
+  // never sits on top of the end tile (e.g. the spinner when a side is empty).
+  const DROP_GAP = 3.5; // ~half the drop-zone size in coord units
+  const dropPos = (tile, fallbackDir) => {
+    const dir = tile.dir ?? fallbackDir;
+    const half = halfLenAlong(tile.orientation, dir);
+    const d = DIRS[dir];
+    return { x: (tile.x ?? 50) + d.sx * (half + DROP_GAP), y: (tile.y ?? 50) + d.sy * (half + DROP_GAP) };
+  };
+  const leftDrop  = leftTiles.length  ? dropPos(leftTile, 'left')   : dropPos(firstTile, 'left');
+  const rightDrop = rightTiles.length ? dropPos(rightTile, 'right') : dropPos(firstTile, 'right');
+  let topDrop = null, bottomDrop = null;
+  if (armsOpen) {
+    topDrop    = topTile    ? dropPos(topTile, 'top')        : dropPos(spinner, 'top');
+    bottomDrop = bottomTile ? dropPos(bottomTile, 'bottom') : dropPos(spinner, 'bottom');
+  }
+
   return {
     left:       endPip(leftTile, 'left'),
     right:      endPip(rightTile, 'right'),
@@ -214,6 +231,7 @@ export function getOpenEnds(board) {
     topScore:   armsOpen ? armScore(topTile, 'top')       : null,
     bottomScore:armsOpen ? armScore(bottomTile, 'bottom') : null,
     leftPos, rightPos, topPos, bottomPos,
+    leftDrop, rightDrop, topDrop, bottomDrop,
     hasSpinner: !!spinner,
     armsOpen,
   };

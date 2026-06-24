@@ -110,12 +110,12 @@ export default function DominoBoard({ board = [], openEnds = {}, playableEnds = 
 
       {interactive && onEndClick && (
         <>
-          <DropZone side="left"   pos={openEnds.leftPos}   value={openEnds.left}   active={playableEnds.has('left')} />
-          <DropZone side="right"  pos={openEnds.rightPos}  value={openEnds.right}  active={playableEnds.has('right')} />
+          <DropZone side="left"   pos={openEnds.leftDrop}   value={openEnds.left}   active={playableEnds.has('left')} />
+          <DropZone side="right"  pos={openEnds.rightDrop}  value={openEnds.right}  active={playableEnds.has('right')} />
           {openEnds.hasSpinner && (
             <>
-              <DropZone side="top"    pos={openEnds.topPos}    value={openEnds.top}    active={playableEnds.has('top')} />
-              <DropZone side="bottom" pos={openEnds.bottomPos} value={openEnds.bottom} active={playableEnds.has('bottom')} />
+              <DropZone side="top"    pos={openEnds.topDrop}    value={openEnds.top}    active={playableEnds.has('top')} />
+              <DropZone side="bottom" pos={openEnds.bottomDrop} value={openEnds.bottom} active={playableEnds.has('bottom')} />
             </>
           )}
         </>
