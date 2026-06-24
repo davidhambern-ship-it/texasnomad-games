@@ -66,15 +66,14 @@ export function findRoundWinnerSeat(players, winnerSeat) {
 // Coordinates are percentages (0-100) inside a fixed square board layer.
 // The renderer maps this square into the table; branches turn at the bounds.
 const TBL = { minX: 12, maxX: 88, minY: 14, maxY: 86 };
-const STEP = 9.5;            // center-to-center step between dominoes (coord units)
 const DOMINO_NARROW = 4.5;  // narrow dimension of a domino (coord units)
 const DOMINO_LONG = 9;      // long dimension of a domino (coord units)
 
 const DIRS = {
-  left:   { dx: -STEP, dy: 0,     rot: 90, orient: 'h' },
-  right:  { dx:  STEP, dy: 0,     rot: 90, orient: 'h' },
-  top:    { dx: 0,     dy: -STEP, rot: 0,  orient: 'v' },
-  bottom: { dx: 0,     dy:  STEP, rot: 0,  orient: 'v' },
+  left:   { sx: -1, sy: 0,  rot: 90, orient: 'h' },
+  right:  { sx:  1, sy: 0,  rot: 90, orient: 'h' },
+  top:    { sx:  0, sy: -1, rot: 0,  orient: 'v' },
+  bottom: { sx:  0, sy:  1, rot: 0,  orient: 'v' },
 };
 
 function insideTable(x, y) {
@@ -91,29 +90,37 @@ function isOccupied(board, x, y) {
   });
 }
 
+// Half the extent of a tile along a given chain direction.
+function halfLenAlong(orientation, dir) {
+  const horiz = dir === 'left' || dir === 'right';
+  if (horiz) return orientation === 'h' ? DOMINO_LONG / 2 : DOMINO_NARROW / 2;
+  return orientation === 'v' ? DOMINO_LONG / 2 : DOMINO_NARROW / 2;
+}
+
 // Turn a branch inward when it would cross a table edge.
 function turnDirection(dir, x, y) {
   if (dir === 'left' || dir === 'right') return y < 50 ? 'bottom' : 'top';
   return x < 50 ? 'right' : 'left';
 }
 
-// Find the next in-bounds, unoccupied position for a domino extending from (ex,ey).
-function findNextPosition(board, ex, ey, edir) {
-  const d = DIRS[edir];
-  let nx = ex + d.dx, ny = ey + d.dy;
-  if (insideTable(nx, ny) && !isOccupied(board, nx, ny)) return { x: nx, y: ny, dir: edir };
-
+// Find the next growth direction (after any turn) for a domino extending from (ex,ey).
+// Probes with the maximum possible step so smaller real steps also fit.
+function findNextDirection(board, ex, ey, edir) {
+  const probe = (dir) => {
+    const d = DIRS[dir];
+    return { x: ex + d.sx * DOMINO_LONG, y: ey + d.sy * DOMINO_LONG };
+  };
+  let p = probe(edir);
+  if (insideTable(p.x, p.y) && !isOccupied(board, p.x, p.y)) return edir;
   const td = turnDirection(edir, ex, ey);
-  const tdo = DIRS[td];
-  nx = ex + tdo.dx; ny = ey + tdo.dy;
-  if (insideTable(nx, ny) && !isOccupied(board, nx, ny)) return { x: nx, y: ny, dir: td };
-
+  p = probe(td);
+  if (insideTable(p.x, p.y) && !isOccupied(board, p.x, p.y)) return td;
   for (const name of ['right', 'bottom', 'left', 'top']) {
-    const o = DIRS[name];
-    const cx = ex + o.dx, cy = ey + o.dy;
-    if (insideTable(cx, cy) && !isOccupied(board, cx, cy)) return { x: cx, y: cy, dir: name };
+    if (name === edir || name === td) continue;
+    p = probe(name);
+    if (insideTable(p.x, p.y) && !isOccupied(board, p.x, p.y)) return name;
   }
-  return { x: ex, y: ey, dir: edir };
+  return edir;
 }
 
 // ── Board state ────────────────────────────────────────────────────────────
@@ -188,7 +195,7 @@ export function getOpenEnds(board) {
   const armScore = (tile, side) => tile ? endScore(tile, side) : null;
 
   // Position (x,y in 0-100 coords + growth direction) for each open end
-  const posOf = (tile, fallbackDir) => ({ x: tile.x ?? 50, y: tile.y ?? 50, dir: tile.dir ?? fallbackDir });
+  const posOf = (tile, fallbackDir) => ({ x: tile.x ?? 50, y: tile.y ?? 50, dir: tile.dir ?? fallbackDir, orientation: tile.orientation });
   const leftPos  = leftTiles.length  ? posOf(leftTile, 'left')   : posOf(firstTile, 'left');
   const rightPos = rightTiles.length ? posOf(rightTile, 'right') : posOf(firstTile, 'right');
   let topPos = null, bottomPos = null;
@@ -279,9 +286,8 @@ export function buildEntry(domino, side, board) {
   const isSpinner = isDouble && !ends.hasSpinner && side !== 'top' && side !== 'bottom';
 
   // Route the next position inside the bounded table (turns at edges / around blocks)
-  const pos = ends[side + 'Pos'] || { x: 50, y: 50, dir: side };
-  const next = findNextPosition(board, pos.x, pos.y, pos.dir);
-  const nd = next.dir; // actual growth direction after any turn
+  const pos = ends[side + 'Pos'] || { x: 50, y: 50, dir: side, orientation: 'h' };
+  const nd = findNextDirection(board, pos.x, pos.y, pos.dir);
   // Doubles are placed perpendicular to the chain (crosswise); the spinner is
   // always vertical so its arms can branch up/down.
   const perpDouble = isDouble && !isSpinner;
@@ -289,10 +295,17 @@ export function buildEntry(domino, side, board) {
   const orientation = isSpinner ? 'v' : (perpDouble ? (DIRS[nd].orient === 'h' ? 'v' : 'h') : DIRS[nd].orient);
   const flip = (nd === 'right' || nd === 'top') ? connectingIsA : !connectingIsA;
 
+  // Edge-to-edge step: half-length of the end tile + half-length of the new tile
+  const endOrient = pos.orientation || (pos.dir === 'left' || pos.dir === 'right' ? 'h' : 'v');
+  const step = halfLenAlong(endOrient, nd) + halfLenAlong(orientation, nd);
+  const d = DIRS[nd];
+  const nx = pos.x + d.sx * step;
+  const ny = pos.y + d.sy * step;
+
   const entry = {
     id: domino.id, a: domino.a, b: domino.b, side,
     orientation, flip, rot,
-    x: next.x, y: next.y, dir: nd,
+    x: nx, y: ny, dir: nd,
     isSpinner,
   };
 

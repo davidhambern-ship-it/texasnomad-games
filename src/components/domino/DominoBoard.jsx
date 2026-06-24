@@ -97,9 +97,6 @@ export default function DominoBoard({ board = [], openEnds = {}, playableEnds = 
             position: 'absolute', left: p.left, top: p.top,
             transform: 'translate(-50%,-50%)',
             zIndex: 1,
-            filter: t.isSpinner
-              ? 'drop-shadow(0 0 8px rgba(0,255,120,0.7)) drop-shadow(0 0 12px rgba(255,160,20,0.5))'
-              : undefined,
           }}>
             <DominoTile
               a={t.flip ? t.b : t.a}
