@@ -7,6 +7,7 @@ import { usePlayerSeat } from '@/hooks/usePlayerSeat';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import RoleSelector from '@/components/game/RoleSelector.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
+import { fetchTriviaQuestion } from '@/lib/squareBizTrivia';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -203,39 +204,11 @@ function SinglePlayerBoard({ gs, updateState, playerId, seatNumber, cpuCharacter
     setTimeout(() => setCpuDialogue(''), 3000);
   };
 
-  // Load a random trivia question from OpenTDB
+  // Load a fresh pop-culture / current-events trivia question
   const loadQuestion = async () => {
-    const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
-    const data = await res.json();
-    if (!data.results || data.results.length === 0) return null;
-    const item = data.results[0];
-
-    // Decode HTML entities
-    const decode = (str) => {
-      const txt = document.createElement('textarea');
-      txt.innerHTML = str;
-      return txt.value;
-    };
-
-    const question = decode(item.question);
-    const correct = decode(item.correct_answer);
-    const incorrects = item.incorrect_answers.map(decode);
-
-    // Shuffle answers into A/B/C/D slots
-    const allAnswers = [correct, ...incorrects].sort(() => Math.random() - 0.5);
-    const letters = ['A', 'B', 'C', 'D'];
-    const correctLetter = letters[allAnswers.indexOf(correct)];
-
-    return {
-      id: Math.random().toString(36),
-      question,
-      answer_a: allAnswers[0],
-      answer_b: allAnswers[1],
-      answer_c: allAnswers[2],
-      answer_d: allAnswers[3],
-      correct_answer: correctLetter,
-      category: decode(item.category),
-    };
+    try {
+      return await fetchTriviaQuestion();
+    } catch { return null; }
   };
 
   // Human selects a square → load question for human to answer

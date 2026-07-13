@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fetchTriviaQuestion } from '@/lib/squareBizTrivia';
 
 const Btn = ({ children, onClick, color = '#FF5F1F', size = 'md', className = '', disabled = false }) => {
   const pad = size === 'lg' ? 'px-6 py-4 text-xl' : size === 'sm' ? 'px-3 py-2 text-sm' : 'px-4 py-3 text-base';
@@ -103,22 +104,16 @@ export default function SquareBizHostPanel({ gs, updateState, sendCommand, room 
   const fetchOTDBQuestion = async (autoShow = false) => {
     setLoadingTrivia(true);
     try {
-      const res = await fetch('https://opentdb.com/api.php?amount=1&type=multiple');
-      const data = await res.json();
-      const q = data.results[0];
-      const correct = decodeHTML(q.correct_answer);
-      const allAnswers = shuffleArray([correct, ...q.incorrect_answers.map(decodeHTML)]);
-      const letters = ['A','B','C','D'];
-      const choices = {};
-      allAnswers.forEach((ans, i) => { choices[letters[i]] = ans; });
-      const correctLetter = letters[allAnswers.indexOf(correct)];
+      const q = await fetchTriviaQuestion();
+      if (!q) return;
+      const choices = { A: q.answer_a, B: q.answer_b, C: q.answer_c, D: q.answer_d };
       await updateState({
         show_question: autoShow,
         show_choices: false,
-        current_question: decodeHTML(q.question),
+        current_question: q.question,
         current_choices: choices,
-        correct_answer: correctLetter,
-        current_category: decodeHTML(q.category),
+        correct_answer: q.correct_answer,
+        current_category: q.category,
         answer_result: null,
         selected_answer: null,
         popup: null,
