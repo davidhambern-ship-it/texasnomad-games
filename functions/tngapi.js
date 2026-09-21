@@ -50,8 +50,21 @@ function isBase44PreviewOrigin(origin) {
   }
 }
 
+function isTngStagingOrigin(origin) {
+  if (!origin) return false;
+
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'https:' &&
+      url.hostname.toLowerCase() ===
+        'texasnomad-games-git-staging-live-test-texasnomadgames.vercel.app';
+  } catch {
+    return false;
+  }
+}
+
 function isAllowedOrigin(origin) {
-  return configuredOrigins().has(origin) || isBase44PreviewOrigin(origin);
+  return configuredOrigins().has(origin) || isBase44PreviewOrigin(origin) || isTngStagingOrigin(origin);
 }
 
 function corsHeaders(request) {
