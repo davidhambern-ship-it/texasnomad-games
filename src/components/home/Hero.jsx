@@ -24,6 +24,20 @@ export default function Hero({ heroBg, crownLogo }) {
           GAMES
         </h2>
 
+        {/* Live test entry point */}
+        <a
+          href="https://texasnomad-games-git-staging-live-test-texasnomadgames.vercel.app"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-5 inline-flex items-center justify-center rounded-lg border-2 border-[#FFD700] bg-black/75 px-6 py-3 text-[9px] sm:text-[11px] tracking-[0.14em] text-[#FFD700] uppercase transition-all duration-300 hover:bg-[#FFD700] hover:text-black hover:scale-105 animate-pulse-glow"
+          style={{
+            fontFamily: "'Press Start 2P', monospace",
+            boxShadow: '0 0 18px rgba(255,215,0,0.35), 0 0 34px rgba(188,19,254,0.18)',
+          }}
+        >
+          ⚡ LIVE TEST SITE
+        </a>
+
         {/* Game icons row */}
         <div className="flex items-center gap-4 mt-4">
           {/* Orange X */}
