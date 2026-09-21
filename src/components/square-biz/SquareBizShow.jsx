@@ -94,7 +94,6 @@ function MiniPlayer({ player, mark, current }) {
           </div>
         </div>
       </div>
-      </div>
     </div>
   );
 }
@@ -248,6 +247,7 @@ export function SquareBizBoard({
             </div>
           </div>
         </section>
+      </div>
       </div>
     </div>
   );
