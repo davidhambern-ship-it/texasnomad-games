@@ -429,7 +429,7 @@ export default function NeonSpadesPlayer({ roomCode }) {
               </div>
             </div>
 
-            {(tableState.players || []).map((player) => {
+            {(presentationTableState.players || []).map((player) => {
               const seat = Number(player.seatNumber);
               const isMe = seat === mySeat;
               return (
