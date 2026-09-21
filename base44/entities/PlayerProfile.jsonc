@@ -129,6 +129,20 @@
     "host_stats": {
       "type": "object",
       "description": "Hosting activity stats: { total_sessions, total_host_time_minutes, last_hosted }"
+    },
+    "handle": {
+      "type": "string",
+      "description": "Permanent unique TNG handle chosen during onboarding"
+    },
+    "onboarding_complete": {
+      "type": "boolean",
+      "default": false,
+      "description": "True after the required TNG identity setup is complete"
+    },
+    "profile_locked": {
+      "type": "boolean",
+      "default": true,
+      "description": "System-owned profile; users cannot customize identity after onboarding"
     }
   },
   "required": [
