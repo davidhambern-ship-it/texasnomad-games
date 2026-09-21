@@ -1,4 +1,5 @@
 import { getTngAccessToken } from '@/api/neonAuthClient';
+import { migrationEndpoints } from '@/config/backendMigration';
 
 /**
  * @typedef {object} RequestOptions
@@ -23,7 +24,7 @@ export class TngApiError extends Error {
  * @param {RequestOptions} [options]
  */
 function apiUrl(path) {
-  const base = import.meta.env.VITE_TNG_API_URL?.trim();
+  const base = migrationEndpoints.tngApiUrl;
   if (!base) return path;
   return `${base.replace(/\/$/, '')}${path.replace(/^\/api/, '')}`;
 }
