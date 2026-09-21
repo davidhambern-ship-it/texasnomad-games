@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+
 import { base44 } from '@/api/base44Client';
+import { TngApiError, tngApi } from '@/api/tngApi';
+import { useAuth } from '@/lib/AuthContext';
+import { isBase44Preview } from '@/lib/previewTngProfile';
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -14,7 +18,21 @@ const GAME_PATHS = {
   'name-that-track': '/games/name-that-track',
 };
 
+async function ensurePlayerDevice() {
+  let deviceId = localStorage.getItem('tng_player_device_id');
+  if (deviceId) return deviceId;
+
+  const { device } = await tngApi.devices.create({
+    role: 'player',
+    deviceLabel: 'Player Device',
+  });
+
+  localStorage.setItem('tng_player_device_id', device.id);
+  return device.id;
+}
+
 export default function JoinRoom() {
+  const { isAuthenticated, isLoadingAuth } = useAuth();
   const path = window.location.pathname;
   const roomCode = path.split('/join/')[1]?.toUpperCase() || 'UNKNOWN';
   const [error, setError] = useState(null);
@@ -25,28 +43,79 @@ export default function JoinRoom() {
       return;
     }
 
+    if (isLoadingAuth) return;
+
     async function findAndJoin() {
+      setError(null);
+
       try {
+        if (isBase44Preview) {
+          if (!isAuthenticated) {
+            const next = encodeURIComponent(`/join/${roomCode}`);
+            window.location.href = `/login?next=${next}`;
+            return;
+          }
+
+          let deviceId = await ensurePlayerDevice();
+
+          try {
+            const payload = await tngApi.player.joinRoom(deviceId, roomCode);
+            const gamePath = GAME_PATHS[payload.room?.gameId];
+
+            if (!gamePath) {
+              setError(`Unknown game type for room "${roomCode}".`);
+              return;
+            }
+
+            window.location.href = `${gamePath}?room=${roomCode}&neon=1`;
+            return;
+          } catch (joinError) {
+            if (
+              joinError instanceof TngApiError &&
+              ['INVALID_PLAYER_DEVICE', 'PLAYER_DEVICE_REQUIRED'].includes(joinError.code)
+            ) {
+              localStorage.removeItem('tng_player_device_id');
+              deviceId = await ensurePlayerDevice();
+              const payload = await tngApi.player.joinRoom(deviceId, roomCode);
+              const gamePath = GAME_PATHS[payload.room?.gameId];
+
+              if (!gamePath) {
+                setError(`Unknown game type for room "${roomCode}".`);
+                return;
+              }
+
+              window.location.href = `${gamePath}?room=${roomCode}&neon=1`;
+              return;
+            }
+
+            throw joinError;
+          }
+        }
+
         const rooms = await base44.entities.GameRoom.filter({ room_code: roomCode });
         if (!rooms || rooms.length === 0) {
           setError(`Room "${roomCode}" not found. Check the code and try again.`);
           return;
         }
+
         const room = rooms[0];
         const gamePath = GAME_PATHS[room.game_id];
         if (!gamePath) {
           setError(`Unknown game type for room "${roomCode}".`);
           return;
         }
-        // Redirect to the game viewer with room code
+
         window.location.href = `${gamePath}?room=${roomCode}`;
-      } catch (e) {
-        setError('Could not connect. Please try again.');
+      } catch (joinError) {
+        setError(
+          joinError?.message ||
+          `Room "${roomCode}" could not be joined. Check the code and try again.`,
+        );
       }
     }
 
     findAndJoin();
-  }, [roomCode]);
+  }, [roomCode, isAuthenticated, isLoadingAuth]);
 
   return (
     <div className="min-h-screen bg-midnight-void flex flex-col items-center justify-center px-4 text-center">
@@ -61,7 +130,9 @@ export default function JoinRoom() {
       {error ? (
         <p className="mt-4 text-red-400 font-body">{error}</p>
       ) : (
-        <p className="mt-4 text-white/60 font-body animate-pulse">Looking up game session…</p>
+        <p className="mt-4 text-white/60 font-body animate-pulse">
+          {isBase44Preview ? 'Connecting to live Neon room…' : 'Looking up game session…'}
+        </p>
       )}
 
       <Link
