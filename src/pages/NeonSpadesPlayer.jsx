@@ -174,7 +174,12 @@ export default function NeonSpadesPlayer({ roomCode }) {
     <div className="min-h-screen bg-[#070311] text-white lg:h-screen lg:overflow-hidden">
       <main className="mx-auto flex min-h-screen max-w-[1700px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4">
         <section className="order-1 min-w-0 flex-1 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
-          <div className="w-full">
+          <div
+            className="w-full mx-auto"
+            style={{
+              maxWidth: 'min(100%, calc((100dvh - 110px) * 8 / 7))',
+            }}
+          >
             <SpadesTable
               gs={tableState}
               playerId={neonPlayerId}
