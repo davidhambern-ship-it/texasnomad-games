@@ -224,7 +224,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
           )}
 
           {phase === 'intro' && (
-            <SquareBizIntro gameState={gameState} now={clock} />
+            <SquareBizIntro gameState={gameState} now={clock} playAudio />
           )}
         </main>
 
