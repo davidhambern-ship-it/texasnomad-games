@@ -416,7 +416,7 @@ function IntroArt({ type }) {
   );
 }
 
-export function SquareBizIntro({ gameState = {}, now = Date.now(), audioSrc = '/assets/square-biz/jingle.mp3' }) {
+export function SquareBizIntro({ gameState = {}, now = Date.now(), audioSrc = '/assets/square-biz/Square%20Biz!.mp3' }) {
   const audioRef = useRef(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const start = Number(gameState.introStartedAt || now);
