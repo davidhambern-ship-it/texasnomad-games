@@ -114,7 +114,7 @@ export default function NeonSpadesHostPanel({ controllerId }) {
 
     const timer = window.setTimeout(() => {
       act('start_hand');
-    }, 10500);
+    }, 12000);
 
     return () => window.clearTimeout(timer);
   }, [act, handNumber, phase]);
