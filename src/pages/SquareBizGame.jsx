@@ -8,6 +8,7 @@ import SeatBadge from '@/components/game/SeatBadge.jsx';
 import RoleSelector from '@/components/game/RoleSelector.jsx';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { fetchTriviaQuestion } from '@/lib/squareBizTrivia';
+import NeonSquareBizPlayer from '@/pages/NeonSquareBizPlayer';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -50,7 +51,7 @@ function cpuPickSquare(board, cpuMark, humanMark) {
   return empty[Math.floor(Math.random() * empty.length)];
 }
 
-export default function SquareBizGame() {
+function LegacySquareBizGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const cpuId = params.get('cpu');
@@ -936,4 +937,16 @@ function BoardModeBoard({ gs, updateState, playerId, seatNumber, isSeated, chose
       <div className="flex-1" />
     </div>
   );
+}
+
+export default function SquareBizGame() {
+  const params = new URLSearchParams(window.location.search);
+  const roomCode = (params.get('room') || '').trim().toUpperCase();
+  const useNeon = params.get('neon') === '1';
+
+  if (useNeon && roomCode) {
+    return <NeonSquareBizPlayer roomCode={roomCode} />;
+  }
+
+  return <LegacySquareBizGame />;
 }
