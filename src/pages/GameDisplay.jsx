@@ -668,25 +668,36 @@ function SpadesDisplay({ room }) {
           }}
         >
           <div
-            className="absolute inset-0 rounded-[48%] border-[9px] border-[#4a2d18] bg-[#0a2a17]"
+            className="absolute inset-0 rounded-[48%] border-[9px] border-[#6b3518]"
             style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(255,151,45,.78) 0%, rgba(222,92,18,.70) 48%, rgba(126,42,4,.82) 100%)',
               boxShadow:
-                'inset 0 0 110px rgba(0,0,0,.82), 0 22px 60px rgba(0,0,0,.46)',
+                'inset 0 0 110px rgba(72,20,0,.62), inset 0 0 34px rgba(255,206,104,.14), 0 22px 60px rgba(0,0,0,.46), 0 0 70px rgba(255,104,0,.12)',
             }}
           >
             <div
-              className="absolute inset-[14px] rounded-[48%] border border-white/[0.045]"
+              className="absolute inset-[14px] rounded-[48%] border border-white/[0.07]"
               style={{
                 background:
-                  'radial-gradient(circle at 50% 46%, rgba(32,116,69,.42), rgba(7,54,29,.38) 46%, rgba(2,26,14,.64) 78%, rgba(0,0,0,.25) 100%)',
+                  'linear-gradient(135deg, rgba(255,235,172,.11) 0%, rgba(255,170,70,.025) 46%, rgba(54,10,0,.22) 100%)',
               }}
             />
 
             <div
-              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[150px] font-black leading-none text-white/[0.025]"
-              style={{ fontFamily: 'serif' }}
+              className="pointer-events-none absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
+              style={{
+                width: 'clamp(150px, 13vw, 225px)',
+                height: 'clamp(150px, 13vw, 225px)',
+                opacity: 0.30,
+                filter: 'drop-shadow(0 0 24px rgba(255,214,110,.12))',
+              }}
             >
-              ♠
+              <img
+                src="https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/1954440a1_logoimage-3-nobg.png"
+                alt=""
+                className="h-full w-full object-contain"
+              />
             </div>
 
             <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" />
@@ -699,16 +710,15 @@ function SpadesDisplay({ room }) {
               style={{ width: 300, height: 230 }}
             >
               {trick.length === 0 ? (
-                <div className="flex h-full flex-col items-center justify-center text-center">
-                  <div className="text-6xl text-white/12">♠</div>
+                <div className="flex h-full flex-col items-center justify-end pb-3 text-center">
                   <div
-                    className="mt-4 text-[8px] uppercase tracking-[0.18em] text-white/25"
+                    className="text-[8px] uppercase tracking-[0.18em] text-white/40"
                     style={PS2}
                   >
                     {state.phase === 'dealt' ? 'CARDS DEALT' : phaseLabel}
                   </div>
                   {state.phase === 'dealt' && (
-                    <div className="mt-2 text-sm text-green-400/60">
+                    <div className="mt-2 text-sm text-[#FFD7A0]/70">
                       Waiting for bidding
                     </div>
                   )}
