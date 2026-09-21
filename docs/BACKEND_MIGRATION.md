@@ -55,13 +55,37 @@ by UI checks.
 | `GET /api/profile` | Account JWT | Returns the locked TNG profile and generated statistics. |
 | `POST /api/profile` | Account JWT | Creates the one-time TNG display name and unique handle. |
 | `POST /api/device-session` | Account JWT | Registers a player, spectator, or Host Controller device. |
-| `POST /api/host/session` | JWT + controller ID | Starts or resumes the account's only active Host session. |
+| `POST /api/host/session` | JWT + controller ID | Starts or resumes the account's only active Host session and returns any active room. |
+| `DELETE /api/host/session` | JWT + controller ID | Ends the Host session, abandons any active room, and disconnects the paired display. |
 | `POST /api/host/pairing` | JWT + controller ID | Generates a ten-minute Game Display pairing code. |
 | `POST /api/display/pair` | One-time pairing code | Creates a restricted Game Display session and token. |
 | `POST /api/host/room` | JWT + controller ID | Creates the Host session's only active room after a display is connected. |
+| `DELETE /api/host/room` | JWT + controller ID | Releases the active room while keeping the Host Controller and display paired. |
 
 Controller requests use the `X-TNG-Device-Id` header. Display tokens are random,
 stored only as SHA-256 hashes, and never grant Host Controller authority.
+
+## Phase 3 development status
+
+The `codex/neon-backend-foundation` branch now contains the Host Controller and
+Game Display wiring behind `VITE_TNG_BACKEND_ENABLED`:
+
+- Google sign-in preserves the requested return path through TNG onboarding.
+- `/host` uses the Neon Host Controller flow when the migration flag is enabled
+  and preserves the legacy Base44 Host Panel when it is disabled.
+- Host Controller devices start or resume the account's single active Host session.
+- `/display` accepts the six-digit pairing code and creates the restricted Game
+  Display session.
+- The Host Panel remains locked until a Game Display is paired.
+- Room creation is server-owned and automatically generates the room code.
+- Reloading the Host Panel recovers its active room from Postgres.
+- A second active room is rejected by both API checks and Postgres constraints.
+- Disconnecting a room releases the room while keeping the display paired.
+- Signing out ends the Host session and disconnects the display server-side.
+
+Production is still untouched. End-to-end browser verification requires a
+server-function environment (for example, a Vercel preview) configured with the
+Neon development credentials and `VITE_TNG_BACKEND_ENABLED=true`.
 
 ## Local setup
 
