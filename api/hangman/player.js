@@ -172,6 +172,7 @@ function publicGameState(room, players) {
     maxWrong: Number(gameState.max_wrong || 6),
     currentGoRound: Number(gameState.current_go_round || 1),
     seatsThatChose,
+    currentTurnSeat: Number(gameState.current_turn_seat || players[0]?.seatNumber || 0),
     lastAction: gameState.last_action || null,
     winnerSeat: gameState.winner_seat || null,
     players,
@@ -221,37 +222,46 @@ async function resolvePlayer(request) {
   return { account, device, room, participant };
 }
 
-function applyGoRound(gameState, seatNumber, connectedSeats) {
-  const totalPeople = connectedSeats.length + 1;
-  if (totalPeople < 4) {
-    return {
-      current_go_round: Number(gameState.current_go_round || 1),
-      seats_that_chose: Array.isArray(gameState.seats_that_chose)
-        ? gameState.seats_that_chose
-        : [],
-    };
-  }
+function currentTurnSeat(gameState, connectedSeats) {
+  const configured = Number(gameState.current_turn_seat || 0);
+  return connectedSeats.includes(configured)
+    ? configured
+    : (connectedSeats[0] || 0);
+}
 
-  const seatsThatChose = Array.isArray(gameState.seats_that_chose)
-    ? gameState.seats_that_chose
-    : [];
+function requireCurrentTurn(gameState, seatNumber, connectedSeats) {
+  const currentSeat = currentTurnSeat(gameState, connectedSeats);
 
-  if (seatsThatChose.includes(seatNumber)) {
-    const error = new Error('You already guessed this go-round. Wait for the other players.');
+  if (currentSeat && seatNumber !== currentSeat) {
+    const error = new Error(`It is Seat ${currentSeat}'s turn.`);
     error.statusCode = 409;
-    error.code = 'HANGMAN_WAIT_FOR_GO_ROUND';
+    error.code = 'HANGMAN_NOT_YOUR_TURN';
     throw error;
   }
 
-  const nextChosen = [...seatsThatChose, seatNumber];
-  const allChosen = connectedSeats.length > 0 &&
-    connectedSeats.every((seat) => nextChosen.includes(seat));
+  return currentSeat;
+}
+
+function turnPatchAfterGuess(gameState, seatNumber, connectedSeats, isCorrect) {
+  const round = Number(gameState.current_go_round || 1);
+
+  // A correct guess keeps control with the same player.
+  if (isCorrect || connectedSeats.length <= 1) {
+    return {
+      current_turn_seat: seatNumber,
+      current_go_round: round,
+      seats_that_chose: [],
+    };
+  }
+
+  const currentIndex = Math.max(0, connectedSeats.indexOf(seatNumber));
+  const nextIndex = (currentIndex + 1) % connectedSeats.length;
+  const wrapped = nextIndex === 0;
 
   return {
-    current_go_round: allChosen
-      ? Number(gameState.current_go_round || 1) + 1
-      : Number(gameState.current_go_round || 1),
-    seats_that_chose: allChosen ? [] : nextChosen,
+    current_turn_seat: connectedSeats[nextIndex],
+    current_go_round: wrapped ? round + 1 : round,
+    seats_that_chose: [],
   };
 }
 
@@ -352,7 +362,7 @@ export default async function handler(request, response) {
       const guessed = Array.isArray(gameState.guessed_letters) ? gameState.guessed_letters : [];
       const wrong = Array.isArray(gameState.wrong_letters) ? gameState.wrong_letters : [];
       const maxWrong = Number(gameState.max_wrong || 6);
-      const goRoundPatch = applyGoRound(gameState, seatNumber, connectedSeats);
+      requireCurrentTurn(gameState, seatNumber, connectedSeats);
       let nextGameState;
 
       if (action === 'guess_letter') {
@@ -384,7 +394,7 @@ export default async function handler(request, response) {
           wrong_letters: newWrong,
           phase: finished ? 'finished' : 'playing',
           word_revealed: finished,
-          ...goRoundPatch,
+          ...turnPatchAfterGuess(gameState, seatNumber, connectedSeats, isCorrect),
           last_action: {
             playerId: account.id,
             seatNumber,
@@ -419,7 +429,7 @@ export default async function handler(request, response) {
           wrong_letters: newWrong,
           phase: finished ? 'finished' : 'playing',
           word_revealed: finished,
-          ...goRoundPatch,
+          ...turnPatchAfterGuess(gameState, seatNumber, connectedSeats, isCorrect),
           last_action: {
             playerId: account.id,
             seatNumber,
