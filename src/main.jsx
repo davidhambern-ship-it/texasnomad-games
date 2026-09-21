@@ -19,6 +19,10 @@ function showGlobalCrash(kind, errorLike, eventMeta = {}) {
       eventMeta.lineno ? `line ${eventMeta.lineno}` : '',
       eventMeta.colno ? `col ${eventMeta.colno}` : '',
     ].filter(Boolean).join(' • ');
+    let lastAuthRequest = '';
+    try {
+      lastAuthRequest = localStorage.getItem('tng_last_auth_request') || '';
+    } catch {}
 
     let overlay = document.getElementById('tng-global-crash-overlay');
     if (!overlay) {
@@ -66,6 +70,7 @@ function showGlobalCrash(kind, errorLike, eventMeta = {}) {
         `${kind}: ${message}`,
         location ? `SOURCE: ${location}` : '',
         stack ? `STACK:\n${stack}` : '',
+        lastAuthRequest ? `LAST NEON AUTH REQUEST: ${lastAuthRequest}` : '',
         `URL: ${window.location.href}`,
       ].filter(Boolean).join('\n\n');
     }
