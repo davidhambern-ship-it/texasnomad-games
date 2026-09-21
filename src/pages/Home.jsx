@@ -156,7 +156,7 @@ function RoomRow({ room }) {
           <span className="block text-[5px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLR</span>
         </div>
         <span className={`px-1.5 py-0.5 rounded text-[6px] tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          {isLive ? 'LIVE' : room.status.toUpperCase()}
+          {isLive ? 'LIVE' : String(room.status || 'OFFLINE').toUpperCase()}
         </span>
       </div>
     </div>
