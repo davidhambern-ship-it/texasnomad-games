@@ -66,12 +66,14 @@ export const tngApi = Object.freeze({
   },
   host: {
     startSession: (deviceId) => request('/api/host/session', { method: 'POST', deviceId }),
+    endSession: (deviceId) => request('/api/host/session', { method: 'DELETE', deviceId }),
     createPairing: (deviceId) => request('/api/host/pairing', { method: 'POST', deviceId }),
     createRoom: (deviceId, gameId) => request('/api/host/room', {
       method: 'POST',
       deviceId,
       body: { gameId },
     }),
+    endRoom: (deviceId) => request('/api/host/room', { method: 'DELETE', deviceId }),
   },
   display: {
     pair: (code) => request('/api/display/pair', {
