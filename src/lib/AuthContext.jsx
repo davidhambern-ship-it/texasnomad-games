@@ -70,6 +70,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('tng_device_id');
       localStorage.removeItem('tng_connection_role');
       localStorage.removeItem('tng_player_test_mode');
+      localStorage.removeItem('tng_player_device_id');
+      localStorage.removeItem('tng_player_device_owner');
     } catch {}
 
     if (shouldRedirect) {
