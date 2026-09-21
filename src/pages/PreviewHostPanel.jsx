@@ -4,7 +4,7 @@ import { Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
 
 import { ALL_GAMES } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
-import { tngApi } from '@/api/tngApi';
+import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -25,6 +25,33 @@ export default function PreviewHostPanel() {
     [activeRoom, selectedGame],
   );
 
+  async function createController() {
+    const { device } = await tngApi.devices.create({
+      role: 'host_controller',
+      deviceLabel: 'Host Controller',
+    });
+    localStorage.setItem('tng_device_id', device.id);
+    localStorage.setItem('tng_connection_role', 'host_controller');
+    return device.id;
+  }
+
+  async function startOrReplaceController(deviceId) {
+    try {
+      return await tngApi.host.startSession(deviceId);
+    } catch (sessionError) {
+      if (
+        sessionError instanceof TngApiError &&
+        ['INVALID_CONTROLLER', 'CONTROLLER_REQUIRED'].includes(sessionError.code)
+      ) {
+        localStorage.removeItem('tng_device_id');
+        const replacementId = await createController();
+        setControllerId(replacementId);
+        return tngApi.host.startSession(replacementId);
+      }
+      throw sessionError;
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
 
@@ -36,19 +63,13 @@ export default function PreviewHostPanel() {
           !deviceId ||
           localStorage.getItem('tng_connection_role') !== 'host_controller'
         ) {
-          const { device } = await tngApi.devices.create({
-            role: 'host_controller',
-            deviceLabel: 'Host Controller',
-          });
-          deviceId = device.id;
-          localStorage.setItem('tng_device_id', deviceId);
-          localStorage.setItem('tng_connection_role', 'host_controller');
+          deviceId = await createController();
         }
 
         if (cancelled) return;
         setControllerId(deviceId);
 
-        const session = await tngApi.host.startSession(deviceId);
+        const session = await startOrReplaceController(deviceId);
         if (cancelled) return;
 
         setActiveRoom(session.activeRoom || null);
