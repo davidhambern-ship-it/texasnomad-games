@@ -31,6 +31,11 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 }
 
 export default function Login() {
+  const requestedNext = new URLSearchParams(window.location.search).get('next');
+  const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/';
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -42,7 +47,7 @@ export default function Login() {
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = "/";
+      window.location.href = nextPath;
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -59,7 +64,7 @@ export default function Login() {
       localStorage.removeItem('tng_preview_user_access_token');
     } catch {}
 
-    base44.auth.loginWithProvider("google", "/");
+    base44.auth.loginWithProvider("google", nextPath);
   };
 
   return (
