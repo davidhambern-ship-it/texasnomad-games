@@ -7,9 +7,10 @@ import HostConsole from '@/components/host/HostConsole';
 import LivePlayersPanel from '@/components/host/AdminLivePlayers';
 import PlayerProfilesPanel from '@/components/host/AdminPlayerProfiles';
 import useHostSession from '@/hooks/useHostSession';
-import PreviewHostPanel from '@/pages/PreviewHostPanel';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
+
+const LazyPreviewHostPanel = React.lazy(() => import('@/pages/PreviewHostPanel'));
 
 const HOST_PASSWORD = 'BERNA88@tx';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -59,7 +60,17 @@ export default function HostPanel() {
   if (isBase44Preview || isNeonStaging) {
     return (
       <HostPanelErrorBoundary>
-        <PreviewHostPanel />
+        <React.Suspense
+          fallback={
+            <div className="min-h-screen bg-[#050505] text-white flex items-center justify-center">
+              <div className="text-[#BC13FE] text-sm tracking-widest uppercase">
+                LOADING HOST CONTROLLER…
+              </div>
+            </div>
+          }
+        >
+          <LazyPreviewHostPanel />
+        </React.Suspense>
       </HostPanelErrorBoundary>
     );
   }
