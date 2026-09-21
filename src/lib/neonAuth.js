@@ -1,4 +1,5 @@
 import { createAuthClient } from '@neondatabase/auth';
+import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
 export const NEON_AUTH_URL =
   import.meta.env.VITE_NEON_AUTH_URL ||
@@ -6,7 +7,9 @@ export const NEON_AUTH_URL =
 
 export const isNeonStaging = true;
 
-export const authClient = createAuthClient(NEON_AUTH_URL);
+export const authClient = createAuthClient(NEON_AUTH_URL, {
+  adapter: BetterAuthReactAdapter(),
+});
 
 function unwrapSession(result) {
   if (!result) return null;
