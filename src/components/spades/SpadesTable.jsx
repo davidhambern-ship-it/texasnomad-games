@@ -30,6 +30,7 @@ export default function SpadesTable({
   onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown,
   onChooseSpectate, onChooseSit, onPlayCard, onStandUp,
   onTakeOverCPU, onBidTimeout, showPlayerControls = true,
+  showTableHud = true,
 }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
@@ -186,7 +187,7 @@ export default function SpadesTable({
       )}
 
       {/* ── Phase banner ─────────────────────────────────────────── */}
-      {!isPlaying && !isBidding && (
+      {showTableHud && !isPlaying && !isBidding && (
         <div className="w-full px-3 py-2 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 text-center">
           <div className="text-[7px] tracking-widest text-[#FFD700]/70 uppercase" style={PS2}>
             {gs.phase === 'setup' || !gs.phase
@@ -200,7 +201,7 @@ export default function SpadesTable({
       )}
 
       {/* ── Bidding banner ───────────────────────────────────────── */}
-      {isBidding && !gs.first_hand_no_bid && (() => {
+      {showTableHud && isBidding && !gs.first_hand_no_bid && (() => {
         const bidder = players.find(p => p.seatNumber === gs.current_bidder_seat);
         const bidderName = bidder?.playerName || bidder?.name || `Seat ${gs.current_bidder_seat || '?'}`;
         const isMyBidTurn = gs.current_bidder_seat === mySeatNumber;
@@ -222,6 +223,7 @@ export default function SpadesTable({
       })()}
 
       {/* ── Score row with team indicators ────────────────────────────────────────────── */}
+      {showTableHud && (
       <div className="w-full grid grid-cols-2 gap-2">
         {[
           { name: gs.team1Name || 'Team 1', score: gs.score1 || 0, bid: gs.bid1, books: gs.books1, color: '#BC13FE', seats: '1 & 3' },
@@ -243,9 +245,10 @@ export default function SpadesTable({
           );
         })}
       </div>
+      )}
 
       {/* ── Trick info ───────────────────────────────────────────── */}
-      {(isPlaying || isBidding) && (
+      {showTableHud && (isPlaying || isBidding) && (
         <div className="w-full px-3 py-1.5 rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 grid grid-cols-3 gap-2 text-[6px]" style={PS2}>
           <div className="text-center">
             <div className="text-white/40 uppercase">Book</div>
