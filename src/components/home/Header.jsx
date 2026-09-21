@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 const NAV_ITEMS = [
   { label: 'HOME', path: '/' },
@@ -13,14 +15,18 @@ const NAV_ITEMS = [
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState(null);
+  const [legacyUser, setLegacyUser] = useState(null);
+  const { user: neonUser, logout } = useAuth();
+  const user = isNeonStaging ? neonUser : legacyUser;
 
   useEffect(() => {
+    if (isNeonStaging) return undefined;
+
     let heartbeatInterval;
     async function initProfile() {
       try {
         const u = await base44.auth.me();
-        setUser(u);
+        setLegacyUser(u);
         // Ensure PlayerProfile exists for this user (idempotent)
         const profiles = await base44.entities.PlayerProfile.filter({ user_id: u.id });
         if (profiles.length === 0) {
@@ -85,6 +91,17 @@ export default function Header() {
           </Link>
         )}
 
+        {user && isNeonStaging && (
+          <button
+            type="button"
+            onClick={() => logout()}
+            className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-red-500/40 text-red-400/80 rounded text-[8px] tracking-widest uppercase hover:bg-red-500/10 hover:border-red-400 transition-all mr-1"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            ↪ SIGN OUT
+          </button>
+        )}
+
         {/* Host Link - Desktop */}
         <Link
           to="/host"
@@ -140,6 +157,17 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
+            {user && (
+              <Link
+                to="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block px-4 py-3 text-sm tracking-widest text-[#FFD700]/70 hover:text-[#FFD700] hover:bg-[#FFD700]/10 rounded-lg transition-colors uppercase border border-[#FFD700]/30"
+                style={{ fontFamily: "'Press Start 2P', monospace" }}
+              >
+                👤 PROFILE
+              </Link>
+            )}
+
             <Link
               to="/host"
               onClick={() => setMobileMenuOpen(false)}
@@ -148,6 +176,20 @@ export default function Header() {
             >
               🎛 HOST
             </Link>
+
+            {user && isNeonStaging && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  logout();
+                }}
+                className="block w-full px-4 py-3 text-left text-sm tracking-widest text-red-400/80 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors uppercase border border-red-500/30"
+                style={{ fontFamily: "'Press Start 2P', monospace" }}
+              >
+                ↪ SIGN OUT
+              </button>
+            )}
             
             {/* Mobile Social Icons */}
             <div className="flex gap-3 pt-3 border-t border-cyber-purple/30">
