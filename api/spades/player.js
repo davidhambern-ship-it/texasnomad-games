@@ -10,6 +10,7 @@ import {
   roomParticipants,
 } from '../../server/db/schema.js';
 import {
+  applySpadesBid,
   defaultSpadesState,
   determineSpadesTrickWinner,
   isSpadeCard,
@@ -281,6 +282,38 @@ export default async function handler(request, response) {
       });
 
       return sendJson(response, 200, await payload(result.room, result.participant, account.id));
+    }
+
+    if (action === 'place_bid') {
+      const seatNumber = Number(participant.seatNumber || 0);
+
+      if (![2, 3, 4].includes(seatNumber)) {
+        const error = new Error('Take a seat before bidding.');
+        error.statusCode = 409;
+        error.code = 'SPADES_SEAT_REQUIRED';
+        throw error;
+      }
+
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+
+      const nextGameState = applySpadesBid(
+        gameState,
+        seatNumber,
+        request.body?.bid,
+      );
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: nextGameState,
+        },
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
+
+      return sendJson(response, 200, await payload(updatedRoom, participant, account.id));
     }
 
     if (action === 'play_card') {
