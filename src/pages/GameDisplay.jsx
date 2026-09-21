@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -452,6 +453,204 @@ function HangmanDisplay({ room }) {
   );
 }
 
+
+function SpadesSeat({ seat, player, state, position }) {
+  const team = seat === 1 || seat === 3 ? 1 : 2;
+  const isTurn = state.currentTurnSeat === seat;
+  const isDealer = state.dealerSeat === seat;
+  const positionClass = {
+    top: 'absolute left-1/2 top-4 -translate-x-1/2',
+    bottom: 'absolute bottom-4 left-1/2 -translate-x-1/2',
+    left: 'absolute left-5 top-1/2 -translate-y-1/2',
+    right: 'absolute right-5 top-1/2 -translate-y-1/2',
+  }[position];
+
+  return (
+    <div className={positionClass + ' z-20'}>
+      <div
+        className="min-w-[150px] rounded-xl border bg-black/75 px-4 py-3 text-center backdrop-blur-sm"
+        style={{
+          borderColor: isTurn
+            ? '#FFD700'
+            : team === 1
+              ? 'rgba(188,19,254,.45)'
+              : 'rgba(255,95,31,.45)',
+          boxShadow: isTurn ? '0 0 24px rgba(255,215,0,.18)' : 'none',
+        }}
+      >
+        <div className="flex items-center justify-center gap-2">
+          <span className="text-[7px] uppercase tracking-[0.16em] text-white/30" style={PS2}>
+            SEAT {seat}
+          </span>
+          {isDealer && (
+            <span className="rounded-full border border-white/15 px-1.5 py-0.5 text-[6px] text-white/45" style={PS2}>
+              D
+            </span>
+          )}
+        </div>
+
+        <div className="mt-2 text-base text-white">
+          {player?.name || 'Waiting…'}
+        </div>
+
+        <div className="mt-1 text-[7px] uppercase tracking-[0.12em] text-white/30" style={PS2}>
+          TEAM {team}
+          {player?.playerType === 'cpu' ? ' · CPU' : ''}
+        </div>
+
+        <div className="mt-3 flex items-center justify-center gap-2">
+          <img
+            src={getCardBack()}
+            alt=""
+            className="h-12 w-9 rounded object-contain opacity-80"
+          />
+          <div className="text-left">
+            <div className="font-mono text-xl text-[#FFD700]">
+              {player?.cardCount || 0}
+            </div>
+            <div className="text-[6px] uppercase tracking-[0.12em] text-white/25" style={PS2}>
+              CARDS
+            </div>
+          </div>
+        </div>
+
+        {(player?.bid != null || player?.tricksWon > 0) && (
+          <div className="mt-2 text-xs text-white/45">
+            Bid {player?.bid ?? '-'} · Books {player?.tricksWon || 0}
+          </div>
+        )}
+
+        {isTurn && (
+          <div className="mt-2 text-[7px] uppercase tracking-[0.14em] text-[#FFD700]" style={PS2}>
+            ▶ TURN
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SpadesDisplay({ room }) {
+  const state = room.state || {};
+  const players = state.players || [];
+  const trick = state.currentTrick || [];
+  const phaseLabel = {
+    setup: 'SETTING TABLE',
+    dealt: 'CARDS DEALT',
+    bidding: 'BIDDING',
+    playing: 'PLAYING',
+    round_over: 'ROUND OVER',
+  }[state.phase] || String(state.phase || 'WAITING').toUpperCase();
+
+  const playerAt = (seat) => players.find((player) => player.seatNumber === seat);
+
+  return (
+    <div className="relative z-10 h-full w-full px-8 py-5">
+      <div className="flex h-full flex-col">
+        <div className="mb-3 flex items-center justify-between px-3">
+          <div>
+            <div className="text-[8px] uppercase tracking-[0.2em] text-[#BC13FE]" style={PS2}>
+              TEXASNOMAD SPADES
+            </div>
+            <div className="mt-1 text-sm text-white/30">
+              Hand {state.handNumber || 0} · {phaseLabel}
+            </div>
+          </div>
+
+          <div className="flex gap-5 text-right">
+            <div>
+              <div className="text-[6px] uppercase tracking-[0.15em] text-white/25" style={PS2}>
+                {state.team1Name || 'Team 1'}
+              </div>
+              <div className="mt-1 text-2xl text-[#BC13FE]">{state.score1 || 0}</div>
+            </div>
+            <div>
+              <div className="text-[6px] uppercase tracking-[0.15em] text-white/25" style={PS2}>
+                {state.team2Name || 'Team 2'}
+              </div>
+              <div className="mt-1 text-2xl text-[#FF5F1F]">{state.score2 || 0}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="relative flex-1 min-h-0">
+          <div
+            className="absolute inset-3 rounded-[42%] border-[10px] border-[#3d2817] bg-[#0a2a17]"
+            style={{
+              boxShadow:
+                'inset 0 0 90px rgba(0,0,0,.78), 0 0 40px rgba(0,0,0,.35)',
+            }}
+          >
+            <div
+              className="absolute inset-4 rounded-[42%] border border-white/[0.05]"
+              style={{
+                background:
+                  'radial-gradient(circle at 50% 45%, rgba(28,105,63,.4), rgba(4,38,20,.5) 55%, rgba(0,0,0,.28) 100%)',
+              }}
+            />
+
+            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" />
+            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" />
+            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" />
+            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" />
+
+            <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+              {trick.length === 0 ? (
+                <div className="text-center">
+                  <div className="text-6xl">♠</div>
+                  <div className="mt-3 text-[8px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
+                    {state.phase === 'dealt' ? 'PRIVATE DEAL VERIFIED' : phaseLabel}
+                  </div>
+                  {state.phase === 'dealt' && (
+                    <div className="mt-2 text-sm text-green-400/70">
+                      No hidden hands are sent to this display.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="relative h-40 w-52">
+                  {trick.map((play, index) => {
+                    const positions = [
+                      { left: 78, top: 82, transform: 'rotate(0deg)' },
+                      { left: 22, top: 48, transform: 'rotate(-90deg)' },
+                      { left: 78, top: 10, transform: 'rotate(180deg)' },
+                      { left: 136, top: 48, transform: 'rotate(90deg)' },
+                    ];
+                    const pos = positions[index] || positions[0];
+
+                    return (
+                      <img
+                        key={play.card?.id || index}
+                        src={getCardImage(play.card)}
+                        alt=""
+                        className="absolute h-20 w-14 rounded object-contain shadow-xl"
+                        style={pos}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-4 px-3">
+          <div className="rounded-lg border border-[#BC13FE]/20 bg-[#BC13FE]/[0.04] px-4 py-2 text-center">
+            <span className="text-xs text-white/35">
+              {state.team1Name || 'Team 1'} · Bid {state.bid1 ?? '-'} · Books {state.books1 || 0}
+            </span>
+          </div>
+          <div className="rounded-lg border border-[#FF5F1F]/20 bg-[#FF5F1F]/[0.04] px-4 py-2 text-center">
+            <span className="text-xs text-white/35">
+              {state.team2Name || 'Team 2'} · Bid {state.bid2 ?? '-'} · Books {state.books2 || 0}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function GameDisplay() {
   const initial = useMemo(savedDisplay, []);
   const [code, setCode] = useState('');
@@ -636,8 +835,9 @@ export default function GameDisplay() {
         )}
 
         {room?.gameId === 'hangman' && <HangmanDisplay room={room} />}
+        {room?.gameId === 'spades' && <SpadesDisplay room={room} />}
 
-        {room && room.gameId !== 'hangman' && (
+        {room && !['hangman', 'spades'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>
