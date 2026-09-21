@@ -1,7 +1,8 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -30,6 +31,8 @@ import Register from '@/pages/Register';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
+import TngOnboarding from '@/pages/TngOnboarding';
+import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -38,10 +41,53 @@ function HomeGate() {
 }
 
 const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
+  const location = useLocation();
+  const [profileState, setProfileState] = useState('idle');
+  const [profileError, setProfileError] = useState('');
 
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkPreviewProfile() {
+      if (!isBase44Preview || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
+        setProfileState('idle');
+        setProfileError('');
+        return;
+      }
+
+      setProfileState('checking');
+      setProfileError('');
+
+      try {
+        const profile = await getPreviewTngProfile(user);
+        if (cancelled) return;
+        setProfileState(profile ? 'ready' : 'missing');
+      } catch (error) {
+        if (cancelled) return;
+        console.error('[TNG Preview profile gate] profile check failed:', error);
+        setProfileError(error.message || 'TNG could not verify your profile.');
+        setProfileState('error');
+      }
+    }
+
+    checkPreviewProfile();
+    return () => { cancelled = true; };
+  }, [
+    user?.id,
+    user?.email,
+    isAuthenticated,
+    isLoadingAuth,
+    isLoadingPublicSettings,
+    location.pathname,
+  ]);
+
+  // Show loading spinner while checking app public settings, auth, or Preview TNG profile
+  if (
+    isLoadingPublicSettings ||
+    isLoadingAuth ||
+    (isBase44Preview && isAuthenticated && profileState === 'checking')
+  ) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
@@ -60,12 +106,52 @@ const AuthenticatedApp = () => {
     }
   }
 
+  const onboardingExemptPaths = new Set([
+    '/login',
+    '/register',
+    '/onboarding',
+    '/forgot-password',
+    '/reset-password',
+  ]);
+
+  if (
+    isBase44Preview &&
+    isAuthenticated &&
+    profileState === 'missing' &&
+    !onboardingExemptPaths.has(location.pathname)
+  ) {
+    const next = encodeURIComponent(`${location.pathname}${location.search}`);
+    return <Navigate to={`/onboarding?next=${next}`} replace />;
+  }
+
+  if (
+    isBase44Preview &&
+    isAuthenticated &&
+    profileState === 'error' &&
+    location.pathname !== '/onboarding'
+  ) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-[#05030b] px-4 text-center text-white">
+        <div className="max-w-md">
+          <div className="mb-3 text-sm text-red-400">{profileError}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="rounded-lg border border-[#BC13FE] px-4 py-2 text-sm text-[#BC13FE]"
+          >
+            RETRY
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Render the main app
   return (
     <Routes>
       <Route path="/welcome" element={<Welcome />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/onboarding" element={<TngOnboarding />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<HomeGate />} />
