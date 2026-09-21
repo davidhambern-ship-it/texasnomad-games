@@ -61,8 +61,16 @@ export default async function handler(request, response) {
     )).limit(1);
 
     if (activeSession) {
+      const activeRoom = await findActiveRoom(activeSession.id);
+
       if (activeSession.controllerDeviceId !== device.id) {
-        const reclaimController = request.body?.reclaimController === true;
+        // Development player-testing recovery:
+        // if this account already owns a LIVE room, a valid controller device
+        // for the same account may reclaim that room automatically. This keeps
+        // Preview auth refreshes from forcing a Game Display reconnect.
+        const reclaimController =
+          request.body?.reclaimController === true ||
+          Boolean(activeRoom);
 
         if (!reclaimController) {
           const error = new Error('This Host account already has an active controller.');
@@ -86,7 +94,6 @@ export default async function handler(request, response) {
           return [updated];
         });
 
-        const activeRoom = await findActiveRoom(reclaimedSession.id);
         return sendJson(response, 200, {
           hostSession: reclaimedSession,
           activeRoom,
@@ -95,7 +102,6 @@ export default async function handler(request, response) {
         });
       }
 
-      const activeRoom = await findActiveRoom(activeSession.id);
       return sendJson(response, 200, { hostSession: activeSession, activeRoom, resumed: true });
     }
 
