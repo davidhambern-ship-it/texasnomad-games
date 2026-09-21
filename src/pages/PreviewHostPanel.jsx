@@ -159,10 +159,8 @@ export default function PreviewHostPanel() {
 
         if (localStorage.getItem('tng_player_test_mode') === '1') {
           setPlayerTestMode(true);
-          setError(
-            'Player Test Mode is active, but TNG could not find a recoverable live test room for this Host session.',
-          );
-          setPhase('test-recovery');
+          setError('');
+          setPhase('ready');
           return;
         }
 
@@ -306,6 +304,15 @@ export default function PreviewHostPanel() {
     }
   }
 
+  function continueWithoutDisplay() {
+    localStorage.setItem('tng_player_test_mode', '1');
+    setPlayerTestMode(true);
+    setPairing(null);
+    setRepairingDisplay(false);
+    setError('');
+    setPhase('ready');
+  }
+
   async function createRoom(game) {
     setBusy(true);
     setError('');
@@ -352,12 +359,11 @@ export default function PreviewHostPanel() {
       setSelectedGame(null);
 
       if (playerTestMode) {
-        const payload = await tngApi.host.createPairing(controllerId, false);
-        setPairing(payload.pairing);
+        setPairing(null);
         setRepairingDisplay(false);
-        localStorage.removeItem('tng_player_test_mode');
-        setPlayerTestMode(false);
-        setPhase('pairing');
+        localStorage.setItem('tng_player_test_mode', '1');
+        setPlayerTestMode(true);
+        setPhase('ready');
       } else {
         setPhase('ready');
       }
@@ -483,14 +489,33 @@ export default function PreviewHostPanel() {
               <div className="border-2 border-[#FFD700]/50 rounded-2xl p-8 font-mono text-6xl tracking-[0.25em] text-[#FFD700]">
                 {pairing?.code || '------'}
               </div>
-              <Link
-                to="/display"
-                target="_blank"
-                className="inline-block mt-6 px-5 py-3 bg-[#FFD700] text-black rounded-lg"
-                style={PS2}
-              >
-                OPEN DISPLAY
-              </Link>
+              <div className="mt-6 flex flex-col items-center gap-3">
+                <Link
+                  to="/display"
+                  target="_blank"
+                  className="inline-block px-5 py-3 bg-[#FFD700] text-black rounded-lg"
+                  style={PS2}
+                >
+                  OPEN DISPLAY
+                </Link>
+
+                {!repairingDisplay && (
+                  <>
+                    <div className="text-[10px] text-white/30 uppercase tracking-widest">or</div>
+                    <button
+                      type="button"
+                      onClick={continueWithoutDisplay}
+                      className="px-5 py-3 rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 text-[#BC13FE] hover:bg-[#BC13FE]/20 transition-all"
+                      style={{ ...PS2, fontSize: 8 }}
+                    >
+                      CONTINUE WITHOUT DISPLAY
+                    </button>
+                    <p className="max-w-md text-xs leading-relaxed text-white/35">
+                      Live-test mode only. Use the Host Controller on this device without pairing a separate Game Display.
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )}
