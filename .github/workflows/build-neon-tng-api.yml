@@ -1,0 +1,55 @@
+name: Build Neon TNG API
+
+on:
+  push:
+    branches:
+      - codex/neon-backend-foundation
+    paths-ignore:
+      - build/tngapi.b64
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out migration branch
+        uses: actions/checkout@v4
+        with:
+          ref: codex/neon-backend-foundation
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bundle Neon Function
+        run: |
+          mkdir -p dist build
+          ./node_modules/.bin/esbuild functions/tngapi.js \
+            --bundle \
+            --platform=node \
+            --target=node24 \
+            --format=esm \
+            --banner:js="import{createRequire as ___cr}from'module';import{fileURLToPath as ___f}from'url';import{dirname as ___d}from'path';const require=___cr(import.meta.url);const __filename=___f(import.meta.url);const __dirname=___d(__filename);" \
+            --outfile=dist/index.mjs
+          zip -j /tmp/tngapi.zip dist/index.mjs
+          base64 -w 0 /tmp/tngapi.zip > build/tngapi.b64
+
+      - name: Publish development bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add build/tngapi.b64
+          if git diff --cached --quiet; then
+            echo "Bundle unchanged."
+            exit 0
+          fi
+          git commit -m "build: refresh Neon TNG API bundle"
+          git push origin HEAD:codex/neon-backend-foundation
