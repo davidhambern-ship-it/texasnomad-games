@@ -688,7 +688,8 @@ function SpadesDisplay({ room }) {
     dealt: 'CARDS DEALT',
     bidding: 'BIDDING',
     playing: 'PLAYING',
-    round_over: 'ROUND OVER',
+    resolving: 'TRICK COMPLETE',
+    round_over: 'HAND COMPLETE',
   }[state.phase] || String(state.phase || 'WAITING').toUpperCase();
 
   const displayPhaseLabel =
@@ -831,7 +832,7 @@ function SpadesDisplay({ room }) {
                   <SpadesDealAnimation
                     dealSequence={publicDealSequence}
                     seatedPlayers={players}
-                    dealStartSeat={state.currentBidderSeat || state.currentTurnSeat || 1}
+                    dealStartSeat={state.dealStartSeat || state.currentBidderSeat || state.currentTurnSeat || 1}
                     mySeatNumber={null}
                     onCardDealt={(seatNumber) => {
                       setVisualCardCounts((current) => ({
@@ -901,9 +902,11 @@ function SpadesDisplay({ room }) {
                 ? 'DEALING CARDS'
                 : state.phase === 'setup'
                   ? 'SET THE TABLE · THEN SHUFFLE & DEAL'
-                  : state.spadesBroken
-                    ? 'SPADES BROKEN'
-                    : 'SPADES NOT BROKEN'}
+                  : state.phase === 'round_over'
+                    ? `HAND COMPLETE · ${state.books1 || 0}–${state.books2 || 0} BOOKS`
+                    : state.spadesBroken
+                      ? 'SPADES BROKEN'
+                      : 'SPADES NOT BROKEN'}
           </div>
         </div>
       </div>
