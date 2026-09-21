@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { createRoomAndJoin } from '@/lib/roomUtils';
 import { base44 } from '@/api/base44Client';
+import { isNeonStaging } from '@/lib/neonAuth';
 import Header from '../components/home/Header';
 import Hero from '../components/home/Hero';
 import FeaturedGames from '../components/home/FeaturedGames';
@@ -65,7 +66,13 @@ function FeaturedGamesInline({ gameImages }) {
         ].map((game, i) => (
           <button
             key={game.id}
-            onClick={() => createRoomAndJoin(game.id)}
+            onClick={() => {
+              if (isNeonStaging) {
+                window.location.href = '/host';
+                return;
+              }
+              createRoomAndJoin(game.id);
+            }}
             className="group flex flex-col items-center p-2 border border-cyber-purple/20 rounded bg-black/60 hover:border-outlaw-gold hover:box-glow-gold transition-all duration-300"
           >
             <div className="w-16 h-16 md:w-20 md:h-20 mb-2 rounded overflow-hidden">
@@ -167,10 +174,18 @@ function LiveStatusInline() {
   const [rooms, setRooms] = React.useState([]);
 
   React.useEffect(() => {
+    if (isNeonStaging) {
+      // The staging site must not poll Base44. Public Neon live-room
+      // discovery will be wired to the TNG API separately.
+      setRooms([]);
+      return undefined;
+    }
+
     async function fetchLive() {
       const all = await base44.entities.GameRoom.list('-updated_date', 20);
       setRooms(all);
     }
+
     fetchLive();
     const interval = setInterval(fetchLive, 15000);
     return () => clearInterval(interval);
@@ -200,7 +215,9 @@ function LiveStatusInline() {
       {/* Scrolling feed */}
       <div className="overflow-hidden relative" style={{ height: 120 }}>
         {rooms.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-white/20 text-[6px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>No rooms yet</div>
+          <div className="flex items-center justify-center h-full text-white/20 text-[6px] tracking-widest uppercase text-center px-3" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            {isNeonStaging ? 'NEON LIVE TEST — ROOM FEED COMING ONLINE' : 'No rooms yet'}
+          </div>
         ) : (
           <div className="live-scroll">
             {scrollItems.map((room, i) => <RoomRow key={`${room.id}-${i}`} room={room} />)}
@@ -209,8 +226,8 @@ function LiveStatusInline() {
       </div>
 
       <div className="mt-3 text-center">
-        <a href="/live-status" className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[6px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          VIEW ALL →
+        <a href={isNeonStaging ? '/host' : '/live-status'} className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[6px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          {isNeonStaging ? 'HOST PANEL →' : 'VIEW ALL →'}
         </a>
       </div>
     </div>
