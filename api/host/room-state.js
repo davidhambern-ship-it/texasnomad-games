@@ -89,7 +89,12 @@ async function normalizeRoom(room) {
   const displayState = room.displayState || {};
   const baseGameState = displayState.gameState || defaultState(room.gameId);
   const gameState = room.gameId === 'hangman'
-    ? { ...baseGameState, players: await hangmanPlayers(room.id) }
+    ? {
+        ...baseGameState,
+        secret_word: '',
+        hint: baseGameState.hint_revealed ? (baseGameState.hint || '') : '',
+        players: await hangmanPlayers(room.id),
+      }
     : baseGameState;
 
   return {
@@ -127,6 +132,13 @@ export default async function handler(request, response) {
 
     if (request.method === 'GET') {
       return sendJson(response, 200, { room: await normalizeRoom(room) });
+    }
+
+    if (room.gameId === 'hangman') {
+      const error = new Error('Hangman state is controlled by the dedicated Hangman API.');
+      error.statusCode = 409;
+      error.code = 'HANGMAN_DEDICATED_API_REQUIRED';
+      throw error;
     }
 
     const current = room.displayState || {};
