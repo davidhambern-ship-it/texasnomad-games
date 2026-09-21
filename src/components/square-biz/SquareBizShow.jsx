@@ -108,9 +108,12 @@ export function SquareBizBoard({
   const xPlayer = players.find((p) => p.mark === 'X');
   const oPlayer = players.find((p) => p.mark === 'O');
   const latest = gameState.lastAction || {};
-  const slammedSquare = latest.type === 'answer' && latest.result === 'correct'
-    ? Number(latest.squareIndex)
-    : -1;
+  const slammedSquare =
+    latest.type === 'turn_changed' && latest.placedSquare != null
+      ? Number(latest.placedSquare)
+      : gameState.phase === 'finished' && latest.type === 'answer' && latest.result === 'correct'
+        ? Number(latest.squareIndex)
+        : -1;
   const winKey = Array.isArray(gameState.winningLine) ? gameState.winningLine.join(',') : '';
   const win = WIN_COORDS[winKey];
 
