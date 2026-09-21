@@ -37,6 +37,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build Neon frontend
+        run: npm run build:neon
+
       - name: Bundle Neon Function
         run: |
           mkdir -p dist build
