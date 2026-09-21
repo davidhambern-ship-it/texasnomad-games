@@ -8,6 +8,29 @@ import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
 function defaultState(gameId) {
+  if (gameId === 'spades') {
+    return {
+      phase: 'setup',
+      team1Name: 'Team 1',
+      team2Name: 'Team 2',
+      targetScore: 500,
+      score1: 0,
+      score2: 0,
+      bid1: null,
+      bid2: null,
+      books1: 0,
+      books2: 0,
+      dealerSeat: 1,
+      currentBidderSeat: null,
+      currentTurnSeat: null,
+      currentTrick: [],
+      tricksPlayed: 0,
+      spadesBroken: false,
+      handNumber: 0,
+      players: [],
+    };
+  }
+
   if (gameId === 'hangman') {
     return {
       phase: 'setup',
