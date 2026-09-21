@@ -426,13 +426,36 @@ function IntroArt({ type }) {
 
   if (type === 'win') {
     return (
-      <div className="relative grid w-[260px] grid-cols-3 gap-2">
-        {[0,1,2,3,4,5,6,7,8].map((i) => (
-          <div key={i} className="aspect-square rounded-lg border-2 border-[#ff781f]/65 bg-[#ff781f]/5">
-            {[0,4,8].includes(i) && <PieceArt mark="X" className="h-full w-full" />}
-          </div>
-        ))}
-        <div className="absolute left-[12%] top-[48%] h-2 w-[110%] origin-left rotate-45 rounded-full bg-[#ff1593] shadow-[0_0_18px_#ff1593]" />
+      <div className="relative w-[220px] sm:w-[250px]">
+        <div className="relative grid aspect-square w-full grid-cols-3 gap-2">
+          {[0,1,2,3,4,5,6,7,8].map((i) => (
+            <div
+              key={i}
+              className="relative aspect-square rounded-lg border-2 border-[#ff781f]/65 bg-[#ff781f]/5"
+            >
+              {[0,4,8].includes(i) && (
+                <PieceArt mark="X" className="absolute inset-[12%] h-auto w-auto" />
+              )}
+            </div>
+          ))}
+
+          <svg
+            className="pointer-events-none absolute inset-0 h-full w-full"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+          >
+            <line
+              x1="16"
+              y1="16"
+              x2="84"
+              y2="84"
+              stroke="#ff1593"
+              strokeWidth="4"
+              strokeLinecap="round"
+              style={{ filter: 'drop-shadow(0 0 8px #ff1593)' }}
+            />
+          </svg>
+        </div>
       </div>
     );
   }
@@ -506,7 +529,7 @@ export function SquareBizIntro({
           'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
       }} />
 
-      <div key={index} className="sb-intro-slide relative z-10 flex w-full max-w-[1050px] flex-col items-center text-center">
+      <div key={index} className="sb-intro-slide relative z-10 flex w-full max-w-[980px] flex-col items-center justify-center text-center">
         <div className="text-[9px] uppercase tracking-[.35em]" style={{ ...MONO, color: slide.accent }}>{slide.kicker}</div>
         <div
           className="mt-3 text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[.86] text-white"
@@ -517,7 +540,7 @@ export function SquareBizIntro({
         <div className="mt-6">
           <IntroArt type={slide.art} />
         </div>
-        <div className="mt-5 max-w-[780px] text-[clamp(.9rem,2vw,1.35rem)] font-bold leading-relaxed text-white/78">
+        <div className="mt-4 max-w-[760px] px-4 text-[clamp(.8rem,1.5vw,1.15rem)] font-bold leading-snug text-white/78">
           {slide.body}
         </div>
       </div>
