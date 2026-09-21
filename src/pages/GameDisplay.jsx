@@ -34,15 +34,6 @@ export default function GameDisplay() {
     }
   }
 
-  function resetDisplay() {
-    localStorage.removeItem('tng_display_token');
-    localStorage.removeItem('tng_display_device_id');
-    localStorage.removeItem('tng_display_host_session_id');
-    setDisplay(null);
-    setCode('');
-    setError('');
-  }
-
   if (!backendMigration.tngBackendEnabled) {
     return (
       <div className="min-h-screen bg-[#05030b] text-white flex items-center justify-center px-4 text-center">
@@ -68,9 +59,6 @@ export default function GameDisplay() {
             <div className="font-mono text-xs text-white/55 break-all">{display.deviceId}</div>
           </div>
 
-          <button onClick={resetDisplay} className="mt-7 px-5 py-3 rounded-lg border border-white/20 text-white/45 hover:text-white hover:bg-white/5 uppercase tracking-widest" style={{ ...PS2, fontSize: 8 }}>
-            DISCONNECT DISPLAY
-          </button>
         </div>
       </div>
     );
