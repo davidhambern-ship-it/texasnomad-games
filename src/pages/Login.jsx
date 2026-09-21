@@ -63,6 +63,9 @@ export default function Login() {
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL: `${window.location.origin}${nextPath}`,
+        additionalParams: {
+          prompt: "select_account",
+        },
       });
       if (result?.error) throw new Error(result.error.message || "Google sign-in failed");
     } catch (err) {
