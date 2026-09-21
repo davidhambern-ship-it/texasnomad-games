@@ -148,4 +148,24 @@ export const tngApi = {
       body:{ roomCode, action, ...payload },
     }),
   },
+  wordSearch: {
+    getHostState: (deviceId) => request('/api/word-search/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/word-search/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/word-search/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/word-search/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+  },
 };
