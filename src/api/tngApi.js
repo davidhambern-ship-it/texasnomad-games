@@ -128,4 +128,16 @@ export const tngApi = {
       body:{ roomCode, action, ...payload },
     }),
   },
+  hangman: {
+    getPlayerState: (deviceId, roomCode) => request('/api/hangman/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/hangman/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+  },
 };
