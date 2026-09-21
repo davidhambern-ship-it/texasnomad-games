@@ -82,10 +82,10 @@ export const tngApi = {
   },
   spades: {
     getHostState: (deviceId) => request('/api/spades/host', { deviceId }),
-    hostAction: (deviceId, action) => request('/api/spades/host', {
+    hostAction: (deviceId, action, payload = {}) => request('/api/spades/host', {
       method:'POST',
       deviceId,
-      body:{ action },
+      body:{ action, ...payload },
     }),
   },
 };
