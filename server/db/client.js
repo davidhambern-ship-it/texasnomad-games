@@ -1,4 +1,3 @@
-import { attachDatabasePool } from '@vercel/functions';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import pg from 'pg';
 
@@ -21,7 +20,12 @@ export const pool = globalForDatabase.__tngPool ?? new Pool({
 });
 
 if (!globalForDatabase.__tngPool) {
-  attachDatabasePool(pool);
+  // Long-lived runtimes (including Neon Functions) may reclaim idle Postgres
+  // connections. pg removes dead clients from the pool; this listener prevents
+  // an expected idle disconnect from becoming an uncaught process error.
+  pool.on('error', (error) => {
+    console.warn('[TNG database pool] idle client disconnected:', error.message);
+  });
   globalForDatabase.__tngPool = pool;
 }
 
