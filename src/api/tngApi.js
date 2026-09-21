@@ -1,6 +1,8 @@
-import { appParams } from '@/lib/app-params';
+import { getNeonAuthToken } from '@/lib/neonAuth';
 
-const API_BASE = 'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech';
+const API_BASE =
+  import.meta.env.VITE_TNG_API_BASE ||
+  'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech';
 
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
@@ -23,8 +25,14 @@ async function request(path, {
 } = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
-    if (!appParams.token) throw new TngApiError('Your TNG session is missing.', { code:'AUTH_REQUIRED', status:401 });
-    headers.Authorization = `Bearer ${appParams.token}`;
+    const token = await getNeonAuthToken();
+    if (!token) {
+      throw new TngApiError('Your TNG session is missing.', {
+        code: 'AUTH_REQUIRED',
+        status: 401,
+      });
+    }
+    headers.Authorization = `Bearer ${token}`;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (displayId) headers['X-TNG-Display-Id'] = displayId;
