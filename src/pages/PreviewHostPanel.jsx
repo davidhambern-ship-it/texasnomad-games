@@ -26,6 +26,20 @@ export default function PreviewHostPanel() {
   const [busy, setBusy] = useState(false);
   const authRecoveryStartedRef = useRef(false);
 
+  function isStaleRoom(room) {
+    if (!room) return false;
+    const stamp =
+      room.updatedAt ||
+      room.updated_at ||
+      room.createdAt ||
+      room.created_at ||
+      null;
+    if (!stamp) return false;
+    const value = new Date(stamp).getTime();
+    if (!Number.isFinite(value)) return false;
+    return Date.now() - value > 30 * 60 * 1000;
+  }
+
   const roomGame = useMemo(
     () => ALL_GAMES.find((game) => game.id === activeRoom?.gameId) || selectedGame,
     [activeRoom, selectedGame],
@@ -125,8 +139,17 @@ export default function PreviewHostPanel() {
         setActiveRoom(session.activeRoom || null);
 
         if (session.activeRoom) {
+          // Do not blindly mount a long-abandoned live room. A stale recovered
+          // room can contain old game state and should require an explicit
+          // recovery choice before game-specific controls are mounted.
+          if (isStaleRoom(session.activeRoom)) {
+            setError('');
+            setPhase('stale-room');
+            return;
+          }
+
           // Preview is currently being used for controller + player testing.
-          // Once a live room exists, always resume it headlessly instead of
+          // Once a current live room exists, resume it headlessly instead of
           // forcing the Game Display requirement back on after auth refresh.
           localStorage.setItem('tng_player_test_mode', '1');
           setPlayerTestMode(true);
@@ -390,6 +413,43 @@ export default function PreviewHostPanel() {
             <div>
               <div style={PS2}>HOST CONTROLLER ERROR</div>
               <p className="mt-4">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {phase === 'stale-room' && activeRoom && (
+          <div className="h-full flex items-center justify-center px-4">
+            <div className="max-w-xl w-full text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
+              <div className="text-[#FFD700]" style={PS2}>OLD LIVE ROOM FOUND</div>
+              <h2 className="mt-4 text-2xl">Recover previous room?</h2>
+              <p className="mt-3 text-sm leading-relaxed text-white/50">
+                TNG found an older live {activeRoom.gameId || 'game'} room
+                {activeRoom.roomCode ? ` (${activeRoom.roomCode})` : ''}.
+                It will not auto-load old game controls until you choose what to do.
+              </p>
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.setItem('tng_player_test_mode', '1');
+                    setPlayerTestMode(true);
+                    setPhase('room');
+                  }}
+                  className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE]"
+                >
+                  RESUME ROOM
+                </button>
+                <button
+                  type="button"
+                  onClick={endRoom}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-lg border border-red-500/50 bg-red-500/10 text-red-400 disabled:opacity-50"
+                >
+                  DISCONNECT OLD ROOM
+                </button>
+              </div>
             </div>
           </div>
         )}
