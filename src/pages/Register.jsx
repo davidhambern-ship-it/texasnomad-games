@@ -60,6 +60,8 @@ function TNGButton({ onClick, disabled, loading, children, type = 'button', colo
 }
 
 export default function Register() {
+  const requestedNext = new URLSearchParams(window.location.search).get('next');
+  const nextPath = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/';
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -118,7 +120,7 @@ export default function Register() {
   const handleGoogle = async () => {
     setError('');
     try {
-      if (backendMigration.tngBackendEnabled) await signInWithGoogle();
+      if (backendMigration.tngBackendEnabled) await signInWithGoogle(nextPath);
       else base44.auth.loginWithProvider("google", "/");
     } catch (err) {
       setError(err.message || 'Google sign-in could not start.');
