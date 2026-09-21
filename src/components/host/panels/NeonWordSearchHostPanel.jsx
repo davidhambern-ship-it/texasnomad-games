@@ -149,16 +149,6 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
 
   return (
     <div className="max-w-[1500px] mx-auto space-y-2">
-      <WordSearchTurnEffects
-        mode={currentMode}
-        phase={phase}
-        paused={paused}
-        activeSeat={activeSeat}
-        players={players}
-        viewerSeat={1}
-        timeRemaining={timeRemaining}
-      />
-
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400 text-center">
           {error}
@@ -199,7 +189,18 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
       {phase !== 'setup' && (
         <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
 
-          <section className="rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
+          <section className="relative rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
+            <WordSearchTurnEffects
+              mode={currentMode}
+              phase={phase}
+              paused={paused}
+              activeSeat={activeSeat}
+              players={players}
+              viewerSeat={1}
+              timeRemaining={timeRemaining}
+              roundNumber={gameState.roundNumber || 1}
+            />
+
             <NeonWordSearchBoard
               grid={grid}
               words={words}
