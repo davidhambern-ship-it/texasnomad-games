@@ -66,14 +66,16 @@ export default function PreviewHostPanel() {
   }
 
   async function startOrReplaceController(deviceId) {
+    const resumeTestRoom = localStorage.getItem('tng_player_test_mode') === '1';
+
     try {
-      return await tngApi.host.startSession(deviceId);
+      return await tngApi.host.startSession(deviceId, false, resumeTestRoom);
     } catch (sessionError) {
       if (
         sessionError instanceof TngApiError &&
         sessionError.code === 'HOST_ALREADY_CONTROLLED'
       ) {
-        return tngApi.host.startSession(deviceId, true);
+        return tngApi.host.startSession(deviceId, true, resumeTestRoom);
       }
 
       if (
@@ -85,13 +87,13 @@ export default function PreviewHostPanel() {
         setControllerId(replacementId);
 
         try {
-          return await tngApi.host.startSession(replacementId);
+          return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
         } catch (replacementError) {
           if (
             replacementError instanceof TngApiError &&
             replacementError.code === 'HOST_ALREADY_CONTROLLED'
           ) {
-            return tngApi.host.startSession(replacementId, true);
+            return tngApi.host.startSession(replacementId, true, resumeTestRoom);
           }
           throw replacementError;
         }
@@ -135,7 +137,7 @@ export default function PreviewHostPanel() {
         if (localStorage.getItem('tng_player_test_mode') === '1') {
           setPlayerTestMode(true);
           setError(
-            'Player Test Mode is active, but this signed-in Host account does not own the live room. Switch back to the Host account that created the room.',
+            'Player Test Mode is active, but TNG could not find a recoverable live test room for this Host session.',
           );
           setPhase('test-recovery');
           return;
@@ -397,21 +399,13 @@ export default function PreviewHostPanel() {
             <div className="max-w-xl text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
               <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
               <div className="text-[#FFD700]" style={PS2}>PLAYER TEST MODE</div>
-              <h2 className="mt-4 text-2xl">Wrong Host account signed in</h2>
+              <h2 className="mt-4 text-2xl">Test room recovery needed</h2>
               <p className="mt-3 text-sm leading-relaxed text-white/50">
-                The live test room still exists. This login does not own it, so TNG will not ask you to pair another display or create a second room.
+                {error || 'TNG could not find a recoverable live test room for this Host session.'}
               </p>
               <p className="mt-3 text-sm text-white/65">
-                Switch back to the Host account that created the room, then the controller will reclaim the existing live session automatically.
+                Your Host login is valid. Reconnect the normal display only if you want to start a new room.
               </p>
-              <button
-                type="button"
-                onClick={() => logout(true)}
-                className="mt-6 rounded-lg border border-[#BC13FE]/50 px-5 py-3 text-[#BC13FE]"
-                style={PS2}
-              >
-                SWITCH HOST ACCOUNT
-              </button>
             </div>
           </div>
         )}
