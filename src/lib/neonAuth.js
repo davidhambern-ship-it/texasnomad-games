@@ -8,7 +8,15 @@ export const NEON_AUTH_URL =
 export const isNeonStaging = true;
 
 export const authClient = createAuthClient(NEON_AUTH_URL, {
-  adapter: BetterAuthReactAdapter(),
+  adapter: BetterAuthReactAdapter({
+    fetchOptions: {
+      onRequest: (request) => {
+        try {
+          localStorage.setItem('tng_last_auth_request', request.url.toString());
+        } catch {}
+      },
+    },
+  }),
 });
 
 function unwrapSession(result) {
