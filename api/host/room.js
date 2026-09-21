@@ -9,14 +9,6 @@ import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond
 const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
-const STAGING_ORIGIN = 'https://texasnomad-games-git-staging-live-test-texasnomadgames.vercel.app';
-
-function isAuthorizedHeadlessTest(request) {
-  return (
-    request.body?.headlessTest === true &&
-    request.headers?.origin === STAGING_ORIGIN
-  );
-}
 
 function createRoomCode(length = 6) {
   return Array.from({ length }, () => ROOM_ALPHABET[randomInt(0, ROOM_ALPHABET.length)]).join('');
@@ -65,12 +57,7 @@ export default async function handler(request, response) {
       throw error;
     }
 
-    const headlessTest = isAuthorizedHeadlessTest(request);
-
-    if (
-      (!hostSession.displayDeviceId || !['ready', 'live'].includes(hostSession.status)) &&
-      !headlessTest
-    ) {
+    if (!hostSession.displayDeviceId || !['ready', 'live'].includes(hostSession.status)) {
       const error = new Error('Connect the Game Display before creating a live room.');
       error.statusCode = 409;
       error.code = 'DISPLAY_REQUIRED';
