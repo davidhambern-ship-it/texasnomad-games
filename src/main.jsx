@@ -4,13 +4,21 @@ import App from '@/App.jsx'
 import '@/index.css'
 import '@/lib/sw-cleanup.js'
 
-function showGlobalCrash(kind, errorLike) {
+function showGlobalCrash(kind, errorLike, eventMeta = {}) {
   try {
+    const sourceError = errorLike?.reason || errorLike;
     const message =
+      sourceError?.message ||
       errorLike?.message ||
       errorLike?.reason?.message ||
       errorLike?.reason ||
       String(errorLike || 'Unknown error');
+    const stack = sourceError?.stack || errorLike?.stack || '';
+    const location = [
+      eventMeta.filename || '',
+      eventMeta.lineno ? `line ${eventMeta.lineno}` : '',
+      eventMeta.colno ? `col ${eventMeta.colno}` : '',
+    ].filter(Boolean).join(' • ');
 
     let overlay = document.getElementById('tng-global-crash-overlay');
     if (!overlay) {
@@ -54,7 +62,12 @@ function showGlobalCrash(kind, errorLike) {
 
     const body = document.getElementById('tng-global-crash-message');
     if (body) {
-      body.textContent = `${kind}: ${message}\n\nURL: ${window.location.href}`;
+      body.textContent = [
+        `${kind}: ${message}`,
+        location ? `SOURCE: ${location}` : '',
+        stack ? `STACK:\n${stack}` : '',
+        `URL: ${window.location.href}`,
+      ].filter(Boolean).join('\n\n');
     }
   } catch (overlayError) {
     console.error('[TNG global crash overlay failed]', overlayError);
@@ -63,7 +76,11 @@ function showGlobalCrash(kind, errorLike) {
 
 window.addEventListener('error', (event) => {
   console.error('[TNG global error]', event.error || event.message);
-  showGlobalCrash('ERROR', event.error || event.message);
+  showGlobalCrash('ERROR', event.error || event.message, {
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno,
+  });
 });
 
 window.addEventListener('unhandledrejection', (event) => {
