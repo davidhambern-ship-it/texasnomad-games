@@ -122,7 +122,15 @@ export default function NeonSpadesHostPanel({ controllerId }) {
   // CPU turns are requested by the trusted Host Controller, but the card choice
   // and legality checks happen on the server.
   useEffect(() => {
-    if (phase !== 'playing' || ![2, 3, 4].includes(currentTurnSeat)) {
+    const currentPlayer = players.find(
+      (player) => Number(player.seatNumber) === currentTurnSeat,
+    );
+
+    if (
+      phase !== 'playing' ||
+      ![2, 3, 4].includes(currentTurnSeat) ||
+      currentPlayer?.playerType !== 'cpu'
+    ) {
       return undefined;
     }
 
@@ -131,7 +139,7 @@ export default function NeonSpadesHostPanel({ controllerId }) {
     }, 700);
 
     return () => window.clearTimeout(timer);
-  }, [act, currentTrick.length, currentTurnSeat, phase]);
+  }, [act, currentTrick.length, currentTurnSeat, phase, players]);
 
   // Leave a completed four-card trick visible on the TV briefly before the
   // server awards the book and clears the table.
