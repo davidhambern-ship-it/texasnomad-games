@@ -26,6 +26,14 @@ jobs:
           node-version: 24
           cache: npm
 
+      - name: Smoke test deployed Neon API
+        run: |
+          curl --fail --show-error --silent \
+            https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech/health \
+            | tee /tmp/tng-health.json
+          grep -q '"status":"ok"' /tmp/tng-health.json
+          grep -q '"database":"connected"' /tmp/tng-health.json
+
       - name: Install dependencies
         run: npm ci
 
