@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { base44 } from "@/api/base44Client";
+import { authClient } from "@/lib/neonAuth";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -46,7 +46,8 @@ export default function Login() {
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
+      const result = await authClient.signIn.email({ email, password });
+      if (result?.error) throw new Error(result.error.message || "Invalid email or password");
       window.location.href = nextPath;
     } catch (err) {
       setError(err.message || "Invalid email or password");
@@ -55,16 +56,19 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
-    // Base44 Preview normally reinjects the editor/admin access token on every
-    // reload. Mark this redirect so app-params can pin the Google account the
-    // tester explicitly chose instead.
+  const handleGoogle = async () => {
+    setError("");
+    setLoading(true);
     try {
-      localStorage.setItem('tng_preview_expect_user_login', '1');
-      localStorage.removeItem('tng_preview_user_access_token');
-    } catch {}
-
-    base44.auth.loginWithProvider("google", nextPath);
+      const result = await authClient.signIn.social({
+        provider: "google",
+        callbackURL: `${window.location.origin}${nextPath}`,
+      });
+      if (result?.error) throw new Error(result.error.message || "Google sign-in failed");
+    } catch (err) {
+      setError(err.message || "Google sign-in failed");
+      setLoading(false);
+    }
   };
 
   return (
