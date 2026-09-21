@@ -81,7 +81,7 @@ export default function JoinRoom() {
         if (isBase44Preview || isNeonStaging) {
           if (!isAuthenticated) {
             const next = encodeURIComponent(`/join/${roomCode}`);
-            window.location.href = `/login?next=${next}`;
+            window.location.replace(`/login?next=${next}`);
             return;
           }
 
@@ -99,7 +99,7 @@ export default function JoinRoom() {
               return;
             }
 
-            window.location.href = `${gamePath}?room=${roomCode}&neon=1`;
+            window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
             return;
           } catch (joinError) {
             if (
@@ -107,7 +107,7 @@ export default function JoinRoom() {
               ['INVALID_PLAYER_DEVICE', 'PLAYER_DEVICE_REQUIRED'].includes(joinError.code)
             ) {
               localStorage.removeItem('tng_player_device_id');
-              deviceId = await ensurePlayerDevice();
+              deviceId = await ensurePlayerDevice(user?.id);
               const payload = validatePlayerJoin(
               await tngApi.player.joinRoom(deviceId, roomCode),
               roomCode,
@@ -119,7 +119,7 @@ export default function JoinRoom() {
                 return;
               }
 
-              window.location.href = `${gamePath}?room=${roomCode}&neon=1`;
+              window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
               return;
             }
 
@@ -140,7 +140,7 @@ export default function JoinRoom() {
           return;
         }
 
-        window.location.href = `${gamePath}?room=${roomCode}`;
+        window.location.replace(`${gamePath}?room=${roomCode}`);
       } catch (joinError) {
         setError(
           joinError?.message ||
