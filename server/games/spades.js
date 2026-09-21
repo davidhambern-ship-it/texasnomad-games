@@ -72,3 +72,103 @@ export function dealSpades(deck, dealerSeat = 1) {
     firstSeat: SPADES_SEATS[firstSeatIndex],
   };
 }
+
+
+export function isSpadeCard(card) {
+  return card?.suit === '♠' || card?.suit === 'Joker';
+}
+
+export function getSpadesActiveSuit(trick = []) {
+  const lead = trick[0]?.card;
+  if (!lead) return null;
+  return isSpadeCard(lead) ? '♠' : lead.suit;
+}
+
+export function validateSpadesPlay(card, hand = [], trick = [], spadesBroken = false) {
+  if (!card || !hand.some((item) => item.id === card.id)) {
+    return { valid: false, reason: 'That card is not in the player hand.' };
+  }
+
+  const activeSuit = getSpadesActiveSuit(trick);
+
+  if (!activeSuit) {
+    if (isSpadeCard(card) && !spadesBroken) {
+      const hasNonSpade = hand.some((item) => !isSpadeCard(item));
+      if (hasNonSpade) {
+        return { valid: false, reason: 'Spades have not been broken yet.' };
+      }
+    }
+
+    return { valid: true, reason: null };
+  }
+
+  const hasActiveSuit = activeSuit === '♠'
+    ? hand.some(isSpadeCard)
+    : hand.some((item) => item.suit === activeSuit);
+
+  const followsSuit = activeSuit === '♠'
+    ? isSpadeCard(card)
+    : card.suit === activeSuit;
+
+  if (hasActiveSuit && !followsSuit) {
+    return { valid: false, reason: 'You must follow suit.' };
+  }
+
+  return { valid: true, reason: null };
+}
+
+export function legalSpadesCards(hand = [], trick = [], spadesBroken = false) {
+  return hand.filter((card) => validateSpadesPlay(card, hand, trick, spadesBroken).valid);
+}
+
+export function spadesCardStrength(card, activeSuit = null) {
+  if (!card) return -1;
+
+  const rank = {
+    '2': 2,
+    '3': 3,
+    '4': 4,
+    '5': 5,
+    '6': 6,
+    '7': 7,
+    '8': 8,
+    '9': 9,
+    '10': 10,
+    J: 11,
+    Q: 12,
+    K: 13,
+    A: 14,
+  };
+
+  if (card.value === 'BJ') return 66;
+  if (card.value === 'LJ') return 65;
+  if (card.suit === '♠') return 50 + (rank[card.value] || 0);
+  if (activeSuit && card.suit === activeSuit) return 20 + (rank[card.value] || 0);
+  return rank[card.value] || 0;
+}
+
+export function determineSpadesTrickWinner(trick = []) {
+  if (!trick.length) return null;
+
+  const activeSuit = getSpadesActiveSuit(trick);
+  return trick.reduce((winner, play) => (
+    spadesCardStrength(play.card, activeSuit) > spadesCardStrength(winner.card, activeSuit)
+      ? play
+      : winner
+  ), trick[0]);
+}
+
+export function spadesTeamForSeat(seatNumber) {
+  return seatNumber === 1 || seatNumber === 3 ? 1 : 2;
+}
+
+export function nextSpadesSeat(seatNumber) {
+  const index = SPADES_SEATS.indexOf(seatNumber);
+  return SPADES_SEATS[index >= 0 ? (index + 1) % SPADES_SEATS.length : 0];
+}
+
+export function chooseCpuSpadesCard(hand = [], trick = [], spadesBroken = false) {
+  const legal = legalSpadesCards(hand, trick, spadesBroken);
+  if (!legal.length) return null;
+  return legal[randomInt(0, legal.length)];
+}
