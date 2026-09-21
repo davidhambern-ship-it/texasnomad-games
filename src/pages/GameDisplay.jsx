@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   Expand,
@@ -454,7 +454,7 @@ function HangmanDisplay({ room }) {
 }
 
 
-function SpadesSeat({ seat, player, state, position }) {
+function SpadesSeat({ seat, player, state, position, scale = 1 }) {
   const team = seat === 1 || seat === 3 ? 1 : 2;
   const teamColor = team === 1 ? '#BC13FE' : '#FF5F1F';
   const isTurn = state.currentTurnSeat === seat;
@@ -465,22 +465,26 @@ function SpadesSeat({ seat, player, state, position }) {
     top: {
       left: '50%',
       top: 6,
-      transform: 'translateX(-50%)',
+      transform: `translateX(-50%) scale(${scale})`,
+      transformOrigin: 'top center',
     },
     bottom: {
       left: '50%',
       bottom: 6,
-      transform: 'translateX(-50%)',
+      transform: `translateX(-50%) scale(${scale})`,
+      transformOrigin: 'bottom center',
     },
     left: {
       left: 22,
       top: '50%',
-      transform: 'translateY(-50%)',
+      transform: `translateY(-50%) scale(${scale})`,
+      transformOrigin: 'left center',
     },
     right: {
       right: 22,
       top: '50%',
-      transform: 'translateY(-50%)',
+      transform: `translateY(-50%) scale(${scale})`,
+      transformOrigin: 'right center',
     },
   }[position];
 
@@ -591,6 +595,57 @@ function SpadesDisplay({ room }) {
   const state = room.state || {};
   const players = state.players || [];
   const trick = state.currentTrick || [];
+  const playAreaRef = useRef(null);
+  const [tableSize, setTableSize] = useState(null);
+
+  useEffect(() => {
+    const playArea = playAreaRef.current;
+    if (!playArea) return undefined;
+
+    const TARGET_ASPECT = 2.55;
+    const fitTable = () => {
+      const availableWidth = playArea.clientWidth;
+      const availableHeight = playArea.clientHeight;
+      if (!availableWidth || !availableHeight) return;
+
+      // Large screens preserve the approved 62% reference width.
+      // Smaller screens are allowed to use more horizontal space so the table
+      // remains readable while still preserving its shape.
+      const widthFraction =
+        availableWidth < 760 ? 0.94 :
+        availableWidth < 1100 ? 0.82 :
+        availableWidth < 1450 ? 0.72 :
+        0.62;
+
+      const maxWidth = availableWidth * widthFraction;
+      const maxHeight = availableHeight * 0.92;
+
+      let width = maxWidth;
+      let height = width / TARGET_ASPECT;
+
+      if (height > maxHeight) {
+        height = maxHeight;
+        width = height * TARGET_ASPECT;
+      }
+
+      setTableSize({
+        width: Math.round(width),
+        height: Math.round(height),
+        scale: Math.max(0.68, Math.min(1, width / 1120)),
+      });
+    };
+
+    fitTable();
+
+    const observer = new ResizeObserver(fitTable);
+    observer.observe(playArea);
+    window.addEventListener('resize', fitTable);
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', fitTable);
+    };
+  }, []);
 
   const phaseLabel = {
     setup: 'SETTING TABLE',
@@ -658,12 +713,12 @@ function SpadesDisplay({ room }) {
         </div>
       </div>
 
-      <div className="relative min-h-0 flex-1">
+      <div ref={playAreaRef} className="relative min-h-0 flex-1">
         <div
           className="absolute left-1/2 top-1/2"
           style={{
-            width: '62%',
-            height: '92%',
+            width: tableSize ? `${tableSize.width}px` : '62%',
+            height: tableSize ? `${tableSize.height}px` : '92%',
             transform: 'translate(-50%, -50%)',
           }}
         >
@@ -687,8 +742,8 @@ function SpadesDisplay({ room }) {
             <div
               className="pointer-events-none absolute left-1/2 top-1/2 z-[2] -translate-x-1/2 -translate-y-1/2"
               style={{
-                width: 'clamp(150px, 13vw, 225px)',
-                height: 'clamp(150px, 13vw, 225px)',
+                width: 'clamp(110px, 22%, 225px)',
+                aspectRatio: '1 / 1',
                 opacity: 0.30,
                 filter: 'drop-shadow(0 0 24px rgba(255,214,110,.12))',
               }}
@@ -700,10 +755,10 @@ function SpadesDisplay({ room }) {
               />
             </div>
 
-            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" />
-            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" />
-            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" />
-            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" />
+            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" scale={tableSize?.scale || 1} />
+            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" scale={tableSize?.scale || 1} />
+            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" scale={tableSize?.scale || 1} />
+            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" scale={tableSize?.scale || 1} />
 
             <div
               className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
