@@ -27,6 +27,7 @@ import WordWranglerGame from '@/pages/WordWranglerGame';
 import DominoHost from '@/pages/DominoHost';
 import DominoGame from '@/pages/DominoGame';
 import PlayerProfile from '@/pages/PlayerProfile';
+import NeonPlayerProfile from '@/pages/NeonPlayerProfile';
 import Register from '@/pages/Register';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -177,7 +178,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
       <Route path="/games/dominoes/host" element={<DominoHost />} />
       <Route path="/games/dominoes" element={<DominoGame />} />
-      <Route path="/profile" element={<PlayerProfile />} />
+      <Route path="/profile" element={isNeonStaging ? <NeonPlayerProfile /> : <PlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>
