@@ -550,6 +550,10 @@ export function publicSquareBizState(rawState, participants = [], viewerAccountI
       : participants.find((participant) => participant.accountId === viewerAccountId)?.accountId === state.o_account_id
         ? 'O'
         : null,
+    myQueuePosition: (() => {
+      const index = state.queue_account_ids.indexOf(viewerAccountId);
+      return index >= 0 ? index + 1 : null;
+    })(),
     canSelectSquare:
       state.phase === 'board' &&
       String(viewerAccountId || '') === String(currentAccountId || ''),
