@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import SpadesTable from '@/components/spades/SpadesTable';
+import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
+import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -13,14 +15,27 @@ export default function NeonSpadesPlayer({ roomCode }) {
   const [hand, setHand] = useState([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [dealVisualPhase, setDealVisualPhase] = useState('idle');
+  const [visualCardCounts, setVisualCardCounts] = useState(null);
+  const [visualHand, setVisualHand] = useState(null);
   const actionLockRef = useRef(false);
+  const lastAnimatedHandRef = useRef(0);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
   const mySeat = Number(participant?.seatNumber || 0);
   const phase = gameState.phase || 'setup';
+  const handNumber = Number(gameState.handNumber || 0);
   const currentTurnSeat = Number(gameState.currentTurnSeat || 0);
   const isMyTurn = mySeat > 0 && phase === 'playing' && currentTurnSeat === mySeat;
+  const playerStatusLabel =
+    dealVisualPhase === 'shuffling'
+      ? 'SHUFFLING'
+      : dealVisualPhase === 'dealing'
+        ? 'DEALING'
+        : isMyTurn
+          ? 'YOUR TURN'
+          : String(phase).replace(/_/g, ' ');
   const neonPlayerId = 'neon-current-player';
 
   const refresh = useCallback(async () => {
@@ -72,6 +87,25 @@ export default function NeonSpadesPlayer({ roomCode }) {
     return () => window.clearInterval(interval);
   }, [deviceId, refresh]);
 
+  useEffect(() => {
+    const lastAnimatedHand = lastAnimatedHandRef.current;
+
+    if (phase === 'setup' || handNumber < lastAnimatedHand) {
+      lastAnimatedHandRef.current = handNumber;
+      setDealVisualPhase('idle');
+      setVisualCardCounts(null);
+      setVisualHand(null);
+      return;
+    }
+
+    if (phase === 'dealt' && handNumber > lastAnimatedHand) {
+      lastAnimatedHandRef.current = handNumber;
+      setVisualCardCounts({ 1: 0, 2: 0, 3: 0, 4: 0 });
+      setVisualHand([]);
+      setDealVisualPhase('shuffling');
+    }
+  }, [handNumber, phase]);
+
   const tableState = useMemo(() => {
     const sourcePlayers = Array.isArray(gameState.players) ? gameState.players : [];
 
@@ -119,6 +153,57 @@ export default function NeonSpadesPlayer({ roomCode }) {
       (seat) => !players.some((player) => Number(player.seatNumber) === seat),
     );
   }, [tableState.players]);
+
+  const dealSequence = useMemo(() => {
+    const seated = [...(tableState.players || [])]
+      .filter((player) => player.seatNumber != null)
+      .sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
+
+    if (seated.length === 0) return [];
+
+    const dealStartSeat = Number(gameState.dealStartSeat || seated[0]?.seatNumber || 1);
+    const startIndex = Math.max(
+      0,
+      seated.findIndex((player) => Number(player.seatNumber) === dealStartSeat),
+    );
+    const ordered = startIndex > 0
+      ? [...seated.slice(startIndex), ...seated.slice(0, startIndex)]
+      : seated;
+
+    let myCardIndex = 0;
+
+    return Array.from({ length: 52 }, (_, index) => {
+      const targetSeat = Number(ordered[index % ordered.length]?.seatNumber || 0);
+
+      if (targetSeat === mySeat) {
+        const privateCard = hand[myCardIndex];
+        myCardIndex += 1;
+        return privateCard || { id: `player-deal-back-${handNumber}-${index}` };
+      }
+
+      return { id: `player-deal-back-${handNumber}-${index}` };
+    });
+  }, [gameState.dealStartSeat, hand, handNumber, mySeat, tableState.players]);
+
+  const presentationTableState = useMemo(() => {
+    if (!visualCardCounts) return tableState;
+
+    const players = (tableState.players || []).map((player) => {
+      const seatNumber = Number(player.seatNumber);
+      const isMe = seatNumber === mySeat;
+
+      return {
+        ...player,
+        cardCount: Number(visualCardCounts[seatNumber] || 0),
+        hand: isMe ? (visualHand || []) : undefined,
+      };
+    });
+
+    return {
+      ...tableState,
+      players,
+    };
+  }, [mySeat, tableState, visualCardCounts, visualHand]);
 
   const takeSeat = useCallback((seatNumber) => {
     if (busy) return;
@@ -175,13 +260,13 @@ export default function NeonSpadesPlayer({ roomCode }) {
       <main className="mx-auto flex min-h-screen max-w-[1700px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4">
         <section className="order-1 min-w-0 flex-1 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
           <div
-            className="w-full mx-auto"
+            className="relative w-full mx-auto"
             style={{
               maxWidth: 'min(100%, calc((100dvh - 110px) * 8 / 7))',
             }}
           >
             <SpadesTable
-              gs={tableState}
+              gs={presentationTableState}
               playerId={neonPlayerId}
               mySeatNumber={mySeat || null}
               myRole={mySeat ? 'player' : null}
@@ -204,6 +289,48 @@ export default function NeonSpadesPlayer({ roomCode }) {
               showPlayerControls={false}
               showTableHud={false}
             />
+
+            {dealVisualPhase !== 'idle' && (
+              <div className="pointer-events-none absolute inset-0 z-[100] flex items-center justify-center">
+                <div className="relative h-56 w-56 overflow-visible">
+                  {dealVisualPhase === 'shuffling' ? (
+                    <SpadesShuffleAnimation
+                      phase="shuffling"
+                      onComplete={() => setDealVisualPhase('dealing')}
+                    />
+                  ) : (
+                    <SpadesDealAnimation
+                      dealSequence={dealSequence}
+                      seatedPlayers={tableState.players || []}
+                      dealStartSeat={gameState.dealStartSeat || 1}
+                      mySeatNumber={mySeat || null}
+                      onCardDealt={(seatNumber, card) => {
+                        setVisualCardCounts((current) => ({
+                          ...(current || { 1: 0, 2: 0, 3: 0, 4: 0 }),
+                          [seatNumber]: Math.min(
+                            13,
+                            Number(current?.[seatNumber] || 0) + 1,
+                          ),
+                        }));
+
+                        if (
+                          Number(seatNumber) === mySeat &&
+                          card?.suit &&
+                          card?.value
+                        ) {
+                          setVisualHand((current) => [...(current || []), card]);
+                        }
+                      }}
+                      onComplete={() => {
+                        setDealVisualPhase('idle');
+                        setVisualCardCounts(null);
+                        setVisualHand(null);
+                      }}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
@@ -241,7 +368,7 @@ export default function NeonSpadesPlayer({ roomCode }) {
             >
               <div className="text-[6px] uppercase tracking-[0.14em] text-white/25" style={PS2}>STATUS</div>
               <div className={`mt-1 text-xs uppercase ${isMyTurn ? 'text-green-400' : 'text-white/55'}`}>
-                {isMyTurn ? 'YOUR TURN' : String(phase).replace(/_/g, ' ')}
+                {playerStatusLabel}
               </div>
             </div>
 
