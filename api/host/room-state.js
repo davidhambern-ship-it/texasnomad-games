@@ -1,8 +1,8 @@
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 
 import { requireController } from '../../server/auth/require-controller.js';
 import { db } from '../../server/db/client.js';
-import { gameRooms } from '../../server/db/schema.js';
+import { gameRooms, playerProfiles, roomParticipants } from '../../server/db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
@@ -51,15 +51,54 @@ function defaultState(gameId) {
   return {};
 }
 
-function normalizeRoom(room) {
+async function hangmanPlayers(roomId) {
+  const participants = await db.select().from(roomParticipants).where(and(
+    eq(roomParticipants.roomId, roomId),
+    isNull(roomParticipants.leftAt),
+  ));
+
+  const accountIds = participants.map((item) => item.accountId);
+  const profiles = accountIds.length > 0
+    ? await db.select({
+        accountId: playerProfiles.accountId,
+        displayName: playerProfiles.displayName,
+        handle: playerProfiles.handle,
+      }).from(playerProfiles).where(inArray(playerProfiles.accountId, accountIds))
+    : [];
+
+  const profileByAccount = new Map(profiles.map((item) => [item.accountId, item]));
+
+  return participants
+    .filter((item) => [2, 3, 4].includes(Number(item.seatNumber)))
+    .map((item) => {
+      const profile = profileByAccount.get(item.accountId);
+      return {
+        playerId: item.accountId,
+        accountId: item.accountId,
+        seatNumber: Number(item.seatNumber),
+        role: 'player',
+        playerType: 'human',
+        name: profile?.displayName || profile?.handle || `Seat ${item.seatNumber}`,
+        handle: profile?.handle || null,
+      };
+    })
+    .sort((a, b) => a.seatNumber - b.seatNumber);
+}
+
+async function normalizeRoom(room) {
   const displayState = room.displayState || {};
+  const baseGameState = displayState.gameState || defaultState(room.gameId);
+  const gameState = room.gameId === 'hangman'
+    ? { ...baseGameState, players: await hangmanPlayers(room.id) }
+    : baseGameState;
+
   return {
     id: room.id,
     roomCode: room.roomCode,
     gameId: room.gameId,
     status: room.status,
     revision: room.revision,
-    gameState: displayState.gameState || defaultState(room.gameId),
+    gameState,
     lastCommand: displayState.lastCommand || null,
     createdAt: room.createdAt,
     updatedAt: room.updatedAt,
@@ -87,7 +126,7 @@ export default async function handler(request, response) {
     }
 
     if (request.method === 'GET') {
-      return sendJson(response, 200, { room: normalizeRoom(room) });
+      return sendJson(response, 200, { room: await normalizeRoom(room) });
     }
 
     const current = room.displayState || {};
@@ -134,7 +173,7 @@ export default async function handler(request, response) {
       updatedAt: new Date(),
     }).where(eq(gameRooms.id, room.id)).returning();
 
-    return sendJson(response, 200, { room: normalizeRoom(updated) });
+    return sendJson(response, 200, { room: await normalizeRoom(updated) });
   } catch (error) {
     return sendError(response, error);
   }
