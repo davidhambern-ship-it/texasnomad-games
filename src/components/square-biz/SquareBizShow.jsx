@@ -20,55 +20,59 @@ const WIN_COORDS = {
   '2,4,6': [82, 18, 18, 82],
 };
 
-function PaintX({ className = '' }) {
+function FallbackX({ className = '' }) {
   return (
     <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <filter id="sb-x-glow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="3.5" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      <g filter="url(#sb-x-glow)" fill="none" stroke={X_COLOR} strokeLinecap="round">
+      <g fill="none" stroke={X_COLOR} strokeLinecap="round">
         <path d="M18 17 C37 34 62 64 83 84" strokeWidth="17" />
         <path d="M82 15 C64 36 39 61 17 85" strokeWidth="16" />
-        <path d="M14 20 C35 40 60 67 86 88" strokeWidth="4" opacity=".75" />
-        <path d="M87 11 C67 35 41 60 13 89" strokeWidth="3" opacity=".6" />
       </g>
     </svg>
   );
 }
 
-function PaintO({ className = '' }) {
+function FallbackO({ className = '' }) {
   return (
     <svg className={className} viewBox="0 0 100 100" aria-hidden="true">
-      <defs>
-        <filter id="sb-o-glow" x="-60%" y="-60%" width="220%" height="220%">
-          <feGaussianBlur stdDeviation="3.5" result="b" />
-          <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-        </filter>
-      </defs>
-      <g filter="url(#sb-o-glow)" fill="none" stroke={O_COLOR} strokeLinecap="round">
-        <path d="M50 13 C76 12 88 29 87 51 C86 77 70 87 49 87 C26 87 13 72 13 50 C13 26 29 14 50 13 Z" strokeWidth="15" />
-        <path d="M50 18 C72 17 82 31 81 52 C80 70 68 81 49 81" strokeWidth="4" opacity=".7" />
-      </g>
+      <path d="M50 13 C76 12 88 29 87 51 C86 77 70 87 49 87 C26 87 13 72 13 50 C13 26 29 14 50 13 Z" fill="none" stroke={O_COLOR} strokeWidth="15" strokeLinecap="round" />
     </svg>
+  );
+}
+
+function PieceArt({ mark, className = '' }) {
+  const [failed, setFailed] = useState(false);
+  const src = mark === 'X'
+    ? '/assets/square-biz/piece-x.webp'
+    : '/assets/square-biz/piece-o.webp';
+
+  if (failed) {
+    return mark === 'X'
+      ? <FallbackX className={className} />
+      : <FallbackO className={className} />;
+  }
+
+  return (
+    <img
+      src={src}
+      alt=""
+      draggable="false"
+      onError={() => setFailed(true)}
+      className={`${className} object-contain`}
+    />
   );
 }
 
 function Marker({ mark, slam = false, compact = false }) {
   if (!mark) return null;
-  const Component = mark === 'X' ? PaintX : PaintO;
   return (
-    <div className={`absolute inset-[8%] flex items-center justify-center ${slam ? 'sb-piece-slam' : ''}`}>
-      <Component className={compact ? 'h-[90%] w-[90%]' : 'h-full w-full'} />
+    <div className={`absolute inset-[5%] flex items-center justify-center ${slam ? 'sb-piece-slam' : ''}`}>
+      <PieceArt mark={mark} className={compact ? 'h-[94%] w-[94%]' : 'h-full w-full'} />
     </div>
   );
 }
 
 function MiniPlayer({ player, mark, current }) {
   const color = mark === 'X' ? X_COLOR : O_COLOR;
-  const Piece = mark === 'X' ? PaintX : PaintO;
   return (
     <div
       className={`relative overflow-hidden rounded-2xl border p-2.5 transition-all ${current ? 'sb-current-player' : ''}`}
@@ -79,7 +83,7 @@ function MiniPlayer({ player, mark, current }) {
       }}
     >
       <div className="flex items-center gap-2">
-        <Piece className="h-10 w-10 shrink-0" />
+        <PieceArt mark={mark} className="h-10 w-10 shrink-0" />
         <div className="min-w-0">
           <div className="text-[9px] uppercase tracking-[.16em]" style={{ ...MONO, color }}>{`PLAYER ${mark}`}</div>
           <div className="mt-1 truncate text-sm font-black text-white">
@@ -89,6 +93,7 @@ function MiniPlayer({ player, mark, current }) {
             {current ? 'TURN LIVE' : player ? 'READY' : 'OPEN'}
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
@@ -101,6 +106,27 @@ export function SquareBizBoard({
   compact = false,
   hostLabel = 'HOST',
 }) {
+  const fitRef = useRef(null);
+  const [frame, setFrame] = useState({ width: compact ? 820 : 1180, height: compact ? 461 : 664 });
+
+  useEffect(() => {
+    const node = fitRef.current;
+    if (!node || typeof ResizeObserver === 'undefined') return undefined;
+
+    const measure = () => {
+      const rect = node.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
+      const maxWidth = compact ? 820 : 1280;
+      const width = Math.max(280, Math.min(rect.width, rect.height * (16 / 9), maxWidth));
+      setFrame({ width, height: width * (9 / 16) });
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [compact]);
+
   const board = Array.isArray(gameState.board) && gameState.board.length === 9
     ? gameState.board
     : Array(9).fill(null);
@@ -118,17 +144,21 @@ export function SquareBizBoard({
   const win = WIN_COORDS[winKey];
 
   return (
-    <div className={`sb-stage relative w-full select-none overflow-hidden rounded-[28px] border border-[#ff781f]/25 ${compact ? 'max-w-[820px]' : 'max-w-[1100px]'}`}>
+    <div ref={fitRef} className="flex h-full w-full min-h-0 min-w-0 items-center justify-center overflow-hidden">
+      <div
+        className="sb-stage relative shrink-0 select-none overflow-hidden rounded-[28px] border border-[#ff781f]/25"
+        style={{ width: frame.width, height: frame.height, maxWidth: '100%', maxHeight: '100%' }}
+      >
       <div className="absolute inset-0 opacity-90" style={{
         background:
           'radial-gradient(circle at 16% 18%, rgba(159,69,255,.20), transparent 22%), radial-gradient(circle at 86% 78%, rgba(255,21,147,.18), transparent 24%), radial-gradient(circle at 55% 45%, rgba(255,120,31,.09), transparent 38%)',
       }} />
 
-      <div className="relative grid aspect-[16/9] grid-cols-[22%_1fr_23%] grid-rows-[27%_1fr] gap-x-[2.2%] gap-y-[1%] px-[4.2%] pb-[4%] pt-[2.5%]">
-        <div className="col-span-3 flex items-start justify-center">
+      <div className="relative grid h-full w-full grid-cols-[21%_1fr_22%] grid-rows-[22%_1fr] gap-x-[2%] gap-y-[1%] px-[3.6%] pb-[3%] pt-[2.6%]">
+        <div className="col-span-3 flex items-center justify-center overflow-visible">
           <div className="relative text-center">
             <div
-              className="sb-title -rotate-2 text-[clamp(2.4rem,7vw,6.4rem)] uppercase leading-[.78] tracking-tight"
+              className="sb-title -rotate-1 text-[clamp(2.15rem,5.7vw,5.45rem)] uppercase leading-[.9] tracking-tight"
               style={{
                 ...DISPLAY,
                 color: '#ff891f',
@@ -138,7 +168,7 @@ export function SquareBizBoard({
             >
               SQUARE BIZ!
             </div>
-            <div className="mt-2 -rotate-1 text-[clamp(.45rem,1.25vw,1rem)] font-black uppercase tracking-[.28em] text-white/85">
+            <div className="mt-1 -rotate-1 text-[clamp(.42rem,1vw,.86rem)] font-black uppercase tracking-[.24em] text-white/85">
               BE A CONTESTANT OR BE A SQUARE!
             </div>
           </div>
@@ -399,7 +429,7 @@ function IntroArt({ type }) {
       <div className="relative grid w-[260px] grid-cols-3 gap-2">
         {[0,1,2,3,4,5,6,7,8].map((i) => (
           <div key={i} className="aspect-square rounded-lg border-2 border-[#ff781f]/65 bg-[#ff781f]/5">
-            {[0,4,8].includes(i) && <PaintX className="h-full w-full" />}
+            {[0,4,8].includes(i) && <PieceArt mark="X" className="h-full w-full" />}
           </div>
         ))}
         <div className="absolute left-[12%] top-[48%] h-2 w-[110%] origin-left rotate-45 rounded-full bg-[#ff1593] shadow-[0_0_18px_#ff1593]" />
@@ -409,14 +439,19 @@ function IntroArt({ type }) {
 
   return (
     <div className="relative h-[170px] w-[300px]">
-      <PaintX className="absolute left-0 top-4 h-36 w-36 -rotate-6 opacity-90" />
-      <PaintO className="absolute right-0 top-2 h-40 w-40 rotate-6 opacity-90" />
+      <PieceArt mark="X" className="absolute left-0 top-4 h-36 w-36 -rotate-6 opacity-90" />
+      <PieceArt mark="O" className="absolute right-0 top-2 h-40 w-40 rotate-6 opacity-90" />
       <div className="absolute inset-x-0 bottom-0 text-center text-5xl">♛</div>
     </div>
   );
 }
 
-export function SquareBizIntro({ gameState = {}, now = Date.now(), audioSrc = '/assets/square-biz/Square%20Biz!.mp3' }) {
+export function SquareBizIntro({
+  gameState = {},
+  now = Date.now(),
+  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
+  playAudio = false,
+}) {
   const audioRef = useRef(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const start = Number(gameState.introStartedAt || now);
@@ -429,18 +464,43 @@ export function SquareBizIntro({ gameState = {}, now = Date.now(), audioSrc = '/
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
-    audio.currentTime = Math.max(0, elapsed / 1000);
-    const play = audio.play();
-    if (play?.catch) play.catch(() => setAudioBlocked(true));
-    return () => audio.pause();
-  // Re-run only when a new intro starts.
+    if (!audio || !playAudio) return undefined;
+
+    let cancelled = false;
+    const targetTime = Math.max(0, elapsed / 1000);
+
+    const begin = async () => {
+      if (cancelled) return;
+      try {
+        if (Math.abs(audio.currentTime - targetTime) > 1.25) {
+          audio.currentTime = targetTime;
+        }
+        await audio.play();
+        if (!cancelled) setAudioBlocked(false);
+      } catch {
+        if (!cancelled) setAudioBlocked(true);
+      }
+    };
+
+    if (audio.readyState >= 3) {
+      begin();
+    } else {
+      audio.addEventListener('canplaythrough', begin, { once: true });
+      audio.load();
+    }
+
+    return () => {
+      cancelled = true;
+      audio.removeEventListener('canplaythrough', begin);
+      audio.pause();
+    };
+  // Re-run only when a new intro starts or this screen becomes the audio owner.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start]);
+  }, [start, playAudio]);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
-      <audio ref={audioRef} src={audioSrc} preload="auto" />
+      <audio ref={audioRef} src={audioSrc} preload="auto" playsInline />
       <div className="absolute inset-0 opacity-45" style={{
         background:
           'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
@@ -466,7 +526,7 @@ export function SquareBizIntro({ gameState = {}, now = Date.now(), audioSrc = '/
         <div className="h-full rounded-full bg-gradient-to-r from-[#9f45ff] via-[#ff1593] to-[#ff781f]" style={{ width: `${Math.max(2, ratio * 100)}%` }} />
       </div>
 
-      {audioBlocked && (
+      {playAudio && audioBlocked && (
         <button
           type="button"
           onClick={async () => {
