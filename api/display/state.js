@@ -1,7 +1,7 @@
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '../../server/db/client.js';
-import { deviceSessions, gameRooms, hostSessions } from '../../server/db/schema.js';
+import { deviceSessions, gameRooms, hostSessions, playerProfiles, roomParticipants } from '../../server/db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
 import { hashDisplayToken } from '../../server/pairing.js';
 
@@ -77,7 +77,92 @@ function spadesProjection(gameState = {}) {
   };
 }
 
-function projectRoom(room) {
+
+function squareBizProjection(gameState = {}, participants = []) {
+  const phase = gameState.phase || 'lobby';
+  const choicesVisible = ['answering', 'result', 'finished'].includes(phase);
+  const answerVisible = ['result', 'finished'].includes(phase);
+
+  const players = participants.map((participant) => {
+    const mark = participant.accountId === gameState.x_account_id
+      ? 'X'
+      : participant.accountId === gameState.o_account_id
+        ? 'O'
+        : null;
+    const queue = Array.isArray(gameState.queue_account_ids)
+      ? gameState.queue_account_ids.indexOf(participant.accountId)
+      : -1;
+
+    return {
+      accountId: participant.accountId,
+      name: participant.name || 'Player',
+      handle: participant.handle || null,
+      mark,
+      role: mark ? 'player' : 'viewer',
+      queuePosition: queue >= 0 ? queue + 1 : null,
+      isCurrent: mark === gameState.current_mark,
+    };
+  });
+
+  return {
+    phase,
+    board: Array.isArray(gameState.board) ? gameState.board : Array(9).fill(null),
+    currentMark: gameState.current_mark || 'X',
+    selectedSquare: gameState.selected_square ?? null,
+    currentQuestion: gameState.current_question_id
+      ? {
+          id: gameState.current_question_id,
+          question: gameState.current_question,
+          choices: choicesVisible ? gameState.current_choices : null,
+        }
+      : null,
+    choicesRevealAt: gameState.choices_reveal_at || null,
+    answerDeadlineAt: gameState.answer_deadline_at || null,
+    resultEndsAt: gameState.result_ends_at || null,
+    selectedAnswer: gameState.selected_answer || null,
+    answerResult: gameState.answer_result ?? null,
+    correctAnswer: answerVisible ? (gameState.correct_answer || null) : null,
+    correctAnswerText: answerVisible ? (gameState.correct_answer_text || null) : null,
+    introStartedAt: gameState.intro_started_at || null,
+    introEndsAt: gameState.intro_ends_at || null,
+    questionReplayNonce: gameState.question_replay_nonce || 0,
+    winner: gameState.winner || null,
+    winningLine: gameState.winning_line || null,
+    roundNumber: Number(gameState.round_number || 0),
+    players,
+    canSelectSquare: false,
+    canAnswer: false,
+    lastAction: gameState.last_action || null,
+  };
+}
+
+async function squareBizParticipants(roomId) {
+  const participants = await db.select().from(roomParticipants).where(and(
+    eq(roomParticipants.roomId, roomId),
+    isNull(roomParticipants.leftAt),
+  ));
+
+  const accountIds = participants.map((item) => item.accountId);
+  const profiles = accountIds.length
+    ? await db.select({
+        accountId: playerProfiles.accountId,
+        displayName: playerProfiles.displayName,
+        handle: playerProfiles.handle,
+      }).from(playerProfiles).where(inArray(playerProfiles.accountId, accountIds))
+    : [];
+
+  const profileByAccount = new Map(profiles.map((profile) => [profile.accountId, profile]));
+  return participants.map((participant) => {
+    const profile = profileByAccount.get(participant.accountId);
+    return {
+      ...participant,
+      name: profile?.displayName || profile?.handle || 'Player',
+      handle: profile?.handle || null,
+    };
+  });
+}
+
+async function projectRoom(room) {
   const source = room.displayState || {};
   const gameState = source.gameState || {};
 
@@ -92,7 +177,9 @@ function projectRoom(room) {
       ? hangmanProjection(gameState)
       : room.gameId === 'spades'
         ? spadesProjection(gameState)
-        : {},
+        : room.gameId === 'square-biz'
+          ? squareBizProjection(gameState, await squareBizParticipants(room.id))
+          : {},
     updatedAt: room.updatedAt,
   };
 }
@@ -141,7 +228,7 @@ export default async function handler(request, response) {
     )).limit(1);
 
     return sendJson(response, 200, {
-      room: room ? projectRoom(room) : null,
+      room: room ? await projectRoom(room) : null,
       status: room ? 'connected' : 'waiting_for_room',
     });
   } catch (error) {
