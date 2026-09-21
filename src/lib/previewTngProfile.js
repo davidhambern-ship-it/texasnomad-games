@@ -71,6 +71,12 @@ export async function getPreviewTngProfile(user) {
   const legacy = await getBase44Profile(user);
   if (!legacy) return null;
 
+  // Profiles created before the permanent TNG ID system are not considered
+  // fully onboarded until the user chooses a unique handle once.
+  if (!legacy.handle || legacy.onboarding_complete !== true) {
+    return null;
+  }
+
   const synced = await mirrorToNeon(legacy);
   return synced || legacy;
 }
@@ -98,10 +104,20 @@ export async function createPreviewTngProfile(user, { displayName, handle }) {
   }
 
   const existingProfile = await getBase44Profile(user);
-  if (!existingProfile) {
-    const existingHandle = await base44.entities.PlayerProfile.filter({ handle: cleanHandle });
-    if (existingHandle.length > 0) throw new Error('That TNG handle is already taken.');
+  const existingHandle = await base44.entities.PlayerProfile.filter({ handle: cleanHandle });
+  const conflictingHandle = existingHandle.find((profile) => profile.id !== existingProfile?.id);
+  if (conflictingHandle) throw new Error('That TNG handle is already taken.');
 
+  if (existingProfile) {
+    // Upgrade the legacy profile in place so existing stats, badges, referral
+    // history, themes, and host history are preserved.
+    await base44.entities.PlayerProfile.update(existingProfile.id, {
+      username: cleanDisplayName,
+      handle: cleanHandle,
+      onboarding_complete: true,
+      profile_locked: true,
+    });
+  } else {
     await base44.entities.PlayerProfile.create({
       user_id: user.id,
       username: cleanDisplayName,
