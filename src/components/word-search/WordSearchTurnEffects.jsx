@@ -83,11 +83,21 @@ export default function WordSearchTurnEffects({
           50% { filter: brightness(1.45); }
         }
 
+        @keyframes ws-active-card-pulse {
+          0%, 100% { box-shadow: 0 0 8px var(--ws-active-color, #FFD700)22; }
+          50% { box-shadow: 0 0 20px var(--ws-active-color, #FFD700)66; }
+        }
+
+        .ws-active-turn-card {
+          animation: ws-active-card-pulse 1.15s ease-in-out infinite;
+        }
+
         @media (prefers-reduced-motion: reduce) {
           .ws-turn-splash,
           .ws-count-number,
           .ws-count-ring,
-          .ws-count-shell {
+          .ws-count-shell,
+          .ws-active-turn-card {
             animation: none !important;
           }
         }
