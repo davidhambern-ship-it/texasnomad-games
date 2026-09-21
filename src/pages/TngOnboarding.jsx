@@ -84,6 +84,8 @@ export default function TngOnboarding() {
 
     if (role === 'host_controller') {
       navigate('/host', { replace: true });
+    } else if (nextPath.startsWith('/join/')) {
+      navigate(nextPath, { replace: true });
     } else {
       navigate('/games', { replace: true });
     }
