@@ -195,7 +195,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
           <div className="rounded-xl border border-white/10 bg-black/45 p-4 text-center">
             <div className="text-[7px] text-white/30 uppercase" style={PS2}>MODE</div>
             <div className="mt-2 text-sm text-[#4ade80]" style={PS2}>
-              {isGoRoundMode ? 'GO-ROUND' : 'FREE PLAY'}
+              TURN PLAY
             </div>
           </div>
         </section>
