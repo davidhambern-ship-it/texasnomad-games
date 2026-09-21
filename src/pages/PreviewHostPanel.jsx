@@ -14,6 +14,7 @@ export default function PreviewHostPanel() {
   const [phase, setPhase] = useState('loading');
   const [controllerId, setControllerId] = useState(null);
   const [pairing, setPairing] = useState(null);
+  const [repairingDisplay, setRepairingDisplay] = useState(false);
   const [activeRoom, setActiveRoom] = useState(null);
   const [roomState, setRoomState] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -109,6 +110,16 @@ export default function PreviewHostPanel() {
       try {
         const session = await tngApi.host.startSession(controllerId);
 
+        if (repairingDisplay) {
+          if (session.hostSession?.displayDeviceId) {
+            setPairing(null);
+            setRepairingDisplay(false);
+            setActiveRoom(session.activeRoom || null);
+            setPhase(session.activeRoom ? 'room' : 'ready');
+          }
+          return;
+        }
+
         if (session.activeRoom) {
           setActiveRoom(session.activeRoom);
           setPhase('room');
@@ -125,7 +136,7 @@ export default function PreviewHostPanel() {
     }, 2500);
 
     return () => window.clearInterval(interval);
-  }, [phase, controllerId]);
+  }, [phase, controllerId, repairingDisplay]);
 
   useEffect(() => {
     if (phase !== 'room' || !controllerId) {
@@ -157,6 +168,24 @@ export default function PreviewHostPanel() {
       window.clearInterval(interval);
     };
   }, [phase, controllerId]);
+
+  async function replaceDisplay() {
+    if (!controllerId || busy) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const payload = await tngApi.host.createPairing(controllerId, true);
+      setPairing(payload.pairing);
+      setRepairingDisplay(true);
+      setPhase('pairing');
+    } catch (pairingError) {
+      setError(pairingError.message || 'A new Game Display code could not be created.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function createRoom(game) {
     setBusy(true);
@@ -264,7 +293,9 @@ export default function PreviewHostPanel() {
               <Monitor className="w-14 h-14 mx-auto mb-4 text-[#FFD700]" />
               <h1 className="text-3xl mb-3">Connect Game Display</h1>
               <p className="text-white/45 mb-6">
-                Open the Game Display on a second screen and enter this code.
+                {repairingDisplay
+                  ? 'Open /display on the replacement TV/second screen and enter this fresh code. Your live room stays intact.'
+                  : 'Open the Game Display on a second screen and enter this code.'}
               </p>
               <div className="border-2 border-[#FFD700]/50 rounded-2xl p-8 font-mono text-6xl tracking-[0.25em] text-[#FFD700]">
                 {pairing?.code || '------'}
@@ -328,14 +359,25 @@ export default function PreviewHostPanel() {
                 </p>
               </div>
 
-              <button
-                onClick={endRoom}
-                disabled={busy}
-                className="px-5 py-3 border border-red-500/50 text-red-400 rounded-lg"
-              >
-                <Unplug className="w-4 h-4 inline mr-2" />
-                DISCONNECT ROOM
-              </button>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={replaceDisplay}
+                  disabled={busy}
+                  className="px-5 py-3 border border-[#FFD700]/50 text-[#FFD700] rounded-lg"
+                >
+                  <Monitor className="w-4 h-4 inline mr-2" />
+                  RE-PAIR DISPLAY
+                </button>
+
+                <button
+                  onClick={endRoom}
+                  disabled={busy}
+                  className="px-5 py-3 border border-red-500/50 text-red-400 rounded-lg"
+                >
+                  <Unplug className="w-4 h-4 inline mr-2" />
+                  DISCONNECT ROOM
+                </button>
+              </div>
             </div>
 
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
