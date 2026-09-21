@@ -8,6 +8,7 @@ import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { base44 } from '@/api/base44Client';
+import { backendMigration } from '@/config/backendMigration';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -49,6 +50,10 @@ const CHARACTER_WORD_THEMES = {
 
 // ── AI word generation via LLM ────────────────────────────────────────────────
 async function generateAIWord(characterId, difficulty) {
+  if (!backendMigration.base44FunctionsEnabled) {
+    return WORD_BANK[Math.floor(Math.random() * WORD_BANK.length)];
+  }
+
   const theme = CHARACTER_WORD_THEMES[characterId] || 'general knowledge';
   const diffMap = {
     easy:   'a common, simple word (4-6 letters)',

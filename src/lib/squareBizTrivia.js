@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { backendMigration } from '@/config/backendMigration';
 
 // Generates a fresh, up-to-date multiple-choice trivia question focused on
 // pop culture and current events. Uses InvokeLLM with web-search context so
@@ -11,6 +12,8 @@ const MAX_HISTORY = 40;
 const recentQuestions = [];
 
 export async function fetchTriviaQuestion() {
+  if (!backendMigration.base44FunctionsEnabled) return null;
+
   const avoidList = recentQuestions.length
     ? `\nIMPORTANT: Do NOT ask about any of these topics/questions (they were asked recently):\n${recentQuestions.map(q => `- ${q}`).join('\n')}\nPick a completely different topic and angle.`
     : '';
@@ -27,27 +30,33 @@ export async function fetchTriviaQuestion() {
     avoidList,
   ].join(' ');
 
-  const res = await base44.integrations.Core.InvokeLLM({
-    prompt,
-    add_context_from_internet: true,
-    response_json_schema: {
-      type: 'object',
-      properties: {
-        question: { type: 'string' },
-        category: { type: 'string' },
-        choices: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Exactly 4 answer choices in shuffled order',
+  let res;
+  try {
+    res = await base44.integrations.Core.InvokeLLM({
+      prompt,
+      add_context_from_internet: true,
+      response_json_schema: {
+        type: 'object',
+        properties: {
+          question: { type: 'string' },
+          category: { type: 'string' },
+          choices: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Exactly 4 answer choices in shuffled order',
+          },
+          correct_answer: {
+            type: 'string',
+            description: 'The correct answer text (must match one of the choices)',
+          },
         },
-        correct_answer: {
-          type: 'string',
-          description: 'The correct answer text (must match one of the choices)',
-        },
+        required: ['question', 'category', 'choices', 'correct_answer'],
       },
-      required: ['question', 'category', 'choices', 'correct_answer'],
-    },
-  });
+    });
+  } catch (error) {
+    console.warn('Base44 trivia generation failed; using the local trivia database.', error);
+    return null;
+  }
 
   const data = typeof res === 'string' ? JSON.parse(res) : res;
   if (!data || !data.choices || data.choices.length < 4 || !data.correct_answer) return null;

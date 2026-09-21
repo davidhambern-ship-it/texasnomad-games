@@ -4,6 +4,8 @@ import { base44 } from "@/api/base44Client";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import { backendMigration } from '@/config/backendMigration';
+import { signInWithGoogle } from '@/api/neonAuthClient';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -50,8 +52,14 @@ export default function Login() {
     }
   };
 
-  const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", "/");
+  const handleGoogle = async () => {
+    setError('');
+    try {
+      if (backendMigration.tngBackendEnabled) await signInWithGoogle();
+      else base44.auth.loginWithProvider("google", "/");
+    } catch (err) {
+      setError(err.message || 'Google sign-in could not start.');
+    }
   };
 
   return (
@@ -82,18 +90,19 @@ export default function Login() {
         Continue with Google
       </button>
 
+      {error && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
+          {error}
+        </div>
+      )}
+
+      {!backendMigration.tngBackendEnabled && <>
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
         <span style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.2)' }}>or</span>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
       </div>
-
-      {error && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
-          {error}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
@@ -125,6 +134,7 @@ export default function Login() {
           </button>
         </div>
       </form>
+      </>}
     </AuthLayout>
   );
 }

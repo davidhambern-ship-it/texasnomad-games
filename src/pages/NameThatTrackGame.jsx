@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
 import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat';
-import { base44 } from '@/api/base44Client';
+import { invokeLegacyFunction } from '@/api/legacyFunctions';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
 import HostPanel from '@/components/nameThatTrack/HostPanel.jsx';
 import GameScreen from '@/components/nameThatTrack/GameScreen.jsx';
@@ -84,7 +84,7 @@ function NameThatTrackViewer({ roomCode }) {
       console.log('Starting vs AI game...');
       
       // Get available playlists
-      const playlistsRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+      const playlistsRes = await invokeLegacyFunction('nameThatTrack', { action: 'getPlaylists' });
       const playlists = playlistsRes.data.playlists || [];
       
       // Find the default playlist or use any available
@@ -103,13 +103,13 @@ function NameThatTrackViewer({ roomCode }) {
       if (!defaultPlaylistId) {
         // No playlists available - import the default one
         try {
-          const importRes = await base44.functions.invoke('nameThatTrack', {
+          const importRes = await invokeLegacyFunction('nameThatTrack', {
             action: 'importPlaylist',
             playlistUrl: 'https://youtube.com/playlist?list=PL-ac4JdiCykXoe69ObZAaFbjL5ENtLnuM&si=jOzGupVsv7BRXrdN',
             categoryName: 'Solo Play Default',
           });
           
-          const refreshRes = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+          const refreshRes = await invokeLegacyFunction('nameThatTrack', { action: 'getPlaylists' });
           const playlist = refreshRes.data.playlists?.find(p => p.playlistId === youtubePlaylistId);
           if (playlist) {
             defaultPlaylistId = playlist.id;
@@ -125,7 +125,7 @@ function NameThatTrackViewer({ roomCode }) {
       }
 
       // Get random question from the playlist
-      const res = await base44.functions.invoke('nameThatTrack', {
+      const res = await invokeLegacyFunction('nameThatTrack', {
         action: 'getRandomQuestion',
         playlistIds: [defaultPlaylistId],
         categories: [],

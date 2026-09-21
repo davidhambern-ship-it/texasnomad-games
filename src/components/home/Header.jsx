@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
+import { invokeLegacyFunction } from '@/api/legacyFunctions';
+import { backendMigration } from '@/config/backendMigration';
 
 const NAV_ITEMS = [
   { label: 'HOME', path: '/' },
@@ -23,8 +24,8 @@ export default function Header() {
         setUser(u);
         // Ensure PlayerProfile exists for this user (idempotent)
         const profiles = await base44.entities.PlayerProfile.filter({ user_id: u.id });
-        if (profiles.length === 0) {
-          await base44.functions.invoke('initPlayerProfile', { data: { id: u.id, email: u.email, full_name: u.full_name } });
+        if (profiles.length === 0 && backendMigration.base44FunctionsEnabled) {
+          await invokeLegacyFunction('initPlayerProfile', { data: { id: u.id, email: u.email, full_name: u.full_name } });
         }
         // Presence heartbeat — upsert every 60s
         async function heartbeat() {

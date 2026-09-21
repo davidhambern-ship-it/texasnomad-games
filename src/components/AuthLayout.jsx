@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-export default function AuthLayout({ icon: Icon, title, subtitle, footer, children }) {
+export default function AuthLayout({ icon: Icon, title, subtitle, footer = null, children }) {
   return (
     <div style={{ minHeight: '100vh', background: '#050308', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' }}>
 

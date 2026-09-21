@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import { invokeLegacyFunction } from '@/api/legacyFunctions';
 import { Plus, List, Play, Settings, Music, Edit2, Trash2, Check } from 'lucide-react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -23,12 +23,12 @@ export default function HostPanel({ gs, updateState }) {
   }, []);
 
   const loadPlaylists = async () => {
-    const res = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylists' });
+    const res = await invokeLegacyFunction('nameThatTrack', { action: 'getPlaylists' });
     setPlaylists(res.data.playlists || []);
   };
 
   const loadCategories = async () => {
-    const res = await base44.functions.invoke('nameThatTrack', { action: 'getCategories' });
+    const res = await invokeLegacyFunction('nameThatTrack', { action: 'getCategories' });
     setCategories(res.data.categories || []);
   };
 
@@ -36,7 +36,7 @@ export default function HostPanel({ gs, updateState }) {
     if (!importUrl.trim()) return;
     setLoading(true);
     try {
-      const res = await base44.functions.invoke('nameThatTrack', {
+      const res = await invokeLegacyFunction('nameThatTrack', {
         action: 'importPlaylist',
         playlistUrl: importUrl,
         categoryName: importCategory || null,
@@ -53,7 +53,7 @@ export default function HostPanel({ gs, updateState }) {
   };
 
   const handleViewSongs = async (playlistId) => {
-    const res = await base44.functions.invoke('nameThatTrack', { action: 'getPlaylistSongs', playlistId });
+    const res = await invokeLegacyFunction('nameThatTrack', { action: 'getPlaylistSongs', playlistId });
     setViewingSongs({ playlistId, songs: res.data.songs || [] });
   };
 
@@ -63,7 +63,7 @@ export default function HostPanel({ gs, updateState }) {
   };
 
   const handleSaveEdit = async () => {
-    await base44.functions.invoke('nameThatTrack', {
+    await invokeLegacyFunction('nameThatTrack', {
       action: 'updateSong',
       songId: editingSong,
       title: editData.title,
@@ -75,7 +75,7 @@ export default function HostPanel({ gs, updateState }) {
 
   const handleDeleteSong = async (songId) => {
     if (!confirm('Delete this song?')) return;
-    await base44.functions.invoke('nameThatTrack', { action: 'deleteSong', songId });
+    await invokeLegacyFunction('nameThatTrack', { action: 'deleteSong', songId });
     if (viewingSongs) handleViewSongs(viewingSongs.playlistId);
     else loadPlaylists();
   };

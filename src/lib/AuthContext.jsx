@@ -2,6 +2,8 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { base44 } from '@/api/base44Client';
 import { appParams } from '@/lib/app-params';
 import { createAxiosClient } from '@base44/sdk/dist/utils/axios-client';
+import { backendMigration } from '@/config/backendMigration';
+import { requireNeonAuthClient } from '@/api/neonAuthClient';
 
 const AuthContext = createContext();
 
@@ -15,8 +17,37 @@ export const AuthProvider = ({ children }) => {
   const [appPublicSettings, setAppPublicSettings] = useState(null); // Contains only { id, public_settings }
 
   useEffect(() => {
-    checkAppState();
+    if (backendMigration.tngBackendEnabled) checkNeonAuthState();
+    else checkAppState();
   }, []);
+
+  const checkNeonAuthState = async () => {
+    try {
+      setIsLoadingPublicSettings(false);
+      setIsLoadingAuth(true);
+      setAuthError(null);
+      const { data, error } = await requireNeonAuthClient().getSession();
+      if (error) throw error;
+
+      const neonUser = data?.user || null;
+      setUser(neonUser ? {
+        ...neonUser,
+        id: neonUser.id,
+        email: neonUser.email,
+        full_name: neonUser.name || neonUser.email,
+      } : null);
+      setIsAuthenticated(Boolean(data?.session && neonUser));
+      setAuthChecked(true);
+    } catch (error) {
+      console.error('TNG auth check failed:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      setAuthChecked(true);
+      setAuthError({ type: 'unknown', message: error.message || 'Failed to load TNG authentication' });
+    } finally {
+      setIsLoadingAuth(false);
+    }
+  };
 
   const checkAppState = async () => {
     try {
@@ -90,6 +121,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   const checkUserAuth = async () => {
+    if (backendMigration.tngBackendEnabled) return checkNeonAuthState();
+
     try {
       // Now check if the user is authenticated
       setIsLoadingAuth(true);
@@ -114,9 +147,15 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = (shouldRedirect = true) => {
+  const logout = async (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+
+    if (backendMigration.tngBackendEnabled) {
+      await requireNeonAuthClient().signOut();
+      if (shouldRedirect) window.location.assign('/login');
+      return;
+    }
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
@@ -128,6 +167,10 @@ export const AuthProvider = ({ children }) => {
   };
 
   const navigateToLogin = () => {
+    if (backendMigration.tngBackendEnabled) {
+      window.location.assign('/login');
+      return;
+    }
     // Use the SDK's redirectToLogin method
     base44.auth.redirectToLogin(window.location.href);
   };
@@ -144,7 +187,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       navigateToLogin,
       checkUserAuth,
-      checkAppState
+      checkAppState: backendMigration.tngBackendEnabled ? checkNeonAuthState : checkAppState
     }}>
       {children}
     </AuthContext.Provider>

@@ -134,8 +134,8 @@ export default function GameScreen({ gs, updateState, playerId }) {
 
   async function startNextRound() {
     try {
-      const { base44 } = await import('@/api/base44Client');
-      const res = await base44.functions.invoke('nameThatTrack', {
+      const { invokeLegacyFunction } = await import('@/api/legacyFunctions');
+      const res = await invokeLegacyFunction('nameThatTrack', {
         action: 'getRandomQuestion',
         playlistIds: gs.selectedPlaylists || [],
         categories: gs.selectedCategories || [],

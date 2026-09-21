@@ -6,6 +6,8 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
+import { backendMigration } from '@/config/backendMigration';
+import { signInWithGoogle } from '@/api/neonAuthClient';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -113,8 +115,14 @@ export default function Register() {
     }
   };
 
-  const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", "/");
+  const handleGoogle = async () => {
+    setError('');
+    try {
+      if (backendMigration.tngBackendEnabled) await signInWithGoogle();
+      else base44.auth.loginWithProvider("google", "/");
+    } catch (err) {
+      setError(err.message || 'Google sign-in could not start.');
+    }
   };
 
   const FreeBanner = () => (
@@ -188,18 +196,19 @@ export default function Register() {
         Continue with Google
       </button>
 
+      {error && (
+        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
+          {error}
+        </div>
+      )}
+
+      {!backendMigration.tngBackendEnabled && <>
       {/* Divider */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
         <span style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.2)' }}>or</span>
         <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
       </div>
-
-      {error && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
-          {error}
-        </div>
-      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
@@ -220,6 +229,7 @@ export default function Register() {
           </TNGButton>
         </div>
       </form>
+      </>}
     </AuthLayout>
   );
 }
