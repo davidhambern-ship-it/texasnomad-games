@@ -14,6 +14,7 @@ import hangmanPlayer from '../api/hangman/player.js';
 import hangmanHost from '../api/hangman/host.js';
 import wordSearchPlayer from '../api/word-search/player.js';
 import wordSearchHost from '../api/word-search/host.js';
+import squareBizQuestions from '../api/square-biz/questions.js';
 
 const routes = new Map([
   ['/', health],
@@ -33,6 +34,7 @@ const routes = new Map([
   ['/hangman/host', hangmanHost],
   ['/word-search/player', wordSearchPlayer],
   ['/word-search/host', wordSearchHost],
+  ['/square-biz/questions', squareBizQuestions],
 ]);
 
 function configuredOrigins() {
