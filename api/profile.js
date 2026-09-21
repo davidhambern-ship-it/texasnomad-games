@@ -1,6 +1,7 @@
 import { eq, sql } from 'drizzle-orm';
 
 import { requireUser } from '../server/auth/require-user.js';
+import { findAccountForIdentity } from '../server/auth/require-account.js';
 import { db } from '../server/db/client.js';
 import { accounts, hostStats, playerGameStats, playerProfiles } from '../server/db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../server/http/respond.js';
@@ -32,9 +33,8 @@ function validateProfileInput(body) {
   return { displayName, handle, normalizedHandle };
 }
 
-async function findAccount(identity) {
-  const [account] = await db.select().from(accounts).where(eq(accounts.authSubject, identity.subject)).limit(1);
-  return account;
+async function findAccount(identity, executor = db) {
+  return findAccountForIdentity(identity, executor);
 }
 
 async function getProfile(identity) {
@@ -67,18 +67,28 @@ async function createProfile(identity, body) {
 
   try {
     return await db.transaction(async (transaction) => {
-      const [account] = await transaction.insert(accounts).values({
-        authSubject: identity.subject,
-        email: identity.email,
-        emailVerified: identity.emailVerified,
-      }).onConflictDoUpdate({
-        target: accounts.authSubject,
-        set: {
+      let account = await findAccount(identity, transaction);
+
+      if (account) {
+        [account] = await transaction.update(accounts).set({
+          email: identity.email,
+          emailVerified: account.emailVerified || identity.emailVerified,
+          updatedAt: sql`now()`,
+        }).where(eq(accounts.id, account.id)).returning();
+      } else {
+        [account] = await transaction.insert(accounts).values({
+          authSubject: identity.subject,
           email: identity.email,
           emailVerified: identity.emailVerified,
-          updatedAt: sql`now()`,
-        },
-      }).returning();
+        }).onConflictDoUpdate({
+          target: accounts.authSubject,
+          set: {
+            email: identity.email,
+            emailVerified: identity.emailVerified,
+            updatedAt: sql`now()`,
+          },
+        }).returning();
+      }
 
       const [existing] = await transaction.select({ accountId: playerProfiles.accountId })
         .from(playerProfiles)
