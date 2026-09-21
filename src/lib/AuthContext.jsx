@@ -117,6 +117,13 @@ export const AuthProvider = ({ children }) => {
   const logout = (shouldRedirect = true) => {
     setUser(null);
     setIsAuthenticated(false);
+
+    // Signing out intentionally releases any Preview-pinned test identity so
+    // another Google account can be selected cleanly.
+    try {
+      localStorage.removeItem('tng_preview_user_access_token');
+      localStorage.removeItem('tng_preview_expect_user_login');
+    } catch {}
     
     if (shouldRedirect) {
       // Use the SDK's logout method which handles token cleanup and redirect
