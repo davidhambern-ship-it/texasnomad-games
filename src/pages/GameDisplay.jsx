@@ -154,183 +154,300 @@ function HangmanDisplay({ room }) {
   const wrong = state.wrongLetters || [];
   const guessed = state.guessedLetters || [];
   const maxWrong = state.maxWrong || 6;
-  const masked = state.maskedWord || '';
-  const wordCharacters = masked.split('');
+  const wordCharacters = (state.maskedWord || '').split('');
   const finished = state.phase === 'finished';
 
+  if (state.phase === 'setup') {
+    return (
+      <div
+        className="relative z-10 h-full w-full"
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '40% 60%',
+          alignItems: 'center',
+          padding: '28px 54px 36px',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
+          <HangmanBoard wrongCount={0} maxWrong={maxWrong} />
+        </div>
+
+        <div style={{ paddingLeft: 30 }}>
+          <div
+            style={{
+              ...PS2,
+              fontSize: 8,
+              letterSpacing: '0.2em',
+              color: '#BC13FE',
+              marginBottom: 18,
+            }}
+          >
+            HANGMAN
+          </div>
+
+          <div
+            style={{
+              fontSize: 'clamp(42px, 4.5vw, 78px)',
+              lineHeight: 1,
+              fontWeight: 700,
+              color: '#fff',
+            }}
+          >
+            Stand By
+          </div>
+
+          <div
+            style={{
+              marginTop: 18,
+              fontSize: 'clamp(18px, 1.5vw, 28px)',
+              color: 'rgba(255,255,255,.42)',
+            }}
+          >
+            The Host is setting up the next puzzle.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="relative z-10 flex h-full min-h-0 w-full flex-col">
-      {state.phase === 'setup' ? (
-        <div className="flex flex-1 items-center justify-center px-6 py-8">
-          <div className="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
-            <HangmanBoard wrongCount={0} maxWrong={maxWrong} />
+    <div
+      className="relative z-10 h-full w-full"
+      style={{
+        display: 'grid',
+        gridTemplateColumns: '38% 62%',
+        gridTemplateRows: '1fr auto',
+        padding: '18px 42px 26px',
+        columnGap: 34,
+        rowGap: 16,
+      }}
+    >
+      <div
+        style={{
+          gridRow: '1 / span 2',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 0,
+        }}
+      >
+        <HangmanBoard wrongCount={wrong.length} maxWrong={maxWrong} />
+      </div>
 
-            <div className="text-center lg:text-left">
-              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-[#BC13FE]/30 bg-[#BC13FE]/[0.06] px-4 py-2">
-                <Radio className="h-4 w-4 text-[#BC13FE]" />
-                <span className="text-[7px] uppercase tracking-[0.18em] text-[#BC13FE]" style={PS2}>
-                  HOST SETUP
-                </span>
-              </div>
+      <div
+        style={{
+          minWidth: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          paddingTop: 4,
+        }}
+      >
+        {state.category && (
+          <div style={{ marginBottom: 20 }}>
+            <div
+              style={{
+                ...PS2,
+                fontSize: 7,
+                letterSpacing: '0.18em',
+                color: 'rgba(255,255,255,.28)',
+                marginBottom: 8,
+              }}
+            >
+              CATEGORY
+            </div>
+            <div
+              style={{
+                fontSize: 'clamp(28px, 2.5vw, 46px)',
+                lineHeight: 1,
+                color: '#FFD700',
+              }}
+            >
+              {state.category}
+            </div>
+          </div>
+        )}
 
-              <h1
-                className="text-5xl font-semibold uppercase tracking-tight text-white sm:text-6xl"
-                style={{ fontFamily: "'Rye', serif" }}
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            alignItems: 'flex-end',
+            gap: '10px 12px',
+            marginBottom: 26,
+          }}
+        >
+          {wordCharacters.map((character, index) => {
+            if (character === ' ') {
+              return <div key={index} style={{ width: 24 }} />;
+            }
+
+            const revealed = character !== '_';
+
+            return (
+              <div
+                key={index}
+                style={{
+                  width: 'clamp(36px, 3.7vw, 64px)',
+                  textAlign: 'center',
+                }}
               >
-                Hangman
-              </h1>
-              <p className="mt-4 max-w-xl text-lg text-white/40">
-                The Host is setting up the next puzzle.
-              </p>
-
-              <div className="mt-8 inline-flex items-center gap-3 rounded-xl border border-white/[0.08] bg-white/[0.03] px-5 py-3">
-                <Loader2 className="h-5 w-5 animate-spin text-[#FFD700]" />
-                <span className="text-[8px] uppercase tracking-[0.18em] text-white/50" style={PS2}>
-                  STAND BY
-                </span>
+                <div
+                  style={{
+                    minHeight: 'clamp(48px, 4.4vw, 76px)',
+                    fontFamily: 'monospace',
+                    fontSize: 'clamp(42px, 4vw, 70px)',
+                    lineHeight: 1,
+                    fontWeight: 700,
+                    color: '#FFD700',
+                    textShadow: revealed
+                      ? '0 0 18px rgba(255,215,0,.45)'
+                      : 'none',
+                  }}
+                >
+                  {character}
+                </div>
+                <div
+                  style={{
+                    height: 3,
+                    width: '100%',
+                    marginTop: 5,
+                    borderRadius: 99,
+                    background: revealed
+                      ? '#FFD700'
+                      : 'rgba(255,215,0,.28)',
+                  }}
+                />
               </div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      ) : (
-        <div className="grid flex-1 min-h-0 items-center gap-4 px-5 py-4 sm:px-8 lg:grid-cols-[0.8fr_1.2fr] lg:gap-8 lg:px-10">
-          <div className="flex min-h-0 items-center justify-center">
-            <HangmanBoard wrongCount={wrong.length} maxWrong={maxWrong} />
+
+        {state.hintRevealed && state.hint && (
+          <div
+            style={{
+              marginBottom: 20,
+              fontSize: 'clamp(16px, 1.25vw, 22px)',
+              color: 'rgba(255,255,255,.7)',
+            }}
+          >
+            <span style={{ color: '#BC13FE', fontWeight: 700 }}>HINT:</span>{' '}
+            {state.hint}
+          </div>
+        )}
+
+        <div>
+          <div
+            style={{
+              ...PS2,
+              fontSize: 7,
+              letterSpacing: '0.18em',
+              color: 'rgba(255,255,255,.25)',
+              marginBottom: 10,
+            }}
+          >
+            WRONG GUESSES
           </div>
 
-          <div className="flex min-h-0 flex-col justify-center">
-            <div className="mb-4 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
-              {state.category && (
-                <div className="rounded-full border border-[#FFD700]/25 bg-[#FFD700]/[0.05] px-4 py-2">
-                  <span className="mr-2 text-[6px] uppercase tracking-[0.16em] text-white/30" style={PS2}>
-                    CATEGORY
-                  </span>
-                  <span className="text-lg font-medium text-[#FFD700]">
-                    {state.category}
-                  </span>
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: 8,
+              minHeight: 42,
+              alignItems: 'center',
+            }}
+          >
+            {wrong.length === 0 ? (
+              <span style={{ color: 'rgba(255,255,255,.2)', fontSize: 14 }}>
+                None yet
+              </span>
+            ) : (
+              wrong.map((letter) => (
+                <div
+                  key={letter}
+                  style={{
+                    width: 42,
+                    height: 42,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '1px solid rgba(239,68,68,.55)',
+                    borderRadius: 8,
+                    background: 'rgba(239,68,68,.05)',
+                    color: '#ef4444',
+                    fontFamily: 'monospace',
+                    fontSize: 20,
+                  }}
+                >
+                  {letter}
                 </div>
-              )}
-
-              <div className="rounded-full border border-white/[0.08] bg-white/[0.025] px-4 py-2">
-                <span className="text-[7px] uppercase tracking-[0.16em] text-white/35" style={PS2}>
-                  {wrong.length}/{maxWrong} WRONG
-                </span>
-              </div>
-            </div>
-
-            <div className="mb-5 flex flex-wrap justify-center gap-2.5 lg:justify-start">
-              {wordCharacters.map((character, index) => {
-                if (character === ' ') {
-                  return <div key={index} className="w-5 sm:w-7" />;
-                }
-
-                const revealed = character !== '_';
-
-                return (
-                  <div
-                    key={index}
-                    className="flex min-w-[34px] flex-col items-center sm:min-w-[42px] lg:min-w-[48px]"
-                  >
-                    <div
-                      className="text-center font-mono text-4xl font-semibold text-[#FFD700] sm:text-5xl lg:text-6xl"
-                      style={{
-                        textShadow: revealed
-                          ? '0 0 20px rgba(255,215,0,.5)'
-                          : 'none',
-                      }}
-                    >
-                      {character}
-                    </div>
-                    <div
-                      className="mt-1.5 h-[3px] w-full rounded-full"
-                      style={{
-                        background: revealed
-                          ? 'linear-gradient(90deg, rgba(255,215,0,.25), #FFD700, rgba(255,215,0,.25))'
-                          : 'rgba(255,215,0,.22)',
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-
-            {state.hintRevealed && state.hint && (
-              <div className="mb-5 rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/[0.06] px-5 py-3 shadow-[0_0_28px_rgba(188,19,254,.08)]">
-                <span className="text-sm text-[#BC13FE]">💡 HINT</span>
-                <span className="ml-3 text-base text-white/70">{state.hint}</span>
-              </div>
-            )}
-
-            <div className="mb-5">
-              <div className="mb-2 text-[7px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
-                WRONG GUESSES
-              </div>
-
-              <div className="flex min-h-[44px] flex-wrap justify-center gap-2 lg:justify-start">
-                {wrong.length === 0 ? (
-                  <span className="self-center text-sm text-white/20">None yet</span>
-                ) : (
-                  wrong.map((letter) => (
-                    <span
-                      key={letter}
-                      className="flex h-10 w-10 items-center justify-center rounded-lg border border-red-500/50 bg-red-500/[0.05] font-mono text-lg text-red-400 shadow-[0_0_18px_rgba(239,68,68,.08)]"
-                    >
-                      {letter}
-                    </span>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-13 gap-1.5">
-              {ALPHABET.map((letter) => {
-                const isCorrect = guessed.includes(letter);
-                const isWrong = wrong.includes(letter);
-                const used = isCorrect || isWrong;
-
-                return (
-                  <div
-                    key={letter}
-                    className="flex aspect-square items-center justify-center rounded-md border font-mono text-[11px] transition-all sm:text-xs"
-                    style={{
-                      borderColor: isCorrect
-                        ? '#4ade80'
-                        : isWrong
-                          ? '#ef4444'
-                          : 'rgba(255,255,255,.08)',
-                      color: isCorrect
-                        ? '#4ade80'
-                        : isWrong
-                          ? '#ef4444'
-                          : 'rgba(255,255,255,.24)',
-                      background: isCorrect
-                        ? 'rgba(74,222,128,.08)'
-                        : isWrong
-                          ? 'rgba(239,68,68,.08)'
-                          : 'rgba(255,255,255,.015)',
-                      boxShadow: used
-                        ? isCorrect
-                          ? '0 0 16px rgba(74,222,128,.08)'
-                          : '0 0 16px rgba(239,68,68,.08)'
-                        : 'none',
-                    }}
-                  >
-                    {letter}
-                  </div>
-                );
-              })}
-            </div>
-
-            {finished && (
-              <div className="mt-5 rounded-xl border border-green-400/30 bg-green-400/[0.06] px-5 py-4 text-center shadow-[0_0_32px_rgba(74,222,128,.08)]">
-                <div className="text-[10px] uppercase tracking-[0.2em] text-green-400" style={PS2}>
-                  ROUND COMPLETE
-                </div>
-              </div>
+              ))
             )}
           </div>
         </div>
-      )}
+
+        {finished && (
+          <div
+            style={{
+              marginTop: 18,
+              ...PS2,
+              fontSize: 9,
+              letterSpacing: '0.18em',
+              color: '#4ade80',
+            }}
+          >
+            ROUND COMPLETE
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          minWidth: 0,
+          display: 'grid',
+          gridTemplateColumns: 'repeat(13, minmax(0, 1fr))',
+          gap: 6,
+          alignSelf: 'end',
+        }}
+      >
+        {ALPHABET.map((letter) => {
+          const isCorrect = guessed.includes(letter);
+          const isWrong = wrong.includes(letter);
+
+          return (
+            <div
+              key={letter}
+              style={{
+                height: 'clamp(36px, 3.1vw, 52px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 7,
+                border: isCorrect
+                  ? '1px solid #4ade80'
+                  : isWrong
+                    ? '1px solid #ef4444'
+                    : '1px solid rgba(255,255,255,.09)',
+                background: isCorrect
+                  ? 'rgba(74,222,128,.07)'
+                  : isWrong
+                    ? 'rgba(239,68,68,.07)'
+                    : 'rgba(255,255,255,.015)',
+                color: isCorrect
+                  ? '#4ade80'
+                  : isWrong
+                    ? '#ef4444'
+                    : 'rgba(255,255,255,.28)',
+                fontFamily: 'monospace',
+                fontSize: 'clamp(12px, .95vw, 17px)',
+              }}
+            >
+              {letter}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -543,7 +660,7 @@ function AmbientBackdrop() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            'radial-gradient(circle at 18% 35%, rgba(188,19,254,.09), transparent 28%), radial-gradient(circle at 82% 68%, rgba(255,95,31,.07), transparent 30%), radial-gradient(circle at 58% 12%, rgba(255,215,0,.04), transparent 22%)',
+            'radial-gradient(circle at 20% 52%, rgba(188,19,254,.07), transparent 30%), radial-gradient(circle at 75% 48%, rgba(255,215,0,.025), transparent 34%)',
         }}
       />
       <div
