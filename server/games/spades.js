@@ -172,3 +172,101 @@ export function chooseCpuSpadesCard(hand = [], trick = [], spadesBroken = false)
   if (!legal.length) return null;
   return legal[randomInt(0, legal.length)];
 }
+
+
+export function applySpadesBid(gameState, seatNumber, bid) {
+  const numericSeat = Number(seatNumber);
+  const numericBid = Number(bid);
+
+  if (!SPADES_SEATS.includes(numericSeat)) {
+    const error = new Error('That Spades seat cannot bid.');
+    error.statusCode = 400;
+    error.code = 'SPADES_INVALID_BIDDER';
+    throw error;
+  }
+
+  if (!Number.isInteger(numericBid) || numericBid < 0 || numericBid > 13) {
+    const error = new Error('A Spades bid must be a whole number from 0 to 13.');
+    error.statusCode = 400;
+    error.code = 'SPADES_INVALID_BID';
+    throw error;
+  }
+
+  if (gameState.phase !== 'bidding') {
+    const error = new Error('Bidding is not active for this hand.');
+    error.statusCode = 409;
+    error.code = 'SPADES_NOT_BIDDING';
+    throw error;
+  }
+
+  if (Number(gameState.currentBidderSeat || 0) !== numericSeat) {
+    const error = new Error('It is not this seat\'s turn to bid.');
+    error.statusCode = 409;
+    error.code = 'SPADES_NOT_BID_TURN';
+    throw error;
+  }
+
+  const players = (gameState.players || []).map((player) => (
+    Number(player.seatNumber) === numericSeat
+      ? { ...player, bid: numericBid }
+      : player
+  ));
+
+  const seatedPlayers = players
+    .filter((player) => SPADES_SEATS.includes(Number(player.seatNumber)))
+    .sort((a, b) => Number(a.seatNumber) - Number(b.seatNumber));
+
+  const allBid =
+    seatedPlayers.length === SPADES_SEATS.length &&
+    seatedPlayers.every((player) => player.bid != null);
+
+  if (!allBid) {
+    return {
+      ...gameState,
+      players,
+      currentBidderSeat: nextSpadesSeat(numericSeat),
+    };
+  }
+
+  const bid1 = seatedPlayers
+    .filter((player) => [1, 3].includes(Number(player.seatNumber)))
+    .reduce((total, player) => total + Number(player.bid || 0), 0);
+
+  const bid2 = seatedPlayers
+    .filter((player) => [2, 4].includes(Number(player.seatNumber)))
+    .reduce((total, player) => total + Number(player.bid || 0), 0);
+
+  const firstSeat = nextSpadesSeat(Number(gameState.dealerSeat || 1));
+
+  return {
+    ...gameState,
+    players,
+    phase: 'playing',
+    bid1,
+    bid2,
+    currentBidderSeat: null,
+    currentTurnSeat: firstSeat,
+  };
+}
+
+export function chooseCpuSpadesBid(hand = [], characterId = null) {
+  const spadeCount = hand.filter(isSpadeCard).length;
+  const base = Math.round(spadeCount * 0.8);
+
+  switch (characterId) {
+    case 'dexter':
+      return Math.min(13, Math.max(1, base));
+    case 'tank':
+      return Math.min(13, Math.max(1, base - 1));
+    case 'lemonade':
+      return Math.min(13, Math.max(2, base + 1 + (randomInt(0, 10) < 4 ? 1 : 0)));
+    case 'carlos':
+      return Math.min(13, Math.max(1, base + (randomInt(0, 2) === 0 ? -1 : 1)));
+    case 'violet':
+      return Math.min(13, Math.max(2, base));
+    case 'berna':
+      return Math.min(13, Math.max(2, base + (randomInt(0, 10) < 3 ? 1 : 0)));
+    default:
+      return Math.min(13, Math.max(1, base || 1));
+  }
+}
