@@ -18,6 +18,7 @@ async function request(path, {
   deviceId,
   displayId,
   displayToken,
+  roomCode,
   authenticated=true,
 } = {}) {
   const headers = { Accept: 'application/json' };
@@ -28,6 +29,7 @@ async function request(path, {
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (displayId) headers['X-TNG-Display-Id'] = displayId;
   if (displayToken) headers['X-TNG-Display-Token'] = displayToken;
+  if (roomCode) headers['X-TNG-Room-Code'] = roomCode;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const response = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, {
@@ -72,6 +74,18 @@ export const tngApi = {
       body:{ command },
     }),
   },
+  player: {
+    joinRoom: (deviceId, roomCode) => request('/api/player/room', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode },
+    }),
+    getRoom: (deviceId, roomCode) => request('/api/player/room', {
+      deviceId,
+      roomCode,
+    }),
+  },
   display: {
     pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
     getState: (displayId, displayToken) => request('/api/display/state', {
@@ -86,6 +100,16 @@ export const tngApi = {
       method:'POST',
       deviceId,
       body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/spades/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/spades/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
     }),
   },
 };
