@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Gamepad2, Loader2, MonitorUp, UserRound } from 'lucide-react';
 
 import AuthLayout from '@/components/AuthLayout';
@@ -10,6 +10,9 @@ const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 export default function TngOnboarding() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const requestedNext = new URLSearchParams(location.search).get('next');
+  const nextPath = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/';
   const [stage, setStage] = useState('loading');
   const [displayName, setDisplayName] = useState('');
   const [handle, setHandle] = useState('');
@@ -29,7 +32,7 @@ export default function TngOnboarding() {
         setDisplayName(user.name || '');
         try {
           await tngApi.profile.get();
-          navigate('/', { replace: true });
+          navigate(nextPath, { replace: true });
         } catch (profileError) {
           if (!(profileError instanceof TngApiError) || profileError.code !== 'PROFILE_NOT_FOUND') {
             throw profileError;
@@ -43,7 +46,7 @@ export default function TngOnboarding() {
     }
 
     initialize();
-  }, [navigate]);
+  }, [navigate, nextPath]);
 
   async function createProfile(event) {
     event.preventDefault();
