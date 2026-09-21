@@ -7,6 +7,7 @@ import hostRoom from '../api/host/room.js';
 import displayPair from '../api/display/pair.js';
 
 const routes = new Map([
+  ['/', health],
   ['/health', health],
   ['/profile', profile],
   ['/device-session', deviceSession],
