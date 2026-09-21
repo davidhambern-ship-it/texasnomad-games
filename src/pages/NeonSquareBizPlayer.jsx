@@ -115,7 +115,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
   }
 
   return (
-    <div className="relative min-h-screen lg:h-[100dvh] lg:overflow-hidden bg-[#05020a] text-white">
+    <div className="relative h-[100dvh] overflow-hidden bg-[#05020a] text-white">
       <SquareBizShowStyles />
 
       <div className="pointer-events-none absolute inset-0 opacity-60" style={{
@@ -123,7 +123,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
           'radial-gradient(circle at 12% 16%, rgba(159,69,255,.18), transparent 24%), radial-gradient(circle at 86% 72%, rgba(255,21,147,.15), transparent 26%), radial-gradient(circle at 58% 46%, rgba(255,120,31,.08), transparent 42%)',
       }} />
 
-      <div className="relative mx-auto flex min-h-screen max-w-[1500px] flex-col gap-2 p-2 lg:h-full lg:min-h-0">
+      <div className="relative mx-auto flex h-full min-h-0 max-w-[1500px] flex-col gap-2 p-2">
         <header className="z-20 shrink-0 rounded-xl border border-white/10 bg-[#0c0714]/86 px-3 py-2.5 backdrop-blur flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[7px] uppercase tracking-[.25em] text-[#ff781f]" style={MONO}>SQUARE BIZ!</div>
@@ -186,8 +186,8 @@ export default function NeonSquareBizPlayer({ roomCode }) {
               </div>
             </div>
           ) : (
-            <div className="relative flex h-full min-h-[520px] items-center justify-center p-2 sm:p-3">
-              <div className={`flex h-full w-full items-center justify-center transition-all duration-300 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
+            <div className="absolute inset-0">
+              <div className={`absolute inset-2 flex min-h-0 min-w-0 items-center justify-center transition-all duration-300 sm:inset-3 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
                 <SquareBizBoard
                   gameState={gameState}
                   interactive={!busy}
