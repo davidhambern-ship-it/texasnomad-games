@@ -9,6 +9,7 @@ import SpadesMatchOver from '@/components/spades/SpadesMatchOver';
 import CPUOpponentSelect from '@/components/cpu/CPUOpponentSelect';
 import { fillEmptySeatsWithTNCharacters, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import NeonSpadesPlayer from '@/pages/NeonSpadesPlayer';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat, calculateScore } from '@/lib/spadesRules';
 
@@ -20,9 +21,13 @@ export default function SpadesGame() {
   const roomCode = params.get('room');
   const isCreator = params.get('creator') === '1';
   const cpuId = params.get('cpu');
+  const useNeonPlayer = params.get('neon') === '1';
   if (!roomCode) {
     window.location.href = '/games';
     return null;
+  }
+  if (useNeonPlayer) {
+    return <NeonSpadesPlayer roomCode={roomCode.toUpperCase()} />;
   }
   return <SpadesViewer roomCode={roomCode} isCreator={isCreator} cpuId={cpuId} />;
 }
