@@ -31,6 +31,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
   const players = gs.players || [];
   const currentGoRound = gs.current_go_round || 1;
   const seatsThatChose = gs.seats_that_chose || [];
+  const currentTurnSeat = Number(gs.current_turn_seat || players[0]?.seatNumber || 0);
   const lastAction = gs.last_action;
 
   // Host can guess on behalf of players
@@ -72,6 +73,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
       guessed_letters: [],
       wrong_letters: [],
       current_go_round: 1,
+      current_turn_seat: players[0]?.seatNumber || null,
       seats_that_chose: [],
       last_action: null,
     });
@@ -96,6 +98,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
       guessed_letters: [],
       wrong_letters: [],
       current_go_round: 1,
+      current_turn_seat: players[0]?.seatNumber || null,
       seats_that_chose: [],
       last_action: null,
     });
@@ -113,6 +116,7 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
       guessed_letters: [],
       wrong_letters: [],
       current_go_round: 1,
+      current_turn_seat: null,
       seats_that_chose: [],
       last_action: null,
     });
@@ -148,20 +152,22 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
             </div>
           </div>
 
-          {/* Go-Round stats — only in go-round mode */}
+          {/* Turn stats — only in multiplayer turn mode */}
           {isPlaying && isGoRoundMode && (
             <div className="grid grid-cols-3 gap-3 text-center py-2 border-t border-white/10">
               <div>
-                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Go-Round</div>
+                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Round</div>
                 <div className="text-xl text-[#FFD700]" style={PS2}>{currentGoRound}</div>
               </div>
               <div>
-                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Chosen</div>
-                <div className="text-xl text-green-400" style={PS2}>{seatsThatChose.length}</div>
+                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Current Turn</div>
+                <div className="text-xl text-green-400" style={PS2}>
+                  {currentTurnSeat ? `S${currentTurnSeat}` : '—'}
+                </div>
               </div>
               <div>
-                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Waiting</div>
-                <div className="text-xl text-[#FF5F1F]" style={PS2}>{seatsWaiting.length}</div>
+                <div className="text-[7px] tracking-widest text-white/40 uppercase mb-1" style={PS2}>Players</div>
+                <div className="text-xl text-[#FF5F1F]" style={PS2}>{players.length}</div>
               </div>
             </div>
           )}
@@ -174,18 +180,18 @@ export default function HangmanHostPanel({ gs, updateState, sendCommand }) {
           {/* Seat Grid */}
           <div className="flex gap-2 flex-wrap">
             {players.map(p => {
-              const haschosen = seatsThatChose.includes(p.seatNumber);
+              const isCurrentTurn = Number(p.seatNumber) === currentTurnSeat;
               return (
                 <div key={p.playerId}
                   className="px-3 py-2 rounded-lg border text-center min-w-[60px]"
                   style={{
-                    borderColor: haschosen ? '#4ade80' : '#ffffff20',
-                    background: haschosen ? '#4ade8010' : 'transparent',
+                    borderColor: isCurrentTurn ? '#4ade80' : '#ffffff20',
+                    background: isCurrentTurn ? '#4ade8010' : 'transparent',
                   }}>
                   <div className="text-[7px] text-white/30" style={PS2}>SEAT</div>
-                  <div className="text-sm mt-0.5" style={{ ...PS2, color: haschosen ? '#4ade80' : '#ffffff60' }}>{p.seatNumber}</div>
-                  {haschosen && <div className="text-[6px] text-green-400 mt-0.5" style={PS2}>✓ chose</div>}
-                  {!haschosen && isPlaying && <div className="text-[6px] text-[#FF5F1F]/70 mt-0.5" style={PS2}>waiting</div>}
+                  <div className="text-sm mt-0.5" style={{ ...PS2, color: isCurrentTurn ? '#4ade80' : '#ffffff60' }}>{p.seatNumber}</div>
+                  {isCurrentTurn && isPlaying && <div className="text-[6px] text-green-400 mt-0.5" style={PS2}>YOUR TURN</div>}
+                  {!isCurrentTurn && isPlaying && <div className="text-[6px] text-[#FF5F1F]/70 mt-0.5" style={PS2}>waiting</div>}
                 </div>
               );
             })}
