@@ -62,7 +62,7 @@ export default function LiveStatus() {
                       <span className="block text-[10px] tracking-widest text-white/50 uppercase">PLAYERS</span>
                     </div>
                     <span className={`px-2 py-0.5 rounded font-heading text-xs tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`}>
-                      {isLive ? 'LIVE' : room.status.toUpperCase()}
+                      {isLive ? 'LIVE' : String(room.status || 'OFFLINE').toUpperCase()}
                     </span>
                   </div>
                 </div>
