@@ -473,12 +473,12 @@ function SpadesSeat({ seat, player, state, position }) {
       transform: 'translateX(-50%)',
     },
     left: {
-      left: 14,
+      left: 22,
       top: '50%',
       transform: 'translateY(-50%)',
     },
     right: {
-      right: 14,
+      right: 22,
       top: '50%',
       transform: 'translateY(-50%)',
     },
@@ -662,13 +662,13 @@ function SpadesDisplay({ room }) {
         <div
           className="absolute left-1/2 top-1/2"
           style={{
-            width: '82%',
-            height: '74%',
+            width: '76%',
+            height: '68%',
             transform: 'translate(-50%, -50%)',
           }}
         >
           <div
-            className="absolute inset-0 rounded-[48%] border-[9px] border-[#6b3518]"
+            className="absolute inset-0 rounded-[42px] border-[9px] border-[#6b3518]"
             style={{
               background:
                 'radial-gradient(ellipse at center, rgba(255,151,45,.78) 0%, rgba(222,92,18,.70) 48%, rgba(126,42,4,.82) 100%)',
@@ -677,7 +677,7 @@ function SpadesDisplay({ room }) {
             }}
           >
             <div
-              className="absolute inset-[14px] rounded-[48%] border border-white/[0.07]"
+              className="absolute inset-[14px] rounded-[34px] border border-white/[0.07]"
               style={{
                 background:
                   'linear-gradient(135deg, rgba(255,235,172,.11) 0%, rgba(255,170,70,.025) 46%, rgba(54,10,0,.22) 100%)',
