@@ -129,6 +129,14 @@ export const tngApi = {
     }),
   },
   hangman: {
+    getHostState: (deviceId) => request('/api/hangman/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/hangman/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
     getPlayerState: (deviceId, roomCode) => request('/api/hangman/player', {
       deviceId,
       roomCode,
