@@ -127,16 +127,6 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen lg:h-[100dvh] lg:overflow-hidden bg-[#070311] text-white">
-      <WordSearchTurnEffects
-        mode={mode}
-        phase={phase}
-        paused={paused}
-        activeSeat={activeSeat}
-        players={players}
-        viewerSeat={seatNumber}
-        timeRemaining={timeRemaining}
-      />
-
       <div className="mx-auto flex min-h-screen lg:h-full max-w-[1500px] flex-col gap-2 p-2 lg:min-h-0">
 
         <header className="shrink-0 rounded-xl border bg-black/60 px-3 py-2.5 flex items-center justify-between gap-3"
@@ -178,7 +168,18 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
         <main className="min-h-0 flex-1 grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
 
-          <section className="min-h-0 rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
+          <section className="relative min-h-0 rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
+            <WordSearchTurnEffects
+              mode={mode}
+              phase={phase}
+              paused={paused}
+              activeSeat={activeSeat}
+              players={players}
+              viewerSeat={seatNumber}
+              timeRemaining={timeRemaining}
+              roundNumber={gameState.roundNumber || 1}
+            />
+
             {grid.length ? (
               <NeonWordSearchBoard
                 grid={grid}
