@@ -72,10 +72,10 @@ export const tngApi = {
       deviceId,
       body:{ replaceDisplay },
     }),
-    createRoom: (deviceId, gameId, headlessTest = false) => request('/api/host/room', {
+    createRoom: (deviceId, gameId) => request('/api/host/room', {
       method:'POST',
       deviceId,
-      body:{ gameId, headlessTest },
+      body:{ gameId },
     }),
     endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
     getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
