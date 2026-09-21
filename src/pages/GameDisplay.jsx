@@ -1055,7 +1055,7 @@ function SquareBizDisplay({ room }) {
       )}
 
       {phase === 'intro' && (
-        <SquareBizIntro gameState={state} now={clock} />
+        <SquareBizIntro gameState={state} now={clock} playAudio />
       )}
 
       {phase !== 'intro' && (
