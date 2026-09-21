@@ -12,13 +12,22 @@ export class TngApiError extends Error {
   }
 }
 
-async function request(path, { method='GET', body, deviceId, authenticated=true } = {}) {
+async function request(path, {
+  method='GET',
+  body,
+  deviceId,
+  displayId,
+  displayToken,
+  authenticated=true,
+} = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
     if (!appParams.token) throw new TngApiError('Your TNG session is missing.', { code:'AUTH_REQUIRED', status:401 });
     headers.Authorization = `Bearer ${appParams.token}`;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+  if (displayId) headers['X-TNG-Display-Id'] = displayId;
+  if (displayToken) headers['X-TNG-Display-Token'] = displayToken;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
   const response = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, {
@@ -47,8 +56,24 @@ export const tngApi = {
     createPairing: (deviceId) => request('/api/host/pairing', { method:'POST', deviceId }),
     createRoom: (deviceId, gameId) => request('/api/host/room', { method:'POST', deviceId, body:{gameId} }),
     endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
+    getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
+    updateRoomState: (deviceId, statePatch) => request('/api/host/room-state', {
+      method:'PATCH',
+      deviceId,
+      body:{ statePatch },
+    }),
+    sendRoomCommand: (deviceId, command) => request('/api/host/room-state', {
+      method:'PATCH',
+      deviceId,
+      body:{ command },
+    }),
   },
   display: {
     pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
+    getState: (displayId, displayToken) => request('/api/display/state', {
+      displayId,
+      displayToken,
+      authenticated:false,
+    }),
   },
 };
