@@ -62,11 +62,39 @@ export default async function handler(request, response) {
 
     if (activeSession) {
       if (activeSession.controllerDeviceId !== device.id) {
-        const error = new Error('This Host account already has an active controller.');
-        error.statusCode = 409;
-        error.code = 'HOST_ALREADY_CONTROLLED';
-        throw error;
+        const reclaimController = request.body?.reclaimController === true;
+
+        if (!reclaimController) {
+          const error = new Error('This Host account already has an active controller.');
+          error.statusCode = 409;
+          error.code = 'HOST_ALREADY_CONTROLLED';
+          throw error;
+        }
+
+        const now = new Date();
+        const [reclaimedSession] = await db.transaction(async (transaction) => {
+          await transaction.update(deviceSessions).set({
+            status: 'disconnected',
+            updatedAt: now,
+          }).where(eq(deviceSessions.id, activeSession.controllerDeviceId));
+
+          const [updated] = await transaction.update(hostSessions).set({
+            controllerDeviceId: device.id,
+            updatedAt: now,
+          }).where(eq(hostSessions.id, activeSession.id)).returning();
+
+          return [updated];
+        });
+
+        const activeRoom = await findActiveRoom(reclaimedSession.id);
+        return sendJson(response, 200, {
+          hostSession: reclaimedSession,
+          activeRoom,
+          resumed: true,
+          controllerReclaimed: true,
+        });
       }
+
       const activeRoom = await findActiveRoom(activeSession.id);
       return sendJson(response, 200, { hostSession: activeSession, activeRoom, resumed: true });
     }
