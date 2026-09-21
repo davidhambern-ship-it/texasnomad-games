@@ -5,9 +5,11 @@ import hostSession from '../api/host/session.js';
 import hostPairing from '../api/host/pairing.js';
 import hostRoom from '../api/host/room.js';
 import hostRoomState from '../api/host/room-state.js';
+import playerRoom from '../api/player/room.js';
 import displayPair from '../api/display/pair.js';
 import displayState from '../api/display/state.js';
 import spadesHost from '../api/spades/host.js';
+import spadesPlayer from '../api/spades/player.js';
 
 const routes = new Map([
   ['/', health],
@@ -18,9 +20,11 @@ const routes = new Map([
   ['/host/pairing', hostPairing],
   ['/host/room', hostRoom],
   ['/host/room-state', hostRoomState],
+  ['/player/room', playerRoom],
   ['/display/pair', displayPair],
   ['/display/state', displayState],
   ['/spades/host', spadesHost],
+  ['/spades/player', spadesPlayer],
 ]);
 
 function configuredOrigins() {
@@ -53,7 +57,7 @@ function isAllowedOrigin(origin) {
 function corsHeaders(request) {
   const origin = request.headers.get('origin');
   const headers = new Headers({
-    'Access-Control-Allow-Headers': 'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token',
+    'Access-Control-Allow-Headers': 'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Max-Age': '600',
     'Vary': 'Origin',
