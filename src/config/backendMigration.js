@@ -4,46 +4,83 @@ const DEVELOPMENT_NEON_AUTH_URL =
 const DEVELOPMENT_TNG_API_URL =
   'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech/';
 
-function isBase44Preview() {
-  if (typeof window === 'undefined') return false;
-
-  const currentUrl = window.location.href;
-  if (
-    window.location.hostname === 'app.base44.com' &&
-    window.location.pathname.includes('/editor/preview')
-  ) {
-    return true;
-  }
+function looksLikeBase44Preview(value) {
+  if (!value) return false;
 
   try {
-    const referrer = document.referrer ? new URL(document.referrer) : null;
+    const url = new URL(value, window.location.origin);
+    const host = url.hostname.toLowerCase();
+
     if (
-      referrer?.hostname === 'app.base44.com' &&
-      referrer.pathname.includes('/editor/preview')
+      host === 'app.base44.com' &&
+      url.pathname.includes('/editor/preview')
+    ) {
+      return true;
+    }
+
+    if (
+      host.endsWith('.base44.app') &&
+      (host.startsWith('preview--') || host.startsWith('preview-sandbox--'))
     ) {
       return true;
     }
   } catch {
-    // Ignore malformed/blocked referrers.
+    return String(value).includes('/editor/preview');
   }
 
-  return currentUrl.includes('app.base44.com') && currentUrl.includes('/editor/preview');
+  return false;
+}
+
+function forcedNeonMode() {
+  if (typeof window === 'undefined') return false;
+
+  const params = new URLSearchParams(window.location.search);
+  const flag = params.get('tng_neon');
+
+  if (flag === '1') {
+    window.localStorage.setItem('tng_backend_mode', 'neon');
+    return true;
+  }
+
+  if (flag === '0') {
+    window.localStorage.removeItem('tng_backend_mode');
+    return false;
+  }
+
+  return window.localStorage.getItem('tng_backend_mode') === 'neon';
+}
+
+function isBase44Preview() {
+  if (typeof window === 'undefined') return false;
+
+  const candidates = [
+    window.location.href,
+    document.referrer,
+    window.localStorage.getItem('base44_from_url'),
+    window.localStorage.getItem('base44_app_base_url'),
+    new URLSearchParams(window.location.search).get('from_url'),
+    new URLSearchParams(window.location.search).get('app_base_url'),
+  ];
+
+  return candidates.some(looksLikeBase44Preview);
 }
 
 export const base44Preview = isBase44Preview();
+export const forcedNeon = forcedNeonMode();
+export const neonTestMode = base44Preview || forcedNeon;
 
 export const backendMigration = Object.freeze({
   tngBackendEnabled:
-    import.meta.env.VITE_TNG_BACKEND_ENABLED === 'true' || base44Preview,
+    import.meta.env.VITE_TNG_BACKEND_ENABLED === 'true' || neonTestMode,
   base44FunctionsEnabled:
-    import.meta.env.VITE_ENABLE_BASE44_FUNCTIONS === 'true' && !base44Preview,
+    import.meta.env.VITE_ENABLE_BASE44_FUNCTIONS === 'true' && !neonTestMode,
 });
 
 export const migrationEndpoints = Object.freeze({
   neonAuthUrl:
     import.meta.env.VITE_NEON_AUTH_URL?.trim() ||
-    (base44Preview ? DEVELOPMENT_NEON_AUTH_URL : ''),
+    (neonTestMode ? DEVELOPMENT_NEON_AUTH_URL : ''),
   tngApiUrl:
     import.meta.env.VITE_TNG_API_URL?.trim() ||
-    (base44Preview ? DEVELOPMENT_TNG_API_URL : ''),
+    (neonTestMode ? DEVELOPMENT_TNG_API_URL : ''),
 });
