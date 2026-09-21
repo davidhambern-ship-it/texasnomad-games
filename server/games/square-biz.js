@@ -86,34 +86,59 @@ export async function assignSquareBizPlayers(roomId, participants, executor = db
     .filter((player) => !player.leftAt)
     .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
 
+  if (!active.length) return [];
+
+  // Clear all seats first so role rotation can never collide with the room/seat unique index.
+  await executor
+    .update(roomParticipants)
+    .set({
+      seatNumber: null,
+      role: 'player',
+      lastHeartbeatAt: new Date(),
+    })
+    .where(eq(roomParticipants.roomId, roomId));
+
   const assigned = [];
-  const first = active[0] || null;
-  const second = active[1] || null;
 
-  for (const participant of active) {
-    const desiredSeat = participant.accountId === first?.accountId
-      ? 2
-      : participant.accountId === second?.accountId
-        ? 3
-        : null;
+  for (let index = 0; index < active.length; index += 1) {
+    const participant = active[index];
+    const seatNumber = index === 0 ? 2 : index === 1 ? 3 : null;
 
-    if (Number(participant.seatNumber || 0) !== Number(desiredSeat || 0)) {
-      const [updated] = await executor
-        .update(roomParticipants)
-        .set({
-          seatNumber: desiredSeat,
-          role: 'player',
-          lastHeartbeatAt: new Date(),
-        })
-        .where(eq(roomParticipants.id, participant.id))
-        .returning();
-      assigned.push(updated);
-    } else {
-      assigned.push(participant);
-    }
+    const [updated] = await executor
+      .update(roomParticipants)
+      .set({
+        seatNumber,
+        role: 'player',
+        leftAt: null,
+        lastHeartbeatAt: new Date(),
+      })
+      .where(eq(roomParticipants.id, participant.id))
+      .returning();
+
+    assigned.push(updated);
   }
 
   return assigned;
+}
+
+export function syncSquareBizRoster(rawState, participants = []) {
+  const state = normalizeSquareBizState(rawState);
+  if (!['lobby', 'finished'].includes(state.phase)) return state;
+
+  const active = [...participants]
+    .filter((player) => !player.leftAt)
+    .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+
+  const xAccountId = active[0]?.accountId || null;
+  const oAccountId = active[1]?.accountId || null;
+  const queueIds = active.slice(2).map((player) => player.accountId);
+
+  return {
+    ...state,
+    x_account_id: xAccountId,
+    o_account_id: oAccountId,
+    queue_account_ids: queueIds,
+  };
 }
 
 function playerForMark(state, mark) {
