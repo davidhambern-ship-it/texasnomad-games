@@ -1011,8 +1011,8 @@ function SquareBizDisplay({ room }) {
           </div>
         </div>
       ) : (
-        <div className="relative z-10 flex h-full items-center justify-center p-5">
-          <div className={`flex h-full w-full items-center justify-center transition-all duration-300 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
+        <div className="absolute inset-0 z-10">
+          <div className={`absolute inset-5 flex min-h-0 min-w-0 items-center justify-center transition-all duration-300 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
             <SquareBizBoard
               gameState={{ ...state, canSelectSquare: false }}
               interactive={false}
