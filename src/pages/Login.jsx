@@ -1,6 +1,7 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { authClient } from "@/lib/neonAuth";
+import { useAuth } from "@/lib/AuthContext";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -31,6 +32,7 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 }
 
 export default function Login() {
+  const { isAuthenticated, isLoadingAuth } = useAuth();
   const requestedNext = new URLSearchParams(window.location.search).get('next');
   const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext
@@ -41,6 +43,10 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  if (!isLoadingAuth && isAuthenticated) {
+    return <Navigate to={nextPath} replace />;
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -48,7 +54,7 @@ export default function Login() {
     try {
       const result = await authClient.signIn.email({ email, password });
       if (result?.error) throw new Error(result.error.message || "Invalid email or password");
-      window.location.href = nextPath;
+      window.location.replace(nextPath);
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
