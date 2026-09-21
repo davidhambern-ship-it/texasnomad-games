@@ -63,7 +63,9 @@ function RiffleCard({ index }) {
         marginLeft: -CARD_WIDTH / 2,
         marginTop: -CARD_HEIGHT / 2,
         '--riffle-x': `${side * spread}px`,
+        '--riffle-mid-x': `${side * spread * 0.48}px`,
         '--riffle-r': `${rotation}deg`,
+        '--riffle-mid-r': `${rotation * 0.45}deg`,
         '--riffle-delay': `${lane * 18}ms`,
         zIndex: 20 + index,
       }}
@@ -254,8 +256,8 @@ export default function SpadesShuffleAnimation({ phase, onComplete }) {
           }
           52% {
             opacity: 1;
-            transform: translate3d(calc(var(--riffle-x) * .48), 8px, 0)
-              rotate(calc(var(--riffle-r) * .45)) scale(1);
+            transform: translate3d(var(--riffle-mid-x), 8px, 0)
+              rotate(var(--riffle-mid-r)) scale(1);
           }
           67% {
             opacity: 1;
