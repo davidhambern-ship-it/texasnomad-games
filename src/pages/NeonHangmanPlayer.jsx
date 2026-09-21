@@ -64,7 +64,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
   }, [refresh]);
 
   const act = useCallback(async (action, payload = {}) => {
-    if (!deviceId || !roomCode || busy) return;
+    if (!deviceId || !roomCode || busy) return false;
     setBusy(true);
     setError('');
 
@@ -77,8 +77,10 @@ export default function NeonHangmanPlayer({ roomCode }) {
       );
       setRoom(result.room || null);
       setParticipant(result.participant || null);
+      return true;
     } catch (actionError) {
       setError(actionError?.message || 'That Hangman action could not be completed.');
+      return false;
     } finally {
       setBusy(false);
     }
@@ -147,8 +149,8 @@ export default function NeonHangmanPlayer({ roomCode }) {
               className="rounded-lg border px-3 py-2 text-[7px] tracking-widest uppercase"
               style={{
                 ...PS2,
-                borderColor: canAct ? '#4ade80' : 'rgba(255,255,255,.15)',
-                color: canAct ? '#4ade80' : 'rgba(255,255,255,.45)',
+                borderColor: canSetBoard ? '#BC13FE' : canAct ? '#4ade80' : 'rgba(255,255,255,.15)',
+                color: canSetBoard ? '#BC13FE' : canAct ? '#4ade80' : 'rgba(255,255,255,.45)',
               }}
             >
               {statusLabel}
