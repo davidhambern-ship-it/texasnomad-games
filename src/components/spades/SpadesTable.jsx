@@ -29,7 +29,7 @@ export default function SpadesTable({
   updateState, joinableSeats, emptySeats, onSitInSeat, roomCode,
   onPlayAgainstCPU, onWaitForRealPlayers, cpuChoiceShown,
   onChooseSpectate, onChooseSit, onPlayCard, onStandUp,
-  onTakeOverCPU, onBidTimeout,
+  onTakeOverCPU, onBidTimeout, showPlayerControls = true,
 }) {
   const players = gs.players || [];
   const isPlaying = gs.phase === 'playing' || gs.phase === 'playing_trick';
@@ -95,7 +95,9 @@ export default function SpadesTable({
   const getAdjustedCardCount = (seatNumber) => {
     const player = getPlayerAtSeat(seatNumber);
     if (!player) return 0;
-    const baseCount = player.hand?.length || 0;
+    const baseCount = Array.isArray(player.hand)
+      ? player.hand.length
+      : Number(player.cardCount || 0);
     // Subtract cards this seat has played in the current trick
     const cardsPlayedInTrick = (gs.current_trick || []).filter(t => t.seatNumber === seatNumber).length;
     return Math.max(0, baseCount - cardsPlayedInTrick);
@@ -336,7 +338,7 @@ export default function SpadesTable({
       </div>
 
       {/* ── Player controls ───────────────────────────────────────── */}
-      {isPlayer && myPlayer && mySeatNumber && (
+      {showPlayerControls && isPlayer && myPlayer && mySeatNumber && (
         <div style={{ position: 'relative', zIndex: 40 }}>
           <SpadesPlayerControls
             seatNumber={mySeatNumber}
@@ -352,7 +354,7 @@ export default function SpadesTable({
       )}
 
       {/* ── Stand Up button ───────────────────────────────────────── */}
-      {isPlayer && myPlayer && mySeatNumber && (
+      {showPlayerControls && isPlayer && myPlayer && mySeatNumber && (
         <button
           onClick={onStandUp}
           className="w-full py-1.5 px-4 rounded-lg border border-white/20 text-white/30 text-[6px] tracking-widest uppercase hover:border-red-500/40 hover:text-red-400 hover:bg-red-500/10 transition-all"
