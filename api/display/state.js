@@ -39,6 +39,40 @@ function hangmanProjection(gameState = {}) {
   };
 }
 
+function spadesProjection(gameState = {}) {
+  return {
+    phase: gameState.phase || 'setup',
+    team1Name: gameState.team1Name || 'Team 1',
+    team2Name: gameState.team2Name || 'Team 2',
+    targetScore: Number(gameState.targetScore || 500),
+    score1: Number(gameState.score1 || 0),
+    score2: Number(gameState.score2 || 0),
+    bid1: gameState.bid1 ?? null,
+    bid2: gameState.bid2 ?? null,
+    books1: Number(gameState.books1 || 0),
+    books2: Number(gameState.books2 || 0),
+    dealerSeat: gameState.dealerSeat || 1,
+    currentBidderSeat: gameState.currentBidderSeat || null,
+    currentTurnSeat: gameState.currentTurnSeat || null,
+    currentTrick: Array.isArray(gameState.currentTrick) ? gameState.currentTrick : [],
+    tricksPlayed: Number(gameState.tricksPlayed || 0),
+    spadesBroken: gameState.spadesBroken === true,
+    handNumber: Number(gameState.handNumber || 0),
+    players: Array.isArray(gameState.players)
+      ? gameState.players.map((player) => ({
+          seatNumber: player.seatNumber,
+          playerType: player.playerType,
+          characterId: player.characterId || null,
+          name: player.name || null,
+          role: player.role || 'player',
+          cardCount: Number(player.cardCount || 0),
+          bid: player.bid ?? null,
+          tricksWon: Number(player.tricksWon || 0),
+        }))
+      : [],
+  };
+}
+
 function projectRoom(room) {
   const source = room.displayState || {};
   const gameState = source.gameState || {};
@@ -52,7 +86,9 @@ function projectRoom(room) {
     screen: source.screen || 'lobby',
     state: room.gameId === 'hangman'
       ? hangmanProjection(gameState)
-      : {},
+      : room.gameId === 'spades'
+        ? spadesProjection(gameState)
+        : {},
     updatedAt: room.updatedAt,
   };
 }
