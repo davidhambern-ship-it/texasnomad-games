@@ -9,12 +9,13 @@ import PlayerProfilesPanel from '@/components/host/AdminPlayerProfiles';
 import useHostSession from '@/hooks/useHostSession';
 import PreviewHostPanel from '@/pages/PreviewHostPanel';
 import { isBase44Preview } from '@/lib/previewTngProfile';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 const HOST_PASSWORD = 'BERNA88@tx';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 export default function HostPanel() {
-  if (isBase44Preview) return <PreviewHostPanel />;
+  if (isBase44Preview || isNeonStaging) return <PreviewHostPanel />;
   return <LegacyHostPanel />;
 }
 
