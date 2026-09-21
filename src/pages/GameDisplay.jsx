@@ -13,6 +13,7 @@ import { tngApi } from '@/api/tngApi';
 import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
+import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -968,6 +969,104 @@ function SpadesDisplay({ room }) {
   );
 }
 
+
+function SquareBizDisplay({ room }) {
+  const state = room.state || {};
+  const [clock, setClock] = useState(Date.now());
+  const phase = state.phase || 'lobby';
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(Date.now()), 100);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#05020a]">
+      <SquareBizShowStyles />
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          background:
+            'radial-gradient(circle at 12% 16%, rgba(159,69,255,.18), transparent 24%), radial-gradient(circle at 86% 72%, rgba(255,21,147,.15), transparent 26%), radial-gradient(circle at 58% 46%, rgba(255,120,31,.08), transparent 42%)',
+        }}
+      />
+
+      {phase === 'lobby' ? (
+        <div className="relative z-10 flex h-full items-center justify-center px-8 text-center">
+          <div className="w-full max-w-[1120px]">
+            <div className="text-[9px] uppercase tracking-[.34em] text-[#ffd633]/65" style={PS2}>
+              ROOM {room.roomCode} · STAND BY
+            </div>
+            <div className="mt-3">
+              <SquareBizBoard
+                gameState={{ ...state, canSelectSquare: false }}
+                interactive={false}
+                hostLabel="SHOW HOST"
+              />
+            </div>
+            <div className="mt-4 text-lg font-semibold text-white/45">
+              Contestants are connecting. The Host starts the show.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="relative z-10 flex h-full items-center justify-center p-5">
+          <div className={`flex h-full w-full items-center justify-center transition-all duration-300 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
+            <SquareBizBoard
+              gameState={{ ...state, canSelectSquare: false }}
+              interactive={false}
+              hostLabel="SHOW HOST"
+            />
+          </div>
+
+          <SquareBizCueCard
+            gameState={{ ...state, canAnswer: false }}
+            now={clock}
+            busy
+          />
+
+          {phase === 'finished' && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#05020a]/32">
+              <div
+                className="sb-result-pop rounded-[34px] border-2 bg-[#0b0414]/92 px-12 py-8 text-center backdrop-blur-lg"
+                style={{
+                  borderColor: state.winner === 'X' ? '#ff1593' : '#25b9ff',
+                  boxShadow: `0 0 70px ${state.winner === 'X' ? 'rgba(255,21,147,.30)' : 'rgba(37,185,255,.30)'}`,
+                }}
+              >
+                <div className="text-[8px] uppercase tracking-[.3em] text-[#ffd633]" style={PS2}>
+                  ROUND {state.roundNumber}
+                </div>
+                <div
+                  className="mt-4 text-[clamp(4rem,9vw,8rem)] font-black uppercase leading-[.86]"
+                  style={{
+                    fontFamily: 'Impact, sans-serif',
+                    color: state.winner === 'X' ? '#ff1593' : '#25b9ff',
+                    textShadow: '0 0 30px currentColor',
+                  }}
+                >
+                  PLAYER {state.winner}<br />TAKES THE BIZ!
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {phase === 'intro' && (
+        <SquareBizIntro gameState={state} now={clock} />
+      )}
+
+      {phase !== 'intro' && (
+        <div className="pointer-events-none absolute right-4 top-4 z-40 rounded-full border border-white/10 bg-[#0b0414]/75 px-3 py-2 text-[6px] uppercase tracking-widest text-white/30" style={PS2}>
+          ROOM {room.roomCode}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GameDisplay() {
   const initial = useMemo(savedDisplay, []);
   const [code, setCode] = useState('');
@@ -1112,10 +1211,12 @@ export default function GameDisplay() {
     );
   }
 
+  const squareBizMode = room?.gameId === 'square-biz';
+
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-[#030207] text-white">
-      <AmbientBackdrop />
-      <DisplayHud room={room} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+      {!squareBizMode && <AmbientBackdrop />}
+      {!squareBizMode && <DisplayHud room={room} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />}
 
       {error && (
         <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-lg border border-red-500/40 bg-black/90 px-4 py-2 text-sm text-red-400 shadow-xl">
@@ -1123,7 +1224,7 @@ export default function GameDisplay() {
         </div>
       )}
 
-      <div className="relative z-10 h-[calc(100dvh-4rem)] overflow-hidden">
+      <div className={`relative z-10 overflow-hidden ${squareBizMode ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)]'}`}>
         {!room && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
@@ -1153,8 +1254,9 @@ export default function GameDisplay() {
 
         {room?.gameId === 'hangman' && <HangmanDisplay room={room} />}
         {room?.gameId === 'spades' && <SpadesDisplay room={room} />}
+        {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
 
-        {room && !['hangman', 'spades'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>
