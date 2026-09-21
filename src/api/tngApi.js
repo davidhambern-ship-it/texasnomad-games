@@ -53,7 +53,11 @@ export const tngApi = {
   host: {
     startSession: (deviceId) => request('/api/host/session', { method:'POST', deviceId }),
     endSession: (deviceId) => request('/api/host/session', { method:'DELETE', deviceId }),
-    createPairing: (deviceId) => request('/api/host/pairing', { method:'POST', deviceId }),
+    createPairing: (deviceId, replaceDisplay = false) => request('/api/host/pairing', {
+      method:'POST',
+      deviceId,
+      body:{ replaceDisplay },
+    }),
     createRoom: (deviceId, gameId) => request('/api/host/room', { method:'POST', deviceId, body:{gameId} }),
     endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
     getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
