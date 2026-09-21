@@ -13,12 +13,21 @@ export function requireNeonAuthClient() {
   return neonAuthClient;
 }
 
-export async function signInWithGoogle() {
+function normalizeNextPath(value) {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
+    ? value
+    : '/';
+}
+
+export async function signInWithGoogle(nextPath = '/') {
   const client = requireNeonAuthClient();
+  const onboardingUrl = new URL('/onboarding', window.location.origin);
+  onboardingUrl.searchParams.set('next', normalizeNextPath(nextPath));
+
   return client.signIn.social({
     provider: 'google',
-    callbackURL: `${window.location.origin}/onboarding`,
-    newUserCallbackURL: `${window.location.origin}/onboarding`,
+    callbackURL: onboardingUrl.toString(),
+    newUserCallbackURL: onboardingUrl.toString(),
     errorCallbackURL: `${window.location.origin}/login?auth_error=google`,
   });
 }
