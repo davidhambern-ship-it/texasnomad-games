@@ -7,11 +7,18 @@ import HostConsole from '@/components/host/HostConsole';
 import LivePlayersPanel from '@/components/host/AdminLivePlayers';
 import PlayerProfilesPanel from '@/components/host/AdminPlayerProfiles';
 import useHostSession from '@/hooks/useHostSession';
+import PreviewHostPanel from '@/pages/PreviewHostPanel';
+import { isBase44Preview } from '@/lib/previewTngProfile';
 
 const HOST_PASSWORD = 'BERNA88@tx';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
 export default function HostPanel() {
+  if (isBase44Preview) return <PreviewHostPanel />;
+  return <LegacyHostPanel />;
+}
+
+function LegacyHostPanel() {
   const [step, setStep] = useState('password'); // 'password' | 'account' | 'panel'
   const [hostUser, setHostUser] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
