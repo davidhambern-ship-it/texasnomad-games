@@ -75,7 +75,7 @@ export default function NeonHostPanel() {
   const [passwordAccepted, setPasswordAccepted] = useState(false);
   const [phase, setPhase] = useState('idle');
   const [controllerId, setControllerId] = useState(null);
-  const [hostSession, setHostSession] = useState(null);
+  const [, setHostSession] = useState(null);
   const [pairing, setPairing] = useState(null);
   const [activeRoom, setActiveRoom] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
