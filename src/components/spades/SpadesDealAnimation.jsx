@@ -281,7 +281,7 @@ export default function SpadesDealAnimation({
       }
       timersRef.current.clear();
     };
-  }, [dealSequence, dealStartSeat, mySeatNumber, seatedPlayers]);
+  }, []); // Run once per mounted deal; polling rerenders must not restart the animation.
 
   const stackLayers = deckCount <= 0
     ? 0
