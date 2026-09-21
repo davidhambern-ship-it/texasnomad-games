@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
 import { requireController } from '../../server/auth/require-controller.js';
 import { db } from '../../server/db/client.js';
@@ -13,6 +13,32 @@ async function findActiveRoom(hostSessionId, executor = db) {
     inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
   )).limit(1);
   return room || null;
+}
+
+async function resumeTestRoom(hostSessionId) {
+  const [room] = await db.select().from(gameRooms).where(and(
+    eq(gameRooms.hostSessionId, hostSessionId),
+    eq(gameRooms.status, 'abandoned'),
+  )).orderBy(desc(gameRooms.updatedAt)).limit(1);
+
+  if (!room) return null;
+
+  const now = new Date();
+  const [resumedRoom] = await db.transaction(async (transaction) => {
+    const [updatedRoom] = await transaction.update(gameRooms).set({
+      status: 'live',
+      updatedAt: now,
+    }).where(eq(gameRooms.id, room.id)).returning();
+
+    await transaction.update(hostSessions).set({
+      status: 'live',
+      updatedAt: now,
+    }).where(eq(hostSessions.id, hostSessionId));
+
+    return [updatedRoom];
+  });
+
+  return resumedRoom || null;
 }
 
 export default async function handler(request, response) {
@@ -61,7 +87,11 @@ export default async function handler(request, response) {
     )).limit(1);
 
     if (activeSession) {
-      const activeRoom = await findActiveRoom(activeSession.id);
+      let activeRoom = await findActiveRoom(activeSession.id);
+
+      if (!activeRoom && request.body?.resumeTestRoom === true) {
+        activeRoom = await resumeTestRoom(activeSession.id);
+      }
 
       if (activeSession.controllerDeviceId !== device.id) {
         // Development player-testing recovery:
