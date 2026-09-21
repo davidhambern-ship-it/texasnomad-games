@@ -10,6 +10,7 @@ import displayPair from '../api/display/pair.js';
 import displayState from '../api/display/state.js';
 import spadesHost from '../api/spades/host.js';
 import spadesPlayer from '../api/spades/player.js';
+import hangmanPlayer from '../api/hangman/player.js';
 
 const routes = new Map([
   ['/', health],
@@ -25,6 +26,7 @@ const routes = new Map([
   ['/display/state', displayState],
   ['/spades/host', spadesHost],
   ['/spades/player', spadesPlayer],
+  ['/hangman/player', hangmanPlayer],
 ]);
 
 function configuredOrigins() {
