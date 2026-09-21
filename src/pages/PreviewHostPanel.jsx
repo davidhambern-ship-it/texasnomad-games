@@ -653,11 +653,7 @@ export default function PreviewHostPanel() {
             )}
 
             {roomState?.gameId === 'hangman' && (
-              <HangmanHostPanel
-                gs={roomState.gameState || {}}
-                updateState={updateGameState}
-                sendCommand={sendCommand}
-              />
+              <HangmanHostPanel controllerId={controllerId} />
             )}
 
             {roomState?.gameId === 'spades' && (
