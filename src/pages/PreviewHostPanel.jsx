@@ -6,6 +6,7 @@ import { ALL_GAMES } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
 import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
+import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 
@@ -665,7 +666,11 @@ export default function PreviewHostPanel() {
               <NeonWordSearchHostPanel controllerId={controllerId} />
             )}
 
-            {roomState && !['hangman', 'spades', 'word-search'].includes(roomState.gameId) && (
+            {roomState?.gameId === 'square-biz' && (
+              <NeonSquareBizHostPanel controllerId={controllerId} />
+            )}
+
+            {roomState && !['hangman', 'spades', 'word-search', 'square-biz'].includes(roomState.gameId) && (
               <div className="py-16 text-center text-white/40">
                 <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
                 <p>
