@@ -8,6 +8,8 @@ import {
   roomParticipants,
 } from '../../server/db/schema.js';
 import {
+  applySpadesBid,
+  chooseCpuSpadesBid,
   chooseCpuSpadesCard,
   dealSpades,
   defaultSpadesState,
@@ -420,6 +422,71 @@ export default async function handler(request, response) {
           },
         },
         status: 'live',
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'place_bid') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+
+      if (Number(gameState.currentBidderSeat || 0) !== 1) {
+        const error = new Error('It is not the Host player bid turn.');
+        error.statusCode = 409;
+        error.code = 'SPADES_NOT_HOST_BID_TURN';
+        throw error;
+      }
+
+      const nextGameState = applySpadesBid(gameState, 1, request.body?.bid);
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: nextGameState,
+        },
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'cpu_bid') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+      const serverState = current.serverState || {};
+      const seatNumber = Number(gameState.currentBidderSeat || 0);
+      const bidder = (gameState.players || []).find(
+        (player) => Number(player.seatNumber) === seatNumber,
+      );
+
+      if (
+        gameState.phase !== 'bidding' ||
+        ![2, 3, 4].includes(seatNumber) ||
+        !bidder ||
+        bidder.playerType !== 'cpu'
+      ) {
+        const error = new Error('No CPU bid is ready.');
+        error.statusCode = 409;
+        error.code = 'SPADES_NO_CPU_BID';
+        throw error;
+      }
+
+      const cpuHands = serverState.cpuHands || {};
+      const hand = Array.isArray(cpuHands[seatNumber]) ? cpuHands[seatNumber] : [];
+      const bid = chooseCpuSpadesBid(hand, bidder.characterId || null);
+      const nextGameState = applySpadesBid(gameState, seatNumber, bid);
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: nextGameState,
+        },
         revision: room.revision + 1,
         updatedAt: now,
       }).where(eq(gameRooms.id, room.id)).returning();
