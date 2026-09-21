@@ -318,7 +318,11 @@ export default function PreviewHostPanel() {
     setError('');
 
     try {
-      const { room } = await tngApi.host.createRoom(controllerId, game.id);
+      const { room } = await tngApi.host.createRoom(
+        controllerId,
+        game.id,
+        playerTestMode,
+      );
       setSelectedGame(game);
       setActiveRoom(room);
       setRoomState(null);
