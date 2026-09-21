@@ -1,5 +1,6 @@
 import { base44 } from '@/api/base44Client';
 import { TngApiError, tngApi } from '@/api/tngApi';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 function previewHost() {
   if (typeof window === 'undefined') return false;
@@ -66,7 +67,7 @@ export async function getPreviewTngProfile(user) {
   if (!user) return null;
 
   const neon = await getNeonProfile();
-  if (neon) return neon;
+  if (neon || isNeonStaging) return neon;
 
   const legacy = await getBase44Profile(user);
   if (!legacy) return null;
@@ -92,6 +93,17 @@ export async function createPreviewTngProfile(user, { displayName, handle }) {
   }
   if (!/^[a-z0-9_]{3,24}$/.test(cleanHandle)) {
     throw new Error('Handle must be 3–24 characters using letters, numbers, or underscores.');
+  }
+
+  if (isNeonStaging) {
+    let neonProfile = await getNeonProfile();
+    if (neonProfile) return neonProfile;
+
+    const payload = await tngApi.profile.create({
+      displayName: cleanDisplayName,
+      handle: cleanHandle,
+    });
+    return payload.profile;
   }
 
   const existingProfile = await getBase44Profile(user);
