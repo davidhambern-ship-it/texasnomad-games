@@ -51,6 +51,14 @@ export default function Login() {
   };
 
   const handleGoogle = () => {
+    // Base44 Preview normally reinjects the editor/admin access token on every
+    // reload. Mark this redirect so app-params can pin the Google account the
+    // tester explicitly chose instead.
+    try {
+      localStorage.setItem('tng_preview_expect_user_login', '1');
+      localStorage.removeItem('tng_preview_user_access_token');
+    } catch {}
+
     base44.auth.loginWithProvider("google", "/");
   };
 
