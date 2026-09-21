@@ -37,6 +37,8 @@ export default function NeonSpadesHostPanel({ controllerId }) {
   const currentTurnSeat = Number(gameState.currentTurnSeat || 0);
   const handNumber = Number(gameState.handNumber || 0);
   const isHostTurn = phase === 'playing' && currentTurnSeat === 1;
+  const currentBidderSeat = Number(gameState.currentBidderSeat || 0);
+  const isHostBidTurn = phase === 'bidding' && currentBidderSeat === 1;
   const tableReady = players.length === 4;
 
   const legalCardIds = useMemo(() => {
@@ -153,6 +155,48 @@ export default function NeonSpadesHostPanel({ controllerId }) {
     return () => window.clearTimeout(timer);
   }, [act, gameState.trickWinnerSeat, phase]);
 
+  useEffect(() => {
+    if (phase !== 'round_over' || handNumber < 1) return undefined;
+
+    const targetScore = Number(gameState.targetScore || 500);
+    const matchComplete =
+      Number(gameState.score1 || 0) >= targetScore ||
+      Number(gameState.score2 || 0) >= targetScore;
+
+    if (matchComplete) return undefined;
+
+    const timer = window.setTimeout(() => {
+      act('deal');
+    }, 3000);
+
+    return () => window.clearTimeout(timer);
+  }, [
+    act,
+    gameState.score1,
+    gameState.score2,
+    gameState.targetScore,
+    handNumber,
+    phase,
+  ]);
+
+  useEffect(() => {
+    if (phase !== 'bidding' || !currentBidderSeat) return undefined;
+
+    const bidder = players.find(
+      (player) => Number(player.seatNumber) === currentBidderSeat,
+    );
+
+    if (!bidder || bidder.playerType !== 'cpu' || bidder.bid != null) {
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      act('cpu_bid');
+    }, 1200);
+
+    return () => window.clearTimeout(timer);
+  }, [act, currentBidderSeat, phase, players]);
+
   if (!state) {
     return (
       <div className="py-14 text-center">
@@ -226,8 +270,12 @@ export default function NeonSpadesHostPanel({ controllerId }) {
                 {phase === 'resolving' && (
                   `Seat ${gameState.trickWinnerSeat} takes the book.`
                 )}
-                {phase === 'bidding' && 'Bidding begins with this hand.'}
-                {phase === 'round_over' && 'Hand complete.'}
+                {phase === 'bidding' && (
+                  isHostBidTurn
+                    ? 'Your turn to bid.'
+                    : `Seat ${currentBidderSeat || '?'} is bidding…`
+                )}
+                {phase === 'round_over' && 'Hand complete. Next hand starts automatically…'}
               </div>
             </div>
 
@@ -292,6 +340,43 @@ export default function NeonSpadesHostPanel({ controllerId }) {
           );
         })}
       </div>
+
+      {phase === 'bidding' && (
+        <div
+          className="rounded-xl border bg-black/60 p-4"
+          style={{
+            borderColor: isHostBidTurn ? 'rgba(255,95,31,.70)' : 'rgba(255,255,255,.10)',
+            boxShadow: isHostBidTurn ? '0 0 24px rgba(255,95,31,.12)' : 'none',
+          }}
+        >
+          <div className="text-center">
+            <div className="text-[8px] uppercase tracking-[0.18em] text-[#FF5F1F]" style={PS2}>
+              {isHostBidTurn ? 'YOUR TURN TO BID' : `WAITING FOR SEAT ${currentBidderSeat || '?'}`}
+            </div>
+
+            {isHostBidTurn && (
+              <>
+                <div className="mt-2 text-xs text-white/35">
+                  Tap a number to place your bid.
+                </div>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                  {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
+                    <button
+                      key={bid}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => act('place_bid', { bid })}
+                      className="h-10 w-10 rounded-lg border border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-white transition hover:bg-[#FF5F1F]/25 disabled:opacity-40"
+                    >
+                      {bid}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div
         className="rounded-xl border bg-black/60 p-4"
