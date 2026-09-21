@@ -80,4 +80,12 @@ export const tngApi = {
       authenticated:false,
     }),
   },
+  spades: {
+    getHostState: (deviceId) => request('/api/spades/host', { deviceId }),
+    hostAction: (deviceId, action) => request('/api/spades/host', {
+      method:'POST',
+      deviceId,
+      body:{ action },
+    }),
+  },
 };
