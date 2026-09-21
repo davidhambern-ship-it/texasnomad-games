@@ -663,7 +663,7 @@ function SpadesDisplay({ room }) {
           className="absolute left-1/2 top-1/2"
           style={{
             width: '76%',
-            height: '68%',
+            height: '88%',
             transform: 'translate(-50%, -50%)',
           }}
         >
