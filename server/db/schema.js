@@ -216,6 +216,35 @@ export const hostStats = pgTable('host_stats', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+
+export const squareBizQuestions = pgTable('square_biz_questions', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  question: varchar('question', { length: 500 }).notNull(),
+  choices: jsonb('choices').notNull(),
+  correctAnswer: varchar('correct_answer', { length: 1 }).notNull(),
+  category: varchar('category', { length: 100 }).notNull().default('General'),
+  difficulty: varchar('difficulty', { length: 20 }).notNull().default('medium'),
+  source: varchar('source', { length: 50 }).notNull().default('manual'),
+  sourceRef: varchar('source_ref', { length: 255 }),
+  active: boolean('active').notNull().default(true),
+  timesUsed: integer('times_used').notNull().default(0),
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  uniqueIndex('square_biz_questions_question_unique').on(sql`lower(${table.question})`),
+  index('square_biz_questions_active_category_idx').on(table.active, table.category),
+  index('square_biz_questions_usage_idx').on(table.timesUsed, table.lastUsedAt),
+  check('square_biz_questions_correct_answer_check', sql`${table.correctAnswer} IN ('A','B','C','D')`),
+  check(
+    'square_biz_questions_choices_shape_check',
+    sql`jsonb_typeof(${table.choices}) = 'array' AND jsonb_array_length(${table.choices}) = 4`,
+  ),
+  check(
+    'square_biz_questions_difficulty_check',
+    sql`${table.difficulty} IN ('easy','medium','hard')`,
+  ),
+]);
+
 export const outboxEvents = pgTable('outbox_events', {
   id: uuid('id').primaryKey().defaultRandom(),
   topic: varchar('topic', { length: 100 }).notNull(),
