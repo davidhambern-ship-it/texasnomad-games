@@ -16,6 +16,9 @@ export default function PreviewHostPanel() {
   const [controllerId, setControllerId] = useState(null);
   const [pairing, setPairing] = useState(null);
   const [repairingDisplay, setRepairingDisplay] = useState(false);
+  const [playerTestMode, setPlayerTestMode] = useState(
+    () => localStorage.getItem('tng_player_test_mode') === '1',
+  );
   const [activeRoom, setActiveRoom] = useState(null);
   const [roomState, setRoomState] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -77,11 +80,21 @@ export default function PreviewHostPanel() {
         setActiveRoom(session.activeRoom || null);
 
         if (session.activeRoom) {
+          const displayAttached = Boolean(session.hostSession?.displayDeviceId);
+          if (displayAttached) {
+            localStorage.removeItem('tng_player_test_mode');
+            setPlayerTestMode(false);
+          } else {
+            localStorage.setItem('tng_player_test_mode', '1');
+            setPlayerTestMode(true);
+          }
           setPhase('room');
           return;
         }
 
         if (session.hostSession?.displayDeviceId) {
+          localStorage.removeItem('tng_player_test_mode');
+          setPlayerTestMode(false);
           setPhase('ready');
           return;
         }
@@ -115,6 +128,8 @@ export default function PreviewHostPanel() {
           if (session.hostSession?.displayDeviceId) {
             setPairing(null);
             setRepairingDisplay(false);
+            localStorage.removeItem('tng_player_test_mode');
+            setPlayerTestMode(false);
             setActiveRoom(session.activeRoom || null);
             setPhase(session.activeRoom ? 'room' : 'ready');
           }
@@ -188,6 +203,30 @@ export default function PreviewHostPanel() {
     }
   }
 
+  async function releaseDisplayForPlayerTesting() {
+    if (!controllerId || !activeRoom || busy) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      // The existing replace-display backend path disconnects the current
+      // Game Display while preserving the active Host session and room.
+      // We intentionally discard the temporary pairing code here so this
+      // second device can be reused as a signed-in Player screen.
+      await tngApi.host.createPairing(controllerId, true);
+      localStorage.setItem('tng_player_test_mode', '1');
+      setPlayerTestMode(true);
+      setPairing(null);
+      setRepairingDisplay(false);
+      setPhase('room');
+    } catch (releaseError) {
+      setError(releaseError.message || 'The Game Display could not be released for player testing.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function createRoom(game) {
     setBusy(true);
     setError('');
@@ -232,7 +271,17 @@ export default function PreviewHostPanel() {
       setActiveRoom(null);
       setRoomState(null);
       setSelectedGame(null);
-      setPhase('ready');
+
+      if (playerTestMode) {
+        const payload = await tngApi.host.createPairing(controllerId, false);
+        setPairing(payload.pairing);
+        setRepairingDisplay(false);
+        localStorage.removeItem('tng_player_test_mode');
+        setPlayerTestMode(false);
+        setPhase('pairing');
+      } else {
+        setPhase('ready');
+      }
     } catch (roomError) {
       setError(roomError.message || 'The room could not be disconnected.');
     } finally {
@@ -249,6 +298,7 @@ export default function PreviewHostPanel() {
 
     localStorage.removeItem('tng_device_id');
     localStorage.removeItem('tng_connection_role');
+    localStorage.removeItem('tng_player_test_mode');
     logout(true);
   }
 
@@ -358,16 +408,35 @@ export default function PreviewHostPanel() {
                 <p className="mt-2 text-xs text-white/35">
                   This controller is hard-locked to this room until you disconnect it.
                 </p>
+                {playerTestMode && (
+                  <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-3 py-2 text-[#FFD700]">
+                    <span className="h-2 w-2 rounded-full bg-[#FFD700] animate-pulse" />
+                    <span className="text-[7px] uppercase tracking-widest" style={PS2}>
+                      PLAYER TEST MODE · DISPLAY RELEASED
+                    </span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
+                {!playerTestMode && (
+                  <button
+                    onClick={releaseDisplayForPlayerTesting}
+                    disabled={busy}
+                    className="px-5 py-3 border border-[#4ade80]/50 bg-[#4ade80]/10 text-[#4ade80] rounded-lg"
+                  >
+                    <ShieldCheck className="w-4 h-4 inline mr-2" />
+                    PLAYER TEST MODE
+                  </button>
+                )}
+
                 <button
                   onClick={replaceDisplay}
                   disabled={busy}
                   className="px-5 py-3 border border-[#FFD700]/50 text-[#FFD700] rounded-lg"
                 >
                   <Monitor className="w-4 h-4 inline mr-2" />
-                  RE-PAIR DISPLAY
+                  {playerTestMode ? 'RESTORE DISPLAY' : 'RE-PAIR DISPLAY'}
                 </button>
 
                 <button
