@@ -168,4 +168,42 @@ export const tngApi = {
       body:{ roomCode, action, ...payload },
     }),
   },
+  squareBiz: {
+    getHostState: (deviceId) => request('/api/square-biz/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/square-biz/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/square-biz/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/square-biz/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+    questions: {
+      list: (deviceId) => request('/api/square-biz/questions', { deviceId }),
+      create: (deviceId, payload) => request('/api/square-biz/questions', {
+        method:'POST',
+        deviceId,
+        body:{ action:'create', ...payload },
+      }),
+      bulkImport: (deviceId, questions) => request('/api/square-biz/questions', {
+        method:'POST',
+        deviceId,
+        body:{ action:'bulk_import', questions },
+      }),
+      update: (deviceId, payload) => request('/api/square-biz/questions', {
+        method:'PATCH',
+        deviceId,
+        body:payload,
+      }),
+    },
+  },
 };
