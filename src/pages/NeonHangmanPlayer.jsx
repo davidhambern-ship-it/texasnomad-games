@@ -22,6 +22,9 @@ export default function NeonHangmanPlayer({ roomCode }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [wordGuess, setWordGuess] = useState('');
+  const [setterWord, setSetterWord] = useState('');
+  const [setterCategory, setSetterCategory] = useState('');
+  const [setterHint, setSetterHint] = useState('');
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -30,7 +33,12 @@ export default function NeonHangmanPlayer({ roomCode }) {
   const guessed = Array.isArray(gameState.guessedLetters) ? gameState.guessedLetters : [];
   const wrongGuesses = Array.isArray(gameState.wrongGuesses) ? gameState.wrongGuesses : [];
   const currentTurnSeat = Number(gameState.currentTurnSeat || 0);
-  const isGoRoundMode = gameState.isGoRoundMode === true;
+  const setterSeat = Number(gameState.wordSetterSeat || 1);
+  const nextSetterSeat = Number(gameState.nextSetterSeat || setterSeat);
+  const scores = gameState.scores || {};
+  const players = Array.isArray(gameState.players) ? gameState.players : [];
+  const canSetBoard = gameState.canSetBoard === true;
+  const isSetter = gameState.isSetter === true;
   const canAct =
     phase === 'playing' &&
     seatNumber > 0 &&
@@ -106,15 +114,19 @@ export default function NeonHangmanPlayer({ roomCode }) {
   }
 
   const statusLabel =
-    phase === 'setup'
-      ? 'WAITING ON HOST'
-      : phase === 'finished'
-        ? 'ROUND COMPLETE'
-        : canAct
-          ? 'YOUR TURN'
-          : currentTurnSeat
-            ? `SEAT ${currentTurnSeat} TURN`
-            : 'WAITING';
+    canSetBoard
+      ? 'YOU SET THE BOARD'
+      : phase === 'setup'
+        ? `WAITING FOR SEAT ${setterSeat}`
+        : phase === 'finished'
+          ? `NEXT SETTER: SEAT ${nextSetterSeat}`
+          : isSetter
+            ? 'YOU ARE BOARD SETTER'
+            : canAct
+              ? 'YOUR TURN'
+              : currentTurnSeat
+                ? `SEAT ${currentTurnSeat} TURN`
+                : 'WAITING';
 
   return (
     <div className="min-h-screen bg-[#070311] text-white px-4 py-4">
@@ -156,6 +168,102 @@ export default function NeonHangmanPlayer({ roomCode }) {
           <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400 text-center">
             {error}
           </div>
+        )}
+
+        <section className="rounded-xl border border-white/10 bg-black/45 p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div className="text-[7px] tracking-widest uppercase text-white/30" style={PS2}>
+              SCOREBOARD
+            </div>
+            <div className="text-[7px] tracking-widest uppercase text-white/30" style={PS2}>
+              ROUND {gameState.roundNumber || 1}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {players.map((player) => {
+              const seat = Number(player.seatNumber);
+              const playerIsSetter = seat === setterSeat;
+              const playerIsTurn = seat === currentTurnSeat;
+              return (
+                <div
+                  key={player.playerId}
+                  className="rounded-lg border p-3 text-center"
+                  style={{
+                    borderColor: seat === seatNumber
+                      ? '#FFD700'
+                      : playerIsSetter
+                        ? '#BC13FE'
+                        : playerIsTurn
+                          ? '#4ade80'
+                          : 'rgba(255,255,255,.12)',
+                  }}
+                >
+                  <div className="text-[7px] text-white/30 uppercase" style={PS2}>Seat {seat}</div>
+                  <div className="mt-2 text-sm text-white/70 truncate">{player.name || `Seat ${seat}`}</div>
+                  <div className="mt-2 text-2xl text-[#FFD700]" style={PS2}>
+                    {Number(scores?.[String(seat)] || 0)}
+                  </div>
+                  <div
+                    className="mt-2 text-[6px] uppercase tracking-widest"
+                    style={{
+                      ...PS2,
+                      color: playerIsSetter ? '#BC13FE' : playerIsTurn ? '#4ade80' : 'rgba(255,255,255,.25)',
+                    }}
+                  >
+                    {playerIsSetter ? 'SETTER' : playerIsTurn ? 'TURN' : 'WAITING'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {canSetBoard && (
+          <section className="rounded-xl border-2 border-[#BC13FE]/50 bg-[#BC13FE]/5 p-5">
+            <div className="text-[9px] text-[#BC13FE] tracking-widest uppercase mb-4" style={PS2}>
+              {phase === 'finished' ? '🏆 YOU WON — SET THE NEXT BOARD' : '⚙ SET THE BOARD'}
+            </div>
+            <div className="space-y-3">
+              <input
+                value={setterWord}
+                onChange={(event) => setSetterWord(event.target.value.toUpperCase())}
+                placeholder="SECRET WORD OR PHRASE"
+                className="w-full rounded-lg border-2 border-[#FFD700]/40 bg-black/70 px-4 py-3 text-[#FFD700] font-mono text-lg tracking-[0.16em] uppercase outline-none"
+              />
+              <input
+                value={setterCategory}
+                onChange={(event) => setSetterCategory(event.target.value)}
+                placeholder="Category"
+                className="w-full rounded-lg border border-white/15 bg-black/70 px-4 py-3 text-white outline-none"
+              />
+              <input
+                value={setterHint}
+                onChange={(event) => setSetterHint(event.target.value)}
+                placeholder="Optional hint"
+                className="w-full rounded-lg border border-white/15 bg-black/70 px-4 py-3 text-white outline-none"
+              />
+              <button
+                type="button"
+                disabled={!setterWord.trim() || busy}
+                onClick={async () => {
+                  const ok = await act('set_board', {
+                    word: setterWord,
+                    category: setterCategory,
+                    hint: setterHint,
+                  });
+                  if (ok !== false) {
+                    setSetterWord('');
+                    setSetterCategory('');
+                    setSetterHint('');
+                  }
+                }}
+                className="w-full rounded-lg bg-[#BC13FE] px-4 py-4 text-black disabled:opacity-40"
+                style={{ ...PS2, fontSize: 8 }}
+              >
+                {busy ? 'SETTING BOARD…' : 'START BOARD'}
+              </button>
+            </div>
+          </section>
         )}
 
         <section className="rounded-2xl border border-[#FFD700]/25 bg-black/55 p-5">
@@ -327,9 +435,11 @@ export default function NeonHangmanPlayer({ roomCode }) {
               {gameState.maskedWord}
             </div>
             <div className="mt-3 text-sm text-white/45">
-              {gameState.winnerSeat
-                ? `Seat ${gameState.winnerSeat} solved it.`
-                : 'The word was revealed.'}
+              {gameState.roundResult === 'stumped'
+                ? `Nobody solved it. Seat ${setterSeat} earns 50 points and keeps the board.`
+                : gameState.winnerSeat
+                  ? `Seat ${gameState.winnerSeat} solved it and sets the next board.`
+                  : `Seat ${nextSetterSeat} sets the next board.`}
             </div>
           </section>
         )}
@@ -339,7 +449,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
             PLAYERS
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
-            {(gameState.players || []).map((player) => {
+            {players.map((player) => {
               const isTurn = Number(player.seatNumber) === currentTurnSeat;
               return (
                 <div
@@ -355,7 +465,8 @@ export default function NeonHangmanPlayer({ roomCode }) {
                 >
                   <div className="text-sm text-white/75">{player.name || `Seat ${player.seatNumber}`}</div>
                   <div className="mt-1 text-[10px] text-white/30">
-                    Seat {player.seatNumber}{isTurn ? ' · TURN' : ''}
+                    Seat {player.seatNumber}
+                    {Number(player.seatNumber) === setterSeat ? ' · SETTER' : isTurn ? ' · TURN' : ''}
                   </div>
                 </div>
               );
