@@ -11,6 +11,8 @@ import {
 
 import { tngApi } from '@/api/tngApi';
 import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
+import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
+import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -454,12 +456,12 @@ function HangmanDisplay({ room }) {
 }
 
 
-function SpadesSeat({ seat, player, state, position, scale = 1 }) {
+function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount = null }) {
   const team = seat === 1 || seat === 3 ? 1 : 2;
   const teamColor = team === 1 ? '#BC13FE' : '#FF5F1F';
   const isTurn = state.currentTurnSeat === seat;
   const isDealer = state.dealerSeat === seat;
-  const cardCount = Number(player?.cardCount || 0);
+  const cardCount = visualCardCount ?? Number(player?.cardCount || 0);
 
   const positionStyle = {
     top: {
@@ -597,6 +599,17 @@ function SpadesDisplay({ room }) {
   const trick = state.currentTrick || [];
   const playAreaRef = useRef(null);
   const [tableSize, setTableSize] = useState(null);
+  const handNumber = Number(state.handNumber || 0);
+  const lastAnimatedHandRef = useRef(handNumber);
+  const [dealVisualPhase, setDealVisualPhase] = useState('idle');
+  const [visualCardCounts, setVisualCardCounts] = useState(null);
+
+  const publicDealSequence = useMemo(
+    () => Array.from({ length: 52 }, (_, index) => ({
+      id: `public-deal-${handNumber}-${index}`,
+    })),
+    [handNumber],
+  );
 
   useEffect(() => {
     const playArea = playAreaRef.current;
@@ -647,6 +660,29 @@ function SpadesDisplay({ room }) {
     };
   }, []);
 
+  useEffect(() => {
+    const lastAnimatedHand = lastAnimatedHandRef.current;
+
+    // A reset/setup can bring the hand number back down. Track that so the
+    // next confirmed deal is eligible to animate again.
+    if (handNumber < lastAnimatedHand || state.phase === 'setup') {
+      lastAnimatedHandRef.current = handNumber;
+      if (state.phase === 'setup') {
+        setDealVisualPhase('idle');
+        setVisualCardCounts(null);
+      }
+      return;
+    }
+
+    // The server has already completed the secure deal. This is presentation
+    // only: the display animates backs and counts without receiving card IDs.
+    if (state.phase === 'dealt' && handNumber > lastAnimatedHand) {
+      lastAnimatedHandRef.current = handNumber;
+      setVisualCardCounts({ 1: 0, 2: 0, 3: 0, 4: 0 });
+      setDealVisualPhase('shuffling');
+    }
+  }, [handNumber, state.phase]);
+
   const phaseLabel = {
     setup: 'SETTING TABLE',
     dealt: 'CARDS DEALT',
@@ -654,6 +690,13 @@ function SpadesDisplay({ room }) {
     playing: 'PLAYING',
     round_over: 'ROUND OVER',
   }[state.phase] || String(state.phase || 'WAITING').toUpperCase();
+
+  const displayPhaseLabel =
+    dealVisualPhase === 'shuffling'
+      ? 'SHUFFLING'
+      : dealVisualPhase === 'dealing'
+        ? 'DEALING'
+        : phaseLabel;
 
   const playerAt = (seat) => players.find((player) => player.seatNumber === seat);
 
@@ -668,7 +711,7 @@ function SpadesDisplay({ room }) {
             TEXASNOMAD SPADES
           </div>
           <div className="mt-1 text-sm text-white/30">
-            Hand {state.handNumber || 0} · {phaseLabel}
+            Hand {state.handNumber || 0} · {displayPhaseLabel}
           </div>
         </div>
 
@@ -755,22 +798,60 @@ function SpadesDisplay({ room }) {
               />
             </div>
 
-            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" scale={tableSize?.scale || 1} />
-            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" scale={tableSize?.scale || 1} />
-            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" scale={tableSize?.scale || 1} />
-            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" scale={tableSize?.scale || 1} />
+            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[3] ?? null} />
+            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[2] ?? null} />
+            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[4] ?? null} />
+            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[1] ?? null} />
 
             <div
               className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
               style={{ width: 300, height: 230 }}
             >
-              {trick.length === 0 ? (
+              {dealVisualPhase === 'shuffling' ? (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    transform: `scale(${tableSize?.scale || 1})`,
+                    transformOrigin: 'center',
+                  }}
+                >
+                  <SpadesShuffleAnimation
+                    phase="shuffling"
+                    onComplete={() => setDealVisualPhase('dealing')}
+                  />
+                </div>
+              ) : dealVisualPhase === 'dealing' ? (
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    transform: `scale(${tableSize?.scale || 1})`,
+                    transformOrigin: 'center',
+                  }}
+                >
+                  <SpadesDealAnimation
+                    dealSequence={publicDealSequence}
+                    seatedPlayers={players}
+                    dealStartSeat={state.currentBidderSeat || state.currentTurnSeat || 1}
+                    mySeatNumber={null}
+                    onCardDealt={(seatNumber) => {
+                      setVisualCardCounts((current) => ({
+                        ...(current || { 1: 0, 2: 0, 3: 0, 4: 0 }),
+                        [seatNumber]: Math.min(13, (current?.[seatNumber] || 0) + 1),
+                      }));
+                    }}
+                    onComplete={() => {
+                      setDealVisualPhase('idle');
+                      setVisualCardCounts(null);
+                    }}
+                  />
+                </div>
+              ) : trick.length === 0 ? (
                 <div className="flex h-full flex-col items-center justify-end pb-3 text-center">
                   <div
                     className="text-[8px] uppercase tracking-[0.18em] text-white/40"
                     style={PS2}
                   >
-                    {state.phase === 'dealt' ? 'CARDS DEALT' : phaseLabel}
+                    {state.phase === 'dealt' ? 'CARDS DEALT' : displayPhaseLabel}
                   </div>
                   {state.phase === 'dealt' && (
                     <div className="mt-2 text-sm text-[#FFD7A0]/70">
@@ -814,11 +895,15 @@ function SpadesDisplay({ room }) {
             className="text-[6px] uppercase tracking-[0.16em] text-white/18"
             style={PS2}
           >
-            {state.phase === 'setup'
-              ? 'SET THE TABLE · THEN SHUFFLE & DEAL'
-              : state.spadesBroken
-                ? 'SPADES BROKEN'
-                : 'SPADES NOT BROKEN'}
+            {dealVisualPhase === 'shuffling'
+              ? 'SHUFFLING DECK'
+              : dealVisualPhase === 'dealing'
+                ? 'DEALING CARDS'
+                : state.phase === 'setup'
+                  ? 'SET THE TABLE · THEN SHUFFLE & DEAL'
+                  : state.spadesBroken
+                    ? 'SPADES BROKEN'
+                    : 'SPADES NOT BROKEN'}
           </div>
         </div>
       </div>
