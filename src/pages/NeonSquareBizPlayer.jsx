@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
@@ -90,15 +90,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
   }, [busy, deviceId, roomCode]);
 
   const currentPlayer = players.find((player) => player.isCurrent);
-  const queuePosition = useMemo(() => {
-    const viewer = players.find((player) => (
-      !player.mark &&
-      String(player.accountId || '') === String(
-        players.find((p) => p.handle === participant?.handle)?.accountId || ''
-      )
-    ));
-    return viewer?.queuePosition || null;
-  }, [participant?.handle, players]);
+  const queuePosition = gameState.myQueuePosition || null;
 
   if (!deviceId) {
     return (
