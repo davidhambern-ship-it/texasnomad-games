@@ -27,15 +27,21 @@ export default function NeonSpadesPlayer({ roomCode }) {
   const phase = gameState.phase || 'setup';
   const handNumber = Number(gameState.handNumber || 0);
   const currentTurnSeat = Number(gameState.currentTurnSeat || 0);
+  const currentBidderSeat = Number(gameState.currentBidderSeat || 0);
   const isMyTurn = mySeat > 0 && phase === 'playing' && currentTurnSeat === mySeat;
+  const isMyBidTurn = mySeat > 0 && phase === 'bidding' && currentBidderSeat === mySeat;
   const playerStatusLabel =
     dealVisualPhase === 'shuffling'
       ? 'SHUFFLING'
       : dealVisualPhase === 'dealing'
         ? 'DEALING'
-        : isMyTurn
-          ? 'YOUR TURN'
-          : String(phase).replace(/_/g, ' ');
+        : isMyBidTurn
+          ? 'YOUR BID'
+          : phase === 'bidding'
+            ? `SEAT ${currentBidderSeat || '?'} BIDDING`
+            : isMyTurn
+              ? 'YOUR TURN'
+              : String(phase).replace(/_/g, ' ');
   const neonPlayerId = 'neon-current-player';
 
   const refresh = useCallback(async () => {
@@ -215,6 +221,12 @@ export default function NeonSpadesPlayer({ roomCode }) {
     act('play_card', { cardId: card.id });
   }, [act, busy]);
 
+  const placeBid = useCallback((bid) => {
+    if (busy || !isMyBidTurn) return;
+    act('place_bid', { bid });
+  }, [act, busy, isMyBidTurn]);
+
+
   if (!deviceId) {
     return (
       <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center px-4 text-center">
@@ -371,6 +383,41 @@ export default function NeonSpadesPlayer({ roomCode }) {
                 {playerStatusLabel}
               </div>
             </div>
+
+            {phase === 'bidding' && (
+              <div
+                className="col-span-2 rounded-xl border bg-black/50 p-3"
+                style={{
+                  borderColor: isMyBidTurn
+                    ? 'rgba(255,95,31,.65)'
+                    : 'rgba(255,255,255,.10)',
+                }}
+              >
+                <div className="text-center">
+                  <div className="text-[6px] uppercase tracking-[0.14em] text-[#FF5F1F]" style={PS2}>
+                    {isMyBidTurn
+                      ? 'YOUR TURN TO BID'
+                      : `WAITING FOR SEAT ${currentBidderSeat || '?'}`}
+                  </div>
+
+                  {isMyBidTurn && (
+                    <div className="mt-3 grid grid-cols-7 gap-1.5">
+                      {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
+                        <button
+                          key={bid}
+                          type="button"
+                          disabled={busy}
+                          onClick={() => placeBid(bid)}
+                          className="h-9 rounded-lg border border-[#FF5F1F]/55 bg-[#FF5F1F]/10 text-sm text-white transition hover:bg-[#FF5F1F]/25 disabled:opacity-40"
+                        >
+                          {bid}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div
               className="rounded-xl border-2 bg-black/50 p-3"
