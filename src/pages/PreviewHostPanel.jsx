@@ -71,12 +71,30 @@ export default function PreviewHostPanel() {
     } catch (sessionError) {
       if (
         sessionError instanceof TngApiError &&
+        sessionError.code === 'HOST_ALREADY_CONTROLLED'
+      ) {
+        return tngApi.host.startSession(deviceId, true);
+      }
+
+      if (
+        sessionError instanceof TngApiError &&
         ['INVALID_CONTROLLER', 'CONTROLLER_REQUIRED'].includes(sessionError.code)
       ) {
         localStorage.removeItem('tng_device_id');
         const replacementId = await createController();
         setControllerId(replacementId);
-        return tngApi.host.startSession(replacementId);
+
+        try {
+          return await tngApi.host.startSession(replacementId);
+        } catch (replacementError) {
+          if (
+            replacementError instanceof TngApiError &&
+            replacementError.code === 'HOST_ALREADY_CONTROLLED'
+          ) {
+            return tngApi.host.startSession(replacementId, true);
+          }
+          throw replacementError;
+        }
       }
       throw sessionError;
     }
@@ -105,15 +123,21 @@ export default function PreviewHostPanel() {
         setActiveRoom(session.activeRoom || null);
 
         if (session.activeRoom) {
-          const displayAttached = Boolean(session.hostSession?.displayDeviceId);
-          if (displayAttached) {
-            localStorage.removeItem('tng_player_test_mode');
-            setPlayerTestMode(false);
-          } else {
-            localStorage.setItem('tng_player_test_mode', '1');
-            setPlayerTestMode(true);
-          }
+          // Preview is currently being used for controller + player testing.
+          // Once a live room exists, always resume it headlessly instead of
+          // forcing the Game Display requirement back on after auth refresh.
+          localStorage.setItem('tng_player_test_mode', '1');
+          setPlayerTestMode(true);
           setPhase('room');
+          return;
+        }
+
+        if (localStorage.getItem('tng_player_test_mode') === '1') {
+          setPlayerTestMode(true);
+          setError(
+            'Player Test Mode is active, but this signed-in Host account does not own the live room. Switch back to the Host account that created the room.',
+          );
+          setPhase('test-recovery');
           return;
         }
 
@@ -364,6 +388,30 @@ export default function PreviewHostPanel() {
             <div>
               <div style={PS2}>HOST CONTROLLER ERROR</div>
               <p className="mt-4">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {phase === 'test-recovery' && (
+          <div className="h-full flex items-center justify-center px-4">
+            <div className="max-w-xl text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
+              <div className="text-[#FFD700]" style={PS2}>PLAYER TEST MODE</div>
+              <h2 className="mt-4 text-2xl">Wrong Host account signed in</h2>
+              <p className="mt-3 text-sm leading-relaxed text-white/50">
+                The live test room still exists. This login does not own it, so TNG will not ask you to pair another display or create a second room.
+              </p>
+              <p className="mt-3 text-sm text-white/65">
+                Switch back to the Host account that created the room, then the controller will reclaim the existing live session automatically.
+              </p>
+              <button
+                type="button"
+                onClick={() => logout(true)}
+                className="mt-6 rounded-lg border border-[#BC13FE]/50 px-5 py-3 text-[#BC13FE]"
+                style={PS2}
+              >
+                SWITCH HOST ACCOUNT
+              </button>
             </div>
           </div>
         )}
