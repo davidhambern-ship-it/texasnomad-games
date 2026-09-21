@@ -88,14 +88,32 @@ async function hangmanPlayers(roomId) {
 async function normalizeRoom(room) {
   const displayState = room.displayState || {};
   const baseGameState = displayState.gameState || defaultState(room.gameId);
-  const gameState = room.gameId === 'hangman'
-    ? {
-        ...baseGameState,
-        secret_word: '',
-        hint: baseGameState.hint_revealed ? (baseGameState.hint || '') : '',
-        players: await hangmanPlayers(room.id),
-      }
-    : baseGameState;
+  let gameState = baseGameState;
+
+  if (room.gameId === 'hangman') {
+    gameState = {
+      ...baseGameState,
+      secret_word: '',
+      hint: baseGameState.hint_revealed ? (baseGameState.hint || '') : '',
+      players: await hangmanPlayers(room.id),
+    };
+  }
+
+  if (room.gameId === 'word-search') {
+    gameState = {
+      ...baseGameState,
+      words: Array.isArray(baseGameState.words)
+        ? baseGameState.words.map((word) => ({
+            word: word.word,
+            found: word.found === true,
+            foundBy: word.foundBy ?? null,
+            cells: word.found ? (word.cells || []) : [],
+            points: word.found ? (word.points || null) : null,
+            directionLabel: word.found ? (word.directionLabel || null) : null,
+          }))
+        : [],
+    };
+  }
 
   return {
     id: room.id,
@@ -134,10 +152,16 @@ export default async function handler(request, response) {
       return sendJson(response, 200, { room: await normalizeRoom(room) });
     }
 
-    if (room.gameId === 'hangman') {
-      const error = new Error('Hangman state is controlled by the dedicated Hangman API.');
+    if (room.gameId === 'hangman' || room.gameId === 'word-search') {
+      const error = new Error(
+        room.gameId === 'hangman'
+          ? 'Hangman state is controlled by the dedicated Hangman API.'
+          : 'Word Search state is controlled by the dedicated Word Search API.',
+      );
       error.statusCode = 409;
-      error.code = 'HANGMAN_DEDICATED_API_REQUIRED';
+      error.code = room.gameId === 'hangman'
+        ? 'HANGMAN_DEDICATED_API_REQUIRED'
+        : 'WORD_SEARCH_DEDICATED_API_REQUIRED';
       throw error;
     }
 
