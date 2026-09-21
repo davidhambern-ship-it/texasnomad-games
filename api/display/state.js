@@ -54,10 +54,14 @@ function spadesProjection(gameState = {}) {
     dealerSeat: gameState.dealerSeat || 1,
     currentBidderSeat: gameState.currentBidderSeat || null,
     currentTurnSeat: gameState.currentTurnSeat || null,
+    dealStartSeat: gameState.dealStartSeat || null,
+    trickWinnerSeat: gameState.trickWinnerSeat || null,
+    firstHandNoBid: gameState.firstHandNoBid === true,
     currentTrick: Array.isArray(gameState.currentTrick) ? gameState.currentTrick : [],
     tricksPlayed: Number(gameState.tricksPlayed || 0),
     spadesBroken: gameState.spadesBroken === true,
     handNumber: Number(gameState.handNumber || 0),
+    lastHandResult: gameState.lastHandResult || null,
     players: Array.isArray(gameState.players)
       ? gameState.players.map((player) => ({
           seatNumber: player.seatNumber,
