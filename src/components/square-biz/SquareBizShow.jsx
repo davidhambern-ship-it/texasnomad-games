@@ -476,7 +476,9 @@ export function SquareBizIntro({
   playAudio = false,
 }) {
   const audioRef = useRef(null);
+  const audioOwnerRef = useRef(`sb-audio-${Math.random().toString(36).slice(2)}-${Date.now()}`);
   const [audioBlocked, setAudioBlocked] = useState(false);
+  const [audioSuppressed, setAudioSuppressed] = useState(false);
   const start = Number(gameState.introStartedAt || now);
   const end = Number(gameState.introEndsAt || start + 30_800);
   const duration = Math.max(1, end - start);
@@ -490,10 +492,50 @@ export function SquareBizIntro({
     if (!audio || !playAudio) return undefined;
 
     let cancelled = false;
+    const owner = audioOwnerRef.current;
+    const lockKey = 'tng_square_biz_intro_audio_lock';
     const targetTime = Math.max(0, elapsed / 1000);
+    const lockExpiry = Math.max(Date.now() + 5_000, end + 3_000);
+
+    const claimAudio = () => {
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        const sameIntro = Number(current?.start || 0) === start;
+        const lockAlive = Number(current?.expiresAt || 0) > Date.now();
+
+        if (current?.owner && current.owner !== owner && sameIntro && lockAlive) {
+          setAudioSuppressed(true);
+          return false;
+        }
+
+        localStorage.setItem(lockKey, JSON.stringify({
+          owner,
+          start,
+          expiresAt: lockExpiry,
+        }));
+        setAudioSuppressed(false);
+        return true;
+      } catch {
+        // If storage is unavailable, favor audio instead of silently muting the intro.
+        setAudioSuppressed(false);
+        return true;
+      }
+    };
+
+    const releaseAudio = () => {
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        if (current?.owner === owner) {
+          localStorage.removeItem(lockKey);
+        }
+      } catch {}
+    };
 
     const begin = async () => {
-      if (cancelled) return;
+      if (cancelled || !claimAudio()) return;
+
       try {
         if (Math.abs(audio.currentTime - targetTime) > 1.25) {
           audio.currentTime = targetTime;
@@ -512,14 +554,29 @@ export function SquareBizIntro({
       audio.load();
     }
 
+    const handleStorage = (event) => {
+      if (event.key !== lockKey || cancelled) return;
+      try {
+        const current = event.newValue ? JSON.parse(event.newValue) : null;
+        if (current?.owner && current.owner !== owner && Number(current.start || 0) === start) {
+          audio.pause();
+          setAudioSuppressed(true);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', handleStorage);
+
     return () => {
       cancelled = true;
       audio.removeEventListener('canplaythrough', begin);
+      window.removeEventListener('storage', handleStorage);
       audio.pause();
+      releaseAudio();
     };
-  // Re-run only when a new intro starts or this screen becomes the audio owner.
+  // Re-run only when a new intro starts or this screen becomes audio-capable.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, playAudio]);
+  }, [start, end, playAudio]);
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
@@ -549,11 +606,18 @@ export function SquareBizIntro({
         <div className="h-full rounded-full bg-gradient-to-r from-[#9f45ff] via-[#ff1593] to-[#ff781f]" style={{ width: `${Math.max(2, ratio * 100)}%` }} />
       </div>
 
-      {playAudio && audioBlocked && (
+      {playAudio && !audioSuppressed && audioBlocked && (
         <button
           type="button"
           onClick={async () => {
             try {
+              const lockKey = 'tng_square_biz_intro_audio_lock';
+              localStorage.setItem(lockKey, JSON.stringify({
+                owner: audioOwnerRef.current,
+                start,
+                expiresAt: Math.max(Date.now() + 5_000, end + 3_000),
+              }));
+              setAudioSuppressed(false);
               await audioRef.current?.play();
               setAudioBlocked(false);
             } catch {}
