@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -81,15 +81,21 @@ function RiffleCard({ index }) {
 }
 
 export default function SpadesShuffleAnimation({ phase, onComplete }) {
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   useEffect(() => {
     if (phase !== 'shuffling') return undefined;
 
     const timer = window.setTimeout(() => {
-      onComplete?.();
+      onCompleteRef.current?.();
     }, SHUFFLE_MS);
 
     return () => window.clearTimeout(timer);
-  }, [phase, onComplete]);
+  }, [phase]);
 
   if (phase !== 'shuffling') return null;
 
