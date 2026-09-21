@@ -1,8 +1,8 @@
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { addHours } from 'date-fns';
 
 import { db } from '../../server/db/client.js';
-import { deviceSessions, displayPairings, hostSessions } from '../../server/db/schema.js';
+import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../server/db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
 import { createDisplayToken, hashDisplayToken, hashPairingCode } from '../../server/pairing.js';
 
@@ -51,9 +51,17 @@ export default async function handler(request, response) {
         expiresAt: addHours(new Date(), 12),
       }).returning();
 
+      const [activeRoom] = await transaction.select({ id: gameRooms.id })
+        .from(gameRooms)
+        .where(and(
+          eq(gameRooms.hostSessionId, hostSession.id),
+          inArray(gameRooms.status, ['lobby', 'live', 'paused']),
+        ))
+        .limit(1);
+
       await transaction.update(hostSessions).set({
         displayDeviceId: displayDevice.id,
-        status: 'ready',
+        status: activeRoom ? 'live' : 'ready',
         updatedAt: new Date(),
       }).where(eq(hostSessions.id, hostSession.id));
 
