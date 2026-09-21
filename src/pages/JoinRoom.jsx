@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -49,7 +50,7 @@ export default function JoinRoom() {
       setError(null);
 
       try {
-        if (isBase44Preview) {
+        if (isBase44Preview || isNeonStaging) {
           if (!isAuthenticated) {
             const next = encodeURIComponent(`/join/${roomCode}`);
             window.location.href = `/login?next=${next}`;
@@ -131,7 +132,7 @@ export default function JoinRoom() {
         <p className="mt-4 text-red-400 font-body">{error}</p>
       ) : (
         <p className="mt-4 text-white/60 font-body animate-pulse">
-          {isBase44Preview ? 'Connecting to live Neon room…' : 'Looking up game session…'}
+          {isBase44Preview || isNeonStaging ? 'Connecting to live Neon room…' : 'Looking up game session…'}
         </p>
       )}
 
