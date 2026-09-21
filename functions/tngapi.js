@@ -7,6 +7,7 @@ import hostRoom from '../api/host/room.js';
 import hostRoomState from '../api/host/room-state.js';
 import displayPair from '../api/display/pair.js';
 import displayState from '../api/display/state.js';
+import spadesHost from '../api/spades/host.js';
 
 const routes = new Map([
   ['/', health],
@@ -19,6 +20,7 @@ const routes = new Map([
   ['/host/room-state', hostRoomState],
   ['/display/pair', displayPair],
   ['/display/state', displayState],
+  ['/spades/host', spadesHost],
 ]);
 
 function configuredOrigins() {
