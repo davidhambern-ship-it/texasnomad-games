@@ -53,10 +53,10 @@ export const tngApi = {
     create: (data) => request('/api/device-session', { method:'POST', body:data }),
   },
   host: {
-    startSession: (deviceId, reclaimController = false) => request('/api/host/session', {
+    startSession: (deviceId, reclaimController = false, resumeTestRoom = false) => request('/api/host/session', {
       method:'POST',
       deviceId,
-      body:{ reclaimController },
+      body:{ reclaimController, resumeTestRoom },
     }),
     endSession: (deviceId) => request('/api/host/session', { method:'DELETE', deviceId }),
     createPairing: (deviceId, replaceDisplay = false) => request('/api/host/pairing', {
