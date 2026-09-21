@@ -19,9 +19,18 @@ const GAME_PATHS = {
   'name-that-track': '/games/name-that-track',
 };
 
-async function ensurePlayerDevice() {
+async function ensurePlayerDevice(accountId) {
   let deviceId = localStorage.getItem('tng_player_device_id');
-  if (deviceId) return deviceId;
+  const deviceOwner = localStorage.getItem('tng_player_device_owner');
+
+  if (deviceId && deviceOwner === String(accountId || '')) {
+    return deviceId;
+  }
+
+  if (deviceId && deviceOwner !== String(accountId || '')) {
+    localStorage.removeItem('tng_player_device_id');
+    deviceId = null;
+  }
 
   const { device } = await tngApi.devices.create({
     role: 'player',
@@ -29,11 +38,30 @@ async function ensurePlayerDevice() {
   });
 
   localStorage.setItem('tng_player_device_id', device.id);
+  localStorage.setItem('tng_player_device_owner', String(accountId || ''));
   return device.id;
 }
 
+function validatePlayerJoin(payload, roomCode) {
+  const participant = payload?.participant || null;
+  const role = String(participant?.role || '').toLowerCase();
+  const seatNumber = Number(participant?.seatNumber || 0);
+
+  if (role === 'host_player' || role === 'host' || seatNumber === 1) {
+    throw new TngApiError(
+      `This TNG account is already hosting room ${roomCode}. Sign in with a different TNG account to join as a player.`,
+      {
+        code: 'HOST_ACCOUNT_CANNOT_JOIN_AS_PLAYER',
+        status: 409,
+      },
+    );
+  }
+
+  return payload;
+}
+
 export default function JoinRoom() {
-  const { isAuthenticated, isLoadingAuth } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const path = window.location.pathname;
   const roomCode = path.split('/join/')[1]?.toUpperCase() || 'UNKNOWN';
   const [error, setError] = useState(null);
@@ -57,10 +85,13 @@ export default function JoinRoom() {
             return;
           }
 
-          let deviceId = await ensurePlayerDevice();
+          let deviceId = await ensurePlayerDevice(user?.id);
 
           try {
-            const payload = await tngApi.player.joinRoom(deviceId, roomCode);
+            const payload = validatePlayerJoin(
+              await tngApi.player.joinRoom(deviceId, roomCode),
+              roomCode,
+            );
             const gamePath = GAME_PATHS[payload.room?.gameId];
 
             if (!gamePath) {
@@ -77,7 +108,10 @@ export default function JoinRoom() {
             ) {
               localStorage.removeItem('tng_player_device_id');
               deviceId = await ensurePlayerDevice();
-              const payload = await tngApi.player.joinRoom(deviceId, roomCode);
+              const payload = validatePlayerJoin(
+              await tngApi.player.joinRoom(deviceId, roomCode),
+              roomCode,
+            );
               const gamePath = GAME_PATHS[payload.room?.gameId];
 
               if (!gamePath) {
@@ -116,7 +150,7 @@ export default function JoinRoom() {
     }
 
     findAndJoin();
-  }, [roomCode, isAuthenticated, isLoadingAuth]);
+  }, [roomCode, user?.id, isAuthenticated, isLoadingAuth]);
 
   return (
     <div className="min-h-screen bg-midnight-void flex flex-col items-center justify-center px-4 text-center">
