@@ -31,6 +31,7 @@ import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import TngOnboarding from '@/pages/TngOnboarding';
+import GameDisplay from '@/pages/GameDisplay';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<TngOnboarding />} />
+      <Route path="/display" element={<GameDisplay />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<HomeGate />} />
