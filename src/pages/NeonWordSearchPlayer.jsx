@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
+import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -126,6 +127,16 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen lg:h-[100dvh] lg:overflow-hidden bg-[#070311] text-white">
+      <WordSearchTurnEffects
+        mode={mode}
+        phase={phase}
+        paused={paused}
+        activeSeat={activeSeat}
+        players={players}
+        viewerSeat={seatNumber}
+        timeRemaining={timeRemaining}
+      />
+
       <div className="mx-auto flex min-h-screen lg:h-full max-w-[1500px] flex-col gap-2 p-2 lg:min-h-0">
 
         <header className="shrink-0 rounded-xl border bg-black/60 px-3 py-2.5 flex items-center justify-between gap-3"
@@ -223,8 +234,9 @@ export default function NeonWordSearchPlayer({ roomCode }) {
                   return (
                     <div
                       key={player.playerId}
-                      className="rounded-lg border px-2 py-2"
+                      className={`rounded-lg border px-2 py-2 ${mode === 'turn' && playerActive ? 'ws-active-turn-card' : ''}`}
                       style={{
+                        '--ws-active-color': player.color,
                         borderColor: isMe
                           ? player.color
                           : playerActive
