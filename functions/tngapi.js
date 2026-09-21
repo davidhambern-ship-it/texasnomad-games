@@ -17,13 +17,31 @@ const routes = new Map([
   ['/display/pair', displayPair],
 ]);
 
-function allowedOrigins() {
+function configuredOrigins() {
   return new Set(
     (process.env.TNG_ALLOWED_ORIGINS || 'http://localhost:5173')
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean),
   );
+}
+
+function isBase44PreviewOrigin(origin) {
+  if (!origin) return false;
+
+  try {
+    const url = new URL(origin);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' &&
+      host.endsWith('.base44.app') &&
+      (host.startsWith('preview--') || host.startsWith('preview-sandbox--'));
+  } catch {
+    return false;
+  }
+}
+
+function isAllowedOrigin(origin) {
+  return configuredOrigins().has(origin) || isBase44PreviewOrigin(origin);
 }
 
 function corsHeaders(request) {
@@ -35,7 +53,7 @@ function corsHeaders(request) {
     'Vary': 'Origin',
   });
 
-  if (origin && allowedOrigins().has(origin)) {
+  if (origin && isAllowedOrigin(origin)) {
     headers.set('Access-Control-Allow-Origin', origin);
   }
 
@@ -99,7 +117,7 @@ export default {
 
     if (request.method === 'OPTIONS') {
       const origin = request.headers.get('origin');
-      if (origin && !allowedOrigins().has(origin)) {
+      if (origin && !isAllowedOrigin(origin)) {
         return new Response(null, { status: 403, headers: cors });
       }
       return new Response(null, { status: 204, headers: cors });
