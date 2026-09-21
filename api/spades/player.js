@@ -11,6 +11,7 @@ import {
 } from '../../server/db/schema.js';
 import {
   defaultSpadesState,
+  determineSpadesTrickWinner,
   isSpadeCard,
   nextSpadesSeat,
   validateSpadesPlay,
@@ -135,12 +136,13 @@ function stateAfterCardPlay(gameState, seatNumber, card) {
   const spadesBroken = gameState.spadesBroken || isSpadeCard(card);
 
   if (nextTrick.length === 4) {
+    const winner = determineSpadesTrickWinner(nextTrick);
     return {
       ...gameState,
       phase: 'resolving',
       currentTrick: nextTrick,
       currentTurnSeat: null,
-      trickWinnerSeat: null,
+      trickWinnerSeat: winner?.seatNumber || null,
       spadesBroken,
     };
   }
