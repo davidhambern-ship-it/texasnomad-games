@@ -477,6 +477,8 @@ export function advanceSquareBizClock(rawState) {
         last_action: {
           type: 'turn_changed',
           mark: nextMark,
+          placedSquare: state.answer_result === true ? state.selected_square : null,
+          placedMark: state.answer_result === true ? state.current_mark : null,
           timestamp: now,
         },
       };
