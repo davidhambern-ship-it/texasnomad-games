@@ -8,10 +8,16 @@ import {
   roomParticipants,
 } from '../../server/db/schema.js';
 import {
+  chooseCpuSpadesCard,
   dealSpades,
   defaultSpadesState,
+  determineSpadesTrickWinner,
   generateSpadesDeck,
+  isSpadeCard,
+  nextSpadesSeat,
   shuffleSpadesDeck,
+  spadesTeamForSeat,
+  validateSpadesPlay,
 } from '../../server/games/spades.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
 
@@ -68,6 +74,52 @@ async function payload(room, accountId) {
   return {
     room: publicRoom(room),
     hand: await privateHand(room.id, accountId),
+  };
+}
+
+function stateAfterCardPlay(gameState, seatNumber, card) {
+  const currentTrick = Array.isArray(gameState.currentTrick)
+    ? gameState.currentTrick
+    : [];
+  const nextTrick = [...currentTrick, { seatNumber, card }];
+  const spadesBroken = gameState.spadesBroken || isSpadeCard(card);
+
+  if (nextTrick.length === 4) {
+    const winner = determineSpadesTrickWinner(nextTrick);
+    return {
+      ...gameState,
+      phase: 'resolving',
+      currentTrick: nextTrick,
+      currentTurnSeat: null,
+      trickWinnerSeat: winner?.seatNumber || null,
+      spadesBroken,
+    };
+  }
+
+  return {
+    ...gameState,
+    phase: 'playing',
+    currentTrick: nextTrick,
+    currentTurnSeat: nextSpadesSeat(seatNumber),
+    trickWinnerSeat: null,
+    spadesBroken,
+  };
+}
+
+function scoreCompletedHand(gameState, books1, books2) {
+  if (Number(gameState.handNumber || 0) === 1) {
+    return {
+      score1: Number(gameState.score1 || 0) + books1,
+      score2: Number(gameState.score2 || 0) + books2,
+    };
+  }
+
+  const bid1 = Number(gameState.bid1 || 0);
+  const bid2 = Number(gameState.bid2 || 0);
+
+  return {
+    score1: Number(gameState.score1 || 0) + (books1 >= bid1 ? books1 : -bid1),
+    score2: Number(gameState.score2 || 0) + (books2 >= bid2 ? books2 : -bid2),
   };
 }
 
@@ -207,12 +259,13 @@ export default async function handler(request, response) {
       const { hands, firstSeat } = dealSpades(deck, currentGameState.dealerSeat || 1);
       const hostHand = hands.get(1) || [];
       const now = new Date();
+      const nextHandNumber = Number(currentGameState.handNumber || 0) + 1;
 
       const updatedRoom = await db.transaction(async (transaction) => {
         await transaction.insert(participantPrivateState).values({
           roomId: room.id,
           accountId: account.id,
-          revision: 1,
+          revision: nextHandNumber,
           privateState: { hand: hostHand },
           updatedAt: now,
         }).onConflictDoUpdate({
@@ -221,7 +274,7 @@ export default async function handler(request, response) {
             participantPrivateState.accountId,
           ],
           set: {
-            revision: 1,
+            revision: nextHandNumber,
             privateState: { hand: hostHand },
             updatedAt: now,
           },
@@ -243,14 +296,19 @@ export default async function handler(request, response) {
               ...currentGameState,
               phase: 'dealt',
               players: publicPlayers,
+              bid1: null,
+              bid2: null,
               currentTrick: [],
-              currentTurnSeat: firstSeat,
-              currentBidderSeat: firstSeat,
+              currentTurnSeat: null,
+              currentBidderSeat: null,
+              trickWinnerSeat: null,
+              dealStartSeat: firstSeat,
+              firstHandNoBid: nextHandNumber === 1,
               tricksPlayed: 0,
               books1: 0,
               books2: 0,
               spadesBroken: false,
-              handNumber: (currentGameState.handNumber || 0) + 1,
+              handNumber: nextHandNumber,
             },
             serverState: {
               cpuHands: {
@@ -269,6 +327,233 @@ export default async function handler(request, response) {
 
         return nextRoom;
       });
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'start_hand') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+
+      if (gameState.phase !== 'dealt') {
+        const error = new Error('This hand is not waiting to start.');
+        error.statusCode = 409;
+        error.code = 'SPADES_HAND_NOT_DEALT';
+        throw error;
+      }
+
+      const firstSeat = gameState.dealStartSeat || nextSpadesSeat(gameState.dealerSeat || 1);
+      const firstHand = Number(gameState.handNumber || 0) === 1;
+      const players = (gameState.players || []).map((player) => ({
+        ...player,
+        bid: firstHand ? 0 : null,
+      }));
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: {
+            ...gameState,
+            players,
+            phase: firstHand ? 'playing' : 'bidding',
+            bid1: firstHand ? 0 : null,
+            bid2: firstHand ? 0 : null,
+            currentTurnSeat: firstHand ? firstSeat : null,
+            currentBidderSeat: firstHand ? null : firstSeat,
+            firstHandNoBid: firstHand,
+          },
+        },
+        status: 'live',
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'play_card') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+
+      if (gameState.phase !== 'playing' || gameState.currentTurnSeat !== 1) {
+        const error = new Error('It is not the Host player turn.');
+        error.statusCode = 409;
+        error.code = 'SPADES_NOT_HOST_TURN';
+        throw error;
+      }
+
+      const hand = await privateHand(room.id, account.id);
+      const card = hand.find((item) => item.id === request.body?.cardId);
+      const validation = validateSpadesPlay(
+        card,
+        hand,
+        gameState.currentTrick || [],
+        gameState.spadesBroken === true,
+      );
+
+      if (!validation.valid) {
+        const error = new Error(validation.reason || 'That card cannot be played.');
+        error.statusCode = 409;
+        error.code = 'SPADES_ILLEGAL_PLAY';
+        throw error;
+      }
+
+      const remainingHand = hand.filter((item) => item.id !== card.id);
+      const players = (gameState.players || []).map((player) => (
+        player.seatNumber === 1
+          ? { ...player, cardCount: remainingHand.length }
+          : player
+      ));
+      const nextGameState = stateAfterCardPlay({ ...gameState, players }, 1, card);
+      const now = new Date();
+
+      const updatedRoom = await db.transaction(async (transaction) => {
+        await transaction.update(participantPrivateState).set({
+          revision: room.revision + 1,
+          privateState: { hand: remainingHand },
+          updatedAt: now,
+        }).where(and(
+          eq(participantPrivateState.roomId, room.id),
+          eq(participantPrivateState.accountId, account.id),
+        ));
+
+        const [nextRoom] = await transaction.update(gameRooms).set({
+          displayState: {
+            ...current,
+            gameState: nextGameState,
+          },
+          revision: room.revision + 1,
+          updatedAt: now,
+        }).where(eq(gameRooms.id, room.id)).returning();
+
+        return nextRoom;
+      });
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'cpu_turn') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+      const serverState = current.serverState || {};
+      const seatNumber = Number(gameState.currentTurnSeat || 0);
+
+      if (gameState.phase !== 'playing' || ![2, 3, 4].includes(seatNumber)) {
+        const error = new Error('No CPU turn is ready to play.');
+        error.statusCode = 409;
+        error.code = 'SPADES_NO_CPU_TURN';
+        throw error;
+      }
+
+      const cpuHands = { ...(serverState.cpuHands || {}) };
+      const hand = Array.isArray(cpuHands[seatNumber]) ? cpuHands[seatNumber] : [];
+      const card = chooseCpuSpadesCard(
+        hand,
+        gameState.currentTrick || [],
+        gameState.spadesBroken === true,
+      );
+
+      if (!card) {
+        const error = new Error('The CPU has no legal card to play.');
+        error.statusCode = 409;
+        error.code = 'SPADES_CPU_NO_LEGAL_CARD';
+        throw error;
+      }
+
+      cpuHands[seatNumber] = hand.filter((item) => item.id !== card.id);
+      const players = (gameState.players || []).map((player) => (
+        player.seatNumber === seatNumber
+          ? { ...player, cardCount: cpuHands[seatNumber].length }
+          : player
+      ));
+      const nextGameState = stateAfterCardPlay(
+        { ...gameState, players },
+        seatNumber,
+        card,
+      );
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: nextGameState,
+          serverState: {
+            ...serverState,
+            cpuHands,
+          },
+        },
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
+
+      return sendJson(response, 200, await payload(updatedRoom, account.id));
+    }
+
+    if (action === 'resolve_trick') {
+      const current = room.displayState || {};
+      const gameState = current.gameState || defaultSpadesState();
+      const trick = Array.isArray(gameState.currentTrick) ? gameState.currentTrick : [];
+
+      if (gameState.phase !== 'resolving' || trick.length !== 4 || !gameState.trickWinnerSeat) {
+        const error = new Error('There is no completed trick to resolve.');
+        error.statusCode = 409;
+        error.code = 'SPADES_TRICK_NOT_READY';
+        throw error;
+      }
+
+      const winnerSeat = Number(gameState.trickWinnerSeat);
+      const winnerTeam = spadesTeamForSeat(winnerSeat);
+      const tricksPlayed = Number(gameState.tricksPlayed || 0) + 1;
+      const books1 = Number(gameState.books1 || 0) + (winnerTeam === 1 ? 1 : 0);
+      const books2 = Number(gameState.books2 || 0) + (winnerTeam === 2 ? 1 : 0);
+      const players = (gameState.players || []).map((player) => (
+        player.seatNumber === winnerSeat
+          ? { ...player, tricksWon: Number(player.tricksWon || 0) + 1 }
+          : player
+      ));
+      const handComplete = tricksPlayed >= 13;
+      const score = handComplete
+        ? scoreCompletedHand(gameState, books1, books2)
+        : {
+            score1: Number(gameState.score1 || 0),
+            score2: Number(gameState.score2 || 0),
+          };
+      const now = new Date();
+
+      const [updatedRoom] = await db.update(gameRooms).set({
+        displayState: {
+          ...current,
+          gameState: {
+            ...gameState,
+            ...score,
+            players,
+            books1,
+            books2,
+            tricksPlayed,
+            currentTrick: [],
+            trickWinnerSeat: null,
+            phase: handComplete ? 'round_over' : 'playing',
+            currentTurnSeat: handComplete ? null : winnerSeat,
+            currentBidderSeat: null,
+            dealerSeat: handComplete
+              ? nextSpadesSeat(gameState.dealerSeat || 1)
+              : gameState.dealerSeat,
+            lastHandResult: handComplete
+              ? {
+                  handNumber: Number(gameState.handNumber || 0),
+                  books1,
+                  books2,
+                  score1: score.score1,
+                  score2: score.score2,
+                  firstHandBidsItself: Number(gameState.handNumber || 0) === 1,
+                }
+              : gameState.lastHandResult || null,
+          },
+        },
+        revision: room.revision + 1,
+        updatedAt: now,
+      }).where(eq(gameRooms.id, room.id)).returning();
 
       return sendJson(response, 200, await payload(updatedRoom, account.id));
     }
