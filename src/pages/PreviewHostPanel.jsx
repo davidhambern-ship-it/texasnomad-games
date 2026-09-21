@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
 
@@ -24,11 +24,36 @@ export default function PreviewHostPanel() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const authRecoveryStartedRef = useRef(false);
 
   const roomGame = useMemo(
     () => ALL_GAMES.find((game) => game.id === activeRoom?.gameId) || selectedGame,
     [activeRoom, selectedGame],
   );
+
+  function recoverExpiredPreviewSession(authError) {
+    if (
+      !(authError instanceof TngApiError) ||
+      !['INVALID_IDENTITY', 'AUTH_REQUIRED'].includes(authError.code) ||
+      authRecoveryStartedRef.current
+    ) {
+      return false;
+    }
+
+    authRecoveryStartedRef.current = true;
+
+    try {
+      localStorage.setItem('tng_preview_expect_user_login', '1');
+      localStorage.removeItem('tng_preview_user_access_token');
+      localStorage.removeItem('base44_access_token');
+    } catch {}
+
+    const next = encodeURIComponent(
+      window.location.pathname + window.location.search + window.location.hash,
+    );
+    window.location.href = `/login?next=${next}`;
+    return true;
+  }
 
   async function createController() {
     const { device } = await tngApi.devices.create({
@@ -105,6 +130,8 @@ export default function PreviewHostPanel() {
         setPairing(pairingPayload.pairing);
         setPhase('pairing');
       } catch (initializeError) {
+        if (recoverExpiredPreviewSession(initializeError)) return;
+
         if (!cancelled) {
           setError(initializeError.message || 'The Host Controller could not start.');
           setPhase('error');
@@ -147,6 +174,7 @@ export default function PreviewHostPanel() {
           setPhase('ready');
         }
       } catch (pollError) {
+        if (recoverExpiredPreviewSession(pollError)) return;
         console.error('[PreviewHostPanel] display pairing poll failed:', pollError);
       }
     }, 2500);
@@ -170,6 +198,8 @@ export default function PreviewHostPanel() {
           setActiveRoom((current) => ({ ...current, ...payload.room }));
         }
       } catch (roomError) {
+        if (recoverExpiredPreviewSession(roomError)) return;
+
         if (!cancelled) {
           setError(roomError.message || 'The live room state could not be loaded.');
         }
