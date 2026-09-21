@@ -11,6 +11,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: neon-tng-api-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   bundle:
     runs-on: ubuntu-latest
@@ -57,10 +61,19 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin codex/neon-backend-foundation
+          REMOTE_SHA="$(git rev-parse origin/codex/neon-backend-foundation)"
+          if [ "$REMOTE_SHA" != "$GITHUB_SHA" ]; then
+            echo "Branch advanced during this run. A newer workflow will publish the matching bundle."
+            exit 0
+          fi
+
           git add build/tngapi.b64
           if git diff --cached --quiet; then
             echo "Bundle unchanged."
             exit 0
           fi
+
           git commit -m "build: refresh Neon TNG API bundle"
           git push origin HEAD:codex/neon-backend-foundation
