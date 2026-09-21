@@ -13,7 +13,9 @@
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
     "test:backend": "node --test tests/backend/*.test.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:neon": "vite --mode neon",
+    "build:neon": "vite build --mode neon"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.48",
