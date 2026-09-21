@@ -1,0 +1,60 @@
+import { createAuthClient } from '@neondatabase/auth';
+
+export const NEON_AUTH_URL =
+  import.meta.env.VITE_NEON_AUTH_URL ||
+  'https://ep-hidden-wave-avehvh0z.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
+
+export const isNeonStaging = true;
+
+export const authClient = createAuthClient(NEON_AUTH_URL);
+
+function unwrapSession(result) {
+  if (!result) return null;
+  if (result.data) return result.data;
+  return result;
+}
+
+function unwrapToken(result) {
+  if (!result) return null;
+  if (typeof result === 'string') return result;
+  if (typeof result.data === 'string') return result.data;
+  if (typeof result.token === 'string') return result.token;
+  if (typeof result.data?.token === 'string') return result.data.token;
+  if (typeof result.jwt === 'string') return result.jwt;
+  if (typeof result.data?.jwt === 'string') return result.data.jwt;
+  return null;
+}
+
+export async function getNeonSession() {
+  const result = await authClient.getSession();
+  return unwrapSession(result);
+}
+
+export async function getNeonAuthToken() {
+  const getter = authClient.getJWTToken || authClient.getJwtToken;
+  if (typeof getter === 'function') {
+    const token = unwrapToken(await getter.call(authClient));
+    if (token) return token;
+  }
+
+  const session = await getNeonSession();
+  return (
+    session?.token ||
+    session?.jwt ||
+    session?.session?.token ||
+    session?.session?.jwt ||
+    null
+  );
+}
+
+export function mapNeonUser(user) {
+  if (!user) return null;
+
+  return {
+    ...user,
+    id: user.id,
+    email: user.email,
+    full_name: user.name || user.email?.split('@')[0] || 'Nomad',
+    name: user.name || user.email?.split('@')[0] || 'Nomad',
+  };
+}
