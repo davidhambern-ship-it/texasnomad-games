@@ -94,6 +94,11 @@ export async function createPreviewTngProfile(user, { displayName, handle }) {
     throw new Error('Handle must be 3–24 characters using letters, numbers, or underscores.');
   }
 
+  const existingProfile = await getBase44Profile(user);
+  const existingHandle = await base44.entities.PlayerProfile.filter({ handle: cleanHandle });
+  const conflictingHandle = existingHandle.find((profile) => profile.id !== existingProfile?.id);
+  if (conflictingHandle) throw new Error('That TNG handle is already taken.');
+
   let neonProfile = await getNeonProfile();
   if (!neonProfile) {
     const payload = await tngApi.profile.create({
@@ -102,11 +107,6 @@ export async function createPreviewTngProfile(user, { displayName, handle }) {
     });
     neonProfile = payload.profile;
   }
-
-  const existingProfile = await getBase44Profile(user);
-  const existingHandle = await base44.entities.PlayerProfile.filter({ handle: cleanHandle });
-  const conflictingHandle = existingHandle.find((profile) => profile.id !== existingProfile?.id);
-  if (conflictingHandle) throw new Error('That TNG handle is already taken.');
 
   if (existingProfile) {
     // Upgrade the legacy profile in place so existing stats, badges, referral
