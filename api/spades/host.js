@@ -180,26 +180,53 @@ export default async function handler(request, response) {
           });
         }
 
-        const gameState = {
-          ...defaultSpadesState(),
-          players: [
-            {
-              seatNumber: 1,
-              playerType: 'human',
-              role: 'hostPlayer',
-              name: 'HOST',
-              cardCount: 0,
-              bid: null,
-              tricksWon: 0,
-            },
-            ...CPU_SEATS.map((player) => ({
-              ...player,
+        const currentSource = room.displayState || {};
+        const currentGameState = currentSource.gameState || defaultSpadesState();
+        const currentHumans = Array.isArray(currentGameState.players)
+          ? currentGameState.players.filter((player) => (
+              player.playerType === 'human' &&
+              [2, 3, 4].includes(Number(player.seatNumber))
+            ))
+          : [];
+
+        const gamePlayers = [
+          {
+            accountId: account.id,
+            seatNumber: 1,
+            playerType: 'human',
+            role: 'hostPlayer',
+            name: 'HOST',
+            cardCount: 0,
+            bid: null,
+            tricksWon: 0,
+          },
+          ...[2, 3, 4].map((seatNumber) => {
+            const human = currentHumans.find((player) => Number(player.seatNumber) === seatNumber);
+            if (human) {
+              return {
+                ...human,
+                playerType: 'human',
+                role: 'player',
+                cardCount: 0,
+                bid: null,
+                tricksWon: 0,
+              };
+            }
+
+            const cpu = CPU_SEATS.find((player) => player.seatNumber === seatNumber);
+            return {
+              ...cpu,
               role: 'player',
               cardCount: 0,
               bid: null,
               tricksWon: 0,
-            })),
-          ],
+            };
+          }),
+        ];
+
+        const gameState = {
+          ...defaultSpadesState(),
+          players: gamePlayers,
         };
 
         const [nextRoom] = await transaction.update(gameRooms).set({
@@ -280,6 +307,33 @@ export default async function handler(request, response) {
           },
         });
 
+        for (const player of players) {
+          if (
+            player.playerType === 'human' &&
+            player.accountId &&
+            [2, 3, 4].includes(Number(player.seatNumber))
+          ) {
+            const playerHand = hands.get(player.seatNumber) || [];
+            await transaction.insert(participantPrivateState).values({
+              roomId: room.id,
+              accountId: player.accountId,
+              revision: nextHandNumber,
+              privateState: { hand: playerHand },
+              updatedAt: now,
+            }).onConflictDoUpdate({
+              target: [
+                participantPrivateState.roomId,
+                participantPrivateState.accountId,
+              ],
+              set: {
+                revision: nextHandNumber,
+                privateState: { hand: playerHand },
+                updatedAt: now,
+              },
+            });
+          }
+        }
+
         const publicPlayers = players.map((player) => ({
           ...player,
           cardCount: hands.get(player.seatNumber)?.length || 0,
@@ -311,11 +365,12 @@ export default async function handler(request, response) {
               handNumber: nextHandNumber,
             },
             serverState: {
-              cpuHands: {
-                2: hands.get(2) || [],
-                3: hands.get(3) || [],
-                4: hands.get(4) || [],
-              },
+              cpuHands: players.reduce((accumulator, player) => {
+                if (player.playerType === 'cpu' && [2, 3, 4].includes(player.seatNumber)) {
+                  accumulator[player.seatNumber] = hands.get(player.seatNumber) || [];
+                }
+                return accumulator;
+              }, {}),
               deckReady: true,
             },
           },
@@ -438,11 +493,21 @@ export default async function handler(request, response) {
       const gameState = current.gameState || defaultSpadesState();
       const serverState = current.serverState || {};
       const seatNumber = Number(gameState.currentTurnSeat || 0);
+      const currentPlayer = (gameState.players || []).find(
+        (player) => Number(player.seatNumber) === seatNumber,
+      );
 
       if (gameState.phase !== 'playing' || ![2, 3, 4].includes(seatNumber)) {
         const error = new Error('No CPU turn is ready to play.');
         error.statusCode = 409;
         error.code = 'SPADES_NO_CPU_TURN';
+        throw error;
+      }
+
+      if (!currentPlayer || currentPlayer.playerType !== 'cpu') {
+        const error = new Error('The current Spades turn belongs to a human player.');
+        error.statusCode = 409;
+        error.code = 'SPADES_HUMAN_TURN';
         throw error;
       }
 
