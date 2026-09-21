@@ -123,3 +123,49 @@ DATABASE_URL_UNPOOLED='...' npm run db:check
 DATABASE_URL_UNPOOLED='...' npm run db:migrate
 npm run build
 ```
+
+
+## Neon Functions backend
+
+The replacement TNG HTTP API is packaged as a single Neon Function named
+`tngapi` on the Neon `development` branch. This removes the need for a
+separate Vercel/serverless backend during the migration.
+
+Function source:
+- `functions/tngapi.js`
+
+Development invocation base:
+- `https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech/`
+
+The function reuses the existing `api/*` handlers through a Fetch-to-handler
+adapter and exposes:
+
+- `GET /` and `GET /health`
+- `GET|POST /profile`
+- `POST /device-session`
+- `POST|DELETE /host/session`
+- `POST /host/pairing`
+- `POST|DELETE /host/room`
+- `POST /display/pair`
+
+Neon injects the development branch's `DATABASE_URL`,
+`NEON_AUTH_BASE_URL`, and `NEON_AUTH_JWKS_URL`. The deployment adds only
+the TNG pairing secret and allowed browser origins.
+
+The browser client supports `VITE_TNG_API_URL`. When it is set, legacy
+`/api/*` client paths are redirected to the Neon Function base; when it is
+blank, same-origin API behavior remains available.
+
+### Bundle pipeline
+
+`.github/workflows/build-neon-tng-api.yml` builds the Neon Function on pushes
+to `codex/neon-backend-foundation`. It bundles dependencies with esbuild,
+creates the deployment ZIP, and writes its Base64 representation to
+`build/tngapi.b64`. Changes to that generated file are ignored by the workflow
+trigger so the build commit does not recurse.
+
+This workflow does not contain Neon credentials. Deployment to Neon remains a
+separate authenticated step.
+
+Production remains untouched. The Neon Function currently allows only
+`http://localhost:5173` for cross-origin development calls.
