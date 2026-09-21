@@ -1,6 +1,7 @@
 import { createAuthClient } from '@neondatabase/neon-js/auth';
+import { migrationEndpoints } from '@/config/backendMigration';
 
-const authUrl = import.meta.env.VITE_NEON_AUTH_URL?.trim();
+const authUrl = migrationEndpoints.neonAuthUrl;
 
 export const neonAuthClient = authUrl
   ? createAuthClient(authUrl)
