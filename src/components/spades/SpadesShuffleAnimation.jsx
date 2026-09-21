@@ -1,258 +1,308 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+const SHUFFLE_MS = 2700;
+const CARD_WIDTH = 58;
+const CARD_HEIGHT = 82;
 
-/**
- * Professional Shuffle Animation - Modern Western Digital Card Room
- * Stages: Gather → Lift → Riffle 1 → Riffle 2 → Spin → Settle
- */
+function Packet({ side }) {
+  const direction = side === 'left' ? -1 : 1;
+
+  return (
+    <div
+      className={`absolute left-1/2 top-1/2 tng-shuffle-packet tng-shuffle-${side}`}
+      style={{
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        marginLeft: -CARD_WIDTH / 2,
+        marginTop: -CARD_HEIGHT / 2,
+        '--packet-direction': direction,
+      }}
+    >
+      {Array.from({ length: 7 }, (_, index) => (
+        <div
+          key={index}
+          className="absolute overflow-hidden rounded-[6px]"
+          style={{
+            width: CARD_WIDTH,
+            height: CARD_HEIGHT,
+            left: index * 1.2,
+            top: index * -1.15,
+            zIndex: index,
+            boxShadow:
+              index === 6
+                ? '0 10px 24px rgba(0,0,0,.44)'
+                : '0 3px 8px rgba(0,0,0,.24)',
+          }}
+        >
+          <img
+            src={getCardBack()}
+            alt=""
+            className="h-full w-full object-contain"
+            draggable={false}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function RiffleCard({ index }) {
+  const side = index % 2 === 0 ? -1 : 1;
+  const lane = Math.floor(index / 2);
+  const spread = 38 + lane * 2.5;
+  const rotation = side * (8 + lane * 0.7);
+
+  return (
+    <div
+      className="absolute left-1/2 top-1/2 tng-riffle-card overflow-hidden rounded-[6px]"
+      style={{
+        width: CARD_WIDTH,
+        height: CARD_HEIGHT,
+        marginLeft: -CARD_WIDTH / 2,
+        marginTop: -CARD_HEIGHT / 2,
+        '--riffle-x': `${side * spread}px`,
+        '--riffle-r': `${rotation}deg`,
+        '--riffle-delay': `${lane * 18}ms`,
+        zIndex: 20 + index,
+      }}
+    >
+      <img
+        src={getCardBack()}
+        alt=""
+        className="h-full w-full object-contain"
+        draggable={false}
+      />
+    </div>
+  );
+}
+
 export default function SpadesShuffleAnimation({ phase, onComplete }) {
-  const [animationStage, setAnimationStage] = useState(0);
-  const [particles, setParticles] = useState([]);
-
   useEffect(() => {
-    if (phase !== 'shuffling') return;
+    if (phase !== 'shuffling') return undefined;
 
-    // Professional shuffle timing: 1.5-2.5 seconds total
-    const t1 = setTimeout(() => setAnimationStage(1), 50);      // Gather
-    const t2 = setTimeout(() => setAnimationStage(2), 350);     // Lift & glow
-    const t3 = setTimeout(() => {                                // First riffle
-      setAnimationStage(3);
-      generateParticles();
-    }, 650);
-    const t4 = setTimeout(() => setAnimationStage(4), 1100);    // Second riffle
-    const t5 = setTimeout(() => {                                // Spin with particles
-      setAnimationStage(5);
-      generateParticles();
-    }, 1500);
-    const t6 = setTimeout(() => {                                // Settle
-      setAnimationStage(6);
-      setTimeout(onComplete, 300);
-    }, 1900);
+    const timer = window.setTimeout(() => {
+      onComplete?.();
+    }, SHUFFLE_MS);
 
-    return () => {
-      [t1, t2, t3, t4, t5, t6].forEach(t => clearTimeout(t));
-    };
-  }, [phase]);
-
-  const generateParticles = () => {
-    const newParticles = Array.from({ length: 16 }, (_, i) => ({
-      id: i,
-      x: Math.random() * 240 - 120,
-      y: Math.random() * 240 - 120,
-      color: i % 3 === 0 ? '#BC13FE' : i % 3 === 1 ? '#FF5F1F' : '#FFD700',
-      size: Math.random() * 8 + 4,
-      delay: Math.random() * 0.2,
-    }));
-    setParticles(newParticles);
-    setTimeout(() => setParticles([]), 600);
-  };
+    return () => window.clearTimeout(timer);
+  }, [phase, onComplete]);
 
   if (phase !== 'shuffling') return null;
 
   return (
-    <div className="absolute inset-0 flex items-center justify-center overflow-visible">
-      {/* Deck container */}
-      <div className="relative w-20 h-28">
-        {/* Card layers with smooth gathering */}
-        {[7, 6, 5, 4, 3, 2, 1, 0].map(offset => {
-          const stageStyles = {
-            0: { top: 20 + offset * 3, left: offset * 2, rotate: (offset % 2) * 15 - 7.5, opacity: 0.7, scale: 0.9 },
-            1: { top: 12 + offset * 1.5, left: offset * 1.2, rotate: (offset % 2) * 8 - 4, opacity: 0.85, scale: 0.95 },
-            2: { top: 8 + offset * 1.2, left: offset * 0.8, rotate: (offset % 2) * 5 - 2.5, opacity: 0.9, scale: 0.98 },
-            3: { top: 6 + offset * 1, left: offset * 0.6, rotate: (offset % 2) * 3 - 1.5, opacity: 0.95, scale: 1 },
-            4: { top: 8 + offset * 0.8, left: offset * 0.4, rotate: (offset % 2) * 2 - 1, opacity: 0.95, scale: 1 },
-            5: { top: 6 + offset * 0.5, left: offset * 0.3, rotate: (offset % 2) - 0.5, opacity: 1, scale: 1 },
-            6: { top: 8, left: 8, rotate: 0, opacity: 1, scale: 1 },
-          };
-          const style = stageStyles[animationStage] || stageStyles[0];
-          
-          return (
-            <div
-              key={offset}
-              className="absolute rounded-lg overflow-hidden shadow-lg transition-all duration-300 ease-out"
-              style={{
-                width: 56,
-                height: 80,
-                top: style.top,
-                left: style.left,
-                transform: `rotate(${style.rotate}deg) scale(${style.scale})`,
-                opacity: style.opacity,
-                filter: animationStage >= 2 ? 'brightness(1.15) contrast(1.05)' : 'brightness(1)',
-                zIndex: offset,
-              }}>
-              <img src={getCardBack()} alt="Card back" className="w-full h-full object-cover" />
-            </div>
-          );
-        })}
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-visible">
+      <div
+        className="absolute rounded-full tng-shuffle-glow"
+        style={{
+          width: 190,
+          height: 150,
+          background:
+            'radial-gradient(ellipse, rgba(188,19,254,.20) 0%, rgba(255,95,31,.10) 42%, transparent 72%)',
+          filter: 'blur(10px)',
+        }}
+      />
 
-        {/* Professional Riffle - Stage 3 (first riffle) */}
-        {animationStage === 3 && (
-          <>
-            {/* Left half - splitting */}
-            {[0, 1, 2, 3].map(i => (
-              <div
-                key={`l-${i}`}
-                className="absolute rounded-lg overflow-hidden transition-all duration-250 ease-out"
-                style={{
-                  width: 26,
-                  height: 80,
-                  top: -5,
-                  left: -18 + i * 9,
-                  transform: `rotate(${-12 + i * 6}deg) translateY(-8px)`,
-                  opacity: 0.92,
-                  filter: 'brightness(1.1)',
-                }}>
-                <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-              </div>
-            ))}
-            {/* Right half - splitting */}
-            {[0, 1, 2, 3].map(i => (
-              <div
-                key={`r-${i}`}
-                className="absolute rounded-lg overflow-hidden transition-all duration-250 ease-out"
-                style={{
-                  width: 26,
-                  height: 80,
-                  top: -5,
-                  right: -18 + i * 9,
-                  transform: `rotate(${12 - i * 6}deg) translateY(-8px)`,
-                  opacity: 0.92,
-                  filter: 'brightness(1.1)',
-                }}>
-                <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </>
-        )}
+      <div className="relative" style={{ width: 210, height: 150 }}>
+        <Packet side="left" />
+        <Packet side="right" />
 
-        {/* Professional Riffle - Stage 4 (interweave) */}
-        {animationStage === 4 && (
-          <>
-            {/* Interweaved cards */}
-            {[0, 1, 2, 3, 4, 5].map(i => (
-              <div
-                key={`iw-${i}`}
-                className="absolute rounded-lg overflow-hidden transition-all duration-200"
-                style={{
-                  width: i % 2 === 0 ? 24 : 26,
-                  height: 80,
-                  top: i % 2 === 0 ? -3 : 0,
-                  left: -20 + i * 7,
-                  transform: `rotate(${(i % 2 === 0 ? -8 : 8) + (i - 3) * 2}deg)`,
-                  opacity: 0.95,
-                  filter: 'brightness(1.08)',
-                  zIndex: i,
-                }}>
-                <img src={getCardBack()} alt="Card" className="w-full h-full object-cover" />
-              </div>
-            ))}
-          </>
-        )}
-
-        {/* Spin with glow - Stage 5 */}
-        {animationStage === 5 && (
-          <>
-            <div
-              className="absolute rounded-lg overflow-hidden"
-              style={{
-                width: 56,
-                height: 80,
-                top: 8,
-                left: 8,
-                animation: 'deck-spin-fast 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                filter: 'brightness(1.2)',
-              }}>
-              <img src={getCardBack()} alt="Deck" className="w-full h-full object-cover" />
-            </div>
-            {/* Spin glow trail */}
-            <div
-              className="absolute rounded-full"
-              style={{
-                width: 140,
-                height: 140,
-                top: -30,
-                left: -42,
-                background: 'radial-gradient(circle, rgba(188,19,254,0.3) 0%, transparent 70%)',
-                animation: 'pulse-glow 0.25s ease-in-out',
-              }}
-            />
-          </>
-        )}
-
-        {/* Settled deck - Stage 6 (final) */}
-        {animationStage === 6 && (
-          <div
-            className="absolute rounded-lg overflow-hidden shadow-2xl"
-            style={{
-              width: 56,
-              height: 80,
-              top: 8,
-              left: 8,
-              boxShadow: '0 0 40px rgba(188,19,254,0.5), 0 0 80px rgba(255,95,31,0.25), inset 0 0 20px rgba(188,19,254,0.1)',
-              filter: 'brightness(1.1)',
-            }}>
-            <img src={getCardBack()} alt="Deck" className="w-full h-full object-cover" />
-          </div>
-        )}
-
-        {/* Ambient glow - Stage 2+ */}
-        {animationStage >= 2 && animationStage <= 5 && (
-          <div
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width: 140,
-              height: 140,
-              top: -30,
-              left: -42,
-              background: 'radial-gradient(circle, rgba(188,19,254,0.35) 0%, rgba(255,95,31,0.15) 50%, transparent 75%)',
-              animation: 'ambient-pulse 0.8s ease-in-out infinite',
-            }}
-          />
-        )}
-
-        {/* Particle effects */}
-        {particles.map(p => (
-          <div
-            key={p.id}
-            className="absolute rounded-full pointer-events-none"
-            style={{
-              width: p.size,
-              height: p.size,
-              top: `calc(50% + ${p.y}px)`,
-              left: `calc(50% + ${p.x}px)`,
-              background: p.color,
-              boxShadow: `0 0 ${p.size * 2}px ${p.color}, 0 0 ${p.size * 4}px ${p.color}66`,
-              opacity: 0,
-              animation: `particle-burst 0.5s ease-out ${p.delay}s forwards`,
-            }}
-          />
+        {Array.from({ length: 12 }, (_, index) => (
+          <RiffleCard key={index} index={index} />
         ))}
+
+        <div
+          className="absolute left-1/2 top-1/2 tng-shuffle-settled"
+          style={{
+            width: CARD_WIDTH,
+            height: CARD_HEIGHT,
+            marginLeft: -CARD_WIDTH / 2,
+            marginTop: -CARD_HEIGHT / 2,
+          }}
+        >
+          {Array.from({ length: 5 }, (_, index) => (
+            <div
+              key={index}
+              className="absolute overflow-hidden rounded-[6px]"
+              style={{
+                width: CARD_WIDTH,
+                height: CARD_HEIGHT,
+                left: index * 1.15,
+                top: index * -1.1,
+                boxShadow:
+                  index === 4
+                    ? '0 12px 28px rgba(0,0,0,.5), 0 0 28px rgba(255,215,0,.12)'
+                    : '0 2px 7px rgba(0,0,0,.25)',
+              }}
+            >
+              <img
+                src={getCardBack()}
+                alt=""
+                className="h-full w-full object-contain"
+                draggable={false}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
-      {/* Status text */}
       <div className="absolute -bottom-14 left-1/2 -translate-x-1/2 whitespace-nowrap">
-        <div className={`text-[8px] tracking-widest uppercase transition-all duration-300 ${
-          animationStage >= 6 ? 'text-[#4ade80] opacity-100' : 'text-[#FFD700]/80 opacity-90'
-        }`} style={PS2}>
-          {animationStage >= 6 ? '✓ DECK SHUFFLED' : '⏳ SHUFFLING...'}
+        <div
+          className="text-[8px] uppercase tracking-widest text-[#FFD700]/85"
+          style={PS2}
+        >
+          SHUFFLING...
         </div>
       </div>
 
       <style>{`
-        @keyframes deck-spin-fast {
-          0% { transform: rotate(0deg) scale(1); }
-          50% { transform: rotate(180deg) scale(1.08); }
-          100% { transform: rotate(360deg) scale(1); }
+        .tng-shuffle-packet,
+        .tng-riffle-card,
+        .tng-shuffle-settled,
+        .tng-shuffle-glow {
+          will-change: transform, opacity;
+          backface-visibility: hidden;
+          transform-style: preserve-3d;
         }
-        @keyframes particle-burst {
-          0% { opacity: 1; transform: translateY(0) scale(1); }
-          100% { opacity: 0; transform: translateY(-40px) scale(0.6); }
+
+        .tng-shuffle-left {
+          animation: tng-shuffle-left ${SHUFFLE_MS}ms cubic-bezier(.22,.72,.24,1) both;
         }
-        @keyframes ambient-pulse {
-          0%, 100% { opacity: 0.6; transform: scale(1); }
-          50% { opacity: 0.9; transform: scale(1.05); }
+
+        .tng-shuffle-right {
+          animation: tng-shuffle-right ${SHUFFLE_MS}ms cubic-bezier(.22,.72,.24,1) both;
+        }
+
+        .tng-riffle-card {
+          opacity: 0;
+          animation: tng-riffle-card ${SHUFFLE_MS}ms cubic-bezier(.2,.7,.25,1) both;
+          animation-delay: var(--riffle-delay);
+        }
+
+        .tng-shuffle-settled {
+          opacity: 0;
+          animation: tng-shuffle-settle ${SHUFFLE_MS}ms cubic-bezier(.2,.75,.25,1) both;
+        }
+
+        .tng-shuffle-glow {
+          animation: tng-shuffle-glow ${SHUFFLE_MS}ms ease-in-out both;
+        }
+
+        @keyframes tng-shuffle-left {
+          0%, 10% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) rotate(0deg);
+          }
+          24% {
+            transform: translate3d(-52px, -5px, 0) rotate(-7deg);
+          }
+          40% {
+            transform: translate3d(-57px, 5px, 0) rotate(-11deg);
+          }
+          57% {
+            transform: translate3d(-35px, 12px, 0) rotate(8deg);
+          }
+          69% {
+            transform: translate3d(-13px, 17px, 0) rotate(4deg);
+          }
+          80% {
+            opacity: 1;
+            transform: translate3d(-3px, 3px, 0) rotate(-2deg);
+          }
+          88%, 100% {
+            opacity: 0;
+            transform: translate3d(0, 0, 0) rotate(0deg);
+          }
+        }
+
+        @keyframes tng-shuffle-right {
+          0%, 10% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) rotate(0deg);
+          }
+          24% {
+            transform: translate3d(52px, -5px, 0) rotate(7deg);
+          }
+          40% {
+            transform: translate3d(57px, 5px, 0) rotate(11deg);
+          }
+          57% {
+            transform: translate3d(35px, 12px, 0) rotate(-8deg);
+          }
+          69% {
+            transform: translate3d(13px, 17px, 0) rotate(-4deg);
+          }
+          80% {
+            opacity: 1;
+            transform: translate3d(3px, 3px, 0) rotate(2deg);
+          }
+          88%, 100% {
+            opacity: 0;
+            transform: translate3d(0, 0, 0) rotate(0deg);
+          }
+        }
+
+        @keyframes tng-riffle-card {
+          0%, 34% {
+            opacity: 0;
+            transform: translate3d(var(--riffle-x), -4px, 0)
+              rotate(var(--riffle-r)) scale(.98);
+          }
+          38% {
+            opacity: .98;
+          }
+          52% {
+            opacity: 1;
+            transform: translate3d(calc(var(--riffle-x) * .48), 8px, 0)
+              rotate(calc(var(--riffle-r) * .45)) scale(1);
+          }
+          67% {
+            opacity: 1;
+            transform: translate3d(0, 17px, 0) rotate(0deg) scale(1);
+          }
+          78% {
+            opacity: .95;
+            transform: translate3d(0, 4px, 0) rotate(0deg) scale(1);
+          }
+          84%, 100% {
+            opacity: 0;
+            transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+          }
+        }
+
+        @keyframes tng-shuffle-settle {
+          0%, 76% {
+            opacity: 0;
+            transform: translate3d(0, 7px, 0) rotate(0deg) scale(.97);
+          }
+          84% {
+            opacity: 1;
+            transform: translate3d(0, -3px, 0) rotate(-1.2deg) scale(1.02);
+          }
+          92% {
+            opacity: 1;
+            transform: translate3d(0, 1px, 0) rotate(.5deg) scale(1);
+          }
+          100% {
+            opacity: 1;
+            transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+          }
+        }
+
+        @keyframes tng-shuffle-glow {
+          0%, 12% {
+            opacity: .18;
+            transform: scale(.85);
+          }
+          36%, 68% {
+            opacity: .72;
+            transform: scale(1.08);
+          }
+          100% {
+            opacity: .26;
+            transform: scale(.92);
+          }
         }
       `}</style>
     </div>
