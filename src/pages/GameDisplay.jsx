@@ -462,30 +462,32 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
   const isTurn = state.currentTurnSeat === seat;
   const isDealer = state.dealerSeat === seat;
   const cardCount = visualCardCount ?? Number(player?.cardCount || 0);
+  const compactGameplay = state.phase === 'playing' || state.phase === 'resolving';
+  const effectiveScale = scale * (compactGameplay ? 0.82 : 1);
 
   const positionStyle = {
     top: {
       left: '50%',
       top: 6,
-      transform: `translateX(-50%) scale(${scale})`,
+      transform: `translateX(-50%) scale(${effectiveScale})`,
       transformOrigin: 'top center',
     },
     bottom: {
       left: '50%',
       bottom: 6,
-      transform: `translateX(-50%) scale(${scale})`,
+      transform: `translateX(-50%) scale(${effectiveScale})`,
       transformOrigin: 'bottom center',
     },
     left: {
       left: 22,
       top: '50%',
-      transform: `translateY(-50%) scale(${scale})`,
+      transform: `translateY(-50%) scale(${effectiveScale})`,
       transformOrigin: 'left center',
     },
     right: {
       right: 22,
       top: '50%',
-      transform: `translateY(-50%) scale(${scale})`,
+      transform: `translateY(-50%) scale(${effectiveScale})`,
       transformOrigin: 'right center',
     },
   }[position];
@@ -497,7 +499,9 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
       className="absolute z-20"
       style={{
         ...positionStyle,
-        width: position === 'left' || position === 'right' ? 176 : 190,
+        width: compactGameplay
+          ? (position === 'left' || position === 'right' ? 160 : 172)
+          : (position === 'left' || position === 'right' ? 176 : 190),
       }}
     >
       <div
@@ -564,7 +568,7 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
           </div>
         </div>
 
-        {cardCount > 0 && (
+        {cardCount > 0 && !compactGameplay && (
           <div className="relative mt-3 h-9">
             {fanCards.map((cardIndex) => (
               <img
@@ -701,6 +705,48 @@ function SpadesDisplay({ room }) {
 
   const playerAt = (seat) => players.find((player) => player.seatNumber === seat);
 
+  const trickScale = tableSize?.scale || 1;
+  const trickZoneWidth = Math.min(
+    420,
+    Math.max(300, Math.round((tableSize?.width || 900) * 0.38)),
+  );
+  const trickZoneHeight = Math.min(
+    300,
+    Math.max(220, Math.round((tableSize?.height || 420) * 0.72)),
+  );
+  const trickCardWidth = Math.round(64 * trickScale);
+  const trickCardHeight = Math.round(96 * trickScale);
+
+  const trickCardPosition = (seatNumber, index) => {
+    const centeredLeft = Math.round((trickZoneWidth - trickCardWidth) / 2);
+    const centeredTop = Math.round((trickZoneHeight - trickCardHeight) / 2);
+    const edge = Math.max(8, Math.round(12 * trickScale));
+
+    const bySeat = {
+      1: {
+        left: centeredLeft,
+        top: trickZoneHeight - trickCardHeight - edge,
+      },
+      2: {
+        left: edge,
+        top: centeredTop,
+      },
+      3: {
+        left: centeredLeft,
+        top: edge,
+      },
+      4: {
+        left: trickZoneWidth - trickCardWidth - edge,
+        top: centeredTop,
+      },
+    };
+
+    return bySeat[seatNumber] || {
+      left: centeredLeft + index * 5,
+      top: centeredTop + index * 5,
+    };
+  };
+
   return (
     <div className="relative z-10 flex h-full w-full flex-col px-8 pb-5 pt-4">
       <div className="flex shrink-0 items-center justify-between gap-6 px-2 pb-3">
@@ -788,7 +834,7 @@ function SpadesDisplay({ room }) {
               style={{
                 width: 'clamp(110px, 22%, 225px)',
                 aspectRatio: '1 / 1',
-                opacity: 0.30,
+                opacity: trick.length > 0 ? 0.16 : 0.30,
                 filter: 'drop-shadow(0 0 24px rgba(255,214,110,.12))',
               }}
             >
@@ -806,7 +852,10 @@ function SpadesDisplay({ room }) {
 
             <div
               className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
-              style={{ width: 300, height: 230 }}
+              style={{
+                width: trick.length > 0 ? trickZoneWidth : 300,
+                height: trick.length > 0 ? trickZoneHeight : 230,
+              }}
             >
               {dealVisualPhase === 'shuffling' ? (
                 <div
@@ -863,26 +912,32 @@ function SpadesDisplay({ room }) {
               ) : (
                 <div className="relative h-full w-full">
                   {trick.map((play, index) => {
-                    const bySeat = {
-                      1: { left: 122, top: 132, transform: 'rotate(0deg)' },
-                      2: { left: 48, top: 80, transform: 'rotate(-90deg)' },
-                      3: { left: 122, top: 22, transform: 'rotate(180deg)' },
-                      4: { left: 196, top: 80, transform: 'rotate(90deg)' },
-                    };
-                    const pos = bySeat[play.seatNumber] || {
-                      left: 122 + index * 8,
-                      top: 82 + index * 4,
-                      transform: 'rotate(0deg)',
-                    };
+                    const pos = trickCardPosition(play.seatNumber, index);
 
                     return (
-                      <img
+                      <div
                         key={play.card?.id || index}
-                        src={getCardImage(play.card)}
-                        alt=""
-                        className="absolute h-24 w-16 rounded-md object-contain shadow-2xl"
-                        style={pos}
-                      />
+                        className="absolute"
+                        style={{
+                          left: pos.left,
+                          top: pos.top,
+                          width: trickCardWidth,
+                          height: trickCardHeight,
+                          filter: 'drop-shadow(0 10px 18px rgba(0,0,0,.55))',
+                        }}
+                      >
+                        <img
+                          src={getCardImage(play.card)}
+                          alt=""
+                          className="h-full w-full rounded-md object-contain"
+                        />
+                        <div
+                          className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/10 bg-black/70 px-2 py-1 text-[5px] text-white/45"
+                          style={PS2}
+                        >
+                          S{play.seatNumber}
+                        </div>
+                      </div>
                     );
                   })}
                 </div>
