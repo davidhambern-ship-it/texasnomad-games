@@ -157,17 +157,32 @@ export default function PreviewHostPanel() {
           return;
         }
 
-        if (localStorage.getItem('tng_player_test_mode') === '1') {
-          setPlayerTestMode(true);
+        const testModeActive =
+          localStorage.getItem('tng_player_test_mode') === '1';
+
+        if (session.hostSession?.displayDeviceId) {
+          setPlayerTestMode(testModeActive);
           setError('');
           setPhase('ready');
           return;
         }
 
-        if (session.hostSession?.displayDeviceId) {
-          localStorage.removeItem('tng_player_test_mode');
-          setPlayerTestMode(false);
-          setPhase('ready');
+        if (testModeActive) {
+          const pairingPayload = await tngApi.host.createPairing(deviceId);
+          if (cancelled) return;
+
+          await tngApi.display.pair(pairingPayload.pairing.code);
+          if (cancelled) return;
+
+          const refreshedSession = await tngApi.host.startSession(deviceId);
+          if (cancelled) return;
+
+          setPlayerTestMode(true);
+          setPairing(null);
+          setRepairingDisplay(false);
+          setActiveRoom(refreshedSession.activeRoom || null);
+          setError('');
+          setPhase(refreshedSession.activeRoom ? 'room' : 'ready');
           return;
         }
 
