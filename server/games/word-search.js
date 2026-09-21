@@ -151,7 +151,7 @@ export function defaultWordSearchState() {
     message: null,
     winner_seat: null,
     last_action: null,
-    round_number: 1,
+    round_number: 0,
   };
 }
 
