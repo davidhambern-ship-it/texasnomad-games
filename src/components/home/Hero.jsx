@@ -38,6 +38,23 @@ export default function Hero({ heroBg, crownLogo }) {
           ⚡ LIVE TEST SITE
         </a>
 
+        <div className="mt-3 max-w-2xl rounded-lg border border-white/10 bg-black/55 px-4 py-3 text-center backdrop-blur-sm">
+          <div
+            className="mb-2 text-[7px] sm:text-[8px] tracking-[0.14em] text-[#BC13FE] uppercase"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            LIVE TEST ENVIRONMENT
+          </div>
+          <p className="text-[10px] sm:text-xs leading-relaxed text-white/55">
+            TexasNomad Games is still in active development. This test site is being used to test
+            our new player accounts and profiles, Host/Player connections, live multiplayer rooms,
+            Spades gameplay, and our new backend system outside of Base44. You may run into bugs,
+            disconnects, broken features, or test data being reset while we work. The test site does
+            not represent the final version of TNG — if something breaks, congratulations, you found
+            exactly what we&apos;re looking for.
+          </p>
+        </div>
+
         {/* Game icons row */}
         <div className="flex items-center gap-4 mt-4">
           {/* Orange X */}
