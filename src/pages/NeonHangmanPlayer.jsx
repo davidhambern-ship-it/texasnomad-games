@@ -20,13 +20,12 @@ export default function NeonHangmanPlayer({ roomCode }) {
   const phase = gameState.phase || 'setup';
   const guessed = Array.isArray(gameState.guessedLetters) ? gameState.guessedLetters : [];
   const wrongGuesses = Array.isArray(gameState.wrongGuesses) ? gameState.wrongGuesses : [];
-  const seatsThatChose = Array.isArray(gameState.seatsThatChose) ? gameState.seatsThatChose : [];
-  const alreadyChosen = seatNumber > 0 && seatsThatChose.includes(seatNumber);
+  const currentTurnSeat = Number(gameState.currentTurnSeat || 0);
   const isGoRoundMode = gameState.isGoRoundMode === true;
   const canAct =
     phase === 'playing' &&
     seatNumber > 0 &&
-    (!isGoRoundMode || !alreadyChosen);
+    seatNumber === currentTurnSeat;
 
   const refresh = useCallback(async () => {
     if (!deviceId || !roomCode) return;
@@ -102,11 +101,11 @@ export default function NeonHangmanPlayer({ roomCode }) {
       ? 'WAITING ON HOST'
       : phase === 'finished'
         ? 'ROUND COMPLETE'
-        : isGoRoundMode && alreadyChosen
-          ? 'WAITING FOR OTHER PLAYERS'
-          : isGoRoundMode
-            ? 'YOUR CHOICE'
-            : 'FREE PLAY';
+        : canAct
+          ? 'YOUR TURN'
+          : currentTurnSeat
+            ? `SEAT ${currentTurnSeat} TURN`
+            : 'WAITING';
 
   return (
     <div className="min-h-screen bg-[#070311] text-white px-4 py-4">
@@ -206,9 +205,9 @@ export default function NeonHangmanPlayer({ roomCode }) {
             <section className="rounded-xl border border-[#FFD700]/20 bg-black/55 p-4">
               <div className="mb-3 text-center text-[7px] tracking-widest uppercase text-white/30" style={PS2}>
                 {canAct
-                  ? 'CHOOSE A LETTER'
-                  : isGoRoundMode
-                    ? 'YOU ALREADY CHOSE THIS GO-ROUND'
+                  ? 'CHOOSE A LETTER — CORRECT GUESSES KEEP YOUR TURN'
+                  : currentTurnSeat
+                    ? `WAITING FOR SEAT ${currentTurnSeat}`
                     : 'WAITING'}
               </div>
               <div className="flex flex-wrap justify-center gap-2">
@@ -258,7 +257,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
                   }}
                   disabled={!canAct || busy}
                   className="flex-1 rounded-lg border border-[#BC13FE]/35 bg-black/70 px-4 py-3 text-white outline-none"
-                  placeholder={canAct ? 'Type your guess…' : 'Wait for next go-round…'}
+                  placeholder={canAct ? 'Type your guess…' : 'Wait for your turn…'}
                 />
                 <button
                   type="button"
@@ -299,7 +298,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
           </div>
           <div className="grid gap-2 sm:grid-cols-3">
             {(gameState.players || []).map((player) => {
-              const chose = seatsThatChose.includes(Number(player.seatNumber));
+              const isTurn = Number(player.seatNumber) === currentTurnSeat;
               return (
                 <div
                   key={player.playerId}
@@ -307,14 +306,14 @@ export default function NeonHangmanPlayer({ roomCode }) {
                   style={{
                     borderColor: Number(player.seatNumber) === seatNumber
                       ? '#FFD700'
-                      : chose
+                      : isTurn
                         ? '#4ade80'
                         : 'rgba(255,255,255,.12)',
                   }}
                 >
                   <div className="text-sm text-white/75">{player.name || `Seat ${player.seatNumber}`}</div>
                   <div className="mt-1 text-[10px] text-white/30">
-                    Seat {player.seatNumber}{chose ? ' · CHOSE' : ''}
+                    Seat {player.seatNumber}{isTurn ? ' · TURN' : ''}
                   </div>
                 </div>
               );
