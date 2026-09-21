@@ -22,6 +22,12 @@ export class TngApiError extends Error {
  * @param {string} path
  * @param {RequestOptions} [options]
  */
+function apiUrl(path) {
+  const base = import.meta.env.VITE_TNG_API_URL?.trim();
+  if (!base) return path;
+  return `${base.replace(/\/$/, '')}${path.replace(/^\/api/, '')}`;
+}
+
 async function request(path, { method = 'GET', body, deviceId, authenticated = true } = {}) {
   const headers = { Accept: 'application/json' };
 
@@ -31,7 +37,7 @@ async function request(path, { method = 'GET', body, deviceId, authenticated = t
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(path, {
+  const response = await fetch(apiUrl(path), {
     method,
     headers,
     credentials: 'include',
