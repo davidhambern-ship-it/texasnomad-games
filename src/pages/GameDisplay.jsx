@@ -456,73 +456,130 @@ function HangmanDisplay({ room }) {
 
 function SpadesSeat({ seat, player, state, position }) {
   const team = seat === 1 || seat === 3 ? 1 : 2;
+  const teamColor = team === 1 ? '#BC13FE' : '#FF5F1F';
   const isTurn = state.currentTurnSeat === seat;
   const isDealer = state.dealerSeat === seat;
-  const positionClass = {
-    top: 'absolute left-1/2 top-4 -translate-x-1/2',
-    bottom: 'absolute bottom-4 left-1/2 -translate-x-1/2',
-    left: 'absolute left-5 top-1/2 -translate-y-1/2',
-    right: 'absolute right-5 top-1/2 -translate-y-1/2',
+  const cardCount = Number(player?.cardCount || 0);
+
+  const positionStyle = {
+    top: {
+      left: '50%',
+      top: 6,
+      transform: 'translateX(-50%)',
+    },
+    bottom: {
+      left: '50%',
+      bottom: 6,
+      transform: 'translateX(-50%)',
+    },
+    left: {
+      left: 14,
+      top: '50%',
+      transform: 'translateY(-50%)',
+    },
+    right: {
+      right: 14,
+      top: '50%',
+      transform: 'translateY(-50%)',
+    },
   }[position];
 
+  const fanCards = cardCount > 0 ? [0, 1, 2] : [];
+
   return (
-    <div className={positionClass + ' z-20'}>
+    <div
+      className="absolute z-20"
+      style={{
+        ...positionStyle,
+        width: position === 'left' || position === 'right' ? 176 : 190,
+      }}
+    >
       <div
-        className="min-w-[150px] rounded-xl border bg-black/75 px-4 py-3 text-center backdrop-blur-sm"
+        className="rounded-xl border bg-black/88 px-4 py-3 backdrop-blur-md"
         style={{
-          borderColor: isTurn
-            ? '#FFD700'
-            : team === 1
-              ? 'rgba(188,19,254,.45)'
-              : 'rgba(255,95,31,.45)',
-          boxShadow: isTurn ? '0 0 24px rgba(255,215,0,.18)' : 'none',
+          borderColor: isTurn ? '#FFD700' : teamColor + '66',
+          boxShadow: isTurn
+            ? '0 0 26px rgba(255,215,0,.22)'
+            : '0 0 18px rgba(0,0,0,.38)',
         }}
       >
-        <div className="flex items-center justify-center gap-2">
-          <span className="text-[7px] uppercase tracking-[0.16em] text-white/30" style={PS2}>
+        <div className="flex items-center justify-between gap-2">
+          <div
+            className="text-[6px] uppercase tracking-[0.16em] text-white/28"
+            style={PS2}
+          >
             SEAT {seat}
-          </span>
-          {isDealer && (
-            <span className="rounded-full border border-white/15 px-1.5 py-0.5 text-[6px] text-white/45" style={PS2}>
-              D
-            </span>
-          )}
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {isDealer && (
+              <span
+                className="flex h-5 min-w-5 items-center justify-center rounded-full border border-white/15 px-1 text-[6px] text-white/45"
+                style={PS2}
+              >
+                D
+              </span>
+            )}
+
+            {isTurn && (
+              <span
+                className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/10 px-2 py-1 text-[6px] text-[#FFD700]"
+                style={PS2}
+              >
+                TURN
+              </span>
+            )}
+          </div>
         </div>
 
-        <div className="mt-2 text-base text-white">
-          {player?.name || 'Waiting…'}
-        </div>
-
-        <div className="mt-1 text-[7px] uppercase tracking-[0.12em] text-white/30" style={PS2}>
-          TEAM {team}
-          {player?.playerType === 'cpu' ? ' · CPU' : ''}
-        </div>
-
-        <div className="mt-3 flex items-center justify-center gap-2">
-          <img
-            src={getCardBack()}
-            alt=""
-            className="h-12 w-9 rounded object-contain opacity-80"
-          />
-          <div className="text-left">
-            <div className="font-mono text-xl text-[#FFD700]">
-              {player?.cardCount || 0}
+        <div className="mt-1.5 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-lg leading-none text-white">
+              {player?.name || 'Waiting…'}
             </div>
-            <div className="text-[6px] uppercase tracking-[0.12em] text-white/25" style={PS2}>
+            <div
+              className="mt-2 text-[6px] uppercase tracking-[0.12em]"
+              style={{ ...PS2, color: teamColor }}
+            >
+              TEAM {team}{player?.playerType === 'cpu' ? ' · CPU' : ''}
+            </div>
+          </div>
+
+          <div className="shrink-0 text-right">
+            <div className="font-mono text-2xl leading-none text-[#FFD700]">
+              {cardCount}
+            </div>
+            <div
+              className="mt-1 text-[5px] uppercase tracking-[0.1em] text-white/25"
+              style={PS2}
+            >
               CARDS
             </div>
           </div>
         </div>
 
-        {(player?.bid != null || player?.tricksWon > 0) && (
-          <div className="mt-2 text-xs text-white/45">
-            Bid {player?.bid ?? '-'} · Books {player?.tricksWon || 0}
+        {cardCount > 0 && (
+          <div className="relative mt-3 h-9">
+            {fanCards.map((cardIndex) => (
+              <img
+                key={cardIndex}
+                src={getCardBack()}
+                alt=""
+                className="absolute h-9 w-7 rounded-sm object-contain shadow-md"
+                style={{
+                  left: `${52 + cardIndex * 14}px`,
+                  transform: `rotate(${(cardIndex - 1) * 8}deg)`,
+                  transformOrigin: 'bottom center',
+                  opacity: 0.88,
+                }}
+              />
+            ))}
           </div>
         )}
 
-        {isTurn && (
-          <div className="mt-2 text-[7px] uppercase tracking-[0.14em] text-[#FFD700]" style={PS2}>
-            ▶ TURN
+        {(player?.bid != null || player?.tricksWon > 0) && (
+          <div className="mt-2 border-t border-white/[0.06] pt-2 text-center text-xs text-white/40">
+            Bid {player?.bid ?? '-'} · Books {player?.tricksWon || 0}
           </div>
         )}
       </div>
@@ -534,6 +591,7 @@ function SpadesDisplay({ room }) {
   const state = room.state || {};
   const players = state.players || [];
   const trick = state.currentTrick || [];
+
   const phaseLabel = {
     setup: 'SETTING TABLE',
     dealt: 'CARDS DEALT',
@@ -545,85 +603,137 @@ function SpadesDisplay({ room }) {
   const playerAt = (seat) => players.find((player) => player.seatNumber === seat);
 
   return (
-    <div className="relative z-10 h-full w-full px-8 py-5">
-      <div className="flex h-full flex-col">
-        <div className="mb-3 flex items-center justify-between px-3">
-          <div>
-            <div className="text-[8px] uppercase tracking-[0.2em] text-[#BC13FE]" style={PS2}>
-              TEXASNOMAD SPADES
-            </div>
-            <div className="mt-1 text-sm text-white/30">
-              Hand {state.handNumber || 0} · {phaseLabel}
-            </div>
+    <div className="relative z-10 flex h-full w-full flex-col px-8 pb-5 pt-4">
+      <div className="flex shrink-0 items-center justify-between gap-6 px-2 pb-3">
+        <div>
+          <div
+            className="text-[9px] uppercase tracking-[0.2em] text-[#BC13FE]"
+            style={PS2}
+          >
+            TEXASNOMAD SPADES
           </div>
-
-          <div className="flex gap-5 text-right">
-            <div>
-              <div className="text-[6px] uppercase tracking-[0.15em] text-white/25" style={PS2}>
-                {state.team1Name || 'Team 1'}
-              </div>
-              <div className="mt-1 text-2xl text-[#BC13FE]">{state.score1 || 0}</div>
-            </div>
-            <div>
-              <div className="text-[6px] uppercase tracking-[0.15em] text-white/25" style={PS2}>
-                {state.team2Name || 'Team 2'}
-              </div>
-              <div className="mt-1 text-2xl text-[#FF5F1F]">{state.score2 || 0}</div>
-            </div>
+          <div className="mt-1 text-sm text-white/30">
+            Hand {state.handNumber || 0} · {phaseLabel}
           </div>
         </div>
 
-        <div className="relative flex-1 min-h-0">
+        <div className="flex items-stretch gap-2">
+          <div className="min-w-[190px] rounded-lg border border-[#BC13FE]/20 bg-[#BC13FE]/[0.035] px-4 py-2.5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div
+                  className="text-[6px] uppercase tracking-[0.14em] text-white/25"
+                  style={PS2}
+                >
+                  {state.team1Name || 'Team 1'}
+                </div>
+                <div className="mt-1 text-xs text-white/30">
+                  Bid {state.bid1 ?? '-'} · Books {state.books1 || 0}
+                </div>
+              </div>
+              <div className="text-3xl leading-none text-[#BC13FE]">
+                {state.score1 || 0}
+              </div>
+            </div>
+          </div>
+
+          <div className="min-w-[190px] rounded-lg border border-[#FF5F1F]/20 bg-[#FF5F1F]/[0.035] px-4 py-2.5">
+            <div className="flex items-end justify-between gap-4">
+              <div>
+                <div
+                  className="text-[6px] uppercase tracking-[0.14em] text-white/25"
+                  style={PS2}
+                >
+                  {state.team2Name || 'Team 2'}
+                </div>
+                <div className="mt-1 text-xs text-white/30">
+                  Bid {state.bid2 ?? '-'} · Books {state.books2 || 0}
+                </div>
+              </div>
+              <div className="text-3xl leading-none text-[#FF5F1F]">
+                {state.score2 || 0}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1">
+        <div
+          className="absolute left-1/2 top-1/2"
+          style={{
+            width: '82%',
+            height: '74%',
+            transform: 'translate(-50%, -50%)',
+          }}
+        >
           <div
-            className="absolute inset-3 rounded-[42%] border-[10px] border-[#3d2817] bg-[#0a2a17]"
+            className="absolute inset-0 rounded-[48%] border-[9px] border-[#4a2d18] bg-[#0a2a17]"
             style={{
               boxShadow:
-                'inset 0 0 90px rgba(0,0,0,.78), 0 0 40px rgba(0,0,0,.35)',
+                'inset 0 0 110px rgba(0,0,0,.82), 0 22px 60px rgba(0,0,0,.46)',
             }}
           >
             <div
-              className="absolute inset-4 rounded-[42%] border border-white/[0.05]"
+              className="absolute inset-[14px] rounded-[48%] border border-white/[0.045]"
               style={{
                 background:
-                  'radial-gradient(circle at 50% 45%, rgba(28,105,63,.4), rgba(4,38,20,.5) 55%, rgba(0,0,0,.28) 100%)',
+                  'radial-gradient(circle at 50% 46%, rgba(32,116,69,.42), rgba(7,54,29,.38) 46%, rgba(2,26,14,.64) 78%, rgba(0,0,0,.25) 100%)',
               }}
             />
+
+            <div
+              className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-[150px] font-black leading-none text-white/[0.025]"
+              style={{ fontFamily: 'serif' }}
+            >
+              ♠
+            </div>
 
             <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" />
             <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" />
             <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" />
             <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" />
 
-            <div className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
+            <div
+              className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
+              style={{ width: 300, height: 230 }}
+            >
               {trick.length === 0 ? (
-                <div className="text-center">
-                  <div className="text-6xl">♠</div>
-                  <div className="mt-3 text-[8px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
-                    {state.phase === 'dealt' ? 'PRIVATE DEAL VERIFIED' : phaseLabel}
+                <div className="flex h-full flex-col items-center justify-center text-center">
+                  <div className="text-6xl text-white/12">♠</div>
+                  <div
+                    className="mt-4 text-[8px] uppercase tracking-[0.18em] text-white/25"
+                    style={PS2}
+                  >
+                    {state.phase === 'dealt' ? 'CARDS DEALT' : phaseLabel}
                   </div>
                   {state.phase === 'dealt' && (
-                    <div className="mt-2 text-sm text-green-400/70">
-                      No hidden hands are sent to this display.
+                    <div className="mt-2 text-sm text-green-400/60">
+                      Waiting for bidding
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="relative h-40 w-52">
+                <div className="relative h-full w-full">
                   {trick.map((play, index) => {
-                    const positions = [
-                      { left: 78, top: 82, transform: 'rotate(0deg)' },
-                      { left: 22, top: 48, transform: 'rotate(-90deg)' },
-                      { left: 78, top: 10, transform: 'rotate(180deg)' },
-                      { left: 136, top: 48, transform: 'rotate(90deg)' },
-                    ];
-                    const pos = positions[index] || positions[0];
+                    const bySeat = {
+                      1: { left: 122, top: 132, transform: 'rotate(0deg)' },
+                      2: { left: 48, top: 80, transform: 'rotate(-90deg)' },
+                      3: { left: 122, top: 22, transform: 'rotate(180deg)' },
+                      4: { left: 196, top: 80, transform: 'rotate(90deg)' },
+                    };
+                    const pos = bySeat[play.seatNumber] || {
+                      left: 122 + index * 8,
+                      top: 82 + index * 4,
+                      transform: 'rotate(0deg)',
+                    };
 
                     return (
                       <img
                         key={play.card?.id || index}
                         src={getCardImage(play.card)}
                         alt=""
-                        className="absolute h-20 w-14 rounded object-contain shadow-xl"
+                        className="absolute h-24 w-16 rounded-md object-contain shadow-2xl"
                         style={pos}
                       />
                     );
@@ -634,16 +744,16 @@ function SpadesDisplay({ room }) {
           </div>
         </div>
 
-        <div className="mt-3 grid grid-cols-2 gap-4 px-3">
-          <div className="rounded-lg border border-[#BC13FE]/20 bg-[#BC13FE]/[0.04] px-4 py-2 text-center">
-            <span className="text-xs text-white/35">
-              {state.team1Name || 'Team 1'} · Bid {state.bid1 ?? '-'} · Books {state.books1 || 0}
-            </span>
-          </div>
-          <div className="rounded-lg border border-[#FF5F1F]/20 bg-[#FF5F1F]/[0.04] px-4 py-2 text-center">
-            <span className="text-xs text-white/35">
-              {state.team2Name || 'Team 2'} · Bid {state.bid2 ?? '-'} · Books {state.books2 || 0}
-            </span>
+        <div className="pointer-events-none absolute bottom-1 left-1/2 -translate-x-1/2 text-center">
+          <div
+            className="text-[6px] uppercase tracking-[0.16em] text-white/18"
+            style={PS2}
+          >
+            {state.phase === 'setup'
+              ? 'SET THE TABLE · THEN SHUFFLE & DEAL'
+              : state.spadesBroken
+                ? 'SPADES BROKEN'
+                : 'SPADES NOT BROKEN'}
           </div>
         </div>
       </div>
