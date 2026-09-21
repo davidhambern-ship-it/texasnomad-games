@@ -12,6 +12,8 @@ import spadesHost from '../api/spades/host.js';
 import spadesPlayer from '../api/spades/player.js';
 import hangmanPlayer from '../api/hangman/player.js';
 import hangmanHost from '../api/hangman/host.js';
+import wordSearchPlayer from '../api/word-search/player.js';
+import wordSearchHost from '../api/word-search/host.js';
 
 const routes = new Map([
   ['/', health],
@@ -29,6 +31,8 @@ const routes = new Map([
   ['/spades/player', spadesPlayer],
   ['/hangman/player', hangmanPlayer],
   ['/hangman/host', hangmanHost],
+  ['/word-search/player', wordSearchPlayer],
+  ['/word-search/host', wordSearchHost],
 ]);
 
 function configuredOrigins() {
