@@ -619,23 +619,22 @@ function SpadesDisplay({ room }) {
     const playArea = playAreaRef.current;
     if (!playArea) return undefined;
 
-    const TARGET_ASPECT = 2.55;
+    const TARGET_ASPECT = 1.9;
     const fitTable = () => {
       const availableWidth = playArea.clientWidth;
       const availableHeight = playArea.clientHeight;
       if (!availableWidth || !availableHeight) return;
 
-      // Large screens preserve the approved 62% reference width.
-      // Smaller screens are allowed to use more horizontal space so the table
-      // remains readable while still preserving its shape.
+      // Keep the game-display table taller and less stretched while still
+      // scaling cleanly across televisions, desktops, tablets, and phones.
       const widthFraction =
-        availableWidth < 760 ? 0.94 :
-        availableWidth < 1100 ? 0.82 :
-        availableWidth < 1450 ? 0.72 :
-        0.62;
+        availableWidth < 760 ? 0.98 :
+        availableWidth < 1100 ? 0.90 :
+        availableWidth < 1450 ? 0.82 :
+        0.76;
 
       const maxWidth = availableWidth * widthFraction;
-      const maxHeight = availableHeight * 0.92;
+      const maxHeight = availableHeight * 0.96;
 
       let width = maxWidth;
       let height = width / TARGET_ASPECT;
