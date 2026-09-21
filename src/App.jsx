@@ -34,6 +34,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import TngOnboarding from '@/pages/TngOnboarding';
 import GameDisplay from '@/pages/GameDisplay';
 import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -44,6 +45,7 @@ function HomeGate() {
 const AuthenticatedApp = () => {
   const { user, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
   const location = useLocation();
+  const profileGateEnabled = isBase44Preview || isNeonStaging;
   const [profileState, setProfileState] = useState('idle');
   const [profileError, setProfileError] = useState('');
 
@@ -51,7 +53,7 @@ const AuthenticatedApp = () => {
     let cancelled = false;
 
     async function checkPreviewProfile() {
-      if (!isBase44Preview || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
+      if (!profileGateEnabled || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
         setProfileState('idle');
         setProfileError('');
         return;
@@ -81,13 +83,14 @@ const AuthenticatedApp = () => {
     isLoadingAuth,
     isLoadingPublicSettings,
     location.pathname,
+    profileGateEnabled,
   ]);
 
   // Show loading spinner while checking app public settings, auth, or Preview TNG profile
   if (
     isLoadingPublicSettings ||
     isLoadingAuth ||
-    (isBase44Preview && isAuthenticated && profileState === 'checking')
+    (profileGateEnabled && isAuthenticated && profileState === 'checking')
   ) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -116,7 +119,7 @@ const AuthenticatedApp = () => {
   ]);
 
   if (
-    isBase44Preview &&
+    profileGateEnabled &&
     isAuthenticated &&
     profileState === 'missing' &&
     !onboardingExemptPaths.has(location.pathname)
@@ -126,7 +129,7 @@ const AuthenticatedApp = () => {
   }
 
   if (
-    isBase44Preview &&
+    profileGateEnabled &&
     isAuthenticated &&
     profileState === 'error' &&
     location.pathname !== '/onboarding'
