@@ -8,16 +8,46 @@ import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond
 
 const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
 function createRoomCode(length = 6) {
   return Array.from({ length }, () => ROOM_ALPHABET[randomInt(0, ROOM_ALPHABET.length)]).join('');
 }
 
 export default async function handler(request, response) {
-  if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);
+  if (!['POST', 'DELETE'].includes(request.method)) return methodNotAllowed(response, ['POST', 'DELETE']);
 
   try {
     const { hostSession } = await requireController(request, { hostSessionRequired: true });
+
+    if (request.method === 'DELETE') {
+      const [existingRoom] = await db.select().from(gameRooms).where(and(
+        eq(gameRooms.hostSessionId, hostSession.id),
+        inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
+      )).limit(1);
+
+      if (!existingRoom) {
+        return sendJson(response, 200, { room: null, disconnected: false });
+      }
+
+      const now = new Date();
+      const [room] = await db.transaction(async (transaction) => {
+        const ended = await transaction.update(gameRooms).set({
+          status: 'abandoned',
+          updatedAt: now,
+        }).where(eq(gameRooms.id, existingRoom.id)).returning();
+
+        await transaction.update(hostSessions).set({
+          status: hostSession.displayDeviceId ? 'ready' : 'pairing',
+          updatedAt: now,
+        }).where(eq(hostSessions.id, hostSession.id));
+
+        return ended;
+      });
+
+      return sendJson(response, 200, { room, disconnected: true });
+    }
+
     const gameId = typeof request.body?.gameId === 'string' ? request.body.gameId.trim().toLowerCase() : '';
 
     if (!GAME_ID_PATTERN.test(gameId)) {
@@ -36,7 +66,7 @@ export default async function handler(request, response) {
 
     const [existingRoom] = await db.select().from(gameRooms).where(and(
       eq(gameRooms.hostSessionId, hostSession.id),
-      inArray(gameRooms.status, ['lobby', 'live', 'paused']),
+      inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
     )).limit(1);
 
     if (existingRoom) {
