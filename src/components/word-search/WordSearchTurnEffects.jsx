@@ -10,9 +10,13 @@ export default function WordSearchTurnEffects({
   players = [],
   viewerSeat,
   timeRemaining,
+  roundNumber = 1,
 }) {
   const [showTurnSplash, setShowTurnSplash] = useState(false);
+  const [splashKind, setSplashKind] = useState('next');
   const timerRef = useRef(null);
+  const previousSeatRef = useRef(null);
+  const previousRoundRef = useRef(null);
 
   const activePlayer = useMemo(
     () => players.find((player) => Number(player.seatNumber) === Number(activeSeat)) || null,
@@ -43,13 +47,22 @@ export default function WordSearchTurnEffects({
       return undefined;
     }
 
+    const isRoundStart =
+      previousRoundRef.current !== Number(roundNumber) ||
+      previousSeatRef.current === null;
+
+    setSplashKind(isRoundStart ? 'round' : 'next');
     setShowTurnSplash(true);
+
+    previousSeatRef.current = Number(activeSeat);
+    previousRoundRef.current = Number(roundNumber);
+
     timerRef.current = window.setTimeout(() => {
       setShowTurnSplash(false);
-    }, 1450);
+    }, isRoundStart ? 1850 : 1450);
 
     return () => clearTimeout(timerRef.current);
-  }, [activeSeat, mode, paused, phase]);
+  }, [activeSeat, mode, paused, phase, roundNumber]);
 
   if (mode !== 'turn' || phase !== 'playing') return null;
 
@@ -105,22 +118,22 @@ export default function WordSearchTurnEffects({
 
       {showTurnSplash && (
         <div
-          className="ws-turn-splash pointer-events-none fixed left-1/2 top-[72px] z-[90] -translate-x-1/2"
-          style={{ animation: 'ws-turn-enter 1.45s ease-out forwards' }}
+          className="ws-turn-splash pointer-events-none absolute inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ animation: `ws-turn-enter ${splashKind === 'round' ? '1.85s' : '1.45s'} ease-out forwards` }}
           aria-live="polite"
         >
           <div
-            className="rounded-2xl border-2 bg-[#070311]/94 px-7 py-4 text-center backdrop-blur-md"
+            className="rounded-2xl border-2 bg-[#070311]/96 px-7 py-5 text-center backdrop-blur-md"
             style={{
               borderColor: activeColor,
-              boxShadow: `0 0 34px ${activeColor}66, inset 0 0 22px ${activeColor}16`,
+              boxShadow: `0 0 42px ${activeColor}77, inset 0 0 26px ${activeColor}1f`,
             }}
           >
             <div
-              className="text-[7px] tracking-[0.28em] text-white/45 uppercase"
+              className="text-[7px] tracking-[0.28em] text-white/50 uppercase"
               style={PS2}
             >
-              NEXT PLAYER
+              {splashKind === 'round' ? `ROUND ${roundNumber} START` : 'NEXT PLAYER'}
             </div>
             <div
               className="mt-2 whitespace-nowrap text-sm sm:text-lg tracking-widest"
@@ -141,7 +154,7 @@ export default function WordSearchTurnEffects({
 
       {showCountdown && (
         <div
-          className="pointer-events-none fixed bottom-5 right-5 z-[95] sm:bottom-7 sm:right-7"
+          className="pointer-events-none absolute bottom-4 right-4 z-[70] sm:bottom-5 sm:right-5"
           aria-live="assertive"
         >
           <div
