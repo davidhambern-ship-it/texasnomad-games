@@ -304,13 +304,33 @@ export default function PreviewHostPanel() {
     }
   }
 
-  function continueWithoutDisplay() {
-    localStorage.setItem('tng_player_test_mode', '1');
-    setPlayerTestMode(true);
-    setPairing(null);
-    setRepairingDisplay(false);
+  async function continueWithoutDisplay() {
+    if (!pairing?.code || !controllerId || busy) return;
+
+    setBusy(true);
     setError('');
-    setPhase('ready');
+
+    try {
+      // Pair a virtual test display in the background. This satisfies the
+      // backend's real display requirement without opening a second screen.
+      await tngApi.display.pair(pairing.code);
+
+      localStorage.setItem('tng_player_test_mode', '1');
+      setPlayerTestMode(true);
+      setPairing(null);
+      setRepairingDisplay(false);
+
+      const session = await tngApi.host.startSession(controllerId);
+      setActiveRoom(session.activeRoom || null);
+      setPhase(session.activeRoom ? 'room' : 'ready');
+    } catch (bypassError) {
+      setError(
+        bypassError?.message ||
+          'TNG could not start the no-display live-test session.',
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function createRoom(game) {
@@ -318,11 +338,7 @@ export default function PreviewHostPanel() {
     setError('');
 
     try {
-      const { room } = await tngApi.host.createRoom(
-        controllerId,
-        game.id,
-        playerTestMode,
-      );
+      const { room } = await tngApi.host.createRoom(controllerId, game.id);
       setSelectedGame(game);
       setActiveRoom(room);
       setRoomState(null);
@@ -509,10 +525,11 @@ export default function PreviewHostPanel() {
                     <button
                       type="button"
                       onClick={continueWithoutDisplay}
-                      className="px-5 py-3 rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 text-[#BC13FE] hover:bg-[#BC13FE]/20 transition-all"
+                      disabled={busy}
+                      className="px-5 py-3 rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 text-[#BC13FE] hover:bg-[#BC13FE]/20 transition-all disabled:opacity-50"
                       style={{ ...PS2, fontSize: 8 }}
                     >
-                      CONTINUE WITHOUT DISPLAY
+                      {busy ? 'STARTING TEST MODE…' : 'CONTINUE WITHOUT DISPLAY'}
                     </button>
                     <p className="max-w-md text-xs leading-relaxed text-white/35">
                       Live-test mode only. Use the Host Controller on this device without pairing a separate Game Display.
