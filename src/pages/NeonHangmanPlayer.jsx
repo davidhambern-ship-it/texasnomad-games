@@ -7,6 +7,15 @@ import { tngApi } from '@/api/tngApi';
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
+const HANGMAN_PARTS = [
+  <circle key="head" cx="120" cy="75" r="15" stroke="#FFD700" strokeWidth="3" fill="none" />,
+  <line key="body" x1="120" y1="90" x2="120" y2="140" stroke="#FFD700" strokeWidth="3" />,
+  <line key="arm-l" x1="120" y1="100" x2="90" y2="125" stroke="#FFD700" strokeWidth="3" />,
+  <line key="arm-r" x1="120" y1="100" x2="150" y2="125" stroke="#FFD700" strokeWidth="3" />,
+  <line key="leg-l" x1="120" y1="140" x2="90" y2="175" stroke="#FFD700" strokeWidth="3" />,
+  <line key="leg-r" x1="120" y1="140" x2="150" y2="175" stroke="#FFD700" strokeWidth="3" />,
+];
+
 export default function NeonHangmanPlayer({ roomCode }) {
   const [room, setRoom] = useState(null);
   const [participant, setParticipant] = useState(null);
@@ -149,36 +158,69 @@ export default function NeonHangmanPlayer({ roomCode }) {
           </div>
         )}
 
-        <section className="rounded-2xl border border-[#FFD700]/25 bg-black/55 p-5 text-center">
-          <div className="text-[7px] tracking-widest uppercase text-white/30 mb-2" style={PS2}>
-            CATEGORY
-          </div>
-          <div className="text-lg text-[#FFD700]">{gameState.category || '—'}</div>
-
-          <div className="mt-7 flex justify-center flex-wrap gap-2 sm:gap-3">
-            {maskedLetters.length > 0 ? maskedLetters.map((character, index) => (
-              character === ' '
-                ? <div key={index} className="w-4" />
-                : (
-                  <div
-                    key={index}
-                    className="min-w-9 border-b-2 border-white/30 pb-2 text-2xl sm:text-3xl"
-                    style={PS2}
-                  >
-                    {character}
-                  </div>
-                )
-            )) : (
-              <div className="text-white/30">Waiting for Host to set the board…</div>
-            )}
-          </div>
-
-          {gameState.hintRevealed && (
-            <div className="mt-5 rounded-lg border border-[#BC13FE]/25 bg-[#BC13FE]/5 p-3">
-              <div className="text-[7px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>HINT</div>
-              <div className="mt-2 text-white/65">{gameState.hint}</div>
+        <section className="rounded-2xl border border-[#FFD700]/25 bg-black/55 p-5">
+          <div className="text-center">
+            <div className="text-[7px] tracking-widest uppercase text-white/30 mb-2" style={PS2}>
+              CATEGORY
             </div>
-          )}
+            <div className="text-lg text-[#FFD700]">{gameState.category || '—'}</div>
+          </div>
+
+          <div className="mt-5 flex flex-col md:flex-row items-center justify-center gap-5 md:gap-10">
+            <div className="flex items-center gap-4">
+              <svg
+                viewBox="0 0 180 200"
+                className="w-[180px] h-[200px] shrink-0"
+                role="img"
+                aria-label={`Hangman figure: ${wrongGuesses.length} of ${gameState.maxWrong || 6} wrong guesses`}
+              >
+                <line x1="20" y1="190" x2="160" y2="190" stroke="#ffffff15" strokeWidth="3" />
+                <line x1="60" y1="190" x2="60" y2="10" stroke="#ffffff15" strokeWidth="3" />
+                <line x1="60" y1="10" x2="120" y2="10" stroke="#ffffff15" strokeWidth="3" />
+                <line x1="120" y1="10" x2="120" y2="20" stroke="#ffffff15" strokeWidth="3" />
+                <line x1="120" y1="20" x2="120" y2="60" stroke="#BC13FE" strokeWidth="3" />
+                {HANGMAN_PARTS.slice(0, wrongGuesses.length)}
+              </svg>
+
+              <div className="text-center">
+                <div className="text-4xl text-[#FF5F1F]" style={PS2}>{wrongGuesses.length}</div>
+                <div className="mt-1 text-[8px] tracking-widest uppercase text-white/40" style={PS2}>WRONG</div>
+                <div className="mt-1 text-sm text-white/20" style={PS2}>/ {gameState.maxWrong || 6}</div>
+              </div>
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex justify-center flex-wrap gap-2 sm:gap-3">
+                {maskedLetters.length > 0 ? maskedLetters.map((character, index) => (
+                  character === ' '
+                    ? <div key={index} className="w-4" />
+                    : (
+                      <div key={index} className="flex flex-col items-center gap-1">
+                        <span
+                          className="min-w-[1.5ch] text-center text-3xl sm:text-4xl font-bold text-[#FFD700]"
+                          style={{
+                            ...PS2,
+                            textShadow: character !== '_' ? '0 0 15px rgba(255,215,0,0.5)' : 'none',
+                          }}
+                        >
+                          {character}
+                        </span>
+                        <div className="h-0.5 w-full bg-[#FFD700]/40 rounded" />
+                      </div>
+                    )
+                )) : (
+                  <div className="text-white/30">Waiting for Host to set the board…</div>
+                )}
+              </div>
+
+              {gameState.hintRevealed && (
+                <div className="mt-5 rounded-lg border border-[#BC13FE]/25 bg-[#BC13FE]/5 p-3 text-center">
+                  <div className="text-[7px] tracking-widest text-[#BC13FE] uppercase" style={PS2}>HINT</div>
+                  <div className="mt-2 text-white/65">{gameState.hint}</div>
+                </div>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="grid gap-3 sm:grid-cols-3">
