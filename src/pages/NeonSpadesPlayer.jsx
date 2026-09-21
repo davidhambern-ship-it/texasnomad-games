@@ -9,6 +9,12 @@ import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
+function isValidPlayerParticipant(participant) {
+  const role = String(participant?.role || '').toLowerCase();
+  const seatNumber = Number(participant?.seatNumber || 0);
+  return role === 'player' && seatNumber !== 1;
+}
+
 export default function NeonSpadesPlayer({ roomCode }) {
   const [room, setRoom] = useState(null);
   const [participant, setParticipant] = useState(null);
@@ -49,6 +55,17 @@ export default function NeonSpadesPlayer({ roomCode }) {
 
     try {
       const payload = await tngApi.spades.getPlayerState(deviceId, roomCode);
+
+      if (payload?.participant && !isValidPlayerParticipant(payload.participant)) {
+        setRoom(payload.room || null);
+        setParticipant(null);
+        setHand([]);
+        setError(
+          'This TNG account is the Host for this room. Use a different TNG account to join as a player.',
+        );
+        return;
+      }
+
       setRoom(payload.room);
       setParticipant(payload.participant);
       setHand(payload.hand || []);
@@ -72,6 +89,16 @@ export default function NeonSpadesPlayer({ roomCode }) {
         action,
         payload,
       );
+
+      if (result?.participant && !isValidPlayerParticipant(result.participant)) {
+        setParticipant(null);
+        setHand([]);
+        setError(
+          'This TNG account is the Host for this room. Use a different TNG account to join as a player.',
+        );
+        return false;
+      }
+
       setRoom(result.room);
       setParticipant(result.participant);
       setHand(result.hand || []);
@@ -235,6 +262,33 @@ export default function NeonSpadesPlayer({ roomCode }) {
           <Link to={`/join/${roomCode}`} className="text-[#FFD700] underline">
             Rejoin room {roomCode}
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !participant) {
+    return (
+      <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center px-4 text-center">
+        <div className="max-w-lg rounded-2xl border border-red-500/35 bg-red-500/5 p-6">
+          <div className="mb-3 text-sm font-bold tracking-widest text-red-400 uppercase" style={PS2}>
+            PLAYER SESSION BLOCKED
+          </div>
+          <div className="text-sm leading-relaxed text-white/70">{error}</div>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to={`/join/${roomCode}`}
+              className="rounded-lg border border-[#FFD700]/60 px-4 py-2 text-[#FFD700]"
+            >
+              TRY PLAYER JOIN AGAIN
+            </Link>
+            <Link
+              to="/login"
+              className="rounded-lg border border-[#BC13FE]/60 px-4 py-2 text-[#BC13FE]"
+            >
+              SIGN IN WITH ANOTHER ACCOUNT
+            </Link>
+          </div>
         </div>
       </div>
     );
