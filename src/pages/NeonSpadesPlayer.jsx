@@ -172,139 +172,9 @@ export default function NeonSpadesPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen bg-[#070311] text-white lg:h-screen lg:overflow-hidden">
-      <main className="lg:grid lg:h-full lg:grid-cols-[310px_minmax(0,1fr)]">
-        <aside className="border-b border-[#BC13FE]/30 bg-black/35 p-5 lg:h-full lg:overflow-y-auto lg:border-b-0 lg:border-r">
-          <div className="border-b border-white/10 pb-5">
-            <div className="text-[8px] uppercase tracking-[0.22em] text-[#BC13FE]" style={PS2}>
-              TEXASNOMAD SPADES
-            </div>
-            <div className="mt-2 text-[7px] uppercase tracking-[0.18em] text-white/30" style={PS2}>
-              PLAYER VIEW
-            </div>
-            <div className="mt-5">
-              <div className="text-[6px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
-                ROOM
-              </div>
-              <div className="mt-1 font-mono text-2xl tracking-[0.18em] text-[#FFD700]">
-                {roomCode}
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-                <div className="text-[6px] uppercase text-white/25" style={PS2}>SEAT</div>
-                <div className="mt-1 text-lg text-white">{mySeat || '—'}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
-                <div className="text-[6px] uppercase text-white/25" style={PS2}>STATUS</div>
-                <div className={`mt-1 text-sm uppercase ${isMyTurn ? 'text-green-400' : 'text-white/55'}`}>
-                  {isMyTurn ? 'YOUR TURN' : String(phase).replace(/_/g, ' ')}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
-              {error}
-            </div>
-          )}
-
-          {!mySeat && (
-            <div className="mt-4 rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/5 p-3 text-center">
-              <div className="text-[6px] uppercase leading-relaxed tracking-[0.14em] text-[#BC13FE]" style={PS2}>
-                CHOOSE SEAT 2, 3, OR 4 ON THE TABLE
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5 space-y-3">
-            <div
-              className="rounded-xl border-2 p-4"
-              style={{
-                borderColor: mySeat === 1 || mySeat === 3 ? '#FFD700' : 'rgba(188,19,254,.35)',
-                background: 'rgba(188,19,254,.05)',
-              }}
-            >
-              <div className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
-                {teamOne.name}
-              </div>
-              <div className="mt-2 text-3xl font-bold text-[#BC13FE]">{teamOne.score}</div>
-              <div className="mt-2 text-xs text-white/35">
-                Bid {teamOne.bid} · Books {teamOne.books}
-              </div>
-              <div className="mt-1 text-[10px] text-white/20">Seats 1 & 3</div>
-            </div>
-
-            <div
-              className="rounded-xl border-2 p-4"
-              style={{
-                borderColor: mySeat === 2 || mySeat === 4 ? '#FFD700' : 'rgba(255,95,31,.35)',
-                background: 'rgba(255,95,31,.05)',
-              }}
-            >
-              <div className="text-[7px] uppercase tracking-[0.16em] text-[#FF5F1F]" style={PS2}>
-                {teamTwo.name}
-              </div>
-              <div className="mt-2 text-3xl font-bold text-[#FF5F1F]">{teamTwo.score}</div>
-              <div className="mt-2 text-xs text-white/35">
-                Bid {teamTwo.bid} · Books {teamTwo.books}
-              </div>
-              <div className="mt-1 text-[10px] text-white/20">Seats 2 & 4</div>
-            </div>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-4">
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <div className="text-[6px] uppercase text-white/25" style={PS2}>BOOK</div>
-                <div className="mt-2 text-sm text-[#FFD700]">{bookNumber}/13</div>
-              </div>
-              <div>
-                <div className="text-[6px] uppercase text-white/25" style={PS2}>SUIT</div>
-                <div className="mt-2 text-lg text-[#FFD700]">{activeSuit}</div>
-              </div>
-              <div>
-                <div className="text-[6px] uppercase text-white/25" style={PS2}>SPADES</div>
-                <div className={`mt-2 text-[10px] ${gameState.spadesBroken ? 'text-green-400' : 'text-red-400'}`}>
-                  {gameState.spadesBroken ? 'BROKEN' : 'INTACT'}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5">
-            <div className="mb-2 text-[6px] uppercase tracking-[0.16em] text-white/25" style={PS2}>
-              TABLE
-            </div>
-            <div className="space-y-2">
-              {[1, 2, 3, 4].map((seat) => {
-                const player = (tableState.players || []).find((item) => Number(item.seatNumber) === seat);
-                return (
-                  <div
-                    key={seat}
-                    className="flex items-center justify-between rounded-lg border border-white/[0.07] bg-white/[0.02] px-3 py-2"
-                  >
-                    <div>
-                      <div className="text-xs text-white/65">
-                        {player?.name || `Seat ${seat}`}
-                      </div>
-                      <div className="text-[10px] text-white/25">
-                        Seat {seat} · {player?.playerType === 'cpu' ? 'CPU' : seat === 1 ? 'Host' : 'Player'}
-                      </div>
-                    </div>
-                    <div className="text-xs text-[#FFD700]">
-                      {Number(player?.cardCount || 0)} cards
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </aside>
-
-        <section className="min-w-0 p-3 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden lg:p-4">
-          <div className="w-full max-w-[700px]">
+      <main className="mx-auto flex min-h-screen max-w-[1700px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4">
+        <section className="order-1 min-w-0 flex-1 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
+          <div className="w-full">
             <SpadesTable
               gs={tableState}
               playerId={neonPlayerId}
@@ -331,6 +201,145 @@ export default function NeonSpadesPlayer({ roomCode }) {
             />
           </div>
         </section>
+
+        <aside className="order-2 shrink-0 lg:flex lg:h-full lg:w-[390px] lg:items-center">
+          <div className="grid w-full grid-cols-2 gap-2 self-center">
+            <div className="col-span-2 rounded-xl border border-[#BC13FE]/30 bg-black/55 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[6px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
+                    ROOM
+                  </div>
+                  <div className="mt-1 font-mono text-xl tracking-[0.18em] text-[#FFD700]">
+                    {roomCode}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[6px] uppercase tracking-[0.18em] text-[#BC13FE]" style={PS2}>
+                    TEXASNOMAD SPADES
+                  </div>
+                  <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/25">
+                    Player View
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-white/10 bg-black/45 p-3">
+              <div className="text-[6px] uppercase tracking-[0.14em] text-white/25" style={PS2}>SEAT</div>
+              <div className="mt-1 text-xl text-white">{mySeat || '—'}</div>
+            </div>
+
+            <div
+              className="rounded-xl border bg-black/45 p-3"
+              style={{ borderColor: isMyTurn ? 'rgba(74,222,128,.55)' : 'rgba(255,255,255,.10)' }}
+            >
+              <div className="text-[6px] uppercase tracking-[0.14em] text-white/25" style={PS2}>STATUS</div>
+              <div className={`mt-1 text-xs uppercase ${isMyTurn ? 'text-green-400' : 'text-white/55'}`}>
+                {isMyTurn ? 'YOUR TURN' : String(phase).replace(/_/g, ' ')}
+              </div>
+            </div>
+
+            <div
+              className="rounded-xl border-2 bg-black/50 p-3"
+              style={{
+                borderColor: mySeat === 1 || mySeat === 3 ? '#FFD700' : 'rgba(188,19,254,.35)',
+              }}
+            >
+              <div className="text-[6px] uppercase tracking-[0.14em] text-[#BC13FE]" style={PS2}>
+                {teamOne.name}
+              </div>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <div className="text-2xl font-bold text-[#BC13FE]">{teamOne.score}</div>
+                <div className="text-right text-[9px] leading-4 text-white/30">
+                  <div>Bid {teamOne.bid}</div>
+                  <div>Books {teamOne.books}</div>
+                </div>
+              </div>
+              <div className="mt-1 text-[8px] text-white/20">Seats 1 & 3</div>
+            </div>
+
+            <div
+              className="rounded-xl border-2 bg-black/50 p-3"
+              style={{
+                borderColor: mySeat === 2 || mySeat === 4 ? '#FFD700' : 'rgba(255,95,31,.35)',
+              }}
+            >
+              <div className="text-[6px] uppercase tracking-[0.14em] text-[#FF5F1F]" style={PS2}>
+                {teamTwo.name}
+              </div>
+              <div className="mt-1 flex items-end justify-between gap-2">
+                <div className="text-2xl font-bold text-[#FF5F1F]">{teamTwo.score}</div>
+                <div className="text-right text-[9px] leading-4 text-white/30">
+                  <div>Bid {teamTwo.bid}</div>
+                  <div>Books {teamTwo.books}</div>
+                </div>
+              </div>
+              <div className="mt-1 text-[8px] text-white/20">Seats 2 & 4</div>
+            </div>
+
+            <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-3 text-center">
+              <div className="text-[6px] uppercase tracking-[0.12em] text-white/25" style={PS2}>BOOK</div>
+              <div className="mt-1 text-sm text-[#FFD700]">{bookNumber}/13</div>
+            </div>
+
+            <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-3 text-center">
+              <div className="text-[6px] uppercase tracking-[0.12em] text-white/25" style={PS2}>SUIT</div>
+              <div className="mt-1 text-lg text-[#FFD700]">{activeSuit}</div>
+            </div>
+
+            <div className="col-span-2 rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/5 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[6px] uppercase tracking-[0.12em] text-white/25" style={PS2}>SPADES</div>
+                <div className={`text-[10px] font-bold ${gameState.spadesBroken ? 'text-green-400' : 'text-red-400'}`}>
+                  {gameState.spadesBroken ? 'BROKEN' : 'INTACT'}
+                </div>
+              </div>
+            </div>
+
+            {(tableState.players || []).map((player) => {
+              const seat = Number(player.seatNumber);
+              const isMe = seat === mySeat;
+              return (
+                <div
+                  key={seat}
+                  className="rounded-xl border bg-black/45 p-2.5"
+                  style={{
+                    borderColor: isMe ? '#FFD700' : 'rgba(255,255,255,.08)',
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="truncate text-[11px] text-white/70">
+                        {isMe ? 'YOU' : (player.name || `Seat ${seat}`)}
+                      </div>
+                      <div className="mt-1 text-[8px] text-white/25">
+                        S{seat} · {player.playerType === 'cpu' ? 'CPU' : seat === 1 ? 'HOST' : 'PLAYER'}
+                      </div>
+                    </div>
+                    <div className="shrink-0 text-[10px] text-[#FFD700]">
+                      {Number(player.cardCount || 0)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {error && (
+              <div className="col-span-2 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-400">
+                {error}
+              </div>
+            )}
+
+            {!mySeat && (
+              <div className="col-span-2 rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/5 p-3 text-center">
+                <div className="text-[6px] uppercase leading-relaxed tracking-[0.14em] text-[#BC13FE]" style={PS2}>
+                  CHOOSE SEAT 2, 3, OR 4 ON THE TABLE
+                </div>
+              </div>
+            )}
+          </div>
+        </aside>
       </main>
     </div>
   );
