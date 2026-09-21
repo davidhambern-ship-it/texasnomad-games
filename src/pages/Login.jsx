@@ -33,6 +33,8 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 }
 
 export default function Login() {
+  const requestedNext = new URLSearchParams(window.location.search).get('next');
+  const nextPath = requestedNext?.startsWith('/') && !requestedNext.startsWith('//') ? requestedNext : '/';
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -55,8 +57,8 @@ export default function Login() {
   const handleGoogle = async () => {
     setError('');
     try {
-      if (backendMigration.tngBackendEnabled) await signInWithGoogle();
-      else base44.auth.loginWithProvider("google", "/");
+      if (backendMigration.tngBackendEnabled) await signInWithGoogle(nextPath);
+      else base44.auth.loginWithProvider("google", nextPath);
     } catch (err) {
       setError(err.message || 'Google sign-in could not start.');
     }
