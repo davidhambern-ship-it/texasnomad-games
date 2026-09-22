@@ -1,6 +1,7 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
+// Direct Neon Auth transport; do not proxy this through Vercel.
 export const NEON_AUTH_URL =
   import.meta.env.VITE_NEON_AUTH_URL ||
   'https://ep-hidden-wave-avehvh0z.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
