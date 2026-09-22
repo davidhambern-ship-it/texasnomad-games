@@ -310,7 +310,7 @@ function LiveStatusInline() {
     .filter(Boolean)
     .join('\n\n');
 
-  const crawlDuration = Math.max(85, Math.ceil(storyText.length / 24));
+  const crawlDuration = Math.max(120, Math.ceil(storyText.length / 18));
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px] flex flex-col cursor-default">
