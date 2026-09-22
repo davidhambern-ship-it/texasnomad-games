@@ -93,6 +93,7 @@ export default function NeonWordSearchBoard({
   canInteract = false,
   onSubmit,
   maxBoardPx = 650,
+  zoom = 1,
 }) {
   const [start, setStart] = useState(null);
   const [preview, setPreview] = useState([]);
@@ -124,7 +125,11 @@ export default function NeonWordSearchBoard({
   const availableHeight = isPortraitPhone
     ? availableWidth
     : Math.max(260, Math.min(maxBoardPx, viewportHeight - (isPhone ? 110 : 190)));
-  const boardPx = Math.min(availableWidth, availableHeight);
+  const baseBoardPx = Math.min(availableWidth, availableHeight);
+  const boardPx = Math.max(
+    220,
+    Math.min(1400, Math.round(baseBoardPx * Math.max(0.65, Math.min(1.85, Number(zoom) || 1)))),
+  );
   const gap = size >= 20 ? 1 : 2;
   const cellSize = Math.max(12, Math.floor((boardPx - gap * (size - 1) - 16) / size));
 
