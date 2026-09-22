@@ -3,7 +3,7 @@ import React from 'react';
 export function HostWorkspace({ primary, companion, className = '' }) {
   return (
     <section
-      className={`grid min-w-0 grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] ${className}`}
+      className={`grid min-w-0 grid-cols-1 gap-2 min-[560px]:grid-cols-[minmax(0,1fr)_minmax(190px,240px)] min-[560px]:items-start lg:grid-cols-[minmax(0,1fr)_minmax(240px,300px)] xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] ${className}`}
     >
       <div className="min-w-0">{primary}</div>
       <div className="min-w-0">{companion}</div>
@@ -14,7 +14,7 @@ export function HostWorkspace({ primary, companion, className = '' }) {
 export function HostControlDeck({ children, className = '' }) {
   return (
     <section
-      className={`grid gap-2 sm:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-5 ${className}`}
+      className={`grid grid-cols-2 gap-2 min-[680px]:grid-cols-4 xl:grid-cols-5 ${className}`}
     >
       {children}
     </section>
