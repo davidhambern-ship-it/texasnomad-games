@@ -97,42 +97,36 @@ function sendJson(res, status, payload) {
   res.end(body);
 }
 
-async function getBffAuthAccount(req) {
+async function verifyBffHostWithTngApi(req, controllerId) {
   const auth = String(req.headers.authorization || '');
-  const match = auth.match(/^Bearer\s+(.+)$/i);
-  if (!match) return null;
+  if (!auth) return { ok: false, status: 401, payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } } };
 
-  const { rows } = await bffPool.query(`
-    select a.id as account_id, a.email, u.id as auth_user_id, u.name
-    from neon_auth.session s
-    join neon_auth."user" u on u.id = s."userId"
-    join public.accounts a
-      on a.auth_subject = u.id::text
-      or lower(a.email) = lower(u.email)
-    where s.token = $1
-      and s."expiresAt" > now()
-    order by case when a.auth_subject = u.id::text then 0 else 1 end
-    limit 1
-  `, [match[1]]);
+  const response = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+      'X-TNG-Device-Id': controllerId,
+    },
+  });
 
-  return rows[0] || null;
+  const payload = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, payload };
 }
 
-async function loadRailwayBffHostRoom(controllerId, accountId) {
+async function loadRailwayBffHostRoom(controllerId) {
   const { rows } = await bffPool.query(`
     select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
            gr.created_at, gr.updated_at, hs.id as host_session_id
     from public.host_sessions hs
-    join public.device_sessions ds on ds.id = hs.controller_device_id
     join public.game_rooms gr on gr.host_session_id = hs.id
     where hs.controller_device_id = $1::uuid
-      and ds.account_id = $2::uuid
       and hs.status in ('pairing','ready','live')
       and gr.status in ('lobby','live','paused')
       and gr.game_id = 'bff'
     order by gr.updated_at desc
     limit 1
-  `, [controllerId, accountId]);
+  `, [controllerId]);
 
   return rows[0] || null;
 }
@@ -215,19 +209,21 @@ async function handleBffApi(req, res) {
   }
 
   if (req.method === 'GET' && path === '/host') {
-    const account = await getBffAuthAccount(req);
-    if (!account) {
-      sendJson(res, 401, { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } });
-      return;
-    }
-
     const controllerId = String(req.headers['x-tng-device-id'] || '');
     if (!controllerId) {
       sendJson(res, 400, { error: { code: 'CONTROLLER_REQUIRED', message: 'Host controller is missing.' } });
       return;
     }
 
-    const room = await loadRailwayBffHostRoom(controllerId, account.account_id);
+    const verified = await verifyBffHostWithTngApi(req, controllerId);
+    if (!verified.ok) {
+      sendJson(res, verified.status || 401, verified.payload || {
+        error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+      });
+      return;
+    }
+
+    const room = await loadRailwayBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
