@@ -168,9 +168,33 @@ export default function NeonWordSearchPlayer({ roomCode }) {
           </div>
         )}
 
+        <section className="grid grid-cols-3 gap-1.5 lg:hidden">
+          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+            <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
+            <div className="mt-1 text-base text-[#FFD700]" style={PS2}>
+              {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
+            </div>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+            <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
+            <div className="mt-1 text-base text-[#4ade80]" style={PS2}>{foundCount}/{words.length || 0}</div>
+          </div>
+          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+            <div className="text-[5px] text-white/25 uppercase" style={PS2}>YOU</div>
+            <div className="mt-1 text-base" style={{ ...PS2, color: myColor }}>{myScore}</div>
+          </div>
+        </section>
+
+        {phase === 'playing' && canInteract && (
+          <div className="lg:hidden shrink-0 rounded-lg border px-3 py-2 text-center text-[7px] tracking-widest uppercase"
+            style={{ ...PS2, color: myColor, borderColor: `${myColor}55`, background: `${myColor}0b` }}>
+            DRAG ACROSS LETTERS · LIFT TO SUBMIT
+          </div>
+        )}
+
         <main className="min-h-0 flex-1 grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
 
-          <section className="relative min-h-0 rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
+          <section className="relative min-h-0 rounded-xl border border-[#BC13FE]/20 bg-black/45 p-1 sm:p-2 flex items-center justify-center overflow-hidden lg:overflow-auto">
             <WordSearchTurnEffects
               mode={mode}
               phase={phase}
@@ -203,7 +227,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
           <aside className="min-h-0 flex flex-col gap-2">
 
-            <section className="shrink-0 grid grid-cols-3 gap-1.5">
+            <section className="hidden lg:grid shrink-0 grid-cols-3 gap-1.5">
               <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
                 <div className="mt-1 text-xl text-[#FFD700]" style={PS2}>
