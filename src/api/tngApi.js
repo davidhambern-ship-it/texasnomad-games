@@ -223,6 +223,18 @@ export const tngApi = {
       apiBase:BFF_API_BASE,
       body:{ action, ...payload },
     }),
+    getPlayerState: (deviceId, roomCode) => request('/player', {
+      deviceId,
+      roomCode,
+      apiBase:BFF_API_BASE,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      apiBase:BFF_API_BASE,
+      body:{ action, ...payload },
+    }),
   },
   squareBiz: {
     getHostState: (deviceId) => request('/api/square-biz/host', {
