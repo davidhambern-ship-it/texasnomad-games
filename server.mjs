@@ -326,6 +326,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     bye_count: Math.max(0, Math.min(3, Number(gameState.bye_count) || 0)),
     buzzer_phase: gameState.buzzer_phase || null,
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
+    buzz_winner: gameState.buzz_winner || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     answers: safeAnswers,
@@ -673,6 +674,87 @@ function sanitizeBffPlayerState(gameState = {}, players = []) {
   };
 }
 
+async function claimBffBuzz(room, participant) {
+  const client = await bffPool.connect();
+
+  try {
+    await client.query('begin');
+
+    const locked = await client.query(`
+      select id, room_code, game_id, status, revision, display_state, created_at, updated_at
+      from public.game_rooms
+      where id = $1::uuid
+      for update
+    `, [room.id]);
+
+    const lockedRoom = locked.rows[0];
+    if (!lockedRoom) {
+      await client.query('rollback');
+      return { gameState: extractBffGameState(room.display_state || {}), room };
+    }
+
+    const current = extractBffGameState(lockedRoom.display_state || {});
+
+    if (
+      !(current.buzzer_open || current.buzzer_phase === 'buzzer_active')
+      || current.buzz_winner
+    ) {
+      await client.query('commit');
+      return { gameState: current, room: lockedRoom };
+    }
+
+    const teamMap = current.playerTeams || {};
+    const familyTeam =
+      Number(teamMap[participant.accountId] || participant.familyTeam || 0) || null;
+
+    const nextGameState = {
+      ...current,
+      buzzer_open: false,
+      buzzer_phase: 'buzzed',
+      control_team: familyTeam || current.control_team || 1,
+      active_turn: familyTeam || current.active_turn || 1,
+      sound_cue: { name: 'buzz', at: Date.now() },
+      buzz_winner: {
+        playerId: participant.accountId,
+        playerName: participant.playerName || participant.name || 'Player',
+        seatNumber: participant.seatNumber,
+        familyTeam,
+        teamName:
+          familyTeam === 2
+            ? (current.family2 || 'Family 2')
+            : (current.family1 || 'Family 1'),
+        timestamp: Date.now(),
+      },
+    };
+
+    const nextDisplayState = wrapBffGameState(
+      lockedRoom.display_state || {},
+      nextGameState,
+    );
+
+    const updated = await client.query(`
+      update public.game_rooms
+      set display_state = $2::jsonb,
+          revision = revision + 1,
+          updated_at = now()
+      where id = $1::uuid
+      returning id, room_code, game_id, status, revision, display_state, created_at, updated_at
+    `, [room.id, JSON.stringify(nextDisplayState)]);
+
+    await client.query('commit');
+
+    return {
+      gameState: nextGameState,
+      room: updated.rows[0] || lockedRoom,
+    };
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function applyBffPlayerAction(room, participant, body = {}) {
   const action = String(body.action || '').trim();
   const current = extractBffGameState(room.display_state || {});
@@ -837,8 +919,22 @@ async function handleBffApi(req, res) {
     }
 
     const body = await readJsonBody(req).catch(() => ({}));
-    const nextGameState = await applyBffPlayerAction(room, participant, body || {});
-    const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
+
+    let nextGameState;
+    let savedRoom;
+
+    if (String(body?.action || '') === 'buzz') {
+      const claim = await claimBffBuzz(room, participant);
+      nextGameState = claim.gameState;
+      savedRoom = claim.room;
+    } else {
+      nextGameState = await applyBffPlayerAction(room, participant, body || {});
+      savedRoom = await saveBffGameState(
+        room.id,
+        room.display_state || {},
+        nextGameState,
+      );
+    }
 
     players = await loadBffParticipants(room.id, nextGameState);
     const gameState = sanitizeBffPlayerState(nextGameState, players);
