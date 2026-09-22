@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 
 import Header from '@/components/home/Header';
 import Footer from '@/components/home/Footer';
+import { TNG_ORIGIN_STORY } from '@/content/tngOriginStory';
 
 const STEPS = [
   { title: 'SPADES', text: 'One panel. About five people. One question: “Y’all play Spades?” That was the spark.' },
@@ -39,46 +40,32 @@ export default function About() {
             <div className="text-3xl text-cyber-purple">“Y’all play Spades?”</div>
 
             <div className="mt-6 space-y-5 text-[15px] leading-8 text-white/62">
-              <p>
-                TexasNomad <strong className="text-white">LOVES</strong> going LIVE and streaming. But every time he did, something bothered him: hanging out was cool, but it did not always feel like he was putting out real content.
-              </p>
-              <p>
-                As he met more streamers, joined families, sat on panels and watched how people actually used live platforms, he kept noticing the same itch. People wanted to <em>do something together</em>. They wanted real games. The platforms had gifts, battles, mini-features and distractions — but not the kind of games that make a room start arguing, laughing and yelling at each other like family game night.
-              </p>
-              <p>
-                Then one night TexasNomad was sitting on a panel with about five people. Somewhere in the middle of the conversation he asked, <strong className="text-outlaw-gold">“Y’all play Spades?”</strong>
-              </p>
-              <p>
-                Of course they did. Who does not love Spades, right? The problem was simple: if only the platform had an actual deck of cards they could use.
-              </p>
-              <p>
-                The wheels started turning. At first the idea was tiny: design some cards, make the SVGs, bam — cards. Then came the second thought: even if the platform got them, they would probably turn the deck into another monetized feature instead of freely handing people a table and telling them to have fun.
-              </p>
-              <p>
-                TexasNomad was not interested in building another little thing whose whole purpose was squeezing money out of people. He wanted the game.
-              </p>
-              <p>
-                Then the dangerous thought arrived:
-              </p>
-              <div className="rounded-2xl border border-kinetic-orange/35 bg-kinetic-orange/[.05] p-5 text-center text-2xl text-kinetic-orange">
-                “AI’s a thing…”
-              </div>
-              <p>
-                TexasNomad was already familiar with AI and what it could do. Websites? Sure. Images? Obviously. Code? Yep. But actual multiplayer games built around livestreams?
-              </p>
-              <p>
-                Is that a thing?
-              </p>
-              <p>
-                At that point the panel was basically background noise. TexasNomad disappeared down the rabbit hole.
-              </p>
-              <p>
-                Spades led to Hangman. Hangman led to BFF. BFF led to Square Biz! Every answer created three more questions, every game created another game, and before long TexasNomad looked up and realized he was not tinkering with cards anymore.
-              </p>
-              <p className="text-lg text-white">
-                He was lost in a whole <strong className="text-cyber-purple">Digital Arcade.</strong>
-              </p>
-              <p className="pt-2 italic text-cyber-purple/75">— Dexter</p>
+              {TNG_ORIGIN_STORY.map((block, index) => {
+                if (block.type === 'quote') {
+                  return (
+                    <div
+                      key={`${block.type}-${index}`}
+                      className="rounded-2xl border border-kinetic-orange/35 bg-kinetic-orange/[.05] p-5 text-center text-2xl text-kinetic-orange"
+                    >
+                      {block.text}
+                    </div>
+                  );
+                }
+
+                if (block.type === 'signature') {
+                  return <p key={`${block.type}-${index}`} className="pt-2 italic text-cyber-purple/75">{block.text}</p>;
+                }
+
+                const className = block.text === 'He was lost in a whole Digital Arcade.'
+                  ? 'text-lg text-white'
+                  : undefined;
+
+                return (
+                  <p key={`${block.type}-${index}`} className={className}>
+                    {block.text}
+                  </p>
+                );
+              })}
             </div>
           </div>
         </section>
