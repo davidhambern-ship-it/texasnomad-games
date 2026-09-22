@@ -328,12 +328,25 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
     buzz_winner: gameState.buzz_winner || null,
     family_names_set: bffFamilyNamesReady(gameState),
+    mics_ready: bffMicsReady(players, gameState),
     round_stage: gameState.round_stage || 'setup',
     faceoff_players: gameState.faceoff_players || {},
     faceoff_results: gameState.faceoff_results || {},
+    faceoff_attempted: gameState.faceoff_attempted || { 1: [], 2: [] },
+    faceoff_winner_id: gameState.faceoff_winner_id || null,
+    faceoff_winner_team: Number(gameState.faceoff_winner_team) || null,
     faceoff_x_event: gameState.faceoff_x_event || null,
+    play_pass_choice: gameState.play_pass_choice || null,
     active_player_id: gameState.active_player_id || null,
     answer_deadline_at: Number(gameState.answer_deadline_at) || null,
+    consecutive_timeouts: Number(gameState.consecutive_timeouts) || 0,
+    original_playing_team: Number(gameState.original_playing_team) || null,
+    steal_team: Number(gameState.steal_team) || null,
+    match_complete: Boolean(gameState.match_complete),
+    match_tied: Boolean(gameState.match_tied),
+    winning_team: Number(gameState.winning_team) || null,
+    is_tiebreak: Boolean(gameState.is_tiebreak),
+    dysfunction: gameState.dysfunction || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     voice_offers: gameState.voice_offers || {},
@@ -1389,9 +1402,31 @@ function sanitizeBffPlayerState(gameState = {}, players = [], participant = null
     buzz_winner: gameState.buzz_winner || null,
     round_stage: gameState.round_stage || 'setup',
     faceoff_players: gameState.faceoff_players || {},
+    faceoff_winner_id: gameState.faceoff_winner_id || null,
+    faceoff_winner_team: Number(gameState.faceoff_winner_team) || null,
     faceoff_x_event: gameState.faceoff_x_event || null,
+    play_pass_choice: gameState.play_pass_choice || null,
     active_player_id: gameState.active_player_id || null,
     answer_deadline_at: Number(gameState.answer_deadline_at) || null,
+    consecutive_timeouts: Number(gameState.consecutive_timeouts) || 0,
+    original_playing_team: Number(gameState.original_playing_team) || null,
+    steal_team: Number(gameState.steal_team) || null,
+    match_complete: Boolean(gameState.match_complete),
+    match_tied: Boolean(gameState.match_tied),
+    winning_team: Number(gameState.winning_team) || null,
+    is_tiebreak: Boolean(gameState.is_tiebreak),
+    dysfunction: gameState.dysfunction
+      ? {
+          ...gameState.dysfunction,
+          votes:
+            gameState.dysfunction.votes_revealed
+              ? gameState.dysfunction.votes || {}
+              : {},
+          my_vote: participant
+            ? (gameState.dysfunction.votes || {})[participant.accountId || participant.playerId] || null
+            : null,
+        }
+      : null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     voice_answer: participant
