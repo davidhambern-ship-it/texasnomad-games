@@ -427,6 +427,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const hostMicAutoAttemptedRef = useRef(false);
   const hostVoiceMountedRef = useRef(true);
   const publishedVoiceAnswersRef = useRef(new Set());
+  const reportedVoiceLiveRef = useRef(new Set());
   const voiceSignalQueueRef = useRef(Promise.resolve());
 
   const gameState = room?.gameState || {};
@@ -472,19 +473,25 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const voiceSessionLocked = Boolean(gameState.voice_session_locked);
   const assignedPlayers = [...team1, ...team2];
   const backendVoiceReady = gameState.voice_ready || {};
+  const backendVoiceVerified = gameState.voice_verified || {};
   const liveMicsReady = Boolean(
     assignedPlayers.length >= 2
     && team1.length > 0
     && team2.length > 0
     && assignedPlayers.every((player) =>
-      Boolean(voiceConnected[player.playerId] && backendVoiceReady[player.playerId])
+      Boolean(
+        backendVoiceVerified[player.playerId]
+        || (voiceConnected[player.playerId] && backendVoiceReady[player.playerId])
+      )
     )
   );
   const micStatusRows = assignedPlayers.map((player) => {
     const playerId = String(player.playerId);
     const hasOffer = Boolean(gameState.voice_offers?.[playerId]?.sdp);
     const peerLive = Boolean(voiceConnected[playerId]);
-    const backendReady = Boolean(backendVoiceReady[playerId]);
+    const backendReady = Boolean(
+      backendVoiceVerified[playerId] || backendVoiceReady[playerId]
+    );
     return {
       playerId,
       name: player.playerName || player.name || 'Player',
@@ -689,21 +696,26 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
           setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
 
+          if (!live) return;
           if (!publishedVoiceAnswersRef.current.has(String(playerId))) return;
+          if (reportedVoiceLiveRef.current.has(String(playerId))) return;
+
+          reportedVoiceLiveRef.current.add(String(playerId));
 
           queueVoiceHostAction('voice_peer_status', {
             playerId,
-            ready: live,
+            ready: true,
             connectionState: pc.connectionState,
             iceConnectionState: pc.iceConnectionState,
             iceGatheringState: pc.iceGatheringState,
             signalingState: pc.signalingState,
-          }).catch(() => {});
+          }).catch(() => {
+            reportedVoiceLiveRef.current.delete(String(playerId));
+          });
         };
 
         pc.onconnectionstatechange = reportPeerState;
         pc.oniceconnectionstatechange = reportPeerState;
-        pc.onicegatheringstatechange = reportPeerState;
 
         pc.ontrack = (event) => {
           if (!hostVoiceMountedRef.current || event.track.kind !== 'audio') return;
