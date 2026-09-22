@@ -12,7 +12,9 @@ const API_BASE =
 
 const BFF_API_BASE =
   import.meta.env.VITE_BFF_API_BASE ||
-  'https://br-polished-glade-avfsrygs-bffapi.compute.c-11.us-east-1.aws.neon.tech';
+  (IS_RAILWAY_TEMP_HOST
+    ? '/bff-api'
+    : 'https://br-polished-glade-avfsrygs-bffapi.compute.c-11.us-east-1.aws.neon.tech');
 
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
