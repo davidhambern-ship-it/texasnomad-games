@@ -3,6 +3,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { WebSocket, WebSocketServer } from 'ws';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -42,6 +43,20 @@ const bffPool = new Pool({
   max: 5,
   idleTimeoutMillis: 30000,
 });
+
+const bffVoiceWss = new WebSocketServer({ noServer: true });
+const bffVoiceRooms = new Map();
+const bffVoiceActivePlayerByRoom = new Map();
+
+function voiceRoomSet(roomCode) {
+  const key = String(roomCode || '').toUpperCase();
+  if (!bffVoiceRooms.has(key)) bffVoiceRooms.set(key, new Set());
+  return bffVoiceRooms.get(key);
+}
+
+function isUuid(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
 
 async function proxyTngApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
@@ -372,6 +387,9 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     voice_session_players: Array.isArray(gameState.voice_session_players)
       ? gameState.voice_session_players
       : [],
+    voice_relay_connected: gameState.voice_relay_connected || {},
+    voice_relay_host_connected: Boolean(gameState.voice_relay_host_connected),
+    voice_transport: gameState.voice_transport || null,
     answers: safeAnswers,
     players,
   };
@@ -389,7 +407,181 @@ async function saveBffGameState(roomId, originalDisplayState, nextGameState) {
     returning id, room_code, game_id, status, revision, display_state, created_at, updated_at
   `, [roomId, JSON.stringify(nextDisplayState)]);
 
-  return rows[0] || null;
+  const saved = rows[0] || null;
+  if (saved?.room_code) {
+    bffVoiceActivePlayerByRoom.set(
+      String(saved.room_code).toUpperCase(),
+      nextGameState.active_player_id ? String(nextGameState.active_player_id) : null,
+    );
+  }
+
+  return saved;
+}
+
+async function setBffVoiceRelayPresence(roomId, roomCode, role, playerId, connected) {
+  const client = await bffPool.connect();
+
+  try {
+    await client.query('begin');
+    const locked = await client.query(`
+      select id, room_code, display_state
+      from public.game_rooms
+      where id = $1::uuid
+      for update
+    `, [roomId]);
+
+    const row = locked.rows[0];
+    if (!row) {
+      await client.query('rollback');
+      return;
+    }
+
+    const gameState = extractBffGameState(row.display_state || {});
+    gameState.voice_transport = 'railway-websocket';
+
+    if (role === 'host') {
+      gameState.voice_relay_host_connected = Boolean(connected);
+    } else if (playerId) {
+      gameState.voice_relay_connected = {
+        ...(gameState.voice_relay_connected || {}),
+        [String(playerId)]: Boolean(connected),
+      };
+
+      if (connected) {
+        gameState.voice_verified = {
+          ...(gameState.voice_verified || {}),
+          [String(playerId)]: true,
+        };
+        gameState.voice_ready = {
+          ...(gameState.voice_ready || {}),
+          [String(playerId)]: true,
+        };
+      }
+    }
+
+    const nextDisplayState = wrapBffGameState(row.display_state || {}, gameState);
+    await client.query(`
+      update public.game_rooms
+      set display_state = $2::jsonb,
+          revision = revision + 1,
+          updated_at = now()
+      where id = $1::uuid
+    `, [roomId, JSON.stringify(nextDisplayState)]);
+
+    bffVoiceActivePlayerByRoom.set(
+      String(roomCode || row.room_code || '').toUpperCase(),
+      gameState.active_player_id ? String(gameState.active_player_id) : null,
+    );
+
+    await client.query('commit');
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    console.error('[BFF Voice Relay] presence update failed', error);
+  } finally {
+    client.release();
+  }
+}
+
+async function resolveBffVoiceSocket(url) {
+  const roomCode = String(url.searchParams.get('room') || '').toUpperCase();
+  const role = String(url.searchParams.get('role') || '');
+  const identity = String(url.searchParams.get('id') || '');
+
+  if (!roomCode || !['host', 'player'].includes(role) || !isUuid(identity)) {
+    return null;
+  }
+
+  if (role === 'host') {
+    const { rows } = await bffPool.query(`
+      select gr.id, gr.room_code, gr.display_state
+      from public.host_sessions hs
+      join public.game_rooms gr on gr.host_session_id = hs.id
+      where hs.controller_device_id = $1::uuid
+        and hs.status in ('pairing','ready','live')
+        and gr.room_code = $2
+        and gr.game_id = 'bff'
+        and gr.status in ('lobby','live','paused')
+      order by gr.updated_at desc
+      limit 1
+    `, [identity, roomCode]);
+
+    const room = rows[0];
+    if (!room) return null;
+
+    const gameState = extractBffGameState(room.display_state || {});
+    bffVoiceActivePlayerByRoom.set(
+      roomCode,
+      gameState.active_player_id ? String(gameState.active_player_id) : null,
+    );
+
+    return {
+      roomId: room.id,
+      roomCode,
+      role: 'host',
+      identity,
+      playerId: null,
+    };
+  }
+
+  const { rows } = await bffPool.query(`
+    select gr.id, gr.room_code, gr.display_state, rp.account_id
+    from public.game_rooms gr
+    join public.room_participants rp on rp.room_id = gr.id
+    where gr.room_code = $1
+      and gr.game_id = 'bff'
+      and gr.status in ('lobby','live','paused')
+      and rp.device_session_id = $2::uuid
+      and rp.left_at is null
+    order by gr.updated_at desc
+    limit 1
+  `, [roomCode, identity]);
+
+  const room = rows[0];
+  if (!room) return null;
+
+  const gameState = extractBffGameState(room.display_state || {});
+  bffVoiceActivePlayerByRoom.set(
+    roomCode,
+    gameState.active_player_id ? String(gameState.active_player_id) : null,
+  );
+
+  return {
+    roomId: room.id,
+    roomCode,
+    role: 'player',
+    identity,
+    playerId: String(room.account_id),
+  };
+}
+
+function relayBffVoiceFrame(sender, data) {
+  const room = voiceRoomSet(sender.roomCode);
+  if (!Buffer.isBuffer(data) && !(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) {
+    return;
+  }
+
+  if (sender.role === 'player') {
+    const activePlayerId = bffVoiceActivePlayerByRoom.get(sender.roomCode);
+    if (!activePlayerId || String(activePlayerId) !== String(sender.playerId)) {
+      return;
+    }
+  }
+
+  const sourceKind = sender.role === 'host' ? 1 : 2;
+  const source = Buffer.isBuffer(data)
+    ? data
+    : Buffer.from(data.buffer || data, data.byteOffset || 0, data.byteLength || undefined);
+  const packet = Buffer.allocUnsafe(1 + source.length);
+  packet.writeUInt8(sourceKind, 0);
+  source.copy(packet, 1);
+
+  for (const client of room) {
+    if (client.ws === sender.ws) continue;
+    if (client.ws.readyState !== WebSocket.OPEN) continue;
+    try {
+      client.ws.send(packet, { binary: true });
+    } catch {}
+  }
 }
 
 function ensureBffAnswerSlot(answers, index) {
@@ -543,12 +735,15 @@ function bffMicsReady(players = [], gameState = {}) {
     return assigned.every((player) => lockedIds.has(String(player.playerId)));
   }
 
-  const offers = gameState.voice_offers || {};
   const verified = gameState.voice_verified || {};
+  const relayConnected = gameState.voice_relay_connected || {};
 
   return assigned.every((player) => {
     const playerId = String(player.playerId);
-    return Boolean(offers[playerId]?.sdp && verified[playerId] === true);
+    return Boolean(
+      relayConnected[playerId] === true
+      || verified[playerId] === true
+    );
   });
 }
 
@@ -2206,6 +2401,77 @@ const server = http.createServer(async (req, res) => {
     console.error('[TNG temp host] request failed', error);
     res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
     res.end('TNG staging host error');
+  }
+});
+
+bffVoiceWss.on('connection', (ws, request, meta) => {
+  const client = { ws, ...meta };
+  const room = voiceRoomSet(meta.roomCode);
+  room.add(client);
+
+  ws.send(JSON.stringify({
+    type: 'voice-ready',
+    transport: 'railway-websocket',
+    role: meta.role,
+  }));
+
+  setBffVoiceRelayPresence(
+    meta.roomId,
+    meta.roomCode,
+    meta.role,
+    meta.playerId,
+    true,
+  ).catch(() => {});
+
+  ws.on('message', (data, isBinary) => {
+    if (!isBinary) return;
+    relayBffVoiceFrame(client, data);
+  });
+
+  ws.on('close', () => {
+    room.delete(client);
+
+    if (!room.size) bffVoiceRooms.delete(meta.roomCode);
+
+    const sameIdentityStillConnected = [...room].some((entry) =>
+      entry.role === meta.role
+      && String(entry.playerId || entry.identity) === String(meta.playerId || meta.identity)
+      && entry.ws.readyState === WebSocket.OPEN
+    );
+
+    if (!sameIdentityStillConnected) {
+      setBffVoiceRelayPresence(
+        meta.roomId,
+        meta.roomCode,
+        meta.role,
+        meta.playerId,
+        false,
+      ).catch(() => {});
+    }
+  });
+});
+
+server.on('upgrade', async (request, socket, head) => {
+  try {
+    const url = new URL(request.url || '/', 'http://localhost');
+    if (url.pathname !== '/bff-voice') {
+      socket.destroy();
+      return;
+    }
+
+    const meta = await resolveBffVoiceSocket(url);
+    if (!meta) {
+      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+      socket.destroy();
+      return;
+    }
+
+    bffVoiceWss.handleUpgrade(request, socket, head, (ws) => {
+      bffVoiceWss.emit('connection', ws, request, meta);
+    });
+  } catch (error) {
+    console.error('[BFF Voice Relay] upgrade failed', error);
+    socket.destroy();
   }
 });
 
