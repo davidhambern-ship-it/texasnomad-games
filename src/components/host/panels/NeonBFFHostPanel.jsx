@@ -659,16 +659,29 @@ export default function NeonBFFHostPanel({ controllerId }) {
         const silentHostTrack = silentBase.clone();
         const silentSpeakerTrack = silentBase.clone();
 
-        pc.onconnectionstatechange = () => {
+        const reportPeerState = () => {
           if (cancelled) return;
-          const live = ['connected', 'completed'].includes(pc.connectionState);
+
+          const live =
+            pc.connectionState === 'connected'
+            || pc.iceConnectionState === 'connected'
+            || pc.iceConnectionState === 'completed';
+
           setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
 
           tngApi.bff.hostAction(controllerId, 'voice_peer_status', {
             playerId,
             ready: live,
+            connectionState: pc.connectionState,
+            iceConnectionState: pc.iceConnectionState,
+            iceGatheringState: pc.iceGatheringState,
+            signalingState: pc.signalingState,
           }).catch(() => {});
         };
+
+        pc.onconnectionstatechange = reportPeerState;
+        pc.oniceconnectionstatechange = reportPeerState;
+        pc.onicegatheringstatechange = reportPeerState;
 
         pc.ontrack = (event) => {
           if (cancelled || event.track.kind !== 'audio') return;
@@ -702,12 +715,22 @@ export default function NeonBFFHostPanel({ controllerId }) {
         await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
 
         const transceivers = pc.getTransceivers();
+        const playerTransceiver = transceivers[0] || null;
         const hostTransceiver = transceivers[1] || null;
         const speakerTransceiver = transceivers[2] || null;
 
-        if (!hostTransceiver?.sender || !speakerTransceiver?.sender) {
+        if (!playerTransceiver || !hostTransceiver?.sender || !speakerTransceiver?.sender) {
           throw new Error('BFF voice negotiation did not expose the expected audio channels.');
         }
+
+        // The player offers:
+        //   0 = sendonly microphone
+        //   1 = recvonly Host audio
+        //   2 = recvonly active-player audio
+        // The Host answer must explicitly mirror those directions.
+        playerTransceiver.direction = 'recvonly';
+        hostTransceiver.direction = 'sendonly';
+        speakerTransceiver.direction = 'sendonly';
 
         const hostTrack = hostMicTrackRef.current || silentHostTrack;
         await hostTransceiver.sender.replaceTrack(hostTrack);
