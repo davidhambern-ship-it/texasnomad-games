@@ -79,7 +79,8 @@
     "vaul": "^1.1.2",
     "zod": "^3.24.2",
     "@neondatabase/auth": "0.5.0-beta",
-    "pg": "^8.16.3"
+    "pg": "^8.16.3",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
