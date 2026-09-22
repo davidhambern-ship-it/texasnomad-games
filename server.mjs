@@ -673,8 +673,6 @@ function bffResolveFaceoffControl(gameState, players, winnerPlayerId) {
   gameState.active_player_id = winnerPlayerId;
 
   if (gameState.is_tiebreak) {
-    gameState.score1 = Number(gameState.score1 || 0) + (team === 1 ? 1 : 0);
-    gameState.score2 = Number(gameState.score2 || 0) + (team === 2 ? 1 : 0);
     gameState.match_complete = true;
     gameState.match_tied = false;
     gameState.winning_team = team;
@@ -1000,6 +998,7 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.buzz_winner = null;
     next.active_player_id = null;
     next.answer_deadline_at = null;
+    next.faceoff_players = {};
     next.faceoff_results = {};
     next.faceoff_attempted = { 1: [], 2: [] };
     next.faceoff_x_event = null;
