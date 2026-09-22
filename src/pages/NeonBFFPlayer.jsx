@@ -74,6 +74,19 @@ export default function NeonBFFPlayer({ roomCode }) {
   const controlTeam = Number(gameState.control_team || gameState.active_turn || 1) === 2 ? 2 : 1;
   const buzzWinner = gameState.buzz_winner || null;
   const buzzerOpen = Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active');
+  const faceoffPlayers = gameState.faceoff_players || {};
+  const selectedFaceoffIds = [
+    faceoffPlayers['1'] || faceoffPlayers[1] || null,
+    faceoffPlayers['2'] || faceoffPlayers[2] || null,
+  ].filter(Boolean);
+  const isFaceoffPlayer = selectedFaceoffIds.some(
+    (playerId) => String(playerId) === String(myAccountId || ''),
+  );
+  const canBuzz = Boolean(
+    buzzerOpen
+    && isFaceoffPlayer
+    && !buzzWinner
+  );
   const iWonBuzz = Boolean(
     buzzWinner
     && myAccountId
@@ -243,7 +256,7 @@ export default function NeonBFFPlayer({ roomCode }) {
   }, [deviceId, micBusy, roomCode]);
 
   const buzz = useCallback(async () => {
-    if (!deviceId || !roomCode || !buzzerOpen || buzzWinner || busy) return;
+    if (!deviceId || !roomCode || !canBuzz || busy) return;
 
     setBusy(true);
     setError('');
@@ -257,7 +270,7 @@ export default function NeonBFFPlayer({ roomCode }) {
     } finally {
       setBusy(false);
     }
-  }, [busy, buzzerOpen, buzzWinner, deviceId, roomCode]);
+  }, [busy, canBuzz, deviceId, roomCode]);
 
   const status = useMemo(
     () => statusFor(gameState, myTeam, buzzWinner),
@@ -367,45 +380,6 @@ export default function NeonBFFPlayer({ roomCode }) {
           {micOn ? 'LIVE MIC · HOST CAN HEAR YOU' : 'TURN MIC ON SO THE HOST CAN HEAR YOUR ANSWER'}
         </div>
 
-        {buzzerOpen && !buzzWinner && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={buzz}
-            className="relative min-h-[92px] overflow-hidden rounded-2xl border-2 border-[#FF174D] bg-[#FF174D]/12 px-4 py-3 text-center disabled:opacity-40"
-            style={{ boxShadow: '0 0 30px rgba(255,23,77,.25), inset 0 0 26px rgba(255,23,77,.10)' }}
-          >
-            <div className="absolute inset-0 animate-pulse bg-[#FF174D]/5" />
-            <div className="relative z-10">
-              <Radio className="mx-auto h-7 w-7 text-[#FF174D]" />
-              <div className="mt-1 font-heading text-3xl text-[#FF174D]">BUZZ!</div>
-              <div className="mt-1 text-[5px] uppercase tracking-[.18em] text-[#FF174D]/70" style={PS2}>
-                TAP FAST
-              </div>
-            </div>
-          </button>
-        )}
-
-        {buzzWinner && (
-          <div
-            className={`rounded-xl border px-3 py-3 text-center ${
-              iWonBuzz
-                ? 'border-[#4ADE80]/50 bg-[#4ADE80]/10'
-                : 'border-[#FFD700]/35 bg-[#FFD700]/5'
-            }`}
-          >
-            <Zap className={`mx-auto h-5 w-5 ${iWonBuzz ? 'text-[#4ADE80]' : 'text-[#FFD700]'}`} />
-            <div
-              className={`mt-1 text-[7px] uppercase tracking-[.18em] ${
-                iWonBuzz ? 'text-[#4ADE80]' : 'text-[#FFD700]'
-              }`}
-              style={PS2}
-            >
-              {iWonBuzz ? 'YOU BUZZED FIRST!' : `${buzzWinner.playerName || 'A PLAYER'} BUZZED FIRST`}
-            </div>
-          </div>
-        )}
-
         <main className="min-h-0 flex-1">
           <BFFTngBoard
             gs={{
@@ -413,6 +387,10 @@ export default function NeonBFFPlayer({ roomCode }) {
               family1: gameState.family1 || 'Family 1',
               family2: gameState.family2 || 'Family 2',
             }}
+            myPlayerId={myAccountId}
+            canBuzz={canBuzz}
+            buzzerBusy={busy}
+            onBuzz={buzz}
           />
         </main>
 
