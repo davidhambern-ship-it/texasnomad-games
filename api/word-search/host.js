@@ -16,6 +16,7 @@ import {
   submitWordSearchSelection,
 } from '../../server/games/word-search.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
@@ -112,6 +113,30 @@ async function activeParticipants(roomId, executor = db) {
     .sort((a, b) => a.seatNumber - b.seatNumber);
 }
 
+
+async function recordWordSearchRound(room, state, participants, executor = db) {
+  if (state?.phase !== 'finished') return;
+
+  const winnerSeat = Number(state.winner_seat || 0);
+  const scores = state.scores || {};
+
+  await recordGameStatEvent({
+    room,
+    statKey: `round:${Number(state.round_number || 1)}`,
+    entries: participants.map((player) => ({
+      accountId: player.accountId,
+      score: Number(scores[String(player.seatNumber)] || 0),
+      won: winnerSeat > 0 ? Number(player.seatNumber) === winnerSeat : null,
+    })),
+    result: {
+      winnerSeat: winnerSeat || null,
+      mode: state.mode || null,
+      difficulty: state.difficulty || null,
+    },
+    executor,
+  });
+}
+
 async function refreshTimeoutIfNeeded(room) {
   const state = room.displayState?.gameState || {};
   if (
@@ -145,6 +170,8 @@ async function refreshTimeoutIfNeeded(room) {
       revision: lockedRoom.revision + 1,
       updatedAt: new Date(),
     }).where(eq(gameRooms.id, lockedRoom.id)).returning();
+
+    await recordWordSearchRound(updated, nextState, participants, transaction);
 
     return updated;
   });
@@ -295,6 +322,8 @@ export default async function handler(request, response) {
       await transaction.update(roomParticipants).set({
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentHost.id));
+
+      await recordWordSearchRound(nextRoom, nextState, participants, transaction);
 
       return nextRoom;
     });
