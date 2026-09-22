@@ -458,6 +458,16 @@ export default function NeonBFFHostPanel({ controllerId }) {
     : null;
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
   const micsReady = Boolean(gameState.mics_ready);
+  const canActivateBuzz = Boolean(
+    !gameState.buzzer_open
+    && (
+      (faceoffReady && ['faceoff_ready', 'faceoff_setup', 'faceoff_unresolved'].includes(roundStage))
+      || roundStage === 'steal_ready'
+    )
+  );
+  const isMatchComplete = Boolean(gameState.match_complete);
+  const isMatchTie = roundStage === 'match_tie' || Boolean(gameState.match_tied);
+  const dysfunction = gameState.dysfunction || null;
 
   const ensureSilentTrack = useCallback(() => {
     if (!silentAudioRef.current) {
@@ -717,21 +727,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
     }
   }, [busy, controllerId]);
 
-  useEffect(() => {
-    const deadline = Number(gameState.answer_deadline_at || 0);
-    if (
-      roundStage !== 'faceoff_answer'
-      || !deadline
-      || clockNow < deadline
-      || handledDeadlineRef.current === deadline
-    ) {
-      return;
-    }
-
-    handledDeadlineRef.current = deadline;
-    act('faceoff_timeout');
-  }, [act, clockNow, gameState.answer_deadline_at, roundStage]);
-
   const assignPlayer = (playerId, team) => act('assign_player', { playerId, team });
   const selectFaceoffPlayer = (team, playerId) =>
     act('set_faceoff_player', { team, playerId });
@@ -862,9 +857,11 @@ export default function NeonBFFHostPanel({ controllerId }) {
           </div>
 
           <div className="flex items-center gap-2">
-            {activePlayer && roundStage === 'faceoff_answer' && (
+            {activePlayer && ['faceoff_answer', 'family_play', 'steal_answer', 'dysfunction_defense'].includes(roundStage) && (
               <div className="rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/10 px-3 py-2 text-center">
-                <div className="text-[5px] text-[#FFD700]/65" style={PS2}>ANSWERING</div>
+                <div className="text-[5px] text-[#FFD700]/65" style={PS2}>
+                  {roundStage === 'dysfunction_defense' ? 'DEFENDING' : 'ANSWERING'}
+                </div>
                 <div className="mt-1 text-sm font-black text-[#FFD700]">
                   {activePlayer.playerName || activePlayer.name}
                 </div>
@@ -888,6 +885,106 @@ export default function NeonBFFHostPanel({ controllerId }) {
           </div>
         </div>
       </section>
+
+      {(roundStage === 'play_pass' || isMatchComplete || isMatchTie || dysfunction) && (
+        <section className="rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/[.04] px-3 py-3">
+          {roundStage === 'play_pass' && (
+            <div className="text-center">
+              <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+                FACEOFF WON
+              </div>
+              <div className="mt-2 text-sm font-black text-white">
+                {activePlayer?.playerName || activePlayer?.name || 'Winner'} chooses PLAY or PASS on their device.
+              </div>
+            </div>
+          )}
+
+          {isMatchTie && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+                  FIVE-ROUND TIE
+                </div>
+                <div className="mt-1 text-xs text-white/50">Run one sudden-death faceoff to choose the finalist.</div>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act('start_tiebreak')}
+                className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/10 px-3 py-2 text-[6px] text-[#FFD700] disabled:opacity-30"
+                style={PS2}
+              >
+                START TIEBREAK
+              </button>
+            </div>
+          )}
+
+          {isMatchComplete && !dysfunction && (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+                  FIVE ROUNDS COMPLETE
+                </div>
+                <div className="mt-1 text-sm font-black text-white">
+                  {Number(gameState.winning_team) === 2 ? gameState.family2 : gameState.family1} advances to FAMILY DYSFUNCTION.
+                </div>
+              </div>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act('start_dysfunction')}
+                className="rounded-lg border border-[#F472B6]/50 bg-[#F472B6]/10 px-3 py-2 text-[6px] text-[#F472B6] disabled:opacity-30"
+                style={PS2}
+              >
+                START FAMILY DYSFUNCTION
+              </button>
+            </div>
+          )}
+
+          {dysfunction && (
+            <div>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-[6px] uppercase tracking-[.18em] text-[#F472B6]" style={PS2}>
+                    FAMILY DYSFUNCTION · {dysfunction.sudden_death ? 'SUDDEN DEATH' : `PROMPT ${dysfunction.prompt_number || 1}/5`}
+                  </div>
+                  <div className="mt-2 font-heading text-lg text-white">
+                    {dysfunction.prompt || 'Loading the next dysfunctional family prompt…'}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/5 px-3 py-2 text-center">
+                    <div className="text-[5px] text-[#BC13FE]" style={PS2}>SIDE A</div>
+                    <div className="mt-1 font-heading text-2xl">{Number(dysfunction.scoreA) || 0}</div>
+                  </div>
+                  <div className="rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 px-3 py-2 text-center">
+                    <div className="text-[5px] text-[#FF5F1F]" style={PS2}>SIDE B</div>
+                    <div className="mt-1 font-heading text-2xl">{Number(dysfunction.scoreB) || 0}</div>
+                  </div>
+                </div>
+              </div>
+
+              {roundStage === 'dysfunction_vote' && (
+                <div className="mt-2 text-[10px] text-white/40">
+                  Waiting for secret votes. Votes remain hidden until everybody has voted.
+                </div>
+              )}
+
+              {roundStage === 'dysfunction_defense' && (
+                <div className="mt-2 text-[10px] text-[#FFD700]">
+                  Defense mic is live for {activePlayer?.playerName || activePlayer?.name || 'the selected family member'}.
+                </div>
+              )}
+
+              {roundStage === 'dysfunction_complete' && (
+                <div className="mt-3 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 p-3 text-center font-heading text-2xl text-[#FFD700]">
+                  SIDE {dysfunction.winner_side} WINS FAMILY DYSFUNCTION
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section
         className="rounded-xl border border-[#22D3EE]/30 bg-black/60 px-3 py-3 text-center"
@@ -926,6 +1023,19 @@ export default function NeonBFFHostPanel({ controllerId }) {
         </section>
 
         <aside className="rounded-xl border border-[#FF5F1F]/25 bg-black/60 p-2.5">
+          <div className="mb-2 grid grid-cols-2 gap-1.5">
+            <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
+              micsReady ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
+            }`} style={PS2}>
+              PLAYERS {micsReady ? 'MIC READY' : 'NEED MICS'}
+            </div>
+            <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
+              hostMicReady && !hostMuted ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
+            }`} style={PS2}>
+              HOST {hostMicReady && !hostMuted ? 'LIVE' : hostMicReady ? 'MUTED' : 'MIC OFF'}
+            </div>
+          </div>
+
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[6px] uppercase tracking-[.18em] text-[#FF9A3D]" style={PS2}>
               GAME CONTROLS
@@ -947,7 +1057,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
             </div>
           </div>
 
-          {roundStage === 'family_play' || roundStage === 'steal' ? (
+          {roundStage === 'family_play' ? (
             <ByeMeter
               count={byeCount}
               busy={busy}
@@ -971,7 +1081,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy || gameState.phase === 'playing' || !gameState.family_names_set || !micsReady || !hostMicReady}
+              disabled={busy || gameState.phase === 'playing' || Boolean(gameState.current_question) || !gameState.family_names_set || !micsReady || !hostMicReady}
             />
             <ControlButton
               label="Reset Round"
@@ -985,7 +1095,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={SkipForward}
               accent="#22D3EE"
               onClick={() => act('next_question')}
-              disabled={busy}
+              disabled={busy || roundStage !== 'round_complete' || Number(gameState.round_number || 1) >= 5}
             />
 
             <ControlButton
@@ -1019,15 +1129,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
             />
 
             <ControlButton
-              label="Steal"
-              icon={Zap}
-              accent="#FFD700"
-              active={Boolean(gameState.steal_mode)}
-              onClick={() => act('toggle_steal')}
-              disabled={busy}
-            />
-
-            <ControlButton
               label="Team 1 Ctrl"
               icon={Radio}
               accent="#BC13FE"
@@ -1041,7 +1142,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               accent="#22D3EE"
               active={Boolean(gameState.buzzer_open)}
               onClick={() => act('open_buzzers')}
-              disabled={busy || Boolean(gameState.buzzer_open) || !faceoffReady || roundStage === 'faceoff_answer'}
+              disabled={busy || !canActivateBuzz}
             />
             <ControlButton
               label="Team 2 Ctrl"
@@ -1059,6 +1160,16 @@ export default function NeonBFFHostPanel({ controllerId }) {
               onClick={() => act('hide_buzzers')}
               disabled={busy || !gameState.buzzer_open}
             />
+
+            {roundStage === 'steal_answer' && (
+              <ControlButton
+                label="MISS STEAL"
+                icon={Frown}
+                accent="#FF174D"
+                onClick={() => act('steal_miss')}
+                disabled={busy}
+              />
+            )}
 
             <ControlButton
               label="Bank → T1"
