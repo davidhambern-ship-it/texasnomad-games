@@ -1078,6 +1078,7 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.is_tiebreak = true;
     next.phase = 'playing';
     next.round_stage = 'faceoff_setup';
+    next.faceoff_players = {};
     next.faceoff_results = {};
     next.faceoff_attempted = { 1: [], 2: [] };
     next.faceoff_x_event = null;
