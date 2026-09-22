@@ -56,12 +56,26 @@ export default function NeonWordSearchBoard({
   useEffect(() => {
     const resize = () => setViewportTick((value) => value + 1);
     window.addEventListener('resize', resize);
-    return () => window.removeEventListener('resize', resize);
+    window.addEventListener('orientationchange', resize);
+    window.visualViewport?.addEventListener('resize', resize);
+
+    return () => {
+      window.removeEventListener('resize', resize);
+      window.removeEventListener('orientationchange', resize);
+      window.visualViewport?.removeEventListener('resize', resize);
+    };
   }, []);
 
   const size = grid.length || 1;
-  const availableWidth = Math.max(260, Math.min(maxBoardPx, window.innerWidth - 40));
-  const availableHeight = Math.max(260, Math.min(maxBoardPx, window.innerHeight - 190));
+  const viewportWidth = window.visualViewport?.width || window.innerWidth;
+  const viewportHeight = window.visualViewport?.height || window.innerHeight;
+  const isPhone = viewportWidth < 640;
+  const isPortraitPhone = isPhone && viewportHeight >= viewportWidth;
+  const widthPadding = isPhone ? 20 : 40;
+  const availableWidth = Math.max(260, Math.min(maxBoardPx, viewportWidth - widthPadding));
+  const availableHeight = isPortraitPhone
+    ? availableWidth
+    : Math.max(260, Math.min(maxBoardPx, viewportHeight - (isPhone ? 110 : 190)));
   const boardPx = Math.min(availableWidth, availableHeight);
   const gap = size >= 20 ? 1 : 2;
   const cellSize = Math.max(12, Math.floor((boardPx - gap * (size - 1) - 16) / size));
