@@ -6,6 +6,7 @@ export const BFF_SOUND_URLS = {
   buzz: `${RAW_BASE}/buzzer.mp3`,
   correct: `${RAW_BASE}/ding%20bell.mp3`,
   bye: `${RAW_BASE}/buzzer.mp3`,
+  wrong: `${RAW_BASE}/fail%20game%20over%20wah%20wah%20sad%20trombone.mp3`,
   round_start: `${RAW_BASE}/announcement%20timpani%20roll.mp3`,
 };
 
@@ -73,7 +74,7 @@ export function armBffSoundUnlock() {
   document.addEventListener('keydown', unlock, { once: true, capture: true });
 }
 
-export async function playBffSound(name, { volume = 0.9 } = {}) {
+async function playOne(name, volume = 0.9) {
   const audio = getAudio(name);
   if (!audio) return false;
 
@@ -82,10 +83,38 @@ export async function playBffSound(name, { volume = 0.9 } = {}) {
     audio.currentTime = 0;
     audio.muted = false;
     audio.volume = Math.max(0, Math.min(1, Number(volume) || 0.9));
-    await audio.play();
+
+    await new Promise((resolve) => {
+      const finish = () => {
+        audio.removeEventListener('ended', finish);
+        audio.removeEventListener('error', finish);
+        resolve();
+      };
+
+      audio.addEventListener('ended', finish, { once: true });
+      audio.addEventListener('error', finish, { once: true });
+
+      const result = audio.play();
+      Promise.resolve(result).catch(() => finish());
+    });
+
     return true;
   } catch (error) {
     console.warn('[BFF Sound] playback blocked or unavailable', name, error);
     return false;
   }
+}
+
+export async function playBffSound(name, { volume = 0.9 } = {}) {
+  if (name === 'correct_applause') {
+    await playOne('correct', volume);
+    return playOne('applause', volume);
+  }
+
+  if (name === 'wrong_awww') {
+    await playOne('wrong', volume);
+    return playOne('awww', volume);
+  }
+
+  return playOne(name, volume);
 }
