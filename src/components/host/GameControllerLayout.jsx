@@ -3,7 +3,7 @@ import React from 'react';
 export function HostWorkspace({ primary, companion, className = '' }) {
   return (
     <section
-      className={`grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:items-start ${className}`}
+      className={`grid min-w-0 grid-cols-1 gap-2 md:grid-cols-[minmax(0,1fr)_minmax(220px,280px)] md:items-start xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] ${className}`}
     >
       <div className="min-w-0">{primary}</div>
       <div className="min-w-0">{companion}</div>
