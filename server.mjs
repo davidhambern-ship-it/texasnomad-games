@@ -1630,6 +1630,10 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
     dysfunction.last_pointsB = pointsB;
     dysfunction.votes_revealed = true;
 
+    if (pointsA === 0 || pointsB === 0) {
+      next.sound_cue = { name: 'awww', at: Date.now() };
+    }
+
     if (dysfunction.sudden_death) {
       const unanimousA = bffDysfunctionUnanimous(sideA, dysfunction.votes);
       const unanimousB = bffDysfunctionUnanimous(sideB, dysfunction.votes);
