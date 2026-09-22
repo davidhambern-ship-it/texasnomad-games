@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Loader2,
   Users,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -339,6 +340,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [busy, setBusy] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState(0);
   const [manualPoints, setManualPoints] = useState(10);
+  const lastSoundCueRef = useRef(null);
 
   const gameState = room?.gameState || {};
   const players = Array.isArray(gameState.players)
@@ -377,6 +379,17 @@ export default function NeonBFFHostPanel({ controllerId }) {
     const interval = window.setInterval(refresh, 800);
     return () => window.clearInterval(interval);
   }, [refresh]);
+
+  useEffect(() => {
+    preloadBffSounds();
+  }, []);
+
+  useEffect(() => {
+    const cue = gameState.sound_cue;
+    if (!cue?.at || cue.at === lastSoundCueRef.current) return;
+    lastSoundCueRef.current = cue.at;
+    playBffSound(String(cue.name || ''));
+  }, [gameState.sound_cue]);
 
   const act = useCallback(async (action, payload = {}) => {
     if (!controllerId || busy) return false;
@@ -503,8 +516,20 @@ export default function NeonBFFHostPanel({ controllerId }) {
             <div className="text-[6px] uppercase tracking-[.18em] text-[#FF9A3D]" style={PS2}>
               GAME CONTROLS
             </div>
-            <div className="text-[5px] text-white/25" style={PS2}>
-              SLOT {selectedAnswer + 1}
+            <div className="text-right">
+              <div className="text-[5px] text-white/25" style={PS2}>
+                SLOT {selectedAnswer + 1}
+              </div>
+              <div
+                className={`mt-1 text-[5px] uppercase ${gameState.buzzer_open ? 'text-[#22D3EE]' : gameState.buzz_winner ? 'text-[#FFD700]' : 'text-white/20'}`}
+                style={PS2}
+              >
+                {gameState.buzzer_open
+                  ? 'BUZZERS LIVE'
+                  : gameState.buzz_winner
+                    ? `${gameState.buzz_winner.playerName || 'PLAYER'} BUZZED`
+                    : 'BUZZERS HIDDEN'}
+              </div>
             </div>
           </div>
 
@@ -587,12 +612,12 @@ export default function NeonBFFHostPanel({ controllerId }) {
               disabled={busy}
             />
             <ControlButton
-              label="Open Buzz"
+              label="Activate Buzz"
               icon={Radio}
               accent="#22D3EE"
               active={Boolean(gameState.buzzer_open)}
-              onClick={() => act(gameState.buzzer_open ? 'reset_buzzers' : 'open_buzzers')}
-              disabled={busy}
+              onClick={() => act('open_buzzers')}
+              disabled={busy || Boolean(gameState.buzzer_open)}
             />
             <ControlButton
               label="Team 2 Ctrl"
@@ -600,6 +625,28 @@ export default function NeonBFFHostPanel({ controllerId }) {
               accent="#FF5F1F"
               active={controlTeam === 2}
               onClick={() => act('set_control_team', { team: 2 })}
+              disabled={busy}
+            />
+
+            <ControlButton
+              label="Hide Buzz"
+              icon={EyeOff}
+              accent="#64748B"
+              onClick={() => act('hide_buzzers')}
+              disabled={busy || !gameState.buzzer_open}
+            />
+            <ControlButton
+              label="Reset Buzz"
+              icon={RotateCcw}
+              accent="#22D3EE"
+              onClick={() => act('reset_buzzers')}
+              disabled={busy}
+            />
+            <ControlButton
+              label="Buzz Sound"
+              icon={Volume2}
+              accent="#22D3EE"
+              onClick={() => act('sound', { name: 'buzz' })}
               disabled={busy}
             />
 
