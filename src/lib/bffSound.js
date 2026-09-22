@@ -116,5 +116,9 @@ export async function playBffSound(name, { volume = 0.9 } = {}) {
     return playOne('awww', volume);
   }
 
+  if (name === 'faceoff_wrong') {
+    return playOne('wrong', volume);
+  }
+
   return playOne(name, volume);
 }
