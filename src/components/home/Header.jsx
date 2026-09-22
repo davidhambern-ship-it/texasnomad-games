@@ -8,7 +8,6 @@ import { isNeonStaging } from '@/lib/neonAuth';
 const NAV_ITEMS = [
   { label: 'HOME', path: '/' },
   { label: 'GAMES', path: '/games' },
-  { label: 'LIVE STATUS', path: '/live-status' },
   { label: 'ABOUT', path: '/about' },
   { label: 'CONTACT', path: '/contact' },
 ];
