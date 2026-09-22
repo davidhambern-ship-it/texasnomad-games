@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { tngApi } from '@/api/tngApi';
+import { TNG_ORIGIN_STORY } from '@/content/tngOriginStory';
 import Header from '../components/home/Header';
 import Hero from '../components/home/Hero';
 import AboutSection from '../components/home/AboutSection';
@@ -45,14 +46,6 @@ const GAME_SUB_MAP = {
   'name-that-track': 'MUSIC',
 };
 
-const PIXEL_DUST_STORY = [
-  'TexasNomad loves going LIVE. The problem? Every time he hit that button, he kept feeling like he was hanging out instead of putting on an actual show.',
-  'Then he started meeting other streamers, joining families, sitting on panels, and hearing the same thing over and over: people wanted real games to play together — but the streaming platforms did not exactly come stocked with a killer game closet.',
-  'One night TexasNomad was sitting on a panel with about five people and casually asked, “Y’all play Spades?” Of course they did. Who does not love Spades? The only problem was… there were no cards.',
-  'At first the idea was simple: design some cards, turn them into SVGs, boom — Spades. Then came the thought that the platforms would probably lock them up, monetize the life out of them, and definitely not just hand them to everybody.',
-  'Then TexasNomad remembered: “AI’s a thing…” He was already deep into AI, but games? Could AI help build actual live-stream games? He ignored the panel and fell straight down the rabbit hole.',
-  'Spades led to Hangman. Hangman led to BFF. BFF led to Square Biz! And somewhere along the way, TexasNomad looked up and realized he was no longer building a game. He was wandering around a whole digital arcade.',
-];
 
 export default function Home() {
   const [featuredGame, setFeaturedGame] = useState(null);
@@ -259,11 +252,7 @@ function RoomRow({ room }) {
   const statusLabel = room.status === 'lobby' ? 'OPEN' : room.status === 'paused' ? 'PAUSED' : 'LIVE';
 
   return (
-    <button
-      type="button"
-      onClick={() => { window.location.href = `/join/${room.roomCode}`; }}
-      className="w-full flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50 mb-2 shrink-0 text-left hover:border-outlaw-gold/60 transition-colors"
-    >
+    <div className="flex items-center justify-between px-3 py-2.5 border border-cyber-purple/20 rounded bg-black/50 mb-2 shrink-0 text-left cursor-default">
       <div className="flex items-center gap-2 min-w-0">
         <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-outlaw-gold/60'}`} />
         <div className="min-w-0">
@@ -285,7 +274,34 @@ function RoomRow({ room }) {
           {statusLabel}
         </span>
       </div>
-    </button>
+    </div>
+  );
+}
+
+function StoryFeedItem({ block, index }) {
+  if (block.type === 'signature') {
+    return (
+      <div className="mb-3 px-3 text-right text-[10px] italic text-cyber-purple/80">
+        {block.text}
+      </div>
+    );
+  }
+
+  if (block.type === 'quote') {
+    return (
+      <div className="mb-3 rounded-lg border border-kinetic-orange/30 bg-kinetic-orange/[.05] px-3 py-3 text-center text-sm text-kinetic-orange">
+        {block.text}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-white/8 bg-white/[.02] px-3 py-3">
+      <div className="mb-1 text-[5px] tracking-[.2em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+        TNG ORIGIN FEED · {String(index + 1).padStart(2, '0')}
+      </div>
+      <p className="text-[10px] leading-relaxed text-white/48">{block.text}</p>
+    </div>
   );
 }
 
@@ -316,70 +332,94 @@ function LiveStatusInline() {
     };
   }, []);
 
-  const scrollItems = rooms.length > 0 ? [...rooms, ...rooms] : [];
-  const duration = Math.max(8, rooms.length * 3);
+  const feed = [
+    ...(rooms.length === 0
+      ? [{
+          kind: 'dust',
+          id: 'pixel-dustbowl',
+        }]
+      : rooms.map((room) => ({
+          kind: 'room',
+          id: `room-${room.id}`,
+          room,
+        }))),
+    ...TNG_ORIGIN_STORY.map((block, index) => ({
+      kind: 'story',
+      id: `story-${index}`,
+      block,
+      index,
+    })),
+  ];
+
+  const doubledFeed = [...feed, ...feed];
+  const duration = Math.max(38, feed.length * 7);
 
   return (
-    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col">
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col cursor-default">
       <style>{`
-        @keyframes scroll-up {
+        @keyframes tng-rss-scroll {
           0% { transform: translateY(0); }
           100% { transform: translateY(-50%); }
         }
-        .live-scroll { animation: scroll-up ${duration}s linear infinite; }
-        .live-scroll:hover { animation-play-state: paused; }
+        .tng-rss-feed {
+          animation: tng-rss-scroll ${duration}s linear infinite;
+        }
       `}</style>
 
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
-          LIVE ROOMS
-        </h3>
+        <div>
+          <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+            LIVE ROOMS
+          </h3>
+          <div className="mt-1 text-[5px] tracking-[.2em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            TNG RSS FEED
+          </div>
+        </div>
         <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          {loading ? 'CHECKING…' : `${rooms.length} ROOM${rooms.length === 1 ? '' : 'S'}`}
+          {loading ? 'SYNCING…' : `${rooms.length} LIVE`}
         </span>
       </div>
 
-      {rooms.length > 0 ? (
-        <>
-          <div className="overflow-hidden relative" style={{ height: 180 }}>
-            <div className="live-scroll">
-              {scrollItems.map((room, index) => (
-                <RoomRow key={`${room.id}-${index}`} room={room} />
-              ))}
-            </div>
-          </div>
-          <div className="mt-auto pt-3 text-center">
-            <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-              TAP A ROOM TO JOIN
-            </span>
-          </div>
-        </>
-      ) : (
-        <div className="flex-1 min-h-[260px] overflow-y-auto rounded-lg border border-outlaw-gold/15 bg-black/35 p-3">
-          <div className="text-center">
-            <div className="text-2xl">🕸️</div>
-            <div className="mt-2 text-xs text-kinetic-orange uppercase" style={{ fontFamily: "'Rye', serif" }}>
-              THE GREAT PIXEL DUSTBOWL™
-            </div>
-            <p className="mt-2 text-[10px] leading-relaxed text-white/55">
-              Somebody poured blood, sweat, caffeine and an unreasonable number of browser tabs into this digital arcade… just for it to sit here collecting premium-grade pixel dust.
-            </p>
-          </div>
+      <div className="relative flex-1 min-h-[300px] overflow-hidden rounded-lg border border-white/8 bg-black/30">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-[#07030d] to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-[#07030d] to-transparent" />
 
-          <div className="mt-3 space-y-2 text-[10px] leading-relaxed text-white/45">
-            {PIXEL_DUST_STORY.slice(0, 3).map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
-          </div>
+        <div className="tng-rss-feed p-2">
+          {doubledFeed.map((item, duplicateIndex) => {
+            const key = `${item.id}-${duplicateIndex}`;
 
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="text-[9px] italic text-cyber-purple/75">— Dexter</span>
-            <Link to="/about" className="text-[7px] tracking-widest text-outlaw-gold uppercase hover:text-white" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-              READ THE WHOLE RABBIT HOLE →
-            </Link>
-          </div>
+            if (item.kind === 'room') {
+              return <RoomRow key={key} room={item.room} />;
+            }
+
+            if (item.kind === 'dust') {
+              return (
+                <div key={key} className="mb-3 rounded-lg border border-outlaw-gold/20 bg-outlaw-gold/[.035] p-3 text-center">
+                  <div className="text-xl">🕸️</div>
+                  <div className="mt-1 text-xs text-kinetic-orange uppercase" style={{ fontFamily: "'Rye', serif" }}>
+                    THE GREAT PIXEL DUSTBOWL™
+                  </div>
+                  <p className="mt-2 text-[10px] leading-relaxed text-white/48">
+                    Somebody poured blood, sweat, caffeine and an unreasonable number of browser tabs into this digital arcade… just for it to sit here collecting premium-grade pixel dust. So while we wait for somebody to start a room, here is how this whole mess happened.
+                  </p>
+                </div>
+              );
+            }
+
+            return (
+              <StoryFeedItem
+                key={key}
+                block={item.block}
+                index={item.index}
+              />
+            );
+          })}
         </div>
-      )}
+      </div>
+
+      <div className="mt-3 text-center text-[5px] tracking-[.18em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+        PASSIVE FEED · LIVE DATA + THE FULL TNG STORY
+      </div>
     </div>
   );
 }
