@@ -459,12 +459,29 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
   const micsReady = Boolean(gameState.mics_ready);
   const assignedPlayers = [...team1, ...team2];
+  const backendVoiceReady = gameState.voice_ready || {};
   const liveMicsReady = Boolean(
     assignedPlayers.length >= 2
     && team1.length > 0
     && team2.length > 0
-    && assignedPlayers.every((player) => Boolean(voiceConnected[player.playerId]))
+    && assignedPlayers.every((player) =>
+      Boolean(voiceConnected[player.playerId] && backendVoiceReady[player.playerId])
+    )
   );
+  const micStatusRows = assignedPlayers.map((player) => {
+    const playerId = String(player.playerId);
+    const hasOffer = Boolean(gameState.voice_offers?.[playerId]?.sdp);
+    const peerLive = Boolean(voiceConnected[playerId]);
+    const backendReady = Boolean(backendVoiceReady[playerId]);
+    return {
+      playerId,
+      name: player.playerName || player.name || 'Player',
+      status: peerLive && backendReady ? 'live' : hasOffer ? 'connecting' : 'off',
+    };
+  });
+  const missingMicNames = micStatusRows
+    .filter((row) => row.status !== 'live')
+    .map((row) => row.name);
   const canActivateBuzz = Boolean(
     !gameState.buzzer_open
     && (
@@ -639,6 +656,11 @@ export default function NeonBFFHostPanel({ controllerId }) {
           if (cancelled) return;
           const live = ['connected', 'completed'].includes(pc.connectionState);
           setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
+
+          tngApi.bff.hostAction(controllerId, 'voice_peer_status', {
+            playerId,
+            ready: live,
+          }).catch(() => {});
         };
 
         pc.ontrack = (event) => {
@@ -672,12 +694,20 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
         await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
 
+        const transceivers = pc.getTransceivers();
+        const hostTransceiver = transceivers[1] || null;
+        const speakerTransceiver = transceivers[2] || null;
+
+        if (!hostTransceiver?.sender || !speakerTransceiver?.sender) {
+          throw new Error('BFF voice negotiation did not expose the expected audio channels.');
+        }
+
         const hostTrack = hostMicTrackRef.current || silentHostTrack;
-        const hostSender = pc.addTrack(hostTrack, new MediaStream([hostTrack]));
-        const speakerSender = pc.addTrack(
-          silentSpeakerTrack,
-          new MediaStream([silentSpeakerTrack]),
-        );
+        await hostTransceiver.sender.replaceTrack(hostTrack);
+        await speakerTransceiver.sender.replaceTrack(silentSpeakerTrack);
+
+        const hostSender = hostTransceiver.sender;
+        const speakerSender = speakerTransceiver.sender;
 
         voicePeersRef.current.set(playerId, {
           pc,
@@ -785,6 +815,47 @@ export default function NeonBFFHostPanel({ controllerId }) {
           {pollError}
         </div>
       )}
+
+      <section className={`rounded-xl border px-3 py-2 ${
+        gameState.family_names_set && liveMicsReady && hostMicReady
+          ? 'border-[#4ADE80]/35 bg-[#4ADE80]/[.05]'
+          : 'border-[#FF5F1F]/35 bg-[#FF5F1F]/[.05]'
+      }`}>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[6px] uppercase tracking-[.16em] text-white/50" style={PS2}>
+              ROUND SETUP STATUS
+            </div>
+            <div className="mt-1 text-[10px] text-white/55">
+              {!gameState.family_names_set
+                ? 'Enter both family names.'
+                : !hostMicReady
+                  ? 'Enable the Host microphone.'
+                  : missingMicNames.length
+                    ? `Waiting on mic connection: ${missingMicNames.join(', ')}`
+                    : 'READY · Start Round is unlocked.'}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {micStatusRows.map((row) => (
+              <span
+                key={row.playerId}
+                className={`rounded-md border px-2 py-1 text-[6px] uppercase ${
+                  row.status === 'live'
+                    ? 'border-[#4ADE80]/35 text-[#4ADE80]'
+                    : row.status === 'connecting'
+                      ? 'border-[#FFD700]/35 text-[#FFD700]'
+                      : 'border-[#FF5F1F]/35 text-[#FF5F1F]'
+                }`}
+                style={PS2}
+              >
+                {row.name} · {row.status === 'live' ? 'MIC LIVE' : row.status === 'connecting' ? 'CONNECTING' : 'MIC OFF'}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#22D3EE]/25 bg-[#22D3EE]/[.035] px-3 py-2">
         <div>
@@ -1128,7 +1199,15 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             <ControlButton
-              label="Start Round"
+              label={
+                !gameState.family_names_set
+                  ? 'Need Names'
+                  : !hostMicReady
+                    ? 'Host Mic'
+                    : !liveMicsReady
+                      ? 'Need Mics'
+                      : 'Start Round'
+              }
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
@@ -1272,7 +1351,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
-                  voiceLive={Boolean(voiceConnected[player.playerId])}
+                  voiceLive={Boolean(voiceConnected[player.playerId] && backendVoiceReady[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
