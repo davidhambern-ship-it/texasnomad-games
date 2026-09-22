@@ -266,6 +266,8 @@ export default function NeonBFFPlayer({ roomCode }) {
   const [voiceConnectionState, setVoiceConnectionState] = useState('off');
   const micAutoAttemptedRef = useRef(false);
   const currentVoiceOfferAtRef = useRef(null);
+  const voiceRetryCountRef = useRef(0);
+  const voiceRetryTimerRef = useRef(null);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -408,6 +410,10 @@ export default function NeonBFFPlayer({ roomCode }) {
   }, [gameState.voice_answer, gameState.voice_offer_at]);
 
   useEffect(() => () => {
+    if (voiceRetryTimerRef.current) {
+      window.clearTimeout(voiceRetryTimerRef.current);
+      voiceRetryTimerRef.current = null;
+    }
     voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
     voicePcRef.current?.close?.();
   }, []);
@@ -507,10 +513,90 @@ export default function NeonBFFPlayer({ roomCode }) {
         setVoiceConnectionState('connecting');
       };
 
-      pc.onconnectionstatechange = syncConnectionState;
-      pc.oniceconnectionstatechange = syncConnectionState;
+      const publishFreshOffer = async ({ iceRestart = false } = {}) => {
+        const offer = await pc.createOffer(iceRestart ? { iceRestart: true } : undefined);
+        await pc.setLocalDescription(offer);
+        await waitForIceComplete(pc);
 
-      const offer = await pc.createOffer();
+        if (voicePcRef.current !== pc || !pc.localDescription?.sdp) {
+          throw new Error('Microphone connection could not create a fresh offer.');
+        }
+
+        const payload = await tngApi.bff.playerAction(deviceId, roomCode, 'voice_offer', {
+          sdp: pc.localDescription.sdp,
+        });
+
+        setRoom(payload.room || null);
+        setParticipant(payload.participant || null);
+        currentVoiceOfferAtRef.current = Number(
+          payload.room?.gameState?.voice_offer_at || 0,
+        ) || null;
+        setMicOn(true);
+        setVoiceConnectionState('connecting');
+      };
+
+      const scheduleIceRetry = () => {
+        if (voicePcRef.current !== pc) return;
+        if (voiceRetryTimerRef.current) return;
+        if (voiceRetryCountRef.current >= 3) {
+          setVoiceConnectionState('failed');
+          setError('Mic connection failed after automatic retries. Leave this page open while the Host checks the connection.');
+          return;
+        }
+
+        const attempt = voiceRetryCountRef.current + 1;
+        voiceRetryCountRef.current = attempt;
+        setVoiceConnectionState('retrying');
+        setError('');
+
+        voiceRetryTimerRef.current = window.setTimeout(async () => {
+          voiceRetryTimerRef.current = null;
+          if (voicePcRef.current !== pc) return;
+
+          try {
+            pc.restartIce?.();
+            await publishFreshOffer({ iceRestart: true });
+          } catch (retryError) {
+            console.warn('[BFF Voice] ICE retry failed', attempt, retryError);
+            if (voicePcRef.current === pc) {
+              scheduleIceRetry();
+            }
+          }
+        }, 1500 * attempt);
+      };
+
+      const originalSyncConnectionState = syncConnectionState;
+      const syncConnectionStateWithRetry = () => {
+        originalSyncConnectionState();
+
+        if (voicePcRef.current !== pc) return;
+
+        if (
+          pc.connectionState === 'connected'
+          || pc.iceConnectionState === 'connected'
+          || pc.iceConnectionState === 'completed'
+        ) {
+          voiceRetryCountRef.current = 0;
+          if (voiceRetryTimerRef.current) {
+            window.clearTimeout(voiceRetryTimerRef.current);
+            voiceRetryTimerRef.current = null;
+          }
+          return;
+        }
+
+        if (
+          pc.connectionState === 'failed'
+          || pc.iceConnectionState === 'failed'
+          || pc.iceConnectionState === 'disconnected'
+        ) {
+          scheduleIceRetry();
+        }
+      };
+
+      pc.onconnectionstatechange = syncConnectionStateWithRetry;
+      pc.oniceconnectionstatechange = syncConnectionStateWithRetry;
+
+      await publishFreshOffer();
 
       await pc.setLocalDescription(offer);
       await waitForIceComplete(pc);
@@ -531,6 +617,11 @@ export default function NeonBFFPlayer({ roomCode }) {
       setMicOn(true);
       setVoiceConnectionState('connecting');
     } catch (voiceError) {
+      if (voiceRetryTimerRef.current) {
+        window.clearTimeout(voiceRetryTimerRef.current);
+        voiceRetryTimerRef.current = null;
+      }
+      voiceRetryCountRef.current = 0;
       voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
       voiceStreamRef.current = null;
       voicePcRef.current?.close?.();
@@ -757,9 +848,11 @@ export default function NeonBFFPlayer({ roomCode }) {
           {!micOn
             ? 'MIC REQUIRED · TURN IT ON TO PLAY'
             : voiceConnectionState === 'failed'
-              ? 'MIC LINK FAILED · TOGGLE MIC OFF / ON TO RETRY'
-              : voiceConnectionState !== 'live'
-                ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
+              ? 'MIC LINK FAILED · HOST CHECKING CONNECTION'
+              : voiceConnectionState === 'retrying'
+                ? `MIC RETRYING · ATTEMPT ${voiceRetryCountRef.current}/3`
+                : voiceConnectionState !== 'live'
+                  ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
                 : isActiveSpeaker
                   ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
                   : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'}
