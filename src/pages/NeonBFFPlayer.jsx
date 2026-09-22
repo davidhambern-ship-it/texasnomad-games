@@ -5,7 +5,7 @@ import { Loader2, Radio, Users, Zap } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
-import { playBffSound, preloadBffSounds } from '@/lib/bffSound';
+import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -77,6 +77,7 @@ export default function NeonBFFPlayer({ roomCode }) {
 
   useEffect(() => {
     preloadBffSounds();
+    armBffSoundUnlock();
   }, []);
 
   useEffect(() => {
