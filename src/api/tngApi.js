@@ -40,9 +40,30 @@ async function request(path, {
   if (roomCode) headers['X-TNG-Room-Code'] = roomCode;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, {
-    method, headers, body: body === undefined ? undefined : JSON.stringify(body)
+  const url = `${API_BASE}${path.replace(/^\/api/, '')}`;
+  const requestBody = body === undefined ? undefined : JSON.stringify(body);
+
+  let response = await fetch(url, {
+    method,
+    headers,
+    body: requestBody,
   });
+
+  // Neon Auth JWTs are intentionally short-lived. If a request happens on the
+  // edge of a token refresh, fetch one fresh token and retry once before
+  // treating the user as signed out.
+  if (authenticated && response.status === 401) {
+    const freshToken = await getNeonAuthToken().catch(() => null);
+    if (freshToken) {
+      headers.Authorization = `Bearer ${freshToken}`;
+      response = await fetch(url, {
+        method,
+        headers,
+        body: requestBody,
+      });
+    }
+  }
+
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new TngApiError(payload.error?.message || 'The TNG service is unavailable.', {
