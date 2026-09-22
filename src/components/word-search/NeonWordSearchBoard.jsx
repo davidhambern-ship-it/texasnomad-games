@@ -51,6 +51,7 @@ export default function NeonWordSearchBoard({
   const [selecting, setSelecting] = useState(false);
   const [viewportTick, setViewportTick] = useState(0);
   const boardRef = useRef(null);
+  const activePointerRef = useRef(null);
 
   useEffect(() => {
     const resize = () => setViewportTick((value) => value + 1);
@@ -91,11 +92,11 @@ export default function NeonWordSearchBoard({
     return map;
   }, [words, colorBySeat]);
 
-  function pointFromTouch(touch) {
-    const element = document.elementFromPoint(touch.clientX, touch.clientY);
+  function pointFromClient(clientX, clientY) {
+    const element = document.elementFromPoint(clientX, clientY);
     if (!element) return null;
     const target = element.closest?.('[data-ws-cell="1"]');
-    if (!target) return null;
+    if (!target || !boardRef.current?.contains(target)) return null;
 
     return {
       y: Number(target.dataset.y),
@@ -122,37 +123,91 @@ export default function NeonWordSearchBoard({
     setSelecting(false);
     setStart(null);
     setPreview([]);
+    activePointerRef.current = null;
 
     if (!canInteract || cells.length < 2) return;
     await onSubmit?.(cells);
   }
 
+  function cancelSelection() {
+    setSelecting(false);
+    setStart(null);
+    setPreview([]);
+    activePointerRef.current = null;
+  }
+
+  function handlePointerDown(event, y, x) {
+    if (!canInteract) return;
+
+    event.preventDefault();
+    activePointerRef.current = event.pointerId;
+
+    try {
+      boardRef.current?.setPointerCapture?.(event.pointerId);
+    } catch {}
+
+    begin(y, x);
+  }
+
+  function handlePointerMove(event) {
+    if (
+      !canInteract ||
+      !selecting ||
+      activePointerRef.current !== event.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const point = pointFromClient(event.clientX, event.clientY);
+    if (point) move(point.y, point.x);
+  }
+
+  function handlePointerUp(event) {
+    if (
+      !selecting ||
+      activePointerRef.current !== event.pointerId
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    const point = pointFromClient(event.clientX, event.clientY);
+
+    try {
+      boardRef.current?.releasePointerCapture?.(event.pointerId);
+    } catch {}
+
+    if (point) {
+      finish(point.y, point.x);
+    } else {
+      cancelSelection();
+    }
+  }
+
   return (
     <div
       ref={boardRef}
-      className="inline-block rounded-xl p-2 select-none"
+      className="inline-block rounded-xl p-2 select-none overscroll-contain"
       style={{
         background: 'linear-gradient(135deg,#07040d,#0d0620)',
         border: `2px solid ${myColor}55`,
         boxShadow: `0 0 26px ${myColor}18, inset 0 0 30px rgba(255,255,255,.02)`,
-        touchAction: 'none',
+        touchAction: canInteract ? 'none' : 'pan-y',
         userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
       }}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={cancelSelection}
+      onLostPointerCapture={cancelSelection}
     >
       <div
         style={{
           display: 'grid',
           gridTemplateColumns: `repeat(${size}, ${cellSize}px)`,
           gap,
-        }}
-        onMouseUp={(event) => {
-          const target = event.target.closest?.('[data-ws-cell="1"]');
-          if (target) finish(Number(target.dataset.y), Number(target.dataset.x));
-        }}
-        onTouchEnd={(event) => {
-          event.preventDefault();
-          const point = pointFromTouch(event.changedTouches[0]);
-          if (point) finish(point.y, point.x);
         }}
       >
         {grid.map((row, y) => (
@@ -172,17 +227,7 @@ export default function NeonWordSearchBoard({
                 data-ws-cell="1"
                 data-y={y}
                 data-x={x}
-                onMouseDown={() => begin(y, x)}
-                onMouseEnter={() => move(y, x)}
-                onTouchStart={(event) => {
-                  event.preventDefault();
-                  begin(y, x);
-                }}
-                onTouchMove={(event) => {
-                  event.preventDefault();
-                  const point = pointFromTouch(event.touches[0]);
-                  if (point) move(point.y, point.x);
-                }}
+                onPointerDown={(event) => handlePointerDown(event, y, x)}
                 className="flex items-center justify-center rounded-[3px] font-bold"
                 style={{
                   width: cellSize,
