@@ -18,6 +18,8 @@ import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import HostPanel from '@/pages/HostPanel';
 import Games from '@/pages/Games';
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
 import WordSearchGame from '@/pages/WordSearchGame';
 import ViralGame from '@/pages/ViralGame';
 import NameThatTrackGame from '@/pages/NameThatTrackGame';
@@ -168,8 +170,8 @@ const AuthenticatedApp = () => {
       <Route path="/games/spades" element={<SpadesGame />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
       <Route path="/live-status" element={<PlaceholderPage />} />
-      <Route path="/about" element={<PlaceholderPage />} />
-      <Route path="/contact" element={<PlaceholderPage />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/contact" element={<Contact />} />
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/games/name-that-track" element={<NameThatTrackGame />} />
