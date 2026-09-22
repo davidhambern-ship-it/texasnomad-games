@@ -278,33 +278,6 @@ function RoomRow({ room }) {
   );
 }
 
-function StoryFeedItem({ block, index }) {
-  if (block.type === 'signature') {
-    return (
-      <div className="mb-3 px-3 text-right text-[10px] italic text-cyber-purple/80">
-        {block.text}
-      </div>
-    );
-  }
-
-  if (block.type === 'quote') {
-    return (
-      <div className="mb-3 rounded-lg border border-kinetic-orange/30 bg-kinetic-orange/[.05] px-3 py-3 text-center text-sm text-kinetic-orange">
-        {block.text}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-3 rounded-lg border border-white/8 bg-white/[.02] px-3 py-3">
-      <div className="mb-1 text-[5px] tracking-[.2em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-        TNG ORIGIN FEED · {String(index + 1).padStart(2, '0')}
-      </div>
-      <p className="text-[10px] leading-relaxed text-white/48">{block.text}</p>
-    </div>
-  );
-}
-
 function LiveStatusInline() {
   const [rooms, setRooms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -332,94 +305,154 @@ function LiveStatusInline() {
     };
   }, []);
 
-  const feed = [
-    ...(rooms.length === 0
-      ? [{
-          kind: 'dust',
-          id: 'pixel-dustbowl',
-        }]
-      : rooms.map((room) => ({
-          kind: 'room',
-          id: `room-${room.id}`,
-          room,
-        }))),
-    ...TNG_ORIGIN_STORY.map((block, index) => ({
-      kind: 'story',
-      id: `story-${index}`,
-      block,
-      index,
-    })),
-  ];
+  const storyText = TNG_ORIGIN_STORY
+    .map((block) => block.text?.trim())
+    .filter(Boolean)
+    .join('\n\n');
 
-  const doubledFeed = [...feed, ...feed];
-  const duration = Math.max(38, feed.length * 7);
+  const crawlDuration = Math.max(85, Math.ceil(storyText.length / 24));
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px] flex flex-col cursor-default">
       <style>{`
-        @keyframes tng-rss-scroll {
-          0% { transform: translateY(0); }
-          100% { transform: translateY(-50%); }
+        @keyframes tng-story-crawl {
+          0% {
+            transform: rotateX(20deg) translateY(92%);
+          }
+          100% {
+            transform: rotateX(20deg) translateY(-115%);
+          }
         }
-        .tng-rss-feed {
-          animation: tng-rss-scroll ${duration}s linear infinite;
+
+        .tng-story-crawl-stage {
+          position: relative;
+          flex: 1;
+          min-height: 0;
+          overflow: hidden;
+          perspective: 560px;
+        }
+
+        .tng-story-crawl {
+          width: 88%;
+          max-width: 540px;
+          margin: 0 auto;
+          padding-top: 72%;
+          white-space: pre-line;
+          text-align: center;
+          color: rgba(255, 204, 0, 0.9);
+          font-size: 10px;
+          line-height: 1.85;
+          letter-spacing: 0.025em;
+          transform-origin: 50% 100%;
+          animation: tng-story-crawl ${crawlDuration}s linear infinite;
+          text-shadow: 0 0 8px rgba(255, 156, 0, 0.14);
+          will-change: transform;
+        }
+
+        .tng-story-crawl-heading {
+          display: block;
+          margin-bottom: 20px;
+          color: rgba(255, 95, 31, 0.95);
+          font-size: 12px;
+          line-height: 1.6;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+        }
+
+        .tng-story-crawl-title {
+          display: block;
+          margin-bottom: 28px;
+          color: rgba(255, 214, 46, 1);
+          font-size: 14px;
+          line-height: 1.55;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .tng-story-fade-top {
+          position: absolute;
+          inset: 0 0 auto;
+          z-index: 4;
+          height: 28%;
+          pointer-events: none;
+          background: linear-gradient(
+            to bottom,
+            #07030d 0%,
+            rgba(7, 3, 13, 0.92) 30%,
+            rgba(7, 3, 13, 0) 100%
+          );
+        }
+
+        .tng-story-fade-bottom {
+          position: absolute;
+          inset: auto 0 0;
+          z-index: 4;
+          height: 16%;
+          pointer-events: none;
+          background: linear-gradient(
+            to top,
+            #07030d 0%,
+            rgba(7, 3, 13, 0.72) 38%,
+            rgba(7, 3, 13, 0) 100%
+          );
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .tng-story-crawl {
+            animation-duration: ${crawlDuration * 2}s;
+          }
         }
       `}</style>
 
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex items-center justify-between mb-2 shrink-0">
         <div>
-          <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+          <h3
+            className="text-sm tracking-[0.1em] text-outlaw-gold uppercase"
+            style={{ fontFamily: "'Monoton', cursive" }}
+          >
             LIVE ROOMS
           </h3>
-          <div className="mt-1 text-[5px] tracking-[.2em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-            TNG RSS FEED
+          <div
+            className="mt-1 text-[5px] tracking-[.2em] text-white/20 uppercase"
+            style={{ fontFamily: "'Press Start 2P', monospace" }}
+          >
+            TNG STORY FEED
           </div>
         </div>
-        <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+
+        <span
+          className="text-[6px] tracking-widest text-white/30 uppercase"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
           {loading ? 'SYNCING…' : `${rooms.length} LIVE`}
         </span>
       </div>
 
-      <div className="relative flex-1 min-h-0 overflow-hidden rounded-lg border border-white/8 bg-black/30">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-[#07030d] to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-[#07030d] to-transparent" />
+      <div className="tng-story-crawl-stage">
+        <div className="tng-story-fade-top" />
+        <div className="tng-story-fade-bottom" />
 
-        <div className="tng-rss-feed p-2">
-          {doubledFeed.map((item, duplicateIndex) => {
-            const key = `${item.id}-${duplicateIndex}`;
-
-            if (item.kind === 'room') {
-              return <RoomRow key={key} room={item.room} />;
-            }
-
-            if (item.kind === 'dust') {
-              return (
-                <div key={key} className="mb-3 rounded-lg border border-outlaw-gold/20 bg-outlaw-gold/[.035] p-3 text-center">
-                  <div className="text-xl">🕸️</div>
-                  <div className="mt-1 text-xs text-kinetic-orange uppercase" style={{ fontFamily: "'Rye', serif" }}>
-                    THE GREAT PIXEL DUSTBOWL™
-                  </div>
-                  <p className="mt-2 text-[10px] leading-relaxed text-white/48">
-                    Somebody poured blood, sweat, caffeine and an unreasonable number of browser tabs into this digital arcade… just for it to sit here collecting premium-grade pixel dust. So while we wait for somebody to start a room, here is how this whole mess happened.
-                  </p>
-                </div>
-              );
-            }
-
-            return (
-              <StoryFeedItem
-                key={key}
-                block={item.block}
-                index={item.index}
-              />
-            );
-          })}
+        <div
+          className="tng-story-crawl"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
+          <span className="tng-story-crawl-heading">
+            A LONG TIME AGO IN A BROWSER TAB NOT SO FAR AWAY...
+          </span>
+          <span className="tng-story-crawl-title">
+            THE TEXASNOMAD GAMES STORY
+          </span>
+          {storyText}
         </div>
       </div>
 
-      <div className="mt-3 text-center text-[5px] tracking-[.18em] text-white/20 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-        PASSIVE FEED · LIVE DATA + THE FULL TNG STORY
+      <div
+        className="mt-2 shrink-0 text-center text-[5px] tracking-[.18em] text-white/20 uppercase"
+        style={{ fontFamily: "'Press Start 2P', monospace" }}
+      >
+        PASSIVE FEED · FULL STORY · NO CLICKING REQUIRED
       </div>
     </div>
   );
 }
+
