@@ -36,12 +36,51 @@ export function preloadBffSounds() {
   });
 }
 
+let unlockArmed = false;
+
+export function armBffSoundUnlock() {
+  if (typeof document === 'undefined' || unlockArmed) return;
+  unlockArmed = true;
+
+  const unlock = () => {
+    Object.keys(BFF_SOUND_URLS).forEach((name) => {
+      const audio = getAudio(name);
+      if (!audio) return;
+
+      try {
+        audio.muted = true;
+        audio.currentTime = 0;
+        const result = audio.play();
+
+        Promise.resolve(result)
+          .catch(() => {})
+          .finally(() => {
+            try {
+              audio.pause();
+              audio.currentTime = 0;
+              audio.muted = false;
+            } catch {
+              // Ignore media cleanup failures.
+            }
+          });
+      } catch {
+        // A later interaction can still allow normal playback.
+      }
+    });
+  };
+
+  document.addEventListener('pointerdown', unlock, { once: true, capture: true });
+  document.addEventListener('keydown', unlock, { once: true, capture: true });
+}
+
 export async function playBffSound(name, { volume = 0.9 } = {}) {
-  const template = getAudio(name);
-  if (!template) return false;
+  const audio = getAudio(name);
+  if (!audio) return false;
 
   try {
-    const audio = template.cloneNode(true);
+    audio.pause();
+    audio.currentTime = 0;
+    audio.muted = false;
     audio.volume = Math.max(0, Math.min(1, Number(volume) || 0.9));
     await audio.play();
     return true;
