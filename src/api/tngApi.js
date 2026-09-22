@@ -10,6 +10,10 @@ const API_BASE =
     ? '/tng-api'
     : 'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech');
 
+const BFF_API_BASE =
+  import.meta.env.VITE_BFF_API_BASE ||
+  'https://br-polished-glade-avfsrygs-bffapi.compute.c-11.us-east-1.aws.neon.tech';
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -28,6 +32,7 @@ async function request(path, {
   displayToken,
   roomCode,
   authenticated=true,
+  apiBase=API_BASE,
 } = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
@@ -46,7 +51,7 @@ async function request(path, {
   if (roomCode) headers['X-TNG-Room-Code'] = roomCode;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const url = `${API_BASE}${path.replace(/^\/api/, '')}`;
+  const url = `${apiBase}${path.replace(/^\/api/, '')}`;
   const requestBody = body === undefined ? undefined : JSON.stringify(body);
 
   let response = await fetch(url, {
@@ -203,6 +208,12 @@ export const tngApi = {
       deviceId,
       roomCode,
       body:{ roomCode, action, ...payload },
+    }),
+  },
+  bff: {
+    getHostState: (deviceId) => request('/host', {
+      deviceId,
+      apiBase: BFF_API_BASE,
     }),
   },
   squareBiz: {
