@@ -1376,12 +1376,19 @@ async function applyBffHostAction(room, body = {}, players = []) {
   if (action === 'voice_answer') {
     const playerId = String(body.playerId || '');
     const sdp = String(body.sdp || '');
-    if (!playerId || !sdp) return next;
+    const offerAt = Number(body.offerAt || 0);
+    if (!playerId || !sdp || !offerAt) return next;
+
+    const currentOfferAt = Number((next.voice_offers || {})[playerId]?.at || 0);
+    if (!currentOfferAt || currentOfferAt !== offerAt) {
+      return next;
+    }
 
     next.voice_answers = {
       ...(next.voice_answers || {}),
       [playerId]: {
         sdp,
+        offerAt,
         at: Date.now(),
       },
     };
@@ -1508,6 +1515,9 @@ function sanitizeBffPlayerState(gameState = {}, players = [], participant = null
       : null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
+    voice_offer_at: participant
+      ? Number((gameState.voice_offers || {})[participant.accountId || participant.playerId]?.at) || null
+      : null,
     voice_answer: participant
       ? (gameState.voice_answers || {})[participant.accountId || participant.playerId] || null
       : null,
@@ -1747,6 +1757,12 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
     const sdp = String(body.sdp || '');
     if (!sdp || !playerId) return current;
 
+    const offerAt = Date.now();
+    const answers = { ...(current.voice_answers || {}) };
+    const statuses = { ...(current.voice_status || {}) };
+    delete answers[playerId];
+    delete statuses[playerId];
+
     return {
       ...current,
       voice_offers: {
@@ -1755,13 +1771,15 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
           sdp,
           playerId,
           playerName: participant.playerName || participant.name || 'Player',
-          at: Date.now(),
+          at: offerAt,
         },
       },
+      voice_answers: answers,
       voice_ready: {
         ...(current.voice_ready || {}),
         [playerId]: false,
       },
+      voice_status: statuses,
     };
   }
 
