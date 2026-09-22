@@ -364,6 +364,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     voice_offers: gameState.voice_offers || {},
+    voice_ready: gameState.voice_ready || {},
     answers: safeAnswers,
     players,
   };
@@ -525,7 +526,12 @@ function bffMicsReady(players = [], gameState = {}) {
   if (!hasTeam1 || !hasTeam2) return false;
 
   const offers = gameState.voice_offers || {};
-  return assigned.every((player) => Boolean(offers[String(player.playerId)]?.sdp));
+  const ready = gameState.voice_ready || {};
+
+  return assigned.every((player) => {
+    const playerId = String(player.playerId);
+    return Boolean(offers[playerId]?.sdp && ready[playerId] === true);
+  });
 }
 
 function bffFaceoffAttempted(gameState = {}, team) {
@@ -1343,6 +1349,17 @@ async function applyBffHostAction(room, body = {}, players = []) {
     return next;
   }
 
+  if (action === 'voice_peer_status') {
+    const playerId = String(body.playerId || '');
+    if (!playerId) return next;
+
+    next.voice_ready = {
+      ...(next.voice_ready || {}),
+      [playerId]: Boolean(body.ready),
+    };
+    return next;
+  }
+
   if (action === 'voice_answer') {
     const playerId = String(body.playerId || '');
     const sdp = String(body.sdp || '');
@@ -1728,6 +1745,10 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
           at: Date.now(),
         },
       },
+      voice_ready: {
+        ...(current.voice_ready || {}),
+        [playerId]: false,
+      },
     };
   }
 
@@ -1738,13 +1759,16 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
 
     const offers = { ...(current.voice_offers || {}) };
     const answers = { ...(current.voice_answers || {}) };
+    const ready = { ...(current.voice_ready || {}) };
     delete offers[playerId];
     delete answers[playerId];
+    delete ready[playerId];
 
     return {
       ...current,
       voice_offers: offers,
       voice_answers: answers,
+      voice_ready: ready,
     };
   }
 
