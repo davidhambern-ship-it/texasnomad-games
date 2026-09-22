@@ -327,6 +327,13 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     buzzer_phase: gameState.buzzer_phase || null,
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
     buzz_winner: gameState.buzz_winner || null,
+    family_names_set: Boolean(gameState.family_names_set || bffFamilyNamesReady(gameState)),
+    round_stage: gameState.round_stage || 'setup',
+    faceoff_players: gameState.faceoff_players || {},
+    faceoff_results: gameState.faceoff_results || {},
+    faceoff_x_event: gameState.faceoff_x_event || null,
+    active_player_id: gameState.active_player_id || null,
+    answer_deadline_at: Number(gameState.answer_deadline_at) || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     voice_offers: gameState.voice_offers || {},
@@ -439,7 +446,123 @@ async function pickBffSurvey(gameState = {}) {
   };
 }
 
-async function applyBffHostAction(room, body = {}) {
+
+function bffFamilyNamesReady(gameState = {}) {
+  const family1 = String(gameState.family1 || '').trim();
+  const family2 = String(gameState.family2 || '').trim();
+
+  return Boolean(
+    family1 &&
+    family2 &&
+    family1.toLowerCase() !== 'family 1' &&
+    family2.toLowerCase() !== 'family 2'
+  );
+}
+
+function bffTeamForPlayer(gameState = {}, playerId) {
+  return Number((gameState.playerTeams || {})[String(playerId)] || 0) || null;
+}
+
+function bffTeamRoster(players = [], gameState = {}, team) {
+  return players
+    .filter((player) => bffTeamForPlayer(gameState, player.playerId) === Number(team))
+    .slice()
+    .sort((a, b) =>
+      Number(a.seatNumber || 999) - Number(b.seatNumber || 999)
+      || Number(a.joinedAt || 0) - Number(b.joinedAt || 0)
+    );
+}
+
+function bffNextPlayerId(players = [], gameState = {}, team, currentPlayerId) {
+  const roster = bffTeamRoster(players, gameState, team);
+  if (!roster.length) return null;
+
+  const currentIndex = roster.findIndex(
+    (player) => String(player.playerId) === String(currentPlayerId || ''),
+  );
+
+  if (currentIndex < 0) return roster[0].playerId;
+  return roster[(currentIndex + 1) % roster.length]?.playerId || roster[0].playerId;
+}
+
+function bffFaceoffPlayerIds(gameState = {}) {
+  const pair = gameState.faceoff_players || {};
+  return [pair['1'] || pair[1] || null, pair['2'] || pair[2] || null].filter(Boolean);
+}
+
+function bffOtherFaceoffPlayerId(gameState = {}, playerId) {
+  return bffFaceoffPlayerIds(gameState).find(
+    (id) => String(id) !== String(playerId || ''),
+  ) || null;
+}
+
+function bffStartAnswerClock(gameState, playerId) {
+  gameState.active_player_id = playerId || null;
+  gameState.answer_deadline_at = playerId ? Date.now() + 15000 : null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = playerId ? 'answering' : 'board_shown';
+  gameState.round_stage = playerId ? 'faceoff_answer' : gameState.round_stage;
+}
+
+function bffResolveFaceoffControl(gameState, players, winnerPlayerId) {
+  const team = bffTeamForPlayer(gameState, winnerPlayerId);
+  if (!team) return;
+
+  gameState.control_team = team;
+  gameState.active_turn = team;
+  gameState.round_stage = 'family_play';
+  gameState.steal_mode = false;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+  gameState.answer_deadline_at = null;
+  gameState.active_player_id = bffNextPlayerId(
+    players,
+    gameState,
+    team,
+    winnerPlayerId,
+  );
+}
+
+function bffFaceoffResults(gameState = {}) {
+  return { ...(gameState.faceoff_results || {}) };
+}
+
+function bffAdvanceFaceoffAfterMiss(gameState, playerId, { showX = false } = {}) {
+  const results = bffFaceoffResults(gameState);
+  results[String(playerId)] = {
+    ...(results[String(playerId)] || {}),
+    wrong: true,
+    at: Date.now(),
+  };
+  gameState.faceoff_results = results;
+
+  if (showX) {
+    gameState.faceoff_x_event = {
+      playerId,
+      at: Date.now(),
+    };
+    gameState.sound_cue = {
+      name: 'faceoff_wrong',
+      at: Date.now(),
+    };
+  }
+
+  const otherPlayerId = bffOtherFaceoffPlayerId(gameState, playerId);
+  const otherResult = otherPlayerId ? results[String(otherPlayerId)] : null;
+
+  if (otherPlayerId && !otherResult) {
+    bffStartAnswerClock(gameState, otherPlayerId);
+    return;
+  }
+
+  gameState.round_stage = 'faceoff_unresolved';
+  gameState.active_player_id = null;
+  gameState.answer_deadline_at = null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+}
+
+async function applyBffHostAction(room, body = {}, players = []) {
   const action = String(body.action || '').trim();
   const current = extractBffGameState(room.display_state || {});
 
@@ -456,8 +579,16 @@ async function applyBffHostAction(room, body = {}) {
   };
 
   if (action === 'set_family_names') {
-    next.family1 = String(body.family1 || '').trim() || next.family1 || 'Family 1';
-    next.family2 = String(body.family2 || '').trim() || next.family2 || 'Family 2';
+    const family1 = String(body.family1 || '').trim();
+    const family2 = String(body.family2 || '').trim();
+
+    if (!family1 || !family2) {
+      throw new Error('Both family names are required before the round can start.');
+    }
+
+    next.family1 = family1;
+    next.family2 = family2;
+    next.family_names_set = true;
     return next;
   }
 
@@ -472,7 +603,37 @@ async function applyBffHostAction(room, body = {}) {
     return next;
   }
 
+  if (action === 'set_faceoff_player') {
+    const team = Number(body.team);
+    const playerId = String(body.playerId || '');
+
+    if (![1, 2].includes(team) || !playerId) return next;
+    if (bffTeamForPlayer(next, playerId) !== team) {
+      throw new Error('That player is not assigned to this family.');
+    }
+
+    next.faceoff_players = {
+      ...(next.faceoff_players || {}),
+      [team]: playerId,
+    };
+    next.faceoff_results = {};
+    next.buzz_winner = null;
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.buzzer_open = false;
+    next.buzzer_phase = 'board_shown';
+
+    if (next.current_question) {
+      next.round_stage = 'faceoff_ready';
+    }
+    return next;
+  }
+
   if (action === 'start_round') {
+    if (!bffFamilyNamesReady(next)) {
+      throw new Error('Enter both family names before starting the round.');
+    }
+
     const survey = await pickBffSurvey(next);
     if (!survey) {
       throw new Error('No active BFF surveys are available.');
@@ -483,13 +644,19 @@ async function applyBffHostAction(room, body = {}) {
       : [];
 
     next.phase = 'playing';
+    next.family_names_set = true;
+    next.round_stage = 'faceoff_setup';
     next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1));
     next.round_bank = 0;
     next.bye_count = 0;
     next.steal_mode = false;
-    next.buzzer_open = true;
-    next.buzzer_phase = 'buzzer_active';
+    next.buzzer_open = false;
+    next.buzzer_phase = 'board_shown';
     next.buzz_winner = null;
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.faceoff_results = {};
+    next.faceoff_x_event = null;
     next.current_survey_id = survey.id;
     next.used_survey_ids = previousUsed.includes(survey.id)
       ? [survey.id]
@@ -503,12 +670,17 @@ async function applyBffHostAction(room, body = {}) {
 
   if (action === 'reset_round') {
     next.phase = 'playing';
+    next.round_stage = 'faceoff_setup';
     next.round_bank = 0;
     next.bye_count = 0;
     next.steal_mode = false;
     next.buzzer_open = false;
     next.buzzer_phase = 'board_shown';
     next.buzz_winner = null;
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.faceoff_results = {};
+    next.faceoff_x_event = null;
     next.answers = normalizeBffRankedAnswers(getBffAnswers(next));
     next.answer_count = next.answers.length;
     next.sound_cue = null;
@@ -524,10 +696,27 @@ async function applyBffHostAction(room, body = {}) {
     next.buzzer_open = false;
     next.buzzer_phase = 'board_shown';
     next.buzz_winner = null;
+    next.round_stage = 'setup';
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.faceoff_results = {};
+    next.faceoff_x_event = null;
     next.current_question = '';
     next.answers = [];
     next.answer_count = 0;
     next.current_survey_id = null;
+    return next;
+  }
+
+  if (action === 'faceoff_timeout') {
+    if (next.round_stage !== 'faceoff_answer' || !next.active_player_id) return next;
+    bffAdvanceFaceoffAfterMiss(next, next.active_player_id, { showX: false });
+    return next;
+  }
+
+  if (action === 'faceoff_wrong') {
+    if (next.round_stage !== 'faceoff_answer' || !next.active_player_id) return next;
+    bffAdvanceFaceoffAfterMiss(next, next.active_player_id, { showX: true });
     return next;
   }
 
@@ -547,10 +736,59 @@ async function applyBffHostAction(room, body = {}) {
     if (reveal && !wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) + Number(answer.points || 0));
       next.sound_cue = { name: 'correct_applause', at: Date.now() };
+
+      if (next.round_stage === 'faceoff_answer' && next.active_player_id) {
+        const playerId = String(next.active_player_id);
+        const results = bffFaceoffResults(next);
+        results[playerId] = {
+          answerIndex: index,
+          points: Number(answer.points || 0),
+          wrong: false,
+          at: Date.now(),
+        };
+        next.faceoff_results = results;
+
+        const attemptedIds = Object.keys(results);
+        const otherPlayerId = bffOtherFaceoffPlayerId(next, playerId);
+        const otherResult = otherPlayerId ? results[String(otherPlayerId)] : null;
+
+        if (index === 0 && attemptedIds.length === 1) {
+          bffResolveFaceoffControl(next, players, playerId);
+        } else if (otherPlayerId && !otherResult) {
+          bffStartAnswerClock(next, otherPlayerId);
+        } else {
+          const pair = bffFaceoffPlayerIds(next);
+          const ranked = pair
+            .map((id) => ({ id, result: results[String(id)] }))
+            .filter((entry) => entry.result && !entry.result.wrong)
+            .sort((a, b) =>
+              Number(b.result.points || 0) - Number(a.result.points || 0)
+              || Number(a.result.answerIndex || 99) - Number(b.result.answerIndex || 99)
+            );
+
+          if (ranked[0]?.id) {
+            bffResolveFaceoffControl(next, players, ranked[0].id);
+          } else {
+            next.round_stage = 'faceoff_unresolved';
+            next.active_player_id = null;
+            next.answer_deadline_at = null;
+          }
+        }
+      } else if (next.round_stage === 'family_play' && next.active_player_id) {
+        const team = bffTeamForPlayer(next, next.active_player_id) || next.control_team;
+        next.active_player_id = bffNextPlayerId(
+          players,
+          next,
+          team,
+          next.active_player_id,
+        );
+      }
     }
+
     if (!reveal && wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) - Number(answer.points || 0));
     }
+
     return next;
   }
 
@@ -561,8 +799,29 @@ async function applyBffHostAction(room, body = {}) {
   }
 
   if (action === 'add_bye') {
+    if (next.round_stage === 'faceoff_answer') {
+      return next;
+    }
+
     next.bye_count = Math.min(3, Number(next.bye_count || 0) + 1);
     next.sound_cue = { name: 'wrong_awww', at: Date.now() };
+
+    if (next.round_stage === 'family_play' && next.active_player_id) {
+      const team = bffTeamForPlayer(next, next.active_player_id) || next.control_team;
+      next.active_player_id = bffNextPlayerId(
+        players,
+        next,
+        team,
+        next.active_player_id,
+      );
+    }
+
+    if (next.bye_count >= 3) {
+      next.steal_mode = true;
+      next.round_stage = 'steal';
+      next.active_player_id = null;
+    }
+
     return next;
   }
 
@@ -594,15 +853,28 @@ async function applyBffHostAction(room, body = {}) {
   }
 
   if (action === 'open_buzzers') {
+    const pair = next.faceoff_players || {};
+    const team1Player = pair['1'] || pair[1];
+    const team2Player = pair['2'] || pair[2];
+
+    if (!team1Player || !team2Player) {
+      throw new Error('Choose one faceoff player from each family first.');
+    }
+
+    next.round_stage = 'faceoff_buzz';
     next.buzzer_open = true;
     next.buzzer_phase = 'buzzer_active';
     next.buzz_winner = null;
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.faceoff_results = {};
     return next;
   }
 
   if (action === 'hide_buzzers') {
     next.buzzer_open = false;
     next.buzzer_phase = 'board_shown';
+    if (next.round_stage === 'faceoff_buzz') next.round_stage = 'faceoff_ready';
     return next;
   }
 
@@ -719,6 +991,11 @@ function sanitizeBffPlayerState(gameState = {}, players = [], participant = null
     buzzer_phase: gameState.buzzer_phase || null,
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
     buzz_winner: gameState.buzz_winner || null,
+    round_stage: gameState.round_stage || 'setup',
+    faceoff_players: gameState.faceoff_players || {},
+    faceoff_x_event: gameState.faceoff_x_event || null,
+    active_player_id: gameState.active_player_id || null,
+    answer_deadline_at: Number(gameState.answer_deadline_at) || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
     voice_answer: participant
@@ -761,14 +1038,26 @@ async function claimBffBuzz(room, participant) {
     const teamMap = current.playerTeams || {};
     const familyTeam =
       Number(teamMap[participant.accountId] || participant.familyTeam || 0) || null;
+    const allowedFaceoffId =
+      (current.faceoff_players || {})[String(familyTeam)]
+      || (current.faceoff_players || {})[familyTeam];
 
+    if (!familyTeam || String(allowedFaceoffId || '') !== String(participant.accountId || '')) {
+      await client.query('commit');
+      return { gameState: current, room: lockedRoom };
+    }
+
+    const now = Date.now();
     const nextGameState = {
       ...current,
+      round_stage: 'faceoff_answer',
       buzzer_open: false,
-      buzzer_phase: 'buzzed',
+      buzzer_phase: 'answering',
       control_team: familyTeam || current.control_team || 1,
       active_turn: familyTeam || current.active_turn || 1,
-      sound_cue: { name: 'buzz', at: Date.now() },
+      active_player_id: participant.accountId,
+      answer_deadline_at: now + 15000,
+      sound_cue: { name: 'buzz', at: now },
       buzz_winner: {
         playerId: participant.accountId,
         playerName: participant.playerName || participant.name || 'Player',
@@ -1123,9 +1412,13 @@ async function handleBffApi(req, res) {
     }
 
     const body = await readJsonBody(req).catch(() => ({}));
-    const nextGameState = await applyBffHostAction(room, body || {});
-    const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
     await assignBffSeats(room.id);
+    const actionPlayers = await loadBffParticipants(
+      room.id,
+      extractBffGameState(room.display_state || {}),
+    );
+    const nextGameState = await applyBffHostAction(room, body || {}, actionPlayers);
+    const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
     const players = await loadBffParticipants(room.id, nextGameState);
     const gameState = sanitizeBffHostState(nextGameState, players);
 
