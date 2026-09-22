@@ -25,7 +25,25 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      const session = await getNeonSession();
+      const isAuthHandoff =
+        window.location.pathname.startsWith('/onboarding') ||
+        window.location.pathname.startsWith('/login') ||
+        window.location.pathname.startsWith('/register');
+
+      const attempts = isAuthHandoff ? 5 : 1;
+      let session = null;
+
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
+        session = await getNeonSession();
+        if (session?.user) break;
+
+        if (attempt < attempts - 1) {
+          await new Promise((resolve) =>
+            window.setTimeout(resolve, 250 + (attempt * 350))
+          );
+        }
+      }
+
       const neonUser = session?.user || null;
 
       if (neonUser) {
