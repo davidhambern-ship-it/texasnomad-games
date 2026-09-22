@@ -263,7 +263,9 @@ export default function NeonBFFPlayer({ roomCode }) {
   const remoteAudioRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
+  const [voiceConnectionState, setVoiceConnectionState] = useState('off');
   const micAutoAttemptedRef = useRef(false);
+  const currentVoiceOfferAtRef = useRef(null);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -373,16 +375,37 @@ export default function NeonBFFPlayer({ roomCode }) {
     const pc = voicePcRef.current;
     if (!voiceAnswer?.sdp || !pc) return;
 
+    const currentOfferAt = Number(
+      gameState.voice_offer_at || currentVoiceOfferAtRef.current || 0,
+    );
+    const answerOfferAt = Number(voiceAnswer.offerAt || 0);
+
+    if (answerOfferAt && currentOfferAt && answerOfferAt !== currentOfferAt) {
+      return;
+    }
+
     const key = `${voiceAnswer.at || ''}:${voiceAnswer.sdp.length}`;
     if (appliedVoiceAnswerRef.current === key) return;
+    if (pc.signalingState !== 'have-local-offer') return;
+
     appliedVoiceAnswerRef.current = key;
 
     pc.setRemoteDescription({ type: 'answer', sdp: voiceAnswer.sdp })
+      .then(() => {
+        if (voicePcRef.current === pc) {
+          setVoiceConnectionState(
+            pc.connectionState === 'connected' ? 'live' : 'connecting',
+          );
+        }
+      })
       .catch((voiceError) => {
         console.warn('[BFF Voice] Player could not apply Host answer', voiceError);
-        setError('Your microphone connection could not finish. Tap MIC OFF, then MIC ON.');
+        if (voicePcRef.current === pc) {
+          setVoiceConnectionState('failed');
+          setError('Your microphone link could not finish. Toggle MIC OFF, then MIC ON to retry.');
+        }
       });
-  }, [gameState.voice_answer]);
+  }, [gameState.voice_answer, gameState.voice_offer_at]);
 
   useEffect(() => () => {
     voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
@@ -418,9 +441,12 @@ export default function NeonBFFPlayer({ roomCode }) {
         ],
       });
 
-      voicePcRef.current?.close?.();
+      const oldPc = voicePcRef.current;
       voicePcRef.current = pc;
+      oldPc?.close?.();
       appliedVoiceAnswerRef.current = '';
+      currentVoiceOfferAtRef.current = null;
+      setVoiceConnectionState('connecting');
 
       const localTrack = stream.getAudioTracks()[0];
       if (!localTrack) {
@@ -454,11 +480,35 @@ export default function NeonBFFPlayer({ roomCode }) {
         audio.play().catch(() => {});
       };
 
-      pc.onconnectionstatechange = () => {
-        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
-          setMicOn(false);
+      const syncConnectionState = () => {
+        if (voicePcRef.current !== pc) return;
+
+        if (
+          pc.connectionState === 'connected'
+          || pc.iceConnectionState === 'connected'
+          || pc.iceConnectionState === 'completed'
+        ) {
+          setVoiceConnectionState('live');
+          setError('');
+          return;
         }
+
+        if (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') {
+          setVoiceConnectionState('failed');
+          setError('Mic permission is on, but the room audio link failed. Toggle MIC OFF, then MIC ON to retry.');
+          return;
+        }
+
+        if (pc.connectionState === 'closed') {
+          setVoiceConnectionState('off');
+          return;
+        }
+
+        setVoiceConnectionState('connecting');
       };
+
+      pc.onconnectionstatechange = syncConnectionState;
+      pc.oniceconnectionstatechange = syncConnectionState;
 
       const offer = await pc.createOffer();
 
@@ -475,13 +525,18 @@ export default function NeonBFFPlayer({ roomCode }) {
 
       setRoom(payload.room || null);
       setParticipant(payload.participant || null);
+      currentVoiceOfferAtRef.current = Number(
+        payload.room?.gameState?.voice_offer_at || 0,
+      ) || null;
       setMicOn(true);
+      setVoiceConnectionState('connecting');
     } catch (voiceError) {
       voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
       voiceStreamRef.current = null;
       voicePcRef.current?.close?.();
       voicePcRef.current = null;
       setMicOn(false);
+      setVoiceConnectionState('failed');
       setError(voiceError?.message || 'Microphone permission or connection failed.');
     } finally {
       setMicBusy(false);
@@ -505,6 +560,8 @@ export default function NeonBFFPlayer({ roomCode }) {
       }
 
       setMicOn(false);
+      setVoiceConnectionState('off');
+      currentVoiceOfferAtRef.current = null;
     } finally {
       setMicBusy(false);
     }
@@ -687,17 +744,25 @@ export default function NeonBFFPlayer({ roomCode }) {
 
         <div
           className={`rounded-lg border px-3 py-2 text-center text-[6px] uppercase tracking-[.14em] ${
-            micOn
+            voiceConnectionState === 'live'
               ? 'border-[#22D3EE]/30 bg-[#22D3EE]/5 text-[#22D3EE]'
-              : 'border-white/10 bg-white/[.02] text-white/30'
+              : voiceConnectionState === 'failed'
+                ? 'border-[#FF174D]/30 bg-[#FF174D]/5 text-[#FF174D]'
+                : micOn
+                  ? 'border-[#FFD700]/30 bg-[#FFD700]/5 text-[#FFD700]'
+                  : 'border-white/10 bg-white/[.02] text-white/30'
           }`}
           style={PS2}
         >
-          {micOn
-            ? isActiveSpeaker
-              ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
-              : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'
-            : 'MIC REQUIRED · TURN IT ON TO PLAY'}
+          {!micOn
+            ? 'MIC REQUIRED · TURN IT ON TO PLAY'
+            : voiceConnectionState === 'failed'
+              ? 'MIC LINK FAILED · TOGGLE MIC OFF / ON TO RETRY'
+              : voiceConnectionState !== 'live'
+                ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
+                : isActiveSpeaker
+                  ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
+                  : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'}
         </div>
 
         {showPlayPass && (
