@@ -16,6 +16,7 @@ import {
   Zap,
   Undo2,
   Pencil,
+  Mic,
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
@@ -206,19 +207,13 @@ function AnswerSlot({ slot, index, selected, onSelect }) {
 
         <div className="min-w-0 flex-1">
           <div
-            className="text-[6px] uppercase tracking-[.16em]"
+            className="text-[5px] uppercase tracking-[.16em]"
             style={{ ...PS2, color: revealed ? '#FFD700' : `${accent}cc` }}
           >
-            {revealed ? 'REVEALED' : 'HIDDEN ANSWER'}
+            {revealed ? 'REVEALED TO PLAYERS' : 'HOST ANSWER'}
           </div>
-          <div className="mt-2 flex gap-1">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <span
-                key={i}
-                className="h-1.5 flex-1 rounded-full"
-                style={{ background: revealed ? `${accent}85` : `${accent}20` }}
-              />
-            ))}
+          <div className="mt-2 truncate text-sm font-black text-white sm:text-base">
+            {slot?.text || '—'}
           </div>
         </div>
 
@@ -233,25 +228,37 @@ function AnswerSlot({ slot, index, selected, onSelect }) {
   );
 }
 
-function ByeMeter({ count }) {
+function ByeMeter({ count, onStrike, onUndo, busy }) {
   const letters = ['B', 'Y', 'E'];
+
   return (
     <div className="grid grid-cols-3 gap-2">
       {letters.map((letter, index) => {
         const active = index < count;
+        const isNext = index === count;
+        const canUndo = active && index === count - 1;
+        const disabled = busy || (!isNext && !canUndo);
+
         return (
-          <div
+          <button
+            type="button"
             key={letter}
-            className="flex h-14 items-center justify-center rounded-xl border-2 font-heading text-3xl"
+            disabled={disabled}
+            onClick={() => {
+              if (isNext) onStrike();
+              else if (canUndo) onUndo();
+            }}
+            className="flex h-14 items-center justify-center rounded-xl border-2 font-heading text-3xl transition-transform active:scale-95 disabled:cursor-default"
             style={{
-              borderColor: active ? '#FF174D' : 'rgba(255,255,255,.10)',
-              background: active ? 'rgba(255,23,77,.14)' : 'rgba(255,255,255,.025)',
-              color: active ? '#FF174D' : 'rgba(255,255,255,.12)',
+              borderColor: active ? '#FF174D' : isNext ? '#FF174D88' : 'rgba(255,255,255,.10)',
+              background: active ? 'rgba(255,23,77,.14)' : isNext ? 'rgba(255,23,77,.06)' : 'rgba(255,255,255,.025)',
+              color: active ? '#FF174D' : isNext ? '#FF174D88' : 'rgba(255,255,255,.12)',
               textShadow: active ? '0 0 12px #FF174D' : 'none',
             }}
+            title={isNext ? `Give strike ${letter}` : canUndo ? `Undo strike ${letter}` : ''}
           >
             {letter}
-          </div>
+          </button>
         );
       })}
     </div>
@@ -278,7 +285,7 @@ function ControlButton({ label, icon: Icon, accent = '#BC13FE', active = false, 
   );
 }
 
-function PlayerRow({ player, team, onAssign, busy }) {
+function PlayerRow({ player, team, onAssign, busy, voiceLive }) {
   const accent = team === 1 ? '#BC13FE' : team === 2 ? '#FF5F1F' : '#FFD700';
 
   return (
@@ -295,7 +302,10 @@ function PlayerRow({ player, team, onAssign, busy }) {
             SEAT {player.seatNumber ?? '—'}
           </div>
         </div>
-        <span className="h-2 w-2 shrink-0 rounded-full bg-[#4ade80]" />
+        <div className="flex items-center gap-1.5">
+          {voiceLive && <Mic className="h-3 w-3 text-[#22D3EE]" />}
+          <span className="h-2 w-2 shrink-0 rounded-full bg-[#4ade80]" />
+        </div>
       </div>
 
       <div className="mt-2 grid grid-cols-3 gap-1">
@@ -333,6 +343,25 @@ function PlayerRow({ player, team, onAssign, busy }) {
   );
 }
 
+function waitForIceComplete(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const onState = () => {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', onState);
+        resolve();
+      }
+    };
+
+    pc.addEventListener('icegatheringstatechange', onState);
+    window.setTimeout(() => {
+      pc.removeEventListener('icegatheringstatechange', onState);
+      resolve();
+    }, 3500);
+  });
+}
+
 export default function NeonBFFHostPanel({ controllerId }) {
   const [room, setRoom] = useState(null);
   const [actionError, setActionError] = useState('');
@@ -341,6 +370,10 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [selectedAnswer, setSelectedAnswer] = useState(0);
   const [manualPoints, setManualPoints] = useState(10);
   const lastSoundCueRef = useRef(null);
+  const voicePeersRef = useRef(new Map());
+  const handledVoiceOffersRef = useRef(new Map());
+  const voiceAudioRef = useRef(null);
+  const [voiceConnected, setVoiceConnected] = useState({});
 
   const gameState = room?.gameState || {};
   const players = Array.isArray(gameState.players)
@@ -392,6 +425,81 @@ export default function NeonBFFHostPanel({ controllerId }) {
     playBffSound(String(cue.name || ''));
   }, [gameState.sound_cue]);
 
+  useEffect(() => {
+    const offers = gameState.voice_offers || {};
+    let cancelled = false;
+
+    Object.entries(offers).forEach(async ([playerId, offer]) => {
+      if (!offer?.sdp) return;
+
+      const offerKey = `${offer.at || ''}:${offer.sdp.length}`;
+      if (handledVoiceOffersRef.current.get(playerId) === offerKey) return;
+      handledVoiceOffersRef.current.set(playerId, offerKey);
+
+      try {
+        const oldPc = voicePeersRef.current.get(playerId);
+        oldPc?.close?.();
+
+        const pc = new RTCPeerConnection({
+          iceServers: [
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+          ],
+        });
+
+        voicePeersRef.current.set(playerId, pc);
+
+        pc.onconnectionstatechange = () => {
+          if (cancelled) return;
+          const live = ['connected', 'completed'].includes(pc.connectionState);
+          setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
+        };
+
+        pc.ontrack = (event) => {
+          if (cancelled) return;
+          const stream = event.streams?.[0];
+          if (!stream || !voiceAudioRef.current) return;
+
+          let audio = voiceAudioRef.current.querySelector(`audio[data-player-id="${playerId}"]`);
+          if (!audio) {
+            audio = document.createElement('audio');
+            audio.autoplay = true;
+            audio.playsInline = true;
+            audio.dataset.playerId = playerId;
+            voiceAudioRef.current.appendChild(audio);
+          }
+
+          audio.srcObject = stream;
+          audio.play().catch(() => {});
+        };
+
+        await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await waitForIceComplete(pc);
+
+        if (cancelled || !pc.localDescription?.sdp) return;
+
+        await tngApi.bff.hostAction(controllerId, 'voice_answer', {
+          playerId,
+          sdp: pc.localDescription.sdp,
+        });
+      } catch (voiceError) {
+        console.warn('[BFF Voice] Host could not connect player audio', playerId, voiceError);
+        setVoiceConnected((prev) => ({ ...prev, [playerId]: false }));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [controllerId, gameState.voice_offers]);
+
+  useEffect(() => () => {
+    voicePeersRef.current.forEach((pc) => pc.close?.());
+    voicePeersRef.current.clear();
+  }, []);
+
   const act = useCallback(async (action, payload = {}) => {
     if (!controllerId || busy) return false;
     setBusy(true);
@@ -435,6 +543,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-2.5">
+      <div ref={voiceAudioRef} className="hidden" aria-hidden="true" />
       {actionError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
           {actionError}
@@ -495,7 +604,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               ANSWER BOARD
             </div>
             <div className="text-[5px] uppercase tracking-widest text-[#FFD700]/55" style={PS2}>
-              HOST VIEW · ANSWERS HIDDEN
+              HOST JUDGE VIEW · ANSWERS PRIVATE
             </div>
           </div>
 
@@ -534,7 +643,12 @@ export default function NeonBFFHostPanel({ controllerId }) {
             </div>
           </div>
 
-          <ByeMeter count={byeCount} />
+          <ByeMeter
+            count={byeCount}
+            busy={busy}
+            onStrike={() => act('add_bye')}
+            onUndo={() => act('undo_bye')}
+          />
 
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             <ControlButton
@@ -582,20 +696,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
             />
 
             <ControlButton
-              label="+ BYE"
-              icon={Plus}
-              accent="#FF174D"
-              onClick={() => act('add_bye')}
-              disabled={busy || byeCount >= 3}
-            />
-            <ControlButton
-              label="- BYE"
-              icon={RotateCcw}
-              accent="#FB7185"
-              onClick={() => act('undo_bye')}
-              disabled={busy || byeCount <= 0}
-            />
-            <ControlButton
               label="Steal"
               icon={Zap}
               accent="#FFD700"
@@ -636,33 +736,12 @@ export default function NeonBFFHostPanel({ controllerId }) {
               onClick={() => act('hide_buzzers')}
               disabled={busy || !gameState.buzzer_open}
             />
-            <ControlButton
-              label="Reset Buzz"
-              icon={RotateCcw}
-              accent="#22D3EE"
-              onClick={() => act('reset_buzzers')}
-              disabled={busy}
-            />
-            <ControlButton
-              label="Buzz Sound"
-              icon={Volume2}
-              accent="#22D3EE"
-              onClick={() => act('sound', { name: 'buzz' })}
-              disabled={busy}
-            />
 
             <ControlButton
               label="Bank → T1"
               icon={Trophy}
               accent="#BC13FE"
               onClick={() => act('award_bank', { team: 1 })}
-              disabled={busy}
-            />
-            <ControlButton
-              label="Ding"
-              icon={Sparkles}
-              accent="#4ADE80"
-              onClick={() => act('sound', { name: 'correct' })}
               disabled={busy}
             />
             <ControlButton
@@ -685,13 +764,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Frown}
               accent="#F472B6"
               onClick={() => act('sound', { name: 'awww' })}
-              disabled={busy}
-            />
-            <ControlButton
-              label="BYE Sound"
-              icon={Volume2}
-              accent="#FF174D"
-              onClick={() => act('sound', { name: 'bye' })}
               disabled={busy}
             />
           </div>
@@ -729,6 +801,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
+                  voiceLive={Boolean(voiceConnected[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
