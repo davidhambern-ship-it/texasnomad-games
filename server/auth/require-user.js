@@ -1,5 +1,9 @@
+import { and, eq, gt } from 'drizzle-orm';
 import { createClient } from '@base44/sdk';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+
+import { db } from '../db/client.js';
+import { neonAuthSessions, neonAuthUsers } from '../db/schema.js';
 
 let jwks;
 let jwksUrlCache;
@@ -52,6 +56,33 @@ async function verifyNeonIdentity(token) {
   };
 }
 
+async function verifyNeonSessionIdentity(token) {
+  if (!token || token.includes('.')) return null;
+
+  const [row] = await db
+    .select({
+      userId: neonAuthUsers.id,
+      email: neonAuthUsers.email,
+      emailVerified: neonAuthUsers.emailVerified,
+    })
+    .from(neonAuthSessions)
+    .innerJoin(neonAuthUsers, eq(neonAuthUsers.id, neonAuthSessions.userId))
+    .where(and(
+      eq(neonAuthSessions.token, token),
+      gt(neonAuthSessions.expiresAt, new Date()),
+    ))
+    .limit(1);
+
+  if (!row?.userId || typeof row.email !== 'string') return null;
+
+  return {
+    subject: String(row.userId),
+    email: row.email,
+    emailVerified: row.emailVerified === true,
+    provider: 'neon-session',
+  };
+}
+
 async function verifyBase44Identity(token) {
   const client = createClient({
     appId: BASE44_APP_ID,
@@ -87,19 +118,28 @@ export async function requireUser(request) {
     throw error;
   }
 
-  let neonError;
+  let neonJwtError;
   try {
     const identity = await verifyNeonIdentity(token);
     if (identity) return identity;
   } catch (error) {
-    neonError = error;
+    neonJwtError = error;
+  }
+
+  let neonSessionError;
+  try {
+    const identity = await verifyNeonSessionIdentity(token);
+    if (identity) return identity;
+  } catch (error) {
+    neonSessionError = error;
   }
 
   try {
     return await verifyBase44Identity(token);
   } catch (base44Error) {
     console.warn('[TNG auth] bearer token failed Neon and Base44 verification', {
-      neon: neonError?.message,
+      neonJwt: neonJwtError?.message,
+      neonSession: neonSessionError?.message,
       base44: base44Error?.message,
     });
 
