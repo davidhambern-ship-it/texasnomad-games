@@ -659,12 +659,20 @@ export default function NeonBFFHostPanel({ controllerId }) {
               disabled={busy || gameState.phase === 'playing'}
             />
             <ControlButton
+              label="Reset Round"
+              icon={RotateCcw}
+              accent="#FF5F1F"
+              onClick={() => act('reset_round')}
+              disabled={busy || !gameState.current_question}
+            />
+            <ControlButton
               label="Next Q"
               icon={SkipForward}
               accent="#22D3EE"
               onClick={() => act('next_question')}
               disabled={busy}
             />
+
             <ControlButton
               label="Undo"
               icon={Undo2}
