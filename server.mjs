@@ -295,7 +295,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
   const answerCount = Math.max(
     answers.length,
     Number(gameState.answer_count || gameState.answerCount || 0),
-    8,
+    4,
   );
 
   const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
@@ -367,6 +367,53 @@ function bffUndoSnapshot(gameState = {}) {
   return snapshot;
 }
 
+
+async function pickBffSurvey(gameState = {}) {
+  const used = Array.isArray(gameState.used_survey_ids)
+    ? gameState.used_survey_ids.map((id) => Number(id)).filter(Number.isFinite)
+    : [];
+
+  let query = `
+    select id, question, answers
+    from public.bff_surveys
+    where active = true
+      and not (id = any($1::bigint[]))
+    order by random()
+    limit 1
+  `;
+  let params = [used];
+
+  let { rows } = await bffPool.query(query, params);
+
+  if (!rows.length) {
+    const reset = await bffPool.query(`
+      select id, question, answers
+      from public.bff_surveys
+      where active = true
+      order by random()
+      limit 1
+    `);
+    rows = reset.rows;
+  }
+
+  const survey = rows[0] || null;
+  if (!survey) return null;
+
+  const answers = Array.isArray(survey.answers)
+    ? survey.answers
+    : [];
+
+  return {
+    id: Number(survey.id),
+    question: String(survey.question || ''),
+    answers: answers.map((answer) => ({
+      text: String(answer?.text || answer?.answer || ''),
+      points: Math.max(0, Number(answer?.points) || 0),
+      revealed: false,
+    })),
+  };
+}
+
 async function applyBffHostAction(room, body = {}) {
   const action = String(body.action || '').trim();
   const current = extractBffGameState(room.display_state || {});
@@ -401,12 +448,31 @@ async function applyBffHostAction(room, body = {}) {
   }
 
   if (action === 'start_round') {
+    const survey = await pickBffSurvey(next);
+    if (!survey) {
+      throw new Error('No active BFF surveys are available.');
+    }
+
+    const previousUsed = Array.isArray(next.used_survey_ids)
+      ? next.used_survey_ids.map((id) => Number(id)).filter(Number.isFinite)
+      : [];
+
     next.phase = 'playing';
     next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1));
     next.round_bank = 0;
     next.bye_count = 0;
     next.steal_mode = false;
-    next.buzzer_open = false;
+    next.buzzer_open = true;
+    next.buzzer_phase = 'buzzer_active';
+    next.buzz_winner = null;
+    next.current_survey_id = survey.id;
+    next.used_survey_ids = previousUsed.includes(survey.id)
+      ? [survey.id]
+      : [...previousUsed, survey.id];
+    next.current_question = survey.question;
+    next.answers = survey.answers;
+    next.answer_count = survey.answers.length;
+    next.sound_cue = { name: 'round_start', at: Date.now() };
     return next;
   }
 
@@ -417,9 +483,12 @@ async function applyBffHostAction(room, body = {}) {
     next.bye_count = 0;
     next.steal_mode = false;
     next.buzzer_open = false;
-    if (Array.isArray(next.answers)) {
-      next.answers = next.answers.map((answer) => ({ ...answer, revealed: false }));
-    }
+    next.buzzer_phase = 'board_shown';
+    next.buzz_winner = null;
+    next.current_question = '';
+    next.answers = [];
+    next.answer_count = 0;
+    next.current_survey_id = null;
     return next;
   }
 
@@ -438,6 +507,7 @@ async function applyBffHostAction(room, body = {}) {
 
     if (reveal && !wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) + Number(answer.points || 0));
+      next.sound_cue = { name: 'correct', at: Date.now() };
     }
     if (!reveal && wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) - Number(answer.points || 0));
@@ -488,6 +558,12 @@ async function applyBffHostAction(room, body = {}) {
     next.buzzer_open = true;
     next.buzzer_phase = 'buzzer_active';
     next.buzz_winner = null;
+    return next;
+  }
+
+  if (action === 'hide_buzzers') {
+    next.buzzer_open = false;
+    next.buzzer_phase = 'board_shown';
     return next;
   }
 
@@ -554,7 +630,7 @@ function sanitizeBffPlayerState(gameState = {}, players = []) {
   const answerCount = Math.max(
     answers.length,
     Number(gameState.answer_count || gameState.answerCount || 0),
-    8,
+    4,
   );
 
   const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
@@ -617,6 +693,9 @@ async function applyBffPlayerAction(room, participant, body = {}) {
       ...current,
       buzzer_open: false,
       buzzer_phase: 'buzzed',
+      control_team: familyTeam || current.control_team || 1,
+      active_turn: familyTeam || current.active_turn || 1,
+      sound_cue: { name: 'buzz', at: Date.now() },
       buzz_winner: {
         playerId: participant.accountId,
         playerName: participant.playerName || participant.name || 'Player',
