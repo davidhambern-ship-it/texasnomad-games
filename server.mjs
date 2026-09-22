@@ -365,6 +365,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     sound_cue: gameState.sound_cue || null,
     voice_offers: gameState.voice_offers || {},
     voice_ready: gameState.voice_ready || {},
+    voice_status: gameState.voice_status || {},
     answers: safeAnswers,
     players,
   };
@@ -1356,6 +1357,18 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.voice_ready = {
       ...(next.voice_ready || {}),
       [playerId]: Boolean(body.ready),
+    };
+
+    next.voice_status = {
+      ...(next.voice_status || {}),
+      [playerId]: {
+        ready: Boolean(body.ready),
+        connectionState: String(body.connectionState || ''),
+        iceConnectionState: String(body.iceConnectionState || ''),
+        iceGatheringState: String(body.iceGatheringState || ''),
+        signalingState: String(body.signalingState || ''),
+        at: Date.now(),
+      },
     };
     return next;
   }
