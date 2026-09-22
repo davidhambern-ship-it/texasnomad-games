@@ -2,10 +2,37 @@ import React from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-function TeamScore({ side, name, score, active, accent }) {
+function TeamScore({ side, name, score, active, accent, players = [] }) {
+  const members = players.slice(0, 6);
+  const leftMembers = members.slice(0, 3);
+  const rightMembers = members.slice(3, 6);
+
+  const MemberColumn = ({ items, align = 'left' }) => (
+    <div className={`flex min-w-0 flex-col gap-1 ${align === 'right' ? 'items-end text-right' : 'items-start text-left'}`}>
+      {Array.from({ length: 3 }).map((_, index) => {
+        const player = items[index];
+        return (
+          <div
+            key={player?.playerId || `${side}-empty-${align}-${index}`}
+            className="min-h-[22px] w-full max-w-[92px] rounded-md border px-1.5 py-1"
+            style={{
+              borderColor: player ? `${accent}35` : 'rgba(255,255,255,.05)',
+              background: player ? `${accent}08` : 'rgba(255,255,255,.015)',
+              color: player ? 'rgba(255,255,255,.72)' : 'rgba(255,255,255,.08)',
+            }}
+          >
+            <div className="truncate text-[7px] font-semibold sm:text-[8px]">
+              {player ? (player.playerName || player.name || 'Player') : '—'}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+
   return (
     <div
-      className="relative overflow-hidden rounded-[26px] border bg-black/55 px-4 py-4 text-center backdrop-blur-xl"
+      className="relative overflow-hidden rounded-[26px] border bg-black/55 px-3 py-3 text-center backdrop-blur-xl"
       style={{
         borderColor: active ? '#FFD700' : `${accent}66`,
         boxShadow: active
@@ -17,21 +44,45 @@ function TeamScore({ side, name, score, active, accent }) {
         className="absolute inset-x-0 top-0 h-[2px]"
         style={{ background: `linear-gradient(90deg, transparent, ${accent}, transparent)` }}
       />
-      <div className="mb-2 truncate text-[7px] uppercase tracking-[0.22em] text-white/60" style={PS2}>
-        {side}
+
+      <div className="flex items-start justify-between gap-2 text-left">
+        <div className="min-w-0">
+          <div className="truncate text-[7px] uppercase tracking-[0.22em] text-white/45" style={PS2}>
+            {side}
+          </div>
+          <div className="mt-1 truncate font-heading text-base uppercase tracking-wider text-white sm:text-lg">
+            {name}
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-[5px] uppercase tracking-widest text-white/20" style={PS2}>
+            FAMILY
+          </div>
+          <div className="mt-1 text-[7px]" style={{ ...PS2, color: accent }}>
+            {members.length}/6
+          </div>
+        </div>
       </div>
-      <div className="truncate font-heading text-lg uppercase tracking-wider text-white">{name}</div>
-      <div
-        className="mt-1 font-heading text-5xl leading-none sm:text-6xl"
-        style={{ color: accent, textShadow: `0 0 18px ${accent}` }}
-      >
-        {score}
-      </div>
-      <div
-        className={`mt-2 text-[6px] uppercase tracking-[0.2em] ${active ? 'text-[#FFD700]' : 'text-white/20'}`}
-        style={PS2}
-      >
-        {active ? '▶ IN CONTROL' : 'WAITING'}
+
+      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2">
+        <MemberColumn items={leftMembers} />
+
+        <div className="min-w-[58px]">
+          <div
+            className="font-heading text-4xl leading-none sm:text-5xl"
+            style={{ color: accent, textShadow: `0 0 18px ${accent}` }}
+          >
+            {score}
+          </div>
+          <div
+            className={`mt-2 text-[5px] uppercase tracking-[0.16em] ${active ? 'text-[#FFD700]' : 'text-white/20'}`}
+            style={PS2}
+          >
+            {active ? '▶ CONTROL' : 'WAIT'}
+          </div>
+        </div>
+
+        <MemberColumn items={rightMembers} align="right" />
       </div>
     </div>
   );
@@ -163,6 +214,9 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
   const activeTurn = Number(gs.active_turn || gs.control_team || 1);
   const stealMode = Boolean(gs.steal_mode);
   const byeCount = Math.min(3, Number(gs.bye_count || 0));
+  const players = Array.isArray(gs.players) ? gs.players : [];
+  const teamOnePlayers = players.filter((player) => Number(player.familyTeam) === 1).slice(0, 6);
+  const teamTwoPlayers = players.filter((player) => Number(player.familyTeam) === 2).slice(0, 6);
 
   return (
     <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[#080516]/95 p-3 sm:p-4">
@@ -198,6 +252,7 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
             score={gs.score1 || 0}
             active={activeTurn === 1}
             accent="#FF9A3D"
+            players={teamOnePlayers}
           />
           <Marquee />
           <TeamScore
@@ -206,6 +261,7 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
             score={gs.score2 || 0}
             active={activeTurn === 2}
             accent="#BC8CFF"
+            players={teamTwoPlayers}
           />
         </div>
 
