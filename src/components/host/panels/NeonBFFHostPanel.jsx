@@ -17,6 +17,7 @@ import {
   Undo2,
   Pencil,
   Mic,
+  MicOff,
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
@@ -393,6 +394,14 @@ function waitForIceComplete(pc) {
   });
 }
 
+function createSilentAudioTrack() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  const context = new AudioContextClass();
+  const destination = context.createMediaStreamDestination();
+  const track = destination.stream.getAudioTracks()[0];
+  return { context, track };
+}
+
 export default function NeonBFFHostPanel({ controllerId }) {
   const [room, setRoom] = useState(null);
   const [actionError, setActionError] = useState('');
@@ -404,7 +413,15 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const voicePeersRef = useRef(new Map());
   const handledVoiceOffersRef = useRef(new Map());
   const voiceAudioRef = useRef(null);
+  const playerVoiceTracksRef = useRef(new Map());
+  const silentAudioRef = useRef(null);
+  const hostMicStreamRef = useRef(null);
+  const hostMicTrackRef = useRef(null);
+  const activePlayerIdRef = useRef(null);
   const [voiceConnected, setVoiceConnected] = useState({});
+  const [hostMicReady, setHostMicReady] = useState(false);
+  const [hostMuted, setHostMuted] = useState(false);
+  const [hostMicBusy, setHostMicBusy] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const handledDeadlineRef = useRef(null);
 
@@ -440,6 +457,90 @@ export default function NeonBFFHostPanel({ controllerId }) {
     ? Math.max(0, Math.ceil((Number(gameState.answer_deadline_at) - clockNow) / 1000))
     : null;
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
+  const micsReady = Boolean(gameState.mics_ready);
+
+  const ensureSilentTrack = useCallback(() => {
+    if (!silentAudioRef.current) {
+      silentAudioRef.current = createSilentAudioTrack();
+    }
+    return silentAudioRef.current.track;
+  }, []);
+
+  const routeActiveSpeaker = useCallback((activePlayerId) => {
+    const activeId = String(activePlayerId || '');
+    const activeTrack = activeId
+      ? playerVoiceTracksRef.current.get(activeId) || null
+      : null;
+
+    voicePeersRef.current.forEach((meta, targetPlayerId) => {
+      if (!meta?.speakerSender) return;
+      const shouldHearSpeaker =
+        activeTrack
+        && String(targetPlayerId) !== activeId;
+      meta.speakerSender
+        .replaceTrack(shouldHearSpeaker ? activeTrack : meta.silentSpeakerTrack)
+        .catch(() => {});
+    });
+
+    if (voiceAudioRef.current) {
+      voiceAudioRef.current.querySelectorAll('audio[data-player-id]').forEach((audio) => {
+        audio.volume = String(audio.dataset.playerId || '') === activeId ? 1 : 0;
+      });
+    }
+  }, []);
+
+  const enableHostMic = useCallback(async () => {
+    if (hostMicBusy) return;
+    setHostMicBusy(true);
+    setActionError('');
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('This browser does not support Host microphone audio.');
+      }
+
+      const stream = hostMicStreamRef.current || await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
+
+      hostMicStreamRef.current = stream;
+      const track = stream.getAudioTracks()[0];
+      if (!track) throw new Error('No Host microphone track was available.');
+
+      hostMicTrackRef.current = track;
+      track.enabled = true;
+
+      await Promise.all(
+        [...voicePeersRef.current.values()].map((meta) =>
+          meta?.hostSender?.replaceTrack(track).catch(() => {})
+        ),
+      );
+
+      setHostMicReady(true);
+      setHostMuted(false);
+    } catch (error) {
+      setActionError(error?.message || 'Host microphone could not be enabled.');
+    } finally {
+      setHostMicBusy(false);
+    }
+  }, [hostMicBusy]);
+
+  const toggleHostMute = useCallback(() => {
+    const track = hostMicTrackRef.current;
+    if (!track) {
+      enableHostMic();
+      return;
+    }
+
+    const nextMuted = !hostMuted;
+    track.enabled = !nextMuted;
+    setHostMuted(nextMuted);
+  }, [enableHostMic, hostMuted]);
 
   const refresh = useCallback(async () => {
     if (!controllerId) return;
@@ -492,8 +593,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
       handledVoiceOffersRef.current.set(playerId, offerKey);
 
       try {
-        const oldPc = voicePeersRef.current.get(playerId);
-        oldPc?.close?.();
+        const oldMeta = voicePeersRef.current.get(playerId);
+        oldMeta?.pc?.close?.();
 
         const pc = new RTCPeerConnection({
           iceServers: [
@@ -502,7 +603,9 @@ export default function NeonBFFHostPanel({ controllerId }) {
           ],
         });
 
-        voicePeersRef.current.set(playerId, pc);
+        const silentBase = ensureSilentTrack();
+        const silentHostTrack = silentBase.clone();
+        const silentSpeakerTrack = silentBase.clone();
 
         pc.onconnectionstatechange = () => {
           if (cancelled) return;
@@ -511,24 +614,51 @@ export default function NeonBFFHostPanel({ controllerId }) {
         };
 
         pc.ontrack = (event) => {
-          if (cancelled) return;
-          const stream = event.streams?.[0];
-          if (!stream || !voiceAudioRef.current) return;
+          if (cancelled || event.track.kind !== 'audio') return;
 
-          let audio = voiceAudioRef.current.querySelector(`audio[data-player-id="${playerId}"]`);
-          if (!audio) {
-            audio = document.createElement('audio');
-            audio.autoplay = true;
-            audio.playsInline = true;
-            audio.dataset.playerId = playerId;
-            voiceAudioRef.current.appendChild(audio);
+          playerVoiceTracksRef.current.set(String(playerId), event.track);
+
+          if (voiceAudioRef.current) {
+            let audio = voiceAudioRef.current.querySelector(
+              `audio[data-player-id="${playerId}"]`,
+            );
+
+            if (!audio) {
+              audio = document.createElement('audio');
+              audio.autoplay = true;
+              audio.playsInline = true;
+              audio.dataset.playerId = playerId;
+              voiceAudioRef.current.appendChild(audio);
+            }
+
+            audio.srcObject = new MediaStream([event.track]);
+            audio.volume =
+              String(activePlayerIdRef.current || '') === String(playerId)
+                ? 1
+                : 0;
+            audio.play().catch(() => {});
           }
 
-          audio.srcObject = stream;
-          audio.play().catch(() => {});
+          routeActiveSpeaker(activePlayerIdRef.current);
         };
 
         await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
+
+        const hostTrack = hostMicTrackRef.current || silentHostTrack;
+        const hostSender = pc.addTrack(hostTrack, new MediaStream([hostTrack]));
+        const speakerSender = pc.addTrack(
+          silentSpeakerTrack,
+          new MediaStream([silentSpeakerTrack]),
+        );
+
+        voicePeersRef.current.set(playerId, {
+          pc,
+          hostSender,
+          speakerSender,
+          silentHostTrack,
+          silentSpeakerTrack,
+        });
+
         const answer = await pc.createAnswer();
         await pc.setLocalDescription(answer);
         await waitForIceComplete(pc);
@@ -539,6 +669,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
           playerId,
           sdp: pc.localDescription.sdp,
         });
+
+        routeActiveSpeaker(activePlayerIdRef.current);
       } catch (voiceError) {
         console.warn('[BFF Voice] Host could not connect player audio', playerId, voiceError);
         setVoiceConnected((prev) => ({ ...prev, [playerId]: false }));
@@ -548,12 +680,25 @@ export default function NeonBFFHostPanel({ controllerId }) {
     return () => {
       cancelled = true;
     };
-  }, [controllerId, gameState.voice_offers]);
+  }, [controllerId, ensureSilentTrack, gameState.voice_offers, routeActiveSpeaker]);
 
   useEffect(() => () => {
-    voicePeersRef.current.forEach((pc) => pc.close?.());
+    voicePeersRef.current.forEach((meta) => {
+      meta?.pc?.close?.();
+      meta?.silentHostTrack?.stop?.();
+      meta?.silentSpeakerTrack?.stop?.();
+    });
     voicePeersRef.current.clear();
+    playerVoiceTracksRef.current.clear();
+    hostMicStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    silentAudioRef.current?.track?.stop?.();
+    silentAudioRef.current?.context?.close?.().catch(() => {});
   }, []);
+
+  useEffect(() => {
+    activePlayerIdRef.current = gameState.active_player_id || null;
+    routeActiveSpeaker(gameState.active_player_id || null);
+  }, [gameState.active_player_id, routeActiveSpeaker]);
 
   const act = useCallback(async (action, payload = {}) => {
     if (!controllerId || busy) return false;
@@ -627,6 +772,42 @@ export default function NeonBFFHostPanel({ controllerId }) {
           {pollError}
         </div>
       )}
+
+      <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#22D3EE]/25 bg-[#22D3EE]/[.035] px-3 py-2">
+        <div>
+          <div className="text-[6px] uppercase tracking-[.16em] text-[#22D3EE]" style={PS2}>
+            ROOM AUDIO
+          </div>
+          <div className="mt-1 text-[10px] text-white/40">
+            Host is heard by every player. Only the active player's mic is routed back to the room.
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={hostMicBusy}
+          onClick={hostMicReady ? toggleHostMute : enableHostMic}
+          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[6px] uppercase tracking-widest disabled:opacity-40 ${
+            hostMicReady && !hostMuted
+              ? 'border-[#4ADE80]/50 bg-[#4ADE80]/10 text-[#4ADE80]'
+              : hostMicReady
+                ? 'border-[#FF5F1F]/50 bg-[#FF5F1F]/10 text-[#FF5F1F]'
+                : 'border-[#22D3EE]/40 bg-[#22D3EE]/5 text-[#22D3EE]'
+          }`}
+          style={PS2}
+        >
+          {hostMicReady && !hostMuted
+            ? <Mic className="h-4 w-4" />
+            : <MicOff className="h-4 w-4" />}
+          {hostMicBusy
+            ? 'MIC…'
+            : !hostMicReady
+              ? 'ENABLE HOST MIC'
+              : hostMuted
+                ? 'HOST MUTED'
+                : 'HOST LIVE'}
+        </button>
+      </section>
 
       <div className="grid grid-cols-1 gap-2 min-[600px]:grid-cols-[minmax(0,1fr)_minmax(130px,.62fr)_minmax(0,1fr)]">
         <TeamCard
@@ -790,7 +971,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy || gameState.phase === 'playing' || !gameState.family_names_set}
+              disabled={busy || gameState.phase === 'playing' || !gameState.family_names_set || !micsReady || !hostMicReady}
             />
             <ControlButton
               label="Reset Round"
@@ -929,7 +1110,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
-                  voiceLive={Boolean(voiceConnected[player.playerId])}
+                  voiceLive={Boolean(gameState.voice_offers?.[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
