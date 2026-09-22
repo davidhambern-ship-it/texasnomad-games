@@ -263,6 +263,7 @@ export default function NeonBFFPlayer({ roomCode }) {
   const remoteAudioRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
+  const micAutoAttemptedRef = useRef(false);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -508,6 +509,22 @@ export default function NeonBFFPlayer({ roomCode }) {
       setMicBusy(false);
     }
   }, [deviceId, micBusy, roomCode]);
+
+  useEffect(() => {
+    if (
+      micAutoAttemptedRef.current
+      || !participant
+      || micOn
+      || micBusy
+      || !deviceId
+      || !roomCode
+    ) {
+      return;
+    }
+
+    micAutoAttemptedRef.current = true;
+    enableMic();
+  }, [deviceId, enableMic, micBusy, micOn, participant, roomCode]);
 
   const buzz = useCallback(async () => {
     if (!deviceId || !roomCode || !canBuzz || busy) return;
