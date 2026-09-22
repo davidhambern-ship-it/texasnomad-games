@@ -592,60 +592,68 @@ export default function PreviewHostPanel() {
 
         {phase === 'room' && activeRoom && (
           <div className="mx-auto max-w-[1650px]">
-            <div className="sticky top-14 z-30 mb-3 flex flex-col gap-3 rounded-xl border border-[#BC13FE]/30 bg-black/90 p-3 shadow-2xl backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <div className="text-[8px] text-[#BC13FE] uppercase tracking-widest" style={PS2}>
-                  LIVE HOST CONTROLLER
-                </div>
-                <div className="mt-2 flex items-center gap-3">
-                  <span className="text-2xl">{roomGame?.emoji || '🎮'}</span>
-                  <span className="text-xl">{roomGame?.title || activeRoom.gameId}</span>
-                  <span className="font-mono text-xl tracking-[0.18em] text-[#FFD700]">
-                    {activeRoom.roomCode}
-                  </span>
-                </div>
-                <p className="mt-2 text-xs text-white/35">
-                  This controller is hard-locked to this room until you disconnect it.
-                </p>
-                {playerTestMode && (
-                  <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#FFD700]/40 bg-[#FFD700]/10 px-3 py-2 text-[#FFD700]">
-                    <span className="h-2 w-2 rounded-full bg-[#FFD700] animate-pulse" />
-                    <span className="text-[7px] uppercase tracking-widest" style={PS2}>
-                      PLAYER TEST MODE · DISPLAY RELEASED
-                    </span>
+            <div className="sticky top-14 z-30 mb-2 rounded-xl border border-[#BC13FE]/30 bg-black/90 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="text-xl">{roomGame?.emoji || '🎮'}</span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-black uppercase sm:text-base">
+                        {roomGame?.title || activeRoom.gameId}
+                      </span>
+                      <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
+                        {activeRoom.roomCode}
+                      </span>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
+                        LIVE HOST
+                      </span>
+                      {playerTestMode && (
+                        <span className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-[#FFD700]" style={PS2}>
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#FFD700] animate-pulse" />
+                          TEST MODE
+                        </span>
+                      )}
+                    </div>
                   </div>
-                )}
-              </div>
+                </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                {!playerTestMode && (
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {!playerTestMode && (
+                    <button
+                      onClick={releaseDisplayForPlayerTesting}
+                      disabled={busy}
+                      className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/10 px-2.5 py-2 text-[#4ade80] disabled:opacity-40"
+                      title="Player test mode"
+                    >
+                      <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                      <span className="hidden text-[9px] sm:inline">TEST</span>
+                    </button>
+                  )}
+
                   <button
-                    onClick={releaseDisplayForPlayerTesting}
+                    onClick={replaceDisplay}
                     disabled={busy}
-                    className="px-5 py-3 border border-[#4ade80]/50 bg-[#4ade80]/10 text-[#4ade80] rounded-lg"
+                    className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
+                    title={playerTestMode ? 'Restore display' : 'Re-pair display'}
                   >
-                    <ShieldCheck className="w-4 h-4 inline mr-2" />
-                    PLAYER TEST MODE
+                    <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                    <span className="hidden text-[9px] sm:inline">
+                      {playerTestMode ? 'DISPLAY' : 'PAIR'}
+                    </span>
                   </button>
-                )}
 
-                <button
-                  onClick={replaceDisplay}
-                  disabled={busy}
-                  className="px-5 py-3 border border-[#FFD700]/50 text-[#FFD700] rounded-lg"
-                >
-                  <Monitor className="w-4 h-4 inline mr-2" />
-                  {playerTestMode ? 'RESTORE DISPLAY' : 'RE-PAIR DISPLAY'}
-                </button>
-
-                <button
-                  onClick={endRoom}
-                  disabled={busy}
-                  className="px-5 py-3 border border-red-500/50 text-red-400 rounded-lg"
-                >
-                  <Unplug className="w-4 h-4 inline mr-2" />
-                  DISCONNECT ROOM
-                </button>
+                  <button
+                    onClick={endRoom}
+                    disabled={busy}
+                    className="rounded-lg border border-red-500/50 bg-red-500/5 px-2.5 py-2 text-red-400 disabled:opacity-40"
+                    title="Disconnect room"
+                  >
+                    <Unplug className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                    <span className="hidden text-[9px] sm:inline">END</span>
+                  </button>
+                </div>
               </div>
             </div>
 
