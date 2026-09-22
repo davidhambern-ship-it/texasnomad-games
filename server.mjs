@@ -1443,12 +1443,10 @@ async function claimBffBuzz(room, participant) {
   try {
     await client.query('begin');
 
-    const locked = await client.query(`
-      select id, room_code, game_id, status, revision, display_state, created_at, updated_at
-      from public.game_rooms
-      where id = $1::uuid
-      for update
-    `, [room.id]);
+    const locked = await client.query(
+      'select id, room_code, game_id, status, revision, display_state, created_at, updated_at from public.game_rooms where id = $1::uuid for update',
+      [room.id],
+    );
 
     const lockedRoom = locked.rows[0];
     if (!lockedRoom) {
@@ -1466,14 +1464,31 @@ async function claimBffBuzz(room, participant) {
       return { gameState: current, room: lockedRoom };
     }
 
-    const teamMap = current.playerTeams || {};
     const familyTeam =
-      Number(teamMap[participant.accountId] || participant.familyTeam || 0) || null;
-    const allowedFaceoffId =
-      (current.faceoff_players || {})[String(familyTeam)]
-      || (current.faceoff_players || {})[familyTeam];
+      Number((current.playerTeams || {})[participant.accountId] || participant.familyTeam || 0)
+      || null;
+    const playerId = String(participant.accountId || participant.playerId || '');
+    const scope = current.buzzer_scope || (current.round_stage === 'steal_buzz' ? 'steal' : 'faceoff');
 
-    if (!familyTeam || String(allowedFaceoffId || '') !== String(participant.accountId || '')) {
+    let allowed = false;
+    let nextStage = 'faceoff_answer';
+    let deadlineMs = 15000;
+
+    if (scope === 'steal') {
+      allowed = familyTeam === Number(current.steal_team || 0);
+      nextStage = 'steal_answer';
+      deadlineMs = 20000;
+    } else {
+      const allowedFaceoffId =
+        (current.faceoff_players || {})[String(familyTeam)]
+        || (current.faceoff_players || {})[familyTeam];
+      allowed = Boolean(
+        familyTeam
+        && String(allowedFaceoffId || '') === playerId
+      );
+    }
+
+    if (!allowed) {
       await client.query('commit');
       return { gameState: current, room: lockedRoom };
     }
@@ -1481,13 +1496,17 @@ async function claimBffBuzz(room, participant) {
     const now = Date.now();
     const nextGameState = {
       ...current,
-      round_stage: 'faceoff_answer',
+      round_stage: nextStage,
       buzzer_open: false,
       buzzer_phase: 'answering',
-      control_team: familyTeam || current.control_team || 1,
-      active_turn: familyTeam || current.active_turn || 1,
+      control_team: scope === 'steal'
+        ? Number(current.steal_team || familyTeam || current.control_team || 1)
+        : familyTeam || current.control_team || 1,
+      active_turn: scope === 'steal'
+        ? Number(current.steal_team || familyTeam || current.active_turn || 1)
+        : familyTeam || current.active_turn || 1,
       active_player_id: participant.accountId,
-      answer_deadline_at: now + 15000,
+      answer_deadline_at: now + deadlineMs,
       sound_cue: { name: 'buzz', at: now },
       buzz_winner: {
         playerId: participant.accountId,
@@ -1498,7 +1517,7 @@ async function claimBffBuzz(room, participant) {
           familyTeam === 2
             ? (current.family2 || 'Family 2')
             : (current.family1 || 'Family 1'),
-        timestamp: Date.now(),
+        timestamp: now,
       },
     };
 
@@ -1507,14 +1526,10 @@ async function claimBffBuzz(room, participant) {
       nextGameState,
     );
 
-    const updated = await client.query(`
-      update public.game_rooms
-      set display_state = $2::jsonb,
-          revision = revision + 1,
-          updated_at = now()
-      where id = $1::uuid
-      returning id, room_code, game_id, status, revision, display_state, created_at, updated_at
-    `, [room.id, JSON.stringify(nextDisplayState)]);
+    const updated = await client.query(
+      'update public.game_rooms set display_state = $2::jsonb, revision = revision + 1, updated_at = now() where id = $1::uuid returning id, room_code, game_id, status, revision, display_state, created_at, updated_at',
+      [room.id, JSON.stringify(nextDisplayState)],
+    );
 
     await client.query('commit');
 
@@ -1529,6 +1544,7 @@ async function claimBffBuzz(room, participant) {
     client.release();
   }
 }
+
 
 async function applyBffPlayerAction(room, participant, body = {}) {
   const action = String(body.action || '').trim();
