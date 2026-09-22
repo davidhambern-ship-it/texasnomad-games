@@ -16,6 +16,7 @@ import {
   startHangmanBoard,
 } from '../../server/games/hangman.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
@@ -110,6 +111,40 @@ async function activeParticipants(roomId, executor = db) {
       };
     })
     .sort((a, b) => a.seatNumber - b.seatNumber);
+}
+
+
+async function recordHangmanRound(room, state, participants, executor = db) {
+  if (
+    state?.phase !== 'finished' ||
+    !['solved', 'stumped'].includes(state?.round_result)
+  ) {
+    return;
+  }
+
+  const winnerSeat = state.round_result === 'stumped'
+    ? Number(state.word_setter_seat || 0)
+    : Number(state.winner_seat || 0);
+
+  const scores = state.scores || {};
+  const baseline = state.round_start_scores || {};
+
+  await recordGameStatEvent({
+    room,
+    statKey: `round:${Number(state.round_number || 1)}`,
+    entries: participants.map((player) => ({
+      accountId: player.accountId,
+      score: Number(scores[String(player.seatNumber)] || 0)
+        - Number(baseline[String(player.seatNumber)] || 0),
+      won: winnerSeat > 0 ? Number(player.seatNumber) === winnerSeat : null,
+    })),
+    result: {
+      roundResult: state.round_result,
+      winnerSeat: winnerSeat || null,
+      setterSeat: Number(state.word_setter_seat || 0) || null,
+    },
+    executor,
+  });
 }
 
 async function responsePayload(room, hostParticipant) {
@@ -281,6 +316,8 @@ export default async function handler(request, response) {
       await transaction.update(roomParticipants).set({
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentHost.id));
+
+      await recordHangmanRound(nextRoom, nextGameState, participants, transaction);
 
       return nextRoom;
     });
