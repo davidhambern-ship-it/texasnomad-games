@@ -263,6 +263,7 @@ export default function PreviewHostPanel() {
           setRoomState(payload.room);
           setActiveRoom((current) => ({ ...current, ...payload.room }));
           setRoomPollError('');
+          setError('');
         }
       } catch (roomError) {
         if (recoverExpiredPreviewSession(roomError)) return;
