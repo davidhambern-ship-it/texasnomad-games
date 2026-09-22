@@ -1546,46 +1546,121 @@ async function claimBffBuzz(room, participant) {
 }
 
 
-async function applyBffPlayerAction(room, participant, body = {}) {
+async function applyBffPlayerAction(room, participant, body = {}, players = []) {
   const action = String(body.action || '').trim();
   const current = extractBffGameState(room.display_state || {});
+  const playerId = String(participant.accountId || participant.playerId || '');
 
   if (action === 'buzz') {
-    if (!(current.buzzer_open || current.buzzer_phase === 'buzzer_active')) {
+    return current;
+  }
+
+  if (action === 'play_pass') {
+    if (
+      current.round_stage !== 'play_pass'
+      || String(current.faceoff_winner_id || '') !== playerId
+    ) {
       return current;
     }
 
-    if (current.buzz_winner) {
-      return current;
-    }
+    const choice = String(body.choice || '').toLowerCase();
+    if (!['play', 'pass'].includes(choice)) return current;
 
-    const teamMap = current.playerTeams || {};
-    const familyTeam = Number(teamMap[participant.accountId] || participant.familyTeam || 0) || null;
+    const winnerTeam = Number(current.faceoff_winner_team || bffTeamForPlayer(current, playerId) || 0);
+    if (![1, 2].includes(winnerTeam)) return current;
 
-    return {
+    const controlTeam = choice === 'play'
+      ? winnerTeam
+      : winnerTeam === 1 ? 2 : 1;
+    const faceoffPlayerId =
+      (current.faceoff_players || {})[String(controlTeam)]
+      || (current.faceoff_players || {})[controlTeam]
+      || null;
+    const firstPlayer = bffNextPlayerId(players, current, controlTeam, faceoffPlayerId);
+
+    const next = {
       ...current,
+      play_pass_choice: choice,
+      control_team: controlTeam,
+      active_turn: controlTeam,
+      consecutive_timeouts: 0,
+      steal_mode: false,
       buzzer_open: false,
-      buzzer_phase: 'buzzed',
-      control_team: familyTeam || current.control_team || 1,
-      active_turn: familyTeam || current.active_turn || 1,
-      sound_cue: { name: 'buzz', at: Date.now() },
-      buzz_winner: {
-        playerId: participant.accountId,
-        playerName: participant.playerName || participant.name || 'Player',
-        seatNumber: participant.seatNumber,
-        familyTeam,
-        teamName:
-          familyTeam === 2
-            ? (current.family2 || 'Family 2')
-            : (current.family1 || 'Family 1'),
-        timestamp: Date.now(),
-      },
+      buzzer_phase: 'board_shown',
     };
+
+    bffStartFamilyTurn(next, firstPlayer);
+    return next;
+  }
+
+  if (action === 'dysfunction_vote') {
+    if (current.round_stage !== 'dysfunction_vote' || !current.dysfunction) return current;
+
+    const dysfunction = {
+      ...current.dysfunction,
+      votes: { ...(current.dysfunction.votes || {}) },
+    };
+    const side = dysfunction.side_assignments?.[playerId] || null;
+    const targetId = String(body.targetPlayerId || '');
+    if (!side || !targetId) return current;
+
+    const targetSide = dysfunction.side_assignments?.[targetId] || null;
+    if (!targetSide || targetSide === side) return current;
+
+    dysfunction.votes[playerId] = targetId;
+
+    const allVoters = Object.keys(dysfunction.side_assignments || {});
+    const allVoted = allVoters.every((id) => Boolean(dysfunction.votes[String(id)]));
+
+    const next = {
+      ...current,
+      dysfunction,
+    };
+
+    if (!allVoted) return next;
+
+    const sideA = bffDysfunctionSideMembers(dysfunction, 'A');
+    const sideB = bffDysfunctionSideMembers(dysfunction, 'B');
+    const pointsA = bffDysfunctionPoints(sideA, dysfunction.votes);
+    const pointsB = bffDysfunctionPoints(sideB, dysfunction.votes);
+
+    dysfunction.scoreA = Number(dysfunction.scoreA || 0) + pointsA;
+    dysfunction.scoreB = Number(dysfunction.scoreB || 0) + pointsB;
+    dysfunction.last_pointsA = pointsA;
+    dysfunction.last_pointsB = pointsB;
+    dysfunction.votes_revealed = true;
+
+    if (dysfunction.sudden_death) {
+      const unanimousA = bffDysfunctionUnanimous(sideA, dysfunction.votes);
+      const unanimousB = bffDysfunctionUnanimous(sideB, dysfunction.votes);
+
+      if (unanimousA !== unanimousB) {
+        dysfunction.completed = true;
+        dysfunction.winner_side = unanimousA ? 'A' : 'B';
+        next.phase = 'finale_complete';
+        next.round_stage = 'dysfunction_complete';
+        next.active_player_id = null;
+        next.answer_deadline_at = null;
+        return next;
+      }
+
+      dysfunction.prompt_number = Number(dysfunction.prompt_number || 5) + 1;
+      next.dysfunction = dysfunction;
+      await bffLoadNextDysfunctionPrompt(next);
+      return next;
+    }
+
+    const defensePlayerId = bffDysfunctionDefensePlayer(dysfunction.votes);
+    dysfunction.defense_player_id = defensePlayerId;
+    next.dysfunction = dysfunction;
+    next.round_stage = 'dysfunction_defense';
+    next.active_player_id = defensePlayerId;
+    next.answer_deadline_at = defensePlayerId ? Date.now() + 10000 : null;
+    return next;
   }
 
   if (action === 'voice_offer') {
     const sdp = String(body.sdp || '');
-    const playerId = String(participant.accountId || participant.playerId || '');
     if (!sdp || !playerId) return current;
 
     return {
@@ -1603,7 +1678,6 @@ async function applyBffPlayerAction(room, participant, body = {}) {
   }
 
   if (action === 'voice_stop') {
-    const playerId = String(participant.accountId || participant.playerId || '');
     const offers = { ...(current.voice_offers || {}) };
     const answers = { ...(current.voice_answers || {}) };
     delete offers[playerId];
@@ -1618,6 +1692,7 @@ async function applyBffPlayerAction(room, participant, body = {}) {
 
   return current;
 }
+
 
 async function handleBffApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
@@ -1752,7 +1827,7 @@ async function handleBffApi(req, res) {
       nextGameState = claim.gameState;
       savedRoom = claim.room;
     } else {
-      nextGameState = await applyBffPlayerAction(room, participant, body || {});
+      nextGameState = await applyBffPlayerAction(room, participant, body || {}, players);
       savedRoom = await saveBffGameState(
         room.id,
         room.display_state || {},
