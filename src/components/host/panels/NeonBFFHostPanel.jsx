@@ -458,6 +458,13 @@ export default function NeonBFFHostPanel({ controllerId }) {
     : null;
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
   const micsReady = Boolean(gameState.mics_ready);
+  const assignedPlayers = [...team1, ...team2];
+  const liveMicsReady = Boolean(
+    assignedPlayers.length >= 2
+    && team1.length > 0
+    && team2.length > 0
+    && assignedPlayers.every((player) => Boolean(voiceConnected[player.playerId]))
+  );
   const canActivateBuzz = Boolean(
     !gameState.buzzer_open
     && (
@@ -1069,9 +1076,9 @@ export default function NeonBFFHostPanel({ controllerId }) {
         <aside className="rounded-xl border border-[#FF5F1F]/25 bg-black/60 p-2.5">
           <div className="mb-2 grid grid-cols-2 gap-1.5">
             <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
-              micsReady ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
+              micsReady && liveMicsReady ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
             }`} style={PS2}>
-              PLAYERS {micsReady ? 'MIC READY' : 'NEED MICS'}
+              PLAYERS {micsReady && liveMicsReady ? 'MIC READY' : 'NEED MICS'}
             </div>
             <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
               hostMicReady && !hostMuted ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
@@ -1125,7 +1132,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy || gameState.phase === 'playing' || Boolean(gameState.current_question) || !gameState.family_names_set || !micsReady || !hostMicReady}
+              disabled={busy || gameState.phase === 'playing' || Boolean(gameState.current_question) || !gameState.family_names_set || !micsReady || !liveMicsReady || !hostMicReady}
             />
             <ControlButton
               label="Reset Round"
@@ -1265,7 +1272,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
-                  voiceLive={Boolean(gameState.voice_offers?.[player.playerId])}
+                  voiceLive={Boolean(voiceConnected[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
