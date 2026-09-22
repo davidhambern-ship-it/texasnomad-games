@@ -272,6 +272,7 @@ export const socialNotifications = pgTable('social_notifications', {
   actorAccountId: uuid('actor_account_id').references(() => accounts.id, { onDelete: 'set null' }),
   type: varchar('type', { length: 40 }).notNull(),
   payload: jsonb('payload').notNull().default({}),
+  deliveredAt: timestamp('delivered_at', { withTimezone: true }),
   readAt: timestamp('read_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [
