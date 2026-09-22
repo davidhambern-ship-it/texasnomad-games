@@ -11,6 +11,7 @@ import BFFVsAISetup from '@/components/bff/BFFVsAISetup.jsx';
 import BFFTeamRoster from '@/components/bff/BFFTeamRoster.jsx';
 import BFFBuzzer from '@/components/bff/BFFBuzzer.jsx';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
+import NeonBFFPlayer from '@/pages/NeonBFFPlayer.jsx';
 import { useBFFVsAI } from '@/hooks/useBFFVsAI.js';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
 import useGameStats from '@/hooks/useGameStats';
@@ -22,7 +23,9 @@ export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const isVsAI = params.get('vsai') === '1';
+  const isNeonRoom = params.get('neon') === '1';
   if (!roomCode) { window.location.href = '/'; return null; }
+  if (isNeonRoom && !isVsAI) return <NeonBFFPlayer roomCode={roomCode.toUpperCase()} />;
   return <BFFViewer roomCode={roomCode} isVsAI={isVsAI} />;
 }
 
