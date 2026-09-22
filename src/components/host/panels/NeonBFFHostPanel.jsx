@@ -64,7 +64,8 @@ function PlayerCard({ player, team, onAssign, busy }) {
 
 export default function NeonBFFHostPanel({ controllerId }) {
   const [room, setRoom] = useState(null);
-  const [error, setError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [pollError, setPollError] = useState('');
   const [busy, setBusy] = useState(false);
   const [family1, setFamily1] = useState('');
   const [family2, setFamily2] = useState('');
@@ -81,9 +82,9 @@ export default function NeonBFFHostPanel({ controllerId }) {
     try {
       const payload = await tngApi.bff.getHostState(controllerId);
       setRoom(payload.room || null);
-      setError('');
+      setPollError('');
     } catch (err) {
-      setError(err?.message || 'Could not load BFF Host state.');
+      setPollError(err?.message || 'Could not load BFF Host state.');
     }
   }, [controllerId]);
 
@@ -101,13 +102,13 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const updateState = useCallback(async (patch) => {
     if (!controllerId || busy) return;
     setBusy(true);
-    setError('');
+    setActionError('');
     try {
       const payload = await tngApi.host.updateRoomState(controllerId, patch);
       const fresh = await tngApi.bff.getHostState(controllerId);
       setRoom(fresh.room || payload.room || null);
     } catch (err) {
-      setError(err?.message || 'BFF Host state could not be updated.');
+      setActionError(err?.message || 'BFF Host state could not be updated.');
     } finally {
       setBusy(false);
     }
@@ -133,7 +134,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const team2 = useMemo(() => players.filter((p) => Number(teamMap[p.playerId]) === 2), [players, teamMap]);
   const unassigned = useMemo(() => players.filter((p) => !teamMap[p.playerId]), [players, teamMap]);
 
-  if (!room && !error) {
+  if (!room && !pollError) {
     return (
       <div className="py-16 text-center">
         <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#BC13FE]" />
@@ -144,9 +145,15 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
   return (
     <div className="mx-auto max-w-[1500px] space-y-3">
-      {error && (
+      {actionError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
-          {error}
+          {actionError}
+        </div>
+      )}
+
+      {!room && pollError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
+          {pollError}
         </div>
       )}
 
