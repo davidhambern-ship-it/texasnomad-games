@@ -209,7 +209,21 @@ async function ensureBffTeamAssignments(room, gameState = {}, players = []) {
     const playerId = String(player.playerId || '');
     if (!playerId || Object.prototype.hasOwnProperty.call(teamMap, playerId)) continue;
 
-    const team = team1Count <= team2Count ? 1 : 2;
+    let team = null;
+    if (team1Count < 6 && team2Count < 6) {
+      team = team1Count <= team2Count ? 1 : 2;
+    } else if (team1Count < 6) {
+      team = 1;
+    } else if (team2Count < 6) {
+      team = 2;
+    }
+
+    if (!team) {
+      teamMap[playerId] = 0;
+      changed = true;
+      continue;
+    }
+
     teamMap[playerId] = team;
     if (team === 1) team1Count += 1;
     else team2Count += 1;
@@ -942,8 +956,21 @@ async function applyBffHostAction(room, body = {}, players = []) {
     const team = body.team == null ? null : Number(body.team);
     const map = { ...(next.playerTeams || {}) };
     if (!playerId) return next;
-    if (team === 1 || team === 2) map[playerId] = team;
-    else map[playerId] = 0;
+
+    if (team === 1 || team === 2) {
+      const alreadyOnTeam = Number(map[playerId] || 0) === team;
+      const teamCount = Object.entries(map)
+        .filter(([id, value]) => String(id) !== playerId && Number(value) === team)
+        .length;
+
+      if (!alreadyOnTeam && teamCount >= 6) {
+        throw new Error(`Family ${team} already has the maximum of six players.`);
+      }
+      map[playerId] = team;
+    } else {
+      map[playerId] = 0;
+    }
+
     next.playerTeams = map;
     return next;
   }
@@ -1155,8 +1182,16 @@ async function applyBffHostAction(room, body = {}, players = []) {
       } else if (next.round_stage === 'family_play' && next.active_player_id) {
         const team = bffTeamForPlayer(next, next.active_player_id) || next.control_team;
         next.consecutive_timeouts = 0;
-        const nextPlayer = bffNextPlayerId(players, next, team, next.active_player_id);
-        bffStartFamilyTurn(next, nextPlayer);
+
+        const clearedBoard = getBffAnswers(next).length > 0
+          && getBffAnswers(next).every((item) => Boolean(item.revealed));
+
+        if (clearedBoard) {
+          bffCompleteRound(next, Number(team));
+        } else {
+          const nextPlayer = bffNextPlayerId(players, next, team, next.active_player_id);
+          bffStartFamilyTurn(next, nextPlayer);
+        }
       } else if (next.round_stage === 'steal_answer') {
         bffCompleteRound(next, Number(next.steal_team || 0));
       }
