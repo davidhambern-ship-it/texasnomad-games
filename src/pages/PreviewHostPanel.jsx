@@ -445,7 +445,7 @@ export default function PreviewHostPanel() {
         </div>
       </header>
 
-      <main className="flex-1 p-6">
+      <main className="flex-1 p-3 sm:p-4">
         {phase === 'loading' && (
           <div className="h-full flex items-center justify-center text-center">
             <div>
@@ -591,8 +591,8 @@ export default function PreviewHostPanel() {
         )}
 
         {phase === 'room' && activeRoom && (
-          <div className="max-w-4xl mx-auto">
-            <div className="mb-5 rounded-xl border border-[#BC13FE]/30 bg-black/60 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="mx-auto max-w-[1650px]">
+            <div className="sticky top-14 z-30 mb-3 flex flex-col gap-3 rounded-xl border border-[#BC13FE]/30 bg-black/90 p-3 shadow-2xl backdrop-blur-xl lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="text-[8px] text-[#BC13FE] uppercase tracking-widest" style={PS2}>
                   LIVE HOST CONTROLLER
