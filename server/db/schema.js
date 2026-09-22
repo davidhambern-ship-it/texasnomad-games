@@ -204,6 +204,7 @@ export const playerGameStats = pgTable('player_game_stats', {
   wins: integer('wins').notNull().default(0),
   losses: integer('losses').notNull().default(0),
   totalScore: bigint('total_score', { mode: 'number' }).notNull().default(0),
+  bestScore: bigint('best_score', { mode: 'number' }).notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.accountId, table.gameId] })]);
 
@@ -215,6 +216,67 @@ export const hostStats = pgTable('host_stats', {
   totalPlayersHosted: integer('total_players_hosted').notNull().default(0),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const friendships = pgTable('friendships', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  requesterAccountId: uuid('requester_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  recipientAccountId: uuid('recipient_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index('friendships_requester_idx').on(table.requesterAccountId, table.status),
+  index('friendships_recipient_idx').on(table.recipientAccountId, table.status),
+  uniqueIndex('friendships_pair_unique').on(
+    sql`least(${table.requesterAccountId}, ${table.recipientAccountId})`,
+    sql`greatest(${table.requesterAccountId}, ${table.recipientAccountId})`,
+  ),
+  check('friendships_no_self_check', sql`${table.requesterAccountId} <> ${table.recipientAccountId}`),
+  check('friendships_status_check', sql`${table.status} IN ('pending','accepted','declined')`),
+]);
+
+export const directMessages = pgTable('direct_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderAccountId: uuid('sender_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  recipientAccountId: uuid('recipient_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  body: varchar('body', { length: 1200 }).notNull(),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('direct_messages_recipient_idx').on(table.recipientAccountId, table.readAt, table.createdAt),
+  index('direct_messages_pair_idx').on(table.senderAccountId, table.recipientAccountId, table.createdAt),
+  check('direct_messages_no_self_check', sql`${table.senderAccountId} <> ${table.recipientAccountId}`),
+]);
+
+export const gameInvites = pgTable('game_invites', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderAccountId: uuid('sender_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  recipientAccountId: uuid('recipient_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  roomId: uuid('room_id').references(() => gameRooms.id, { onDelete: 'set null' }),
+  roomCode: varchar('room_code', { length: 8 }).notNull(),
+  gameId: varchar('game_id', { length: 64 }).notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  respondedAt: timestamp('responded_at', { withTimezone: true }),
+  ...timestamps,
+}, (table) => [
+  index('game_invites_recipient_idx').on(table.recipientAccountId, table.status, table.expiresAt),
+  index('game_invites_sender_idx').on(table.senderAccountId, table.createdAt),
+  check('game_invites_no_self_check', sql`${table.senderAccountId} <> ${table.recipientAccountId}`),
+  check('game_invites_status_check', sql`${table.status} IN ('pending','accepted','declined','expired')`),
+]);
+
+export const socialNotifications = pgTable('social_notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  recipientAccountId: uuid('recipient_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  actorAccountId: uuid('actor_account_id').references(() => accounts.id, { onDelete: 'set null' }),
+  type: varchar('type', { length: 40 }).notNull(),
+  payload: jsonb('payload').notNull().default({}),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('social_notifications_recipient_idx').on(table.recipientAccountId, table.readAt, table.createdAt),
+]);
 
 
 export const squareBizQuestions = pgTable('square_biz_questions', {
