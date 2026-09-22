@@ -148,4 +148,13 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`TNG staging frontend listening on port ${port}`);
+
+  fetch(`${BFF_API_ORIGIN}/health`)
+    .then(async (response) => {
+      const body = await response.text();
+      console.log('[TNG staging] BFF health check', response.status, body.slice(0, 500));
+    })
+    .catch((error) => {
+      console.error('[TNG staging] BFF health check failed', error);
+    });
 });
