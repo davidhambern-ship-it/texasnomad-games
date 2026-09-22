@@ -1,9 +1,10 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-// Direct Neon Auth transport; do not proxy this through Vercel.
+// Live-test staging is intentionally pinned to the Neon development Auth
+// endpoint. Do not proxy Auth through Vercel and do not let a stale Vercel
+// environment variable silently point this build at another Neon branch.
 export const NEON_AUTH_URL =
-  import.meta.env.VITE_NEON_AUTH_URL ||
   'https://ep-hidden-wave-avehvh0z.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
 
 export const isNeonStaging = true;
@@ -26,25 +27,14 @@ function unwrapSession(result) {
   return result;
 }
 
-function unwrapToken(result) {
-  if (!result) return null;
-  if (typeof result === 'string') return result;
-  if (typeof result.data === 'string') return result.data;
-  if (typeof result.token === 'string') return result.token;
-  if (typeof result.data?.token === 'string') return result.data.token;
-  if (typeof result.jwt === 'string') return result.jwt;
-  if (typeof result.data?.jwt === 'string') return result.data.jwt;
-  return null;
-}
-
 export async function getNeonSession() {
   const result = await authClient.getSession();
   return unwrapSession(result);
 }
 
 export async function getNeonAuthToken() {
-  // TNG backend deployment 28 can securely verify Neon Auth's active opaque
-  // session token directly. Do not call the optional JWT/token plugin routes:
+  // TNG backend deployment 29 verifies Neon Auth's active opaque session
+  // token directly. Do not call the optional JWT/token plugin routes:
   // this Neon Auth deployment does not expose them and they return HTTP 404.
   const session = await getNeonSession();
 
