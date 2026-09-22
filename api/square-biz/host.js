@@ -19,6 +19,7 @@ import {
   syncSquareBizRoster,
 } from '../../server/games/square-biz.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
@@ -80,6 +81,41 @@ async function persistProjectedState(room, state, executor = db) {
     startedAt: room.startedAt || (state.phase !== 'lobby' ? new Date() : null),
     updatedAt: new Date(),
   }).where(eq(gameRooms.id, room.id)).returning();
+
+  if (state.phase === 'finished' && state.winner) {
+    const xScore = Array.isArray(state.board)
+      ? state.board.filter((value) => value === 'X').length
+      : 0;
+    const oScore = Array.isArray(state.board)
+      ? state.board.filter((value) => value === 'O').length
+      : 0;
+
+    await recordGameStatEvent({
+      room: updated,
+      statKey: `round:${Number(state.round_number || 1)}`,
+      entries: [
+        state.x_account_id
+          ? {
+              accountId: state.x_account_id,
+              score: xScore,
+              won: state.winner === 'X',
+            }
+          : null,
+        state.o_account_id
+          ? {
+              accountId: state.o_account_id,
+              score: oScore,
+              won: state.winner === 'O',
+            }
+          : null,
+      ].filter(Boolean),
+      result: {
+        winner: state.winner,
+        winningLine: state.winning_line || null,
+      },
+      executor,
+    });
+  }
 
   return updated;
 }
