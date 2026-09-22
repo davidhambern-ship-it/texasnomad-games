@@ -587,7 +587,6 @@ export default function NeonBFFPlayer({ roomCode }) {
         if (
           pc.connectionState === 'failed'
           || pc.iceConnectionState === 'failed'
-          || pc.iceConnectionState === 'disconnected'
         ) {
           scheduleIceRetry();
         }
@@ -832,8 +831,10 @@ export default function NeonBFFPlayer({ roomCode }) {
               ? 'MIC LINK FAILED · HOST CHECKING CONNECTION'
               : voiceConnectionState === 'retrying'
                 ? `MIC RETRYING · ATTEMPT ${voiceRetryCountRef.current}/3`
-                : voiceConnectionState !== 'live'
-                  ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
+                : voiceConnectionState === 'recovering'
+                  ? 'MIC RECONNECTING · HOLD ON'
+                  : voiceConnectionState !== 'live'
+                    ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
                 : isActiveSpeaker
                   ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
                   : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'}
