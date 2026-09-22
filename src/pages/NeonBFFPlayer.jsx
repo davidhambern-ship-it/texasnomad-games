@@ -5,6 +5,7 @@ import { Loader2, Radio, Users, Zap } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -75,10 +76,22 @@ export default function NeonBFFPlayer({ roomCode }) {
   }, [refresh]);
 
   useEffect(() => {
+    preloadBffSounds();
+  }, []);
+
+  useEffect(() => {
     const cue = gameState.sound_cue;
     if (!cue?.at || cue.at === lastSoundCueRef.current) return;
+
     lastSoundCueRef.current = cue.at;
-    setFlashCue(String(cue.name || '').toUpperCase());
+    const cueName = String(cue.name || '');
+    setFlashCue(cueName.toUpperCase());
+    playBffSound(cueName);
+
+    if (cueName === 'buzz' && typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(80);
+    }
+
     const timeout = window.setTimeout(() => setFlashCue(null), 1600);
     return () => window.clearTimeout(timeout);
   }, [gameState.sound_cue]);
