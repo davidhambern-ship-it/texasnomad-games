@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Radio, Users, Zap } from 'lucide-react';
+import { Loader2, Radio, Users, Zap, Mic, MicOff } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
@@ -8,6 +8,25 @@ import { TngNotificationToaster } from '@/components/social/TngNotificationToast
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+function waitForIceComplete(pc) {
+  if (pc.iceGatheringState === 'complete') return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const onState = () => {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', onState);
+        resolve();
+      }
+    };
+
+    pc.addEventListener('icegatheringstatechange', onState);
+    window.setTimeout(() => {
+      pc.removeEventListener('icegatheringstatechange', onState);
+      resolve();
+    }, 3500);
+  });
+}
 
 function statusFor(gameState, myTeam, buzzWinner) {
   const phase = gameState.phase || 'waiting';
@@ -34,6 +53,11 @@ export default function NeonBFFPlayer({ roomCode }) {
   const [busy, setBusy] = useState(false);
   const [flashCue, setFlashCue] = useState(null);
   const lastSoundCueRef = useRef(null);
+  const voicePcRef = useRef(null);
+  const voiceStreamRef = useRef(null);
+  const appliedVoiceAnswerRef = useRef('');
+  const [micOn, setMicOn] = useState(false);
+  const [micBusy, setMicBusy] = useState(false);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -96,6 +120,121 @@ export default function NeonBFFPlayer({ roomCode }) {
     const timeout = window.setTimeout(() => setFlashCue(null), 1600);
     return () => window.clearTimeout(timeout);
   }, [gameState.sound_cue]);
+
+  useEffect(() => {
+    const voiceAnswer = gameState.voice_answer;
+    const pc = voicePcRef.current;
+    if (!voiceAnswer?.sdp || !pc) return;
+
+    const key = `${voiceAnswer.at || ''}:${voiceAnswer.sdp.length}`;
+    if (appliedVoiceAnswerRef.current === key) return;
+    appliedVoiceAnswerRef.current = key;
+
+    pc.setRemoteDescription({ type: 'answer', sdp: voiceAnswer.sdp })
+      .catch((voiceError) => {
+        console.warn('[BFF Voice] Player could not apply Host answer', voiceError);
+        setError('Your microphone connection could not finish. Tap MIC OFF, then MIC ON.');
+      });
+  }, [gameState.voice_answer]);
+
+  useEffect(() => () => {
+    voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+    voicePcRef.current?.close?.();
+  }, []);
+
+  const enableMic = useCallback(async () => {
+    if (!deviceId || !roomCode || micBusy || micOn) return;
+
+    setMicBusy(true);
+    setError('');
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('This browser does not support live microphone audio.');
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+        video: false,
+      });
+
+      voiceStreamRef.current = stream;
+
+      const pc = new RTCPeerConnection({
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ],
+      });
+
+      voicePcRef.current?.close?.();
+      voicePcRef.current = pc;
+      appliedVoiceAnswerRef.current = '';
+
+      stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+
+      pc.onconnectionstatechange = () => {
+        if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
+          setMicOn(false);
+        }
+      };
+
+      const offer = await pc.createOffer({
+        offerToReceiveAudio: false,
+        offerToReceiveVideo: false,
+      });
+
+      await pc.setLocalDescription(offer);
+      await waitForIceComplete(pc);
+
+      if (!pc.localDescription?.sdp) {
+        throw new Error('Microphone connection could not create an offer.');
+      }
+
+      const payload = await tngApi.bff.playerAction(deviceId, roomCode, 'voice_offer', {
+        sdp: pc.localDescription.sdp,
+      });
+
+      setRoom(payload.room || null);
+      setParticipant(payload.participant || null);
+      setMicOn(true);
+    } catch (voiceError) {
+      voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+      voiceStreamRef.current = null;
+      voicePcRef.current?.close?.();
+      voicePcRef.current = null;
+      setMicOn(false);
+      setError(voiceError?.message || 'Microphone permission or connection failed.');
+    } finally {
+      setMicBusy(false);
+    }
+  }, [deviceId, micBusy, micOn, roomCode]);
+
+  const disableMic = useCallback(async () => {
+    if (micBusy) return;
+
+    setMicBusy(true);
+
+    try {
+      voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
+      voiceStreamRef.current = null;
+      voicePcRef.current?.close?.();
+      voicePcRef.current = null;
+      appliedVoiceAnswerRef.current = '';
+
+      if (deviceId && roomCode) {
+        await tngApi.bff.playerAction(deviceId, roomCode, 'voice_stop').catch(() => {});
+      }
+
+      setMicOn(false);
+    } finally {
+      setMicBusy(false);
+    }
+  }, [deviceId, micBusy, roomCode]);
 
   const buzz = useCallback(async () => {
     if (!deviceId || !roomCode || !buzzerOpen || buzzWinner || busy) return;
@@ -169,6 +308,21 @@ export default function NeonBFFPlayer({ roomCode }) {
               >
                 {status}
               </div>
+              <button
+                type="button"
+                disabled={micBusy}
+                onClick={micOn ? disableMic : enableMic}
+                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[6px] uppercase tracking-widest disabled:opacity-40 ${
+                  micOn
+                    ? 'border-[#22D3EE]/50 bg-[#22D3EE]/10 text-[#22D3EE]'
+                    : 'border-white/15 text-white/45'
+                }`}
+                style={PS2}
+              >
+                {micOn ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
+                {micBusy ? 'MIC…' : micOn ? 'MIC ON' : 'MIC OFF'}
+              </button>
+
               <Link
                 to="/"
                 replace
@@ -195,6 +349,17 @@ export default function NeonBFFPlayer({ roomCode }) {
             {flashCue}
           </div>
         )}
+
+        <div
+          className={`rounded-lg border px-3 py-2 text-center text-[6px] uppercase tracking-[.14em] ${
+            micOn
+              ? 'border-[#22D3EE]/30 bg-[#22D3EE]/5 text-[#22D3EE]'
+              : 'border-white/10 bg-white/[.02] text-white/30'
+          }`}
+          style={PS2}
+        >
+          {micOn ? 'LIVE MIC · HOST CAN HEAR YOU' : 'TURN MIC ON SO THE HOST CAN HEAR YOUR ANSWER'}
+        </div>
 
         {buzzerOpen && !buzzWinner && (
           <button
