@@ -782,6 +782,117 @@ function bffAdvanceFaceoffAfterMiss(gameState, players, playerId, { showX = fals
 }
 
 
+async function pickBffDysfunctionPrompt(usedIds = []) {
+  const used = Array.isArray(usedIds)
+    ? usedIds.map((id) => Number(id)).filter(Number.isFinite)
+    : [];
+
+  let result = await bffPool.query(
+    'select id, prompt from public.bff_dysfunction_prompts where active = true and not (id = any($1::bigint[])) order by random() limit 1',
+    [used],
+  );
+
+  if (!result.rows.length) {
+    result = await bffPool.query(
+      'select id, prompt from public.bff_dysfunction_prompts where active = true order by random() limit 1',
+    );
+  }
+
+  const prompt = result.rows[0] || null;
+  return prompt
+    ? { id: Number(prompt.id), prompt: String(prompt.prompt || '') }
+    : null;
+}
+
+function bffDysfunctionSideMembers(dysfunction = {}, side) {
+  return Object.entries(dysfunction.side_assignments || {})
+    .filter(([, value]) => value === side)
+    .map(([playerId]) => playerId);
+}
+
+function bffDysfunctionPoints(voterIds, votes) {
+  const targets = voterIds.map((id) => votes[String(id)]).filter(Boolean);
+  if (!targets.length) return 0;
+
+  const counts = new Map();
+  targets.forEach((target) => counts.set(target, (counts.get(target) || 0) + 1));
+  const max = Math.max(...counts.values());
+
+  if (targets.length >= 3) {
+    if (max === targets.length) return 3;
+    if (max >= 2) return 2;
+    return 0;
+  }
+
+  if (targets.length === 2) return max === 2 ? 3 : 0;
+  return 1;
+}
+
+function bffDysfunctionUnanimous(voterIds, votes) {
+  if (!voterIds.length) return false;
+  const targets = voterIds.map((id) => votes[String(id)]).filter(Boolean);
+  return targets.length === voterIds.length && new Set(targets).size === 1;
+}
+
+function bffDysfunctionDefensePlayer(votes = {}) {
+  const counts = new Map();
+  Object.values(votes).forEach((target) => {
+    if (!target) return;
+    counts.set(String(target), (counts.get(String(target)) || 0) + 1);
+  });
+
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || String(a[0]).localeCompare(String(b[0])))[0]?.[0] || null;
+}
+
+async function bffLoadNextDysfunctionPrompt(gameState) {
+  const dysfunction = { ...(gameState.dysfunction || {}) };
+  const prompt = await pickBffDysfunctionPrompt(dysfunction.used_prompt_ids || []);
+  if (!prompt) throw new Error('No Family Dysfunction prompts are available.');
+
+  const used = Array.isArray(dysfunction.used_prompt_ids)
+    ? dysfunction.used_prompt_ids.slice()
+    : [];
+
+  dysfunction.prompt_id = prompt.id;
+  dysfunction.prompt = prompt.prompt;
+  dysfunction.used_prompt_ids = used.includes(prompt.id) ? [prompt.id] : [...used, prompt.id];
+  dysfunction.votes = {};
+  dysfunction.votes_revealed = false;
+  dysfunction.defense_player_id = null;
+
+  gameState.dysfunction = dysfunction;
+  gameState.round_stage = 'dysfunction_vote';
+  gameState.active_player_id = null;
+  gameState.answer_deadline_at = null;
+}
+
+async function bffAdvanceDysfunctionAfterDefense(gameState) {
+  const dysfunction = { ...(gameState.dysfunction || {}) };
+
+  if (Number(dysfunction.prompt_number || 1) >= 5) {
+    const scoreA = Number(dysfunction.scoreA || 0);
+    const scoreB = Number(dysfunction.scoreB || 0);
+
+    if (scoreA !== scoreB) {
+      dysfunction.completed = true;
+      dysfunction.winner_side = scoreA > scoreB ? 'A' : 'B';
+      gameState.dysfunction = dysfunction;
+      gameState.round_stage = 'dysfunction_complete';
+      gameState.phase = 'finale_complete';
+      gameState.active_player_id = null;
+      gameState.answer_deadline_at = null;
+      return;
+    }
+
+    dysfunction.sudden_death = true;
+  }
+
+  dysfunction.prompt_number = Number(dysfunction.prompt_number || 1) + 1;
+  gameState.dysfunction = dysfunction;
+  await bffLoadNextDysfunctionPrompt(gameState);
+}
+
 async function applyBffHostAction(room, body = {}, players = []) {
   const action = String(body.action || '').trim();
   const current = extractBffGameState(room.display_state || {});
