@@ -56,6 +56,7 @@ export default function NeonBFFPlayer({ roomCode }) {
   const voicePcRef = useRef(null);
   const voiceStreamRef = useRef(null);
   const appliedVoiceAnswerRef = useRef('');
+  const remoteAudioRef = useRef(null);
   const [micOn, setMicOn] = useState(false);
   const [micBusy, setMicBusy] = useState(false);
 
@@ -82,10 +83,26 @@ export default function NeonBFFPlayer({ roomCode }) {
   const isFaceoffPlayer = selectedFaceoffIds.some(
     (playerId) => String(playerId) === String(myAccountId || ''),
   );
+  const roundStage = gameState.round_stage || 'setup';
+  const stealTeam = Number(gameState.steal_team || 0) || null;
   const canBuzz = Boolean(
     buzzerOpen
-    && isFaceoffPlayer
     && !buzzWinner
+    && (
+      roundStage === 'steal_buzz'
+        ? myTeam === stealTeam
+        : isFaceoffPlayer
+    )
+  );
+  const isActiveSpeaker = Boolean(
+    micOn
+    && myAccountId
+    && String(gameState.active_player_id || '') === String(myAccountId)
+    && ['faceoff_answer', 'play_pass', 'family_play', 'steal_answer', 'dysfunction_defense'].includes(roundStage)
+  );
+  const showPlayPass = Boolean(
+    roundStage === 'play_pass'
+    && String(gameState.faceoff_winner_id || '') === String(myAccountId || '')
   );
   const iWonBuzz = Boolean(
     buzzWinner
@@ -141,6 +158,12 @@ export default function NeonBFFPlayer({ roomCode }) {
   }, [gameState.sound_cue]);
 
   useEffect(() => {
+    const track = voiceStreamRef.current?.getAudioTracks?.()[0];
+    if (!track) return;
+    track.enabled = Boolean(isActiveSpeaker);
+  }, [isActiveSpeaker]);
+
+  useEffect(() => {
     const voiceAnswer = gameState.voice_answer;
     const pc = voicePcRef.current;
     if (!voiceAnswer?.sdp || !pc) return;
@@ -194,7 +217,37 @@ export default function NeonBFFPlayer({ roomCode }) {
       voicePcRef.current = pc;
       appliedVoiceAnswerRef.current = '';
 
-      stream.getAudioTracks().forEach((track) => pc.addTrack(track, stream));
+      const localTrack = stream.getAudioTracks()[0];
+      if (!localTrack) {
+        throw new Error('No microphone track was available.');
+      }
+
+      localTrack.enabled = false;
+      pc.addTransceiver(localTrack, {
+        direction: 'sendonly',
+        streams: [stream],
+      });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      pc.ontrack = (event) => {
+        if (!remoteAudioRef.current) return;
+
+        let audio = remoteAudioRef.current.querySelector(
+          `audio[data-track-id="${event.track.id}"]`,
+        );
+
+        if (!audio) {
+          audio = document.createElement('audio');
+          audio.autoplay = true;
+          audio.playsInline = true;
+          audio.dataset.trackId = event.track.id;
+          remoteAudioRef.current.appendChild(audio);
+        }
+
+        audio.srcObject = new MediaStream([event.track]);
+        audio.play().catch(() => {});
+      };
 
       pc.onconnectionstatechange = () => {
         if (['failed', 'disconnected', 'closed'].includes(pc.connectionState)) {
@@ -202,10 +255,7 @@ export default function NeonBFFPlayer({ roomCode }) {
         }
       };
 
-      const offer = await pc.createOffer({
-        offerToReceiveAudio: false,
-        offerToReceiveVideo: false,
-      });
+      const offer = await pc.createOffer();
 
       await pc.setLocalDescription(offer);
       await waitForIceComplete(pc);
@@ -272,6 +322,28 @@ export default function NeonBFFPlayer({ roomCode }) {
     }
   }, [busy, canBuzz, deviceId, roomCode]);
 
+  const choosePlayPass = useCallback(async (choice) => {
+    if (!deviceId || !roomCode || busy || !showPlayPass) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const payload = await tngApi.bff.playerAction(
+        deviceId,
+        roomCode,
+        'play_pass',
+        { choice },
+      );
+      setRoom(payload.room || null);
+      setParticipant(payload.participant || null);
+    } catch (actionError) {
+      setError(actionError?.message || 'PLAY/PASS could not be submitted.');
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, deviceId, roomCode, showPlayPass]);
+
   const status = useMemo(
     () => statusFor(gameState, myTeam, buzzWinner),
     [buzzWinner, gameState, myTeam],
@@ -304,6 +376,7 @@ export default function NeonBFFPlayer({ roomCode }) {
   return (
     <div className="min-h-[100dvh] bg-[#070311] text-white">
       <TngNotificationToaster />
+      <div ref={remoteAudioRef} className="hidden" aria-hidden="true" />
 
       <div className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-2 p-2 sm:p-3">
         <header className="sticky top-0 z-30 rounded-xl border border-[#BC13FE]/25 bg-[#080512]/95 px-3 py-2.5 backdrop-blur-xl">
@@ -377,8 +450,36 @@ export default function NeonBFFPlayer({ roomCode }) {
           }`}
           style={PS2}
         >
-          {micOn ? 'LIVE MIC · HOST CAN HEAR YOU' : 'TURN MIC ON SO THE HOST CAN HEAR YOUR ANSWER'}
+          {micOn
+            ? isActiveSpeaker
+              ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
+              : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'
+            : 'MIC REQUIRED · TURN IT ON TO PLAY'}
         </div>
+
+        {showPlayPass && (
+          <section className="grid grid-cols-2 gap-2 rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => choosePlayPass('play')}
+              className="rounded-xl border-2 border-[#4ADE80] bg-[#4ADE80]/10 px-4 py-4 font-heading text-2xl text-[#4ADE80] disabled:opacity-30"
+            >
+              PLAY
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => choosePlayPass('pass')}
+              className="rounded-xl border-2 border-[#FF5F1F] bg-[#FF5F1F]/10 px-4 py-4 font-heading text-2xl text-[#FF5F1F] disabled:opacity-30"
+            >
+              PASS
+            </button>
+            <div className="col-span-2 text-center text-[6px] uppercase tracking-[.16em] text-[#FFD700]/70" style={PS2}>
+              YOU WON THE FACEOFF · CHOOSE
+            </div>
+          </section>
+        )}
 
         <main className="min-h-0 flex-1">
           <BFFTngBoard
