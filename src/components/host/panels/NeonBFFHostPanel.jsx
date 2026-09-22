@@ -22,6 +22,7 @@ import {
 
 import { tngApi } from '@/api/tngApi';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
+import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -418,10 +419,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const hostMicStreamRef = useRef(null);
   const hostMicTrackRef = useRef(null);
   const activePlayerIdRef = useRef(null);
-  const [voiceConnected, setVoiceConnected] = useState({});
-  const [hostMicReady, setHostMicReady] = useState(false);
   const [hostMuted, setHostMuted] = useState(false);
-  const [hostMicBusy, setHostMicBusy] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const handledDeadlineRef = useRef(null);
   const hostMicAutoAttemptedRef = useRef(false);
@@ -431,13 +429,17 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const voiceSignalQueueRef = useRef(Promise.resolve());
 
   const gameState = room?.gameState || {};
-  const voiceOfferSignature = useMemo(
-    () => Object.entries(gameState.voice_offers || {})
-      .map(([playerId, offer]) => `${playerId}:${offer?.at || ''}:${offer?.sdp?.length || 0}`)
-      .sort()
-      .join('|'),
-    [gameState.voice_offers],
+  const hostVoiceRelay = useBffVoiceRelay({
+    roomCode: room?.roomCode || null,
+    role: 'host',
+    identity: controllerId,
+    shouldSend: !hostMuted,
+    autoStart: Boolean(room?.roomCode && controllerId),
+  });
+  const hostMicReady = Boolean(
+    hostVoiceRelay.micReady && hostVoiceRelay.status === 'live'
   );
+  const hostMicBusy = hostVoiceRelay.status === 'connecting';
   const players = Array.isArray(gameState.players)
     ? gameState.players
     : Array.isArray(room?.players)
@@ -472,30 +474,22 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const micsReady = Boolean(gameState.mics_ready);
   const voiceSessionLocked = Boolean(gameState.voice_session_locked);
   const assignedPlayers = [...team1, ...team2];
-  const backendVoiceReady = gameState.voice_ready || {};
   const backendVoiceVerified = gameState.voice_verified || {};
+  const relayConnected = gameState.voice_relay_connected || {};
   const liveMicsReady = Boolean(
     assignedPlayers.length >= 2
     && team1.length > 0
     && team2.length > 0
-    && assignedPlayers.every((player) =>
-      Boolean(
-        backendVoiceVerified[player.playerId]
-        || (voiceConnected[player.playerId] && backendVoiceReady[player.playerId])
-      )
-    )
+    && assignedPlayers.every((player) => Boolean(relayConnected[player.playerId]))
   );
   const micStatusRows = assignedPlayers.map((player) => {
     const playerId = String(player.playerId);
-    const hasOffer = Boolean(gameState.voice_offers?.[playerId]?.sdp);
-    const peerLive = Boolean(voiceConnected[playerId]);
-    const backendReady = Boolean(
-      backendVoiceVerified[playerId] || backendVoiceReady[playerId]
-    );
+    const live = Boolean(relayConnected[playerId]);
+    const verified = Boolean(backendVoiceVerified[playerId]);
     return {
       playerId,
       name: player.playerName || player.name || 'Player',
-      status: peerLive && backendReady ? 'live' : hasOffer ? 'connecting' : 'off',
+      status: live ? 'live' : verified ? 'reconnecting' : 'off',
     };
   });
   const missingMicNames = micStatusRows
@@ -523,88 +517,21 @@ export default function NeonBFFHostPanel({ controllerId }) {
     && (Number(gameState.winning_team) === 1 ? team1.length : team2.length) >= 4
   );
 
-  const ensureSilentTrack = useCallback(() => {
-    if (!silentAudioRef.current) {
-      silentAudioRef.current = createSilentAudioTrack();
-    }
-    return silentAudioRef.current.track;
-  }, []);
-
-  const routeActiveSpeaker = useCallback((activePlayerId) => {
-    const activeId = String(activePlayerId || '');
-    const activeTrack = activeId
-      ? playerVoiceTracksRef.current.get(activeId) || null
-      : null;
-
-    voicePeersRef.current.forEach((meta, targetPlayerId) => {
-      if (!meta?.speakerSender) return;
-      const shouldHearSpeaker =
-        activeTrack
-        && String(targetPlayerId) !== activeId;
-      meta.speakerSender
-        .replaceTrack(shouldHearSpeaker ? activeTrack : meta.silentSpeakerTrack)
-        .catch(() => {});
-    });
-
-    if (voiceAudioRef.current) {
-      voiceAudioRef.current.querySelectorAll('audio[data-player-id]').forEach((audio) => {
-        audio.volume = String(audio.dataset.playerId || '') === activeId ? 1 : 0;
-      });
-    }
-  }, []);
-
   const enableHostMic = useCallback(async () => {
-    if (hostMicBusy) return;
-    setHostMicBusy(true);
     setActionError('');
-
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('This browser does not support Host microphone audio.');
-      }
-
-      const stream = hostMicStreamRef.current || await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-
-      hostMicStreamRef.current = stream;
-      const track = stream.getAudioTracks()[0];
-      if (!track) throw new Error('No Host microphone track was available.');
-
-      hostMicTrackRef.current = track;
-      track.enabled = true;
-
-      await Promise.all(
-        [...voicePeersRef.current.values()].map((meta) =>
-          meta?.hostSender?.replaceTrack(track).catch(() => {})
-        ),
-      );
-
-      setHostMicReady(true);
-      setHostMuted(false);
-    } catch (error) {
-      setActionError(error?.message || 'Host microphone could not be enabled.');
-    } finally {
-      setHostMicBusy(false);
+    const ok = await hostVoiceRelay.start();
+    if (!ok && hostVoiceRelay.error) {
+      setActionError(hostVoiceRelay.error);
     }
-  }, [hostMicBusy]);
+  }, [hostVoiceRelay]);
 
   const toggleHostMute = useCallback(() => {
-    const track = hostMicTrackRef.current;
-    if (!track) {
+    if (!hostVoiceRelay.micReady) {
       enableHostMic();
       return;
     }
-
-    const nextMuted = !hostMuted;
-    track.enabled = !nextMuted;
-    setHostMuted(nextMuted);
-  }, [enableHostMic, hostMuted]);
+    setHostMuted((current) => !current);
+  }, [enableHostMic, hostVoiceRelay.micReady]);
 
   const refresh = useCallback(async () => {
     if (!controllerId) return;
@@ -651,184 +578,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
     playBffSound(String(cue.name || ''));
   }, [gameState.sound_cue]);
 
-  const queueVoiceHostAction = useCallback((action, payload) => {
-    const run = () => tngApi.bff.hostAction(controllerId, action, payload);
-    const queued = voiceSignalQueueRef.current.then(run, run);
-    voiceSignalQueueRef.current = queued.catch(() => {});
-    return queued;
-  }, [controllerId]);
-
-  useEffect(() => {
-    const offers = gameState.voice_offers || {};
-
-    Object.entries(offers).forEach(async ([playerId, offer]) => {
-      if (!offer?.sdp) return;
-
-      const offerKey = `${offer.at || ''}:${offer.sdp.length}`;
-      if (handledVoiceOffersRef.current.get(playerId) === offerKey) return;
-      handledVoiceOffersRef.current.set(playerId, offerKey);
-
-      try {
-        const oldMeta = voicePeersRef.current.get(playerId);
-        oldMeta?.pc?.close?.();
-
-        const pc = new RTCPeerConnection({
-          iceServers: [
-            { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' },
-          ],
-        });
-
-        const silentBase = ensureSilentTrack();
-        const silentHostTrack = silentBase.clone();
-        const silentSpeakerTrack = silentBase.clone();
-
-        const reportPeerState = () => {
-          if (!hostVoiceMountedRef.current) return;
-
-          const currentMeta = voicePeersRef.current.get(playerId);
-          if (currentMeta?.pc && currentMeta.pc !== pc) return;
-
-          const live =
-            pc.connectionState === 'connected'
-            || pc.iceConnectionState === 'connected'
-            || pc.iceConnectionState === 'completed';
-
-          setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
-
-          if (!live) return;
-          if (!publishedVoiceAnswersRef.current.has(String(playerId))) return;
-          if (reportedVoiceLiveRef.current.has(String(playerId))) return;
-
-          reportedVoiceLiveRef.current.add(String(playerId));
-
-          queueVoiceHostAction('voice_peer_status', {
-            playerId,
-            ready: true,
-            connectionState: pc.connectionState,
-            iceConnectionState: pc.iceConnectionState,
-            iceGatheringState: pc.iceGatheringState,
-            signalingState: pc.signalingState,
-          }).catch(() => {
-            reportedVoiceLiveRef.current.delete(String(playerId));
-          });
-        };
-
-        pc.onconnectionstatechange = reportPeerState;
-        pc.oniceconnectionstatechange = reportPeerState;
-
-        pc.ontrack = (event) => {
-          if (!hostVoiceMountedRef.current || event.track.kind !== 'audio') return;
-
-          playerVoiceTracksRef.current.set(String(playerId), event.track);
-
-          if (voiceAudioRef.current) {
-            let audio = voiceAudioRef.current.querySelector(
-              `audio[data-player-id="${playerId}"]`,
-            );
-
-            if (!audio) {
-              audio = document.createElement('audio');
-              audio.autoplay = true;
-              audio.playsInline = true;
-              audio.dataset.playerId = playerId;
-              voiceAudioRef.current.appendChild(audio);
-            }
-
-            audio.srcObject = new MediaStream([event.track]);
-            audio.volume =
-              String(activePlayerIdRef.current || '') === String(playerId)
-                ? 1
-                : 0;
-            audio.play().catch(() => {});
-          }
-
-          routeActiveSpeaker(activePlayerIdRef.current);
-        };
-
-        await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
-
-        const transceivers = pc.getTransceivers();
-        const playerTransceiver = transceivers[0] || null;
-        const hostTransceiver = transceivers[1] || null;
-        const speakerTransceiver = transceivers[2] || null;
-
-        if (!playerTransceiver || !hostTransceiver?.sender || !speakerTransceiver?.sender) {
-          throw new Error('BFF voice negotiation did not expose the expected audio channels.');
-        }
-
-        // The player offers:
-        //   0 = sendonly microphone
-        //   1 = recvonly Host audio
-        //   2 = recvonly active-player audio
-        // The Host answer must explicitly mirror those directions.
-        playerTransceiver.direction = 'recvonly';
-        hostTransceiver.direction = 'sendonly';
-        speakerTransceiver.direction = 'sendonly';
-
-        const hostTrack = hostMicTrackRef.current || silentHostTrack;
-        await hostTransceiver.sender.replaceTrack(hostTrack);
-        await speakerTransceiver.sender.replaceTrack(silentSpeakerTrack);
-
-        const hostSender = hostTransceiver.sender;
-        const speakerSender = speakerTransceiver.sender;
-
-        voicePeersRef.current.set(playerId, {
-          pc,
-          hostSender,
-          speakerSender,
-          silentHostTrack,
-          silentSpeakerTrack,
-        });
-
-        const answer = await pc.createAnswer();
-        await pc.setLocalDescription(answer);
-        await waitForIceComplete(pc);
-
-        if (!hostVoiceMountedRef.current || !pc.localDescription?.sdp) return;
-
-        const answerResult = await queueVoiceHostAction('voice_answer', {
-          playerId,
-          offerAt: Number(offer.at),
-          sdp: pc.localDescription.sdp,
-        });
-
-        const savedAnswer = answerResult?.room?.gameState?.voice_answers?.[playerId];
-        if (Number(savedAnswer?.offerAt || 0) !== Number(offer.at || 0)) {
-          throw new Error('The Host answer was superseded before it could be saved.');
-        }
-
-        publishedVoiceAnswersRef.current.add(String(playerId));
-        reportPeerState();
-        routeActiveSpeaker(activePlayerIdRef.current);
-      } catch (voiceError) {
-        console.warn('[BFF Voice] Host could not connect player audio', playerId, voiceError);
-        handledVoiceOffersRef.current.delete(playerId);
-        publishedVoiceAnswersRef.current.delete(String(playerId));
-        setVoiceConnected((prev) => ({ ...prev, [playerId]: false }));
-      }
-    });
-  }, [ensureSilentTrack, queueVoiceHostAction, routeActiveSpeaker, voiceOfferSignature]);
-
-  useEffect(() => () => {
-    hostVoiceMountedRef.current = false;
-    voicePeersRef.current.forEach((meta) => {
-      meta?.pc?.close?.();
-      meta?.silentHostTrack?.stop?.();
-      meta?.silentSpeakerTrack?.stop?.();
-    });
-    voicePeersRef.current.clear();
-    playerVoiceTracksRef.current.clear();
-    hostMicStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-    silentAudioRef.current?.track?.stop?.();
-    silentAudioRef.current?.context?.close?.().catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    activePlayerIdRef.current = gameState.active_player_id || null;
-    routeActiveSpeaker(gameState.active_player_id || null);
-  }, [gameState.active_player_id, routeActiveSpeaker]);
-
   const act = useCallback(async (action, payload = {}) => {
     if (!controllerId || busy) return false;
     setBusy(true);
@@ -874,7 +623,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
   return (
     <div className="mx-auto max-w-[1650px] space-y-2.5">
-      <div ref={voiceAudioRef} className="hidden" aria-hidden="true" />
       {actionError && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
           {actionError}
@@ -919,13 +667,13 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 className={`rounded-md border px-2 py-1 text-[6px] uppercase ${
                   row.status === 'live'
                     ? 'border-[#4ADE80]/35 text-[#4ADE80]'
-                    : row.status === 'connecting'
+                    : row.status === 'reconnecting'
                       ? 'border-[#FFD700]/35 text-[#FFD700]'
                       : 'border-[#FF5F1F]/35 text-[#FF5F1F]'
                 }`}
                 style={PS2}
               >
-                {row.name} · {row.status === 'live' ? 'MIC LIVE' : row.status === 'connecting' ? 'CONNECTING' : 'MIC OFF'}
+                {row.name} · {row.status === 'live' ? 'MIC LIVE' : row.status === 'reconnecting' ? 'RECONNECTING' : 'MIC OFF'}
               </span>
             ))}
           </div>
@@ -1443,7 +1191,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
-                  voiceLive={Boolean(voiceConnected[player.playerId] && backendVoiceReady[player.playerId])}
+                  voiceLive={Boolean(relayConnected[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
