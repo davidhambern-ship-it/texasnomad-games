@@ -32,8 +32,54 @@ async function sendFile(res, filePath) {
   res.end(body);
 }
 
+const TNG_API_ORIGIN =
+  'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech';
+
+async function proxyTngApi(req, res) {
+  const sourceUrl = new URL(req.url || '/', 'http://localhost');
+  const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
+  const targetUrl = `${TNG_API_ORIGIN}${targetPath}${sourceUrl.search}`;
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (
+      value !== undefined &&
+      !['host', 'connection', 'content-length'].includes(key.toLowerCase())
+    ) {
+      headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+    }
+  }
+
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const body = chunks.length ? Buffer.concat(chunks) : undefined;
+
+  const response = await fetch(targetUrl, {
+    method: req.method,
+    headers,
+    body: ['GET', 'HEAD'].includes(req.method || 'GET') ? undefined : body,
+    redirect: 'manual',
+  });
+
+  const responseHeaders = {};
+  response.headers.forEach((value, key) => {
+    if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
+      responseHeaders[key] = value;
+    }
+  });
+
+  const responseBody = Buffer.from(await response.arrayBuffer());
+  res.writeHead(response.status, responseHeaders);
+  res.end(responseBody);
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    if ((req.url || '').startsWith('/tng-api')) {
+      await proxyTngApi(req, res);
+      return;
+    }
+
     const rawPath = decodeURIComponent((req.url || '/').split('?')[0]);
     const safePath = normalize(rawPath).replace(/^([.][.][/\\])+/, '');
     let filePath = join(root, safePath === '/' ? 'index.html' : safePath);
