@@ -317,10 +317,10 @@ function LiveStatusInline() {
       <style>{`
         @keyframes tng-story-crawl {
           0% {
-            transform: rotateX(20deg) translateY(92%);
+            transform: rotateX(12deg) translateY(92%);
           }
           100% {
-            transform: rotateX(20deg) translateY(-115%);
+            transform: rotateX(12deg) translateY(-115%);
           }
         }
 
@@ -329,19 +329,19 @@ function LiveStatusInline() {
           flex: 1;
           min-height: 0;
           overflow: hidden;
-          perspective: 560px;
+          perspective: 900px;
         }
 
         .tng-story-crawl {
-          width: 88%;
-          max-width: 540px;
+          width: 94%;
+          max-width: 620px;
           margin: 0 auto;
           padding-top: 72%;
           white-space: pre-line;
           text-align: center;
           color: rgba(255, 204, 0, 0.9);
-          font-size: 16px;
-          line-height: 1.95;
+          font-size: 20px;
+          line-height: 1.75;
           letter-spacing: 0.025em;
           transform-origin: 50% 100%;
           animation: tng-story-crawl ${crawlDuration}s linear infinite;
@@ -353,7 +353,7 @@ function LiveStatusInline() {
           display: block;
           margin-bottom: 20px;
           color: rgba(255, 95, 31, 0.95);
-          font-size: 16px;
+          font-size: 20px;
           line-height: 1.7;
           letter-spacing: 0.12em;
           text-transform: uppercase;
@@ -363,7 +363,7 @@ function LiveStatusInline() {
           display: block;
           margin-bottom: 28px;
           color: rgba(255, 214, 46, 1);
-          font-size: 18px;
+          font-size: 22px;
           line-height: 1.65;
           letter-spacing: 0.08em;
           text-transform: uppercase;
