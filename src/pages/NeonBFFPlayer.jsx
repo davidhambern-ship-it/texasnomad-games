@@ -46,6 +46,184 @@ function statusFor(gameState, myTeam, buzzWinner) {
   return String(phase).replace(/_/g, ' ').toUpperCase();
 }
 
+function DysfunctionPlayerPanel({
+  gameState,
+  players,
+  myPlayerId,
+  busy,
+  onVote,
+}) {
+  const dysfunction = gameState.dysfunction || {};
+  const assignments = dysfunction.side_assignments || {};
+  const mySide = assignments[String(myPlayerId || '')] || null;
+  const opponentSide = mySide === 'A' ? 'B' : mySide === 'B' ? 'A' : null;
+  const votes = dysfunction.votes || {};
+  const myVote = dysfunction.my_vote || null;
+  const playerById = Object.fromEntries(
+    players.map((player) => [String(player.playerId), player]),
+  );
+  const candidates = Object.entries(assignments)
+    .filter(([, side]) => side === opponentSide)
+    .map(([playerId]) => playerById[playerId])
+    .filter(Boolean);
+  const stage = gameState.round_stage || '';
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const defenseSeconds = gameState.answer_deadline_at
+    ? Math.max(0, Math.ceil((Number(gameState.answer_deadline_at) - now) / 1000))
+    : null;
+  const defensePlayer = playerById[String(gameState.active_player_id || '')] || null;
+
+  return (
+    <section className="relative overflow-hidden rounded-[28px] border border-[#F472B6]/30 bg-[#080516]/95 p-3 sm:p-4">
+      <div className="absolute -left-20 -top-20 h-52 w-52 rounded-full bg-[#BC13FE]/20 blur-3xl" />
+      <div className="absolute -right-20 -top-20 h-52 w-52 rounded-full bg-[#FF5F1F]/20 blur-3xl" />
+
+      <div className="relative z-10 space-y-3">
+        <div className="text-center">
+          <div className="text-[7px] uppercase tracking-[.22em] text-[#F472B6]" style={PS2}>
+            FAMILY DYSFUNCTION
+          </div>
+          <div className="mt-2 font-heading text-3xl text-white">
+            {dysfunction.family_name || 'Winning Family'}
+          </div>
+          <div className="mt-1 text-[6px] uppercase tracking-[.16em] text-white/30" style={PS2}>
+            {dysfunction.sudden_death
+              ? 'SUDDEN DEATH'
+              : `PROMPT ${dysfunction.prompt_number || 1} OF 5`}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl border border-[#BC13FE]/35 bg-[#BC13FE]/5 p-3 text-center">
+            <div className="text-[6px] text-[#BC13FE]" style={PS2}>SIDE A</div>
+            <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreA) || 0}</div>
+          </div>
+          <div className="rounded-xl border border-[#FF5F1F]/35 bg-[#FF5F1F]/5 p-3 text-center">
+            <div className="text-[6px] text-[#FF5F1F]" style={PS2}>SIDE B</div>
+            <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreB) || 0}</div>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/5 p-4 text-center">
+          <div className="text-[5px] uppercase tracking-[.18em] text-[#FFD700]/60" style={PS2}>
+            DYSFUNCTION PROMPT
+          </div>
+          <div className="mt-2 font-heading text-xl leading-snug text-white sm:text-2xl">
+            {dysfunction.prompt || 'Loading prompt…'}
+          </div>
+        </div>
+
+        {!mySide && stage !== 'dysfunction_complete' && (
+          <div className="rounded-xl border border-white/10 bg-white/[.02] p-4 text-center">
+            <div className="font-heading text-xl text-white/45">SPECTATOR MODE</div>
+            <div className="mt-2 text-[10px] text-white/30">
+              The winning family is battling itself. You can hear the action live.
+            </div>
+          </div>
+        )}
+
+        {mySide && stage === 'dysfunction_vote' && (
+          <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+            <div className="text-center text-[6px] uppercase tracking-[.18em] text-white/40" style={PS2}>
+              {myVote ? 'VOTE LOCKED' : `YOU ARE SIDE ${mySide} · PICK SOMEONE ON SIDE ${opponentSide}`}
+            </div>
+
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {candidates.map((player) => {
+                const selected = String(myVote || '') === String(player.playerId);
+                return (
+                  <button
+                    type="button"
+                    key={player.playerId}
+                    disabled={busy || Boolean(myVote)}
+                    onClick={() => onVote(player.playerId)}
+                    className="rounded-xl border p-3 text-center disabled:cursor-default"
+                    style={{
+                      borderColor: selected ? '#FFD700' : 'rgba(255,255,255,.12)',
+                      background: selected ? 'rgba(255,215,0,.10)' : 'rgba(255,255,255,.025)',
+                      color: selected ? '#FFD700' : 'rgba(255,255,255,.72)',
+                    }}
+                  >
+                    <div className="font-heading text-base">
+                      {player.playerName || player.name || 'Player'}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+
+            {myVote && (
+              <div className="mt-3 text-center text-[9px] text-white/30">
+                Your vote is secret until everyone votes.
+              </div>
+            )}
+          </div>
+        )}
+
+        {dysfunction.votes_revealed && stage !== 'dysfunction_vote' && (
+          <div className="rounded-xl border border-white/10 bg-black/40 p-3">
+            <div className="text-[6px] uppercase tracking-[.18em] text-white/35" style={PS2}>
+              THE FAMILY HAS SPOKEN
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+              {Object.entries(votes).map(([voterId, targetId]) => (
+                <div key={voterId} className="rounded-lg border border-white/8 bg-white/[.02] px-2 py-2 text-[10px] text-white/55">
+                  <strong>{playerById[voterId]?.playerName || playerById[voterId]?.name || 'Player'}</strong>
+                  {' → '}
+                  <strong className="text-[#FFD700]">
+                    {playerById[String(targetId)]?.playerName || playerById[String(targetId)]?.name || 'Player'}
+                  </strong>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+              <div className="rounded-lg border border-[#BC13FE]/20 p-2 text-[9px] text-[#BC13FE]">
+                SIDE A +{Number(dysfunction.last_pointsA) || 0}
+              </div>
+              <div className="rounded-lg border border-[#FF5F1F]/20 p-2 text-[9px] text-[#FF5F1F]">
+                SIDE B +{Number(dysfunction.last_pointsB) || 0}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {stage === 'dysfunction_defense' && (
+          <div className="rounded-xl border border-[#FFD700]/45 bg-[#FFD700]/10 p-4 text-center">
+            <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+              THE DEFENSE
+            </div>
+            <div className="mt-2 font-heading text-2xl text-white">
+              {defensePlayer?.playerName || defensePlayer?.name || 'Player'}
+            </div>
+            <div className="mt-2 font-heading text-4xl text-[#FFD700]">{defenseSeconds ?? 0}s</div>
+            <div className="mt-2 text-[10px] text-white/40">
+              Their mic is live to the whole room. Explain yourself.
+            </div>
+          </div>
+        )}
+
+        {stage === 'dysfunction_complete' && (
+          <div className="rounded-xl border-2 border-[#FFD700]/55 bg-[#FFD700]/10 p-6 text-center">
+            <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+              FAMILY DYSFUNCTION CHAMPION
+            </div>
+            <div className="mt-3 font-heading text-5xl text-[#FFD700]">
+              SIDE {dysfunction.winner_side}
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default function NeonBFFPlayer({ roomCode }) {
   const [room, setRoom] = useState(null);
   const [participant, setParticipant] = useState(null);
@@ -344,6 +522,28 @@ export default function NeonBFFPlayer({ roomCode }) {
     }
   }, [busy, deviceId, roomCode, showPlayPass]);
 
+  const submitDysfunctionVote = useCallback(async (targetPlayerId) => {
+    if (!deviceId || !roomCode || busy) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const payload = await tngApi.bff.playerAction(
+        deviceId,
+        roomCode,
+        'dysfunction_vote',
+        { targetPlayerId },
+      );
+      setRoom(payload.room || null);
+      setParticipant(payload.participant || null);
+    } catch (actionError) {
+      setError(actionError?.message || 'Your Family Dysfunction vote could not be submitted.');
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, deviceId, roomCode]);
+
   const status = useMemo(
     () => statusFor(gameState, myTeam, buzzWinner),
     [buzzWinner, gameState, myTeam],
@@ -402,7 +602,7 @@ export default function NeonBFFPlayer({ roomCode }) {
               </div>
               <button
                 type="button"
-                disabled={micBusy}
+                disabled={micBusy || (micOn && ['playing', 'dysfunction'].includes(gameState.phase))}
                 onClick={micOn ? disableMic : enableMic}
                 className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[6px] uppercase tracking-widest disabled:opacity-40 ${
                   micOn
@@ -482,18 +682,28 @@ export default function NeonBFFPlayer({ roomCode }) {
         )}
 
         <main className="min-h-0 flex-1">
-          <BFFTngBoard
-            gs={{
-              ...gameState,
-              family1: gameState.family1 || 'Family 1',
-              family2: gameState.family2 || 'Family 2',
-            }}
-            myPlayerId={myAccountId}
-            canBuzz={canBuzz}
-            buzzerBusy={busy}
-            onBuzz={buzz}
-            showBuzzer
-          />
+          {gameState.dysfunction ? (
+            <DysfunctionPlayerPanel
+              gameState={gameState}
+              players={players}
+              myPlayerId={myAccountId}
+              busy={busy}
+              onVote={submitDysfunctionVote}
+            />
+          ) : (
+            <BFFTngBoard
+              gs={{
+                ...gameState,
+                family1: gameState.family1 || 'Family 1',
+                family2: gameState.family2 || 'Family 2',
+              }}
+              myPlayerId={myAccountId}
+              canBuzz={canBuzz}
+              buzzerBusy={busy}
+              onBuzz={buzz}
+              showBuzzer
+            />
+          )}
         </main>
 
         <footer className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/45 px-3 py-2 text-[9px] text-white/35">
