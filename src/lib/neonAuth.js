@@ -58,30 +58,14 @@ export async function getNeonSession() {
 }
 
 export async function getNeonAuthToken() {
-  // Neon Functions require a short-lived bearer JWT. Always ask the Auth SDK
-  // for its token surface instead of reusing a JWT cached in getSession().
-  //
-  // @neondatabase/auth 0.5.x exposes getJWTToken(); newer client surfaces may
-  // expose token(). Support both so this stays safe across the SDK migration.
-  if (typeof authClient.getJWTToken === 'function') {
-    const tokenResult = await authClient.getJWTToken();
-    const freshToken = unwrapToken(tokenResult);
-    if (freshToken) return freshToken;
-  }
-
-  if (typeof authClient.token === 'function') {
-    const tokenResult = await authClient.token();
-    const freshToken = unwrapToken(tokenResult);
-    if (freshToken) return freshToken;
-  }
-
-  // Last-resort compatibility fallback only.
+  // TNG backend deployment 28 can securely verify Neon Auth's active opaque
+  // session token directly. Do not call the optional JWT/token plugin routes:
+  // this Neon Auth deployment does not expose them and they return HTTP 404.
   const session = await getNeonSession();
+
   return (
     session?.token ||
-    session?.jwt ||
     session?.session?.token ||
-    session?.session?.jwt ||
     null
   );
 }
