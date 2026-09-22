@@ -208,6 +208,18 @@ export const playerGameStats = pgTable('player_game_stats', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, (table) => [primaryKey({ columns: [table.accountId, table.gameId] })]);
 
+export const gameStatEvents = pgTable('game_stat_events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  roomId: uuid('room_id').notNull().references(() => gameRooms.id, { onDelete: 'cascade' }),
+  gameId: varchar('game_id', { length: 64 }).notNull(),
+  statKey: varchar('stat_key', { length: 100 }).notNull(),
+  result: jsonb('result').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex('game_stat_events_room_key_unique').on(table.roomId, table.statKey),
+  index('game_stat_events_room_idx').on(table.roomId, table.createdAt),
+]);
+
 export const hostStats = pgTable('host_stats', {
   accountId: uuid('account_id').primaryKey().references(() => accounts.id, { onDelete: 'cascade' }),
   sessionsHosted: integer('sessions_hosted').notNull().default(0),
