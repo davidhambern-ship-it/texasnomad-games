@@ -544,11 +544,11 @@ function bffMicsReady(players = [], gameState = {}) {
   }
 
   const offers = gameState.voice_offers || {};
-  const ready = gameState.voice_ready || {};
+  const verified = gameState.voice_verified || {};
 
   return assigned.every((player) => {
     const playerId = String(player.playerId);
-    return Boolean(offers[playerId]?.sdp && ready[playerId] === true);
+    return Boolean(offers[playerId]?.sdp && verified[playerId] === true);
   });
 }
 
@@ -1378,12 +1378,14 @@ async function applyBffHostAction(room, body = {}, players = []) {
     const playerId = String(body.playerId || '');
     if (!playerId) return next;
 
+    const previouslyVerified = Boolean((next.voice_verified || {})[playerId]);
+
     next.voice_ready = {
       ...(next.voice_ready || {}),
-      [playerId]: Boolean(body.ready),
+      [playerId]: previouslyVerified || Boolean(body.ready),
     };
 
-    if (body.ready) {
+    if (body.ready || previouslyVerified) {
       next.voice_verified = {
         ...(next.voice_verified || {}),
         [playerId]: true,
@@ -1393,7 +1395,7 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.voice_status = {
       ...(next.voice_status || {}),
       [playerId]: {
-        ready: Boolean(body.ready),
+        ready: previouslyVerified || Boolean(body.ready),
         connectionState: String(body.connectionState || ''),
         iceConnectionState: String(body.iceConnectionState || ''),
         iceGatheringState: String(body.iceGatheringState || ''),
@@ -1808,7 +1810,7 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
       voice_answers: answers,
       voice_ready: {
         ...(current.voice_ready || {}),
-        [playerId]: false,
+        [playerId]: Boolean((current.voice_verified || {})[playerId]),
       },
       voice_status: statuses,
     };
