@@ -1,11 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Minus, Plus, RotateCcw, Pause, Play, Lightbulb } from 'lucide-react';
+import { Loader2, Minus, Plus, RotateCcw, Pause, Play, Lightbulb, ChevronDown, ChevronUp, List } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
 import {
-  HostWorkspace,
   HostControlDeck,
   HostControlCard,
 } from '@/components/host/GameControllerLayout';
@@ -106,11 +105,8 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
   const [difficulty, setDifficulty] = useState('simpleton');
   const [category, setCategory] = useState('random');
   const [clock, setClock] = useState(Date.now());
-  const [zoom, setZoom] = useState(() => {
-    if (typeof window === 'undefined') return 1;
-    if (window.innerWidth >= 768 && window.innerWidth < 1024) return 0.7;
-    return 1;
-  });
+  const [zoom, setZoom] = useState(1);
+  const [wordListOpen, setWordListOpen] = useState(false);
 
   const gameState = room?.gameState || {};
   const phase = gameState.phase || 'setup';
@@ -206,22 +202,74 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
         </div>
       )}
 
-      <div className="flex flex-col gap-2 rounded-xl border border-[#00c875]/25 bg-black/55 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="text-[7px] uppercase tracking-widest text-[#00c875]" style={PS2}>
-            WORD SEARCH CONTROLLER
+      <div className="relative rounded-xl border border-[#00c875]/25 bg-black/60 px-2.5 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <div className="text-[7px] uppercase tracking-widest text-[#00c875]" style={PS2}>
+              WORD SEARCH
+            </div>
+            <div
+              className="rounded-lg border px-2.5 py-1.5 text-[6px] uppercase tracking-widest"
+              style={{ ...PS2, borderColor: myColor, color: myColor }}
+            >
+              {status}
+            </div>
           </div>
-          <div className="mt-1 text-xs text-white/35">
-            Board + word list stay together. Game controls live in the controller deck below.
-          </div>
+
+          {phase !== 'setup' && (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setWordListOpen((open) => !open)}
+                className="flex items-center gap-1.5 rounded-lg border border-[#BC13FE]/45 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE]"
+              >
+                <List className="h-4 w-4" />
+                <span className="text-[6px]" style={PS2}>WORDS {foundCount}/{words.length}</span>
+                {wordListOpen ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </button>
+              <ZoomControls zoom={zoom} setZoom={setZoom} />
+            </div>
+          )}
         </div>
 
-        <div
-          className="w-fit rounded-lg border px-3 py-2 text-[7px] uppercase tracking-widest"
-          style={{ ...PS2, borderColor: myColor, color: myColor }}
-        >
-          {status}
-        </div>
+        {phase !== 'setup' && wordListOpen && (
+          <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-xl border border-[#BC13FE]/45 bg-[#090512]/[.98] p-2 shadow-2xl backdrop-blur-xl">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
+                WORD LIST
+              </span>
+              <span className="text-[6px] text-[#FFD700]" style={PS2}>
+                {foundCount}/{words.length}
+              </span>
+            </div>
+            <div className="grid max-h-[180px] grid-cols-2 gap-1.5 overflow-y-auto sm:grid-cols-3 lg:grid-cols-4">
+              {words.map((word) => {
+                const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
+                const color = word.revealed ? '#777777' : finder?.color || '#BC13FE';
+
+                return (
+                  <div
+                    key={word.word}
+                    className="rounded-lg border px-2 py-2 text-center"
+                    style={{
+                      borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)',
+                      background: word.found ? `${color}10` : 'rgba(255,255,255,.02)',
+                      color: word.found ? color : 'rgba(255,255,255,.55)',
+                      textDecoration: word.found ? 'line-through' : 'none',
+                    }}
+                  >
+                    <div className="text-[7px]" style={PS2}>{word.word}</div>
+                    {word.found && word.points != null && (
+                      <div className="mt-1 text-[5px] opacity-70" style={PS2}>
+                        {word.revealed ? 'REVEAL' : `+${word.points}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {phase === 'setup' && (
@@ -243,94 +291,34 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
 
       {phase !== 'setup' && (
         <>
-          <HostWorkspace
-            primary={
-              <section className="relative overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/45">
-                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
-                  <div>
-                    <div className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
-                      GAME BOARD
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/30">
-                      Zoom on phones/tablets, then pan the board inside this frame.
-                    </div>
-                  </div>
-                  <ZoomControls zoom={zoom} setZoom={setZoom} />
-                </div>
+          <section className="relative overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/45">
+            <div className="relative flex items-start justify-center overflow-auto p-2 sm:p-3">
+              <WordSearchTurnEffects
+                mode={currentMode}
+                phase={phase}
+                paused={paused}
+                activeSeat={activeSeat}
+                players={players}
+                viewerSeat={1}
+                timeRemaining={timeRemaining}
+                roundNumber={gameState.roundNumber || 1}
+              />
 
-                <div className="relative max-h-[78vh] min-h-[360px] overflow-auto p-2 sm:p-3">
-                  <WordSearchTurnEffects
-                    mode={currentMode}
-                    phase={phase}
-                    paused={paused}
-                    activeSeat={activeSeat}
-                    players={players}
-                    viewerSeat={1}
-                    timeRemaining={timeRemaining}
-                    roundNumber={gameState.roundNumber || 1}
-                  />
-
-                  <div className="flex min-w-max items-start justify-center">
-                    <NeonWordSearchBoard
-                      grid={grid}
-                      words={words}
-                      players={players}
-                      mySeat={1}
-                      myColor={myColor}
-                      canInteract={canInteract && !busy}
-                      onSubmit={submitSelection}
-                      maxBoardPx={760}
-                      zoom={zoom}
-                    />
-                  </div>
-                </div>
-              </section>
-            }
-            companion={
-              <section className="overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/55">
-                <div className="flex items-center justify-between border-b border-white/10 px-3 py-3">
-                  <div>
-                    <div className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
-                      WORD LIST
-                    </div>
-                    <div className="mt-1 text-[10px] text-white/30">
-                      Visible beside the board on tablets and larger screens.
-                    </div>
-                  </div>
-                  <span className="text-[7px] text-[#FFD700]" style={PS2}>
-                    {foundCount}/{words.length}
-                  </span>
-                </div>
-
-                <div className="grid max-h-[68vh] grid-cols-1 gap-1.5 overflow-y-auto p-2 sm:p-2.5 xl:grid-cols-2">
-                  {words.map((word) => {
-                    const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
-                    const color = word.revealed ? '#777777' : finder?.color || '#BC13FE';
-
-                    return (
-                      <div
-                        key={word.word}
-                        className="rounded-lg border px-2 py-2 text-center"
-                        style={{
-                          borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)',
-                          background: word.found ? `${color}10` : 'rgba(255,255,255,.02)',
-                          color: word.found ? color : 'rgba(255,255,255,.48)',
-                          textDecoration: word.found ? 'line-through' : 'none',
-                        }}
-                      >
-                        <div className="text-[7px]" style={PS2}>{word.word}</div>
-                        {word.found && word.points != null && (
-                          <div className="mt-1 text-[5px] opacity-70" style={PS2}>
-                            {word.revealed ? 'REVEAL' : `+${word.points}`}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            }
-          />
+              <div className="flex min-w-max items-start justify-center">
+                <NeonWordSearchBoard
+                  grid={grid}
+                  words={words}
+                  players={players}
+                  mySeat={1}
+                  myColor={myColor}
+                  canInteract={canInteract && !busy}
+                  onSubmit={submitSelection}
+                  maxBoardPx={920}
+                  zoom={zoom}
+                />
+              </div>
+            </div>
+          </section>
 
           <HostControlDeck>
             <HostControlCard
