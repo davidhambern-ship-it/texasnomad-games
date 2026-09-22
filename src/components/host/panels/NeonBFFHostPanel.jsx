@@ -427,6 +427,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const hostMicAutoAttemptedRef = useRef(false);
   const hostVoiceMountedRef = useRef(true);
   const publishedVoiceAnswersRef = useRef(new Set());
+  const voiceSignalQueueRef = useRef(Promise.resolve());
 
   const gameState = room?.gameState || {};
   const voiceOfferSignature = useMemo(
@@ -642,6 +643,13 @@ export default function NeonBFFHostPanel({ controllerId }) {
     playBffSound(String(cue.name || ''));
   }, [gameState.sound_cue]);
 
+  const queueVoiceHostAction = useCallback((action, payload) => {
+    const run = () => tngApi.bff.hostAction(controllerId, action, payload);
+    const queued = voiceSignalQueueRef.current.then(run, run);
+    voiceSignalQueueRef.current = queued.catch(() => {});
+    return queued;
+  }, [controllerId]);
+
   useEffect(() => {
     const offers = gameState.voice_offers || {};
 
@@ -682,7 +690,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
           if (!publishedVoiceAnswersRef.current.has(String(playerId))) return;
 
-          tngApi.bff.hostAction(controllerId, 'voice_peer_status', {
+          queueVoiceHostAction('voice_peer_status', {
             playerId,
             ready: live,
             connectionState: pc.connectionState,
@@ -766,11 +774,16 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
         if (!hostVoiceMountedRef.current || !pc.localDescription?.sdp) return;
 
-        await tngApi.bff.hostAction(controllerId, 'voice_answer', {
+        const answerResult = await queueVoiceHostAction('voice_answer', {
           playerId,
           offerAt: Number(offer.at),
           sdp: pc.localDescription.sdp,
         });
+
+        const savedAnswer = answerResult?.room?.gameState?.voice_answers?.[playerId];
+        if (Number(savedAnswer?.offerAt || 0) !== Number(offer.at || 0)) {
+          throw new Error('The Host answer was superseded before it could be saved.');
+        }
 
         publishedVoiceAnswersRef.current.add(String(playerId));
         reportPeerState();
@@ -782,7 +795,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
         setVoiceConnected((prev) => ({ ...prev, [playerId]: false }));
       }
     });
-  }, [controllerId, ensureSilentTrack, routeActiveSpeaker, voiceOfferSignature]);
+  }, [ensureSilentTrack, queueVoiceHostAction, routeActiveSpeaker, voiceOfferSignature]);
 
   useEffect(() => () => {
     hostVoiceMountedRef.current = false;
