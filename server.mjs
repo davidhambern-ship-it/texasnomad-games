@@ -327,7 +327,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     buzzer_phase: gameState.buzzer_phase || null,
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
     buzz_winner: gameState.buzz_winner || null,
-    family_names_set: Boolean(gameState.family_names_set || bffFamilyNamesReady(gameState)),
+    family_names_set: bffFamilyNamesReady(gameState),
     round_stage: gameState.round_stage || 'setup',
     faceoff_players: gameState.faceoff_players || {},
     faceoff_results: gameState.faceoff_results || {},
@@ -588,7 +588,7 @@ async function applyBffHostAction(room, body = {}, players = []) {
 
     next.family1 = family1;
     next.family2 = family2;
-    next.family_names_set = true;
+    next.family_names_set = bffFamilyNamesReady(next);
     return next;
   }
 
