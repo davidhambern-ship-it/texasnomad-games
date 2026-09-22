@@ -16,6 +16,7 @@ export function defaultHangmanState() {
     next_setter_seat: 1,
     current_turn_seat: null,
     scores: { '1': 0, '2': 0, '3': 0, '4': 0 },
+    round_start_scores: { '1': 0, '2': 0, '3': 0, '4': 0 },
     last_action: null,
     round_result: null,
     winner_seat: null,
@@ -33,6 +34,12 @@ export function normalizedHangmanState(raw = {}) {
     scores: {
       ...base.scores,
       ...(raw.scores && typeof raw.scores === 'object' ? raw.scores : {}),
+    },
+    round_start_scores: {
+      ...base.round_start_scores,
+      ...(raw.round_start_scores && typeof raw.round_start_scores === 'object'
+        ? raw.round_start_scores
+        : {}),
     },
   };
 }
@@ -180,6 +187,7 @@ export function startHangmanBoard(rawState, {
     word_setter_seat: setterSeat,
     next_setter_seat: null,
     current_turn_seat: startingTurn,
+    round_start_scores: { ...state.scores },
     last_action: {
       type: 'board_set',
       seatNumber: setterSeat,
