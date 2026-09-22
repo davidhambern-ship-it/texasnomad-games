@@ -651,24 +651,113 @@ function bffResolveFaceoffControl(gameState, players, winnerPlayerId) {
 
   gameState.control_team = team;
   gameState.active_turn = team;
-  gameState.round_stage = 'family_play';
+  gameState.faceoff_winner_id = winnerPlayerId;
+  gameState.faceoff_winner_team = team;
   gameState.steal_mode = false;
   gameState.buzzer_open = false;
   gameState.buzzer_phase = 'board_shown';
   gameState.answer_deadline_at = null;
-  gameState.active_player_id = bffNextPlayerId(
-    players,
-    gameState,
-    team,
-    winnerPlayerId,
-  );
+  gameState.active_player_id = winnerPlayerId;
+
+  if (gameState.is_tiebreak) {
+    gameState.score1 = Number(gameState.score1 || 0) + (team === 1 ? 1 : 0);
+    gameState.score2 = Number(gameState.score2 || 0) + (team === 2 ? 1 : 0);
+    gameState.match_complete = true;
+    gameState.match_tied = false;
+    gameState.winning_team = team;
+    gameState.phase = 'round_over';
+    gameState.round_stage = 'match_complete';
+    gameState.active_player_id = null;
+    return;
+  }
+
+  gameState.round_stage = 'play_pass';
 }
 
 function bffFaceoffResults(gameState = {}) {
   return { ...(gameState.faceoff_results || {}) };
 }
 
-function bffAdvanceFaceoffAfterMiss(gameState, playerId, { showX = false } = {}) {
+function bffChooseBestFaceoffResult(gameState) {
+  const results = bffFaceoffResults(gameState);
+  const pair = bffFaceoffPlayerIds(gameState);
+
+  return pair
+    .map((id) => ({ id, result: results[String(id)] }))
+    .filter((entry) => entry.result && !entry.result.wrong)
+    .sort((a, b) =>
+      Number(b.result.points || 0) - Number(a.result.points || 0)
+      || Number(a.result.answerIndex ?? 99) - Number(b.result.answerIndex ?? 99)
+    )[0]?.id || null;
+}
+
+function bffFaceoffNoWinner(gameState) {
+  gameState.score1 = Math.max(0, Number(gameState.score1 || 0) - 5);
+  gameState.score2 = Math.max(0, Number(gameState.score2 || 0) - 5);
+  gameState.round_bank = 0;
+  gameState.sound_cue = { name: 'wrong_awww', at: Date.now() };
+  bffCompleteRound(gameState, null);
+}
+
+function bffAdvanceFaceoffPair(gameState, players) {
+  const pair = gameState.faceoff_players || {};
+  const current1 = pair['1'] || pair[1] || null;
+  const current2 = pair['2'] || pair[2] || null;
+  const next1 = bffNextUnattemptedPlayer(players, gameState, 1, current1);
+  const next2 = bffNextUnattemptedPlayer(players, gameState, 2, current2);
+
+  gameState.faceoff_results = {};
+  gameState.buzz_winner = null;
+  gameState.faceoff_x_event = null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+
+  if (!next1 && !next2) {
+    bffFaceoffNoWinner(gameState);
+    return;
+  }
+
+  gameState.faceoff_players = {
+    1: next1 || current1,
+    2: next2 || current2,
+  };
+
+  if (next1 && next2) {
+    gameState.round_stage = 'faceoff_ready';
+    gameState.active_player_id = null;
+    gameState.answer_deadline_at = null;
+    return;
+  }
+
+  bffStartAnswerClock(gameState, next1 || next2);
+}
+
+function bffResolveFaceoffAfterAttempt(gameState, players, playerId) {
+  const results = bffFaceoffResults(gameState);
+  const thisResult = results[String(playerId)] || null;
+  const otherPlayerId = bffOtherFaceoffPlayerId(gameState, playerId);
+  const otherResult = otherPlayerId ? results[String(otherPlayerId)] : null;
+
+  if (thisResult && !thisResult.wrong && Number(thisResult.answerIndex) === 0) {
+    bffResolveFaceoffControl(gameState, players, playerId);
+    return;
+  }
+
+  if (otherPlayerId && !otherResult) {
+    bffStartAnswerClock(gameState, otherPlayerId);
+    return;
+  }
+
+  const winner = bffChooseBestFaceoffResult(gameState);
+  if (winner) {
+    bffResolveFaceoffControl(gameState, players, winner);
+    return;
+  }
+
+  bffAdvanceFaceoffPair(gameState, players);
+}
+
+function bffAdvanceFaceoffAfterMiss(gameState, players, playerId, { showX = false } = {}) {
   const results = bffFaceoffResults(gameState);
   results[String(playerId)] = {
     ...(results[String(playerId)] || {}),
@@ -676,6 +765,7 @@ function bffAdvanceFaceoffAfterMiss(gameState, playerId, { showX = false } = {})
     at: Date.now(),
   };
   gameState.faceoff_results = results;
+  bffMarkFaceoffAttempt(gameState, playerId);
 
   if (showX) {
     gameState.faceoff_x_event = {
@@ -688,20 +778,9 @@ function bffAdvanceFaceoffAfterMiss(gameState, playerId, { showX = false } = {})
     };
   }
 
-  const otherPlayerId = bffOtherFaceoffPlayerId(gameState, playerId);
-  const otherResult = otherPlayerId ? results[String(otherPlayerId)] : null;
-
-  if (otherPlayerId && !otherResult) {
-    bffStartAnswerClock(gameState, otherPlayerId);
-    return;
-  }
-
-  gameState.round_stage = 'faceoff_unresolved';
-  gameState.active_player_id = null;
-  gameState.answer_deadline_at = null;
-  gameState.buzzer_open = false;
-  gameState.buzzer_phase = 'board_shown';
+  bffResolveFaceoffAfterAttempt(gameState, players, playerId);
 }
+
 
 async function applyBffHostAction(room, body = {}, players = []) {
   const action = String(body.action || '').trim();
