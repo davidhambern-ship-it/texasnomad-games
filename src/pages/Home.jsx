@@ -340,8 +340,8 @@ function LiveStatusInline() {
           white-space: pre-line;
           text-align: center;
           color: rgba(255, 204, 0, 0.9);
-          font-size: 12px;
-          line-height: 1.9;
+          font-size: 16px;
+          line-height: 1.95;
           letter-spacing: 0.025em;
           transform-origin: 50% 100%;
           animation: tng-story-crawl ${crawlDuration}s linear infinite;
@@ -353,8 +353,8 @@ function LiveStatusInline() {
           display: block;
           margin-bottom: 20px;
           color: rgba(255, 95, 31, 0.95);
-          font-size: 14px;
-          line-height: 1.65;
+          font-size: 16px;
+          line-height: 1.7;
           letter-spacing: 0.12em;
           text-transform: uppercase;
         }
@@ -363,8 +363,8 @@ function LiveStatusInline() {
           display: block;
           margin-bottom: 28px;
           color: rgba(255, 214, 46, 1);
-          font-size: 16px;
-          line-height: 1.6;
+          font-size: 18px;
+          line-height: 1.65;
           letter-spacing: 0.08em;
           text-transform: uppercase;
         }
