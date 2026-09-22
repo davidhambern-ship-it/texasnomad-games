@@ -424,6 +424,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [hostMicBusy, setHostMicBusy] = useState(false);
   const [clockNow, setClockNow] = useState(() => Date.now());
   const handledDeadlineRef = useRef(null);
+  const hostMicAutoAttemptedRef = useRef(false);
 
   const gameState = room?.gameState || {};
   const players = Array.isArray(gameState.players)
@@ -613,6 +614,12 @@ export default function NeonBFFHostPanel({ controllerId }) {
     preloadBffSounds();
     armBffSoundUnlock();
   }, []);
+  useEffect(() => {
+    if (hostMicAutoAttemptedRef.current || hostMicReady || hostMicBusy) return;
+    hostMicAutoAttemptedRef.current = true;
+    enableHostMic();
+  }, [enableHostMic, hostMicBusy, hostMicReady]);
+
 
   useEffect(() => {
     const cue = gameState.sound_cue;
