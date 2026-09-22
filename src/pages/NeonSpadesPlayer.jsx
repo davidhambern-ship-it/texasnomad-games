@@ -6,6 +6,7 @@ import { tngApi } from '@/api/tngApi';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
+import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -323,6 +324,7 @@ export default function NeonSpadesPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen bg-[#070311] text-white lg:h-screen lg:overflow-hidden">
+      <TngNotificationToaster />
       <main className="mx-auto flex min-h-screen max-w-[1700px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4">
         <section className="order-1 min-w-0 flex-1 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
           <div
