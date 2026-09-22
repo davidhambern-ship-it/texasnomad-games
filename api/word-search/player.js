@@ -14,6 +14,7 @@ import {
   submitWordSearchSelection,
 } from '../../server/games/word-search.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -90,6 +91,30 @@ async function activeParticipants(roomId, executor = db) {
       };
     })
     .sort((a, b) => a.seatNumber - b.seatNumber);
+}
+
+
+async function recordWordSearchRound(room, state, participants, executor = db) {
+  if (state?.phase !== 'finished') return;
+
+  const winnerSeat = Number(state.winner_seat || 0);
+  const scores = state.scores || {};
+
+  await recordGameStatEvent({
+    room,
+    statKey: `round:${Number(state.round_number || 1)}`,
+    entries: participants.map((player) => ({
+      accountId: player.accountId,
+      score: Number(scores[String(player.seatNumber)] || 0),
+      won: winnerSeat > 0 ? Number(player.seatNumber) === winnerSeat : null,
+    })),
+    result: {
+      winnerSeat: winnerSeat || null,
+      mode: state.mode || null,
+      difficulty: state.difficulty || null,
+    },
+    executor,
+  });
 }
 
 async function ensurePlayerSeat(room, participant) {
@@ -190,10 +215,12 @@ async function refreshTimeoutIfNeeded(room) {
         gameId: 'word-search',
         gameState: nextState,
       },
-      status: nextState.phase === 'finished' ? 'live' : 'live',
+      status: 'live',
       revision: lockedRoom.revision + 1,
       updatedAt: new Date(),
     }).where(eq(gameRooms.id, lockedRoom.id)).returning();
+
+    await recordWordSearchRound(updated, nextState, participants, transaction);
 
     return updated;
   });
@@ -314,6 +341,8 @@ export default async function handler(request, response) {
       await transaction.update(roomParticipants).set({
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentParticipant.id));
+
+      await recordWordSearchRound(nextRoom, nextState, participants, transaction);
 
       return nextRoom;
     });
