@@ -9,6 +9,7 @@ import {
   SquareBizIntro,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
+import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
 const X_COLOR = '#ff1593';
@@ -116,6 +117,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
 
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-[#05020a] text-white">
+      <TngNotificationToaster />
       <SquareBizShowStyles />
 
       <div className="pointer-events-none absolute inset-0 opacity-60" style={{
