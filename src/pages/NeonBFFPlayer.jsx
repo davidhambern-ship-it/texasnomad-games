@@ -391,6 +391,7 @@ export default function NeonBFFPlayer({ roomCode }) {
             canBuzz={canBuzz}
             buzzerBusy={busy}
             onBuzz={buzz}
+            showBuzzer
           />
         </main>
 
