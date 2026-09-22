@@ -244,6 +244,92 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
   );
 }
 
+function ConstructionCabinet({ game, onOpen }) {
+  const detail = CONSTRUCTION_DETAILS[game.id];
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(game)}
+      className="group w-full max-w-[340px] text-left rounded-2xl border-2 border-[#FFD700]/25 bg-black/55 overflow-hidden transition-all hover:-translate-y-1 hover:border-[#FFD700]/65 hover:shadow-[0_0_30px_rgba(255,215,0,.12)]"
+    >
+      <div className="relative aspect-video overflow-hidden bg-[#050208]">
+        {game.image ? (
+          <img src={game.image} alt={game.title} className="h-full w-full object-cover opacity-55 transition-transform duration-300 group-hover:scale-105 group-hover:opacity-75" />
+        ) : game.screenComponent ? (
+          <div className="h-full w-full opacity-55">{game.screenComponent}</div>
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050208] via-transparent to-transparent" />
+        <div className="absolute left-3 top-3 rounded-full border border-[#FFD700]/45 bg-black/75 px-3 py-1 text-[6px] tracking-widest text-[#FFD700] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          🚧 IN CONSTRUCTION
+        </div>
+      </div>
+      <div className="p-4">
+        <div className="text-xl uppercase text-white" style={{ fontFamily: "'Rye', serif" }}>{game.title}</div>
+        <div className="mt-1 text-[8px] tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: game.color }}>
+          {game.tagline}
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-white/45">{game.description}</p>
+        <div className="mt-4 text-[7px] tracking-widest text-[#FFD700]/70 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          CLICK FOR THE BLUEPRINT →
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ConstructionModal({ game, onClose }) {
+  if (!game) return null;
+  const detail = CONSTRUCTION_DETAILS[game.id] || { status: 'Still cooking', how: [] };
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/85 p-4 backdrop-blur-md" onMouseDown={onClose}>
+      <div
+        className="relative w-full max-w-2xl rounded-2xl border-2 bg-[#08030f] p-6 shadow-[0_0_60px_rgba(255,215,0,.12)]"
+        style={{ borderColor: `${game.color}88` }}
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button type="button" onClick={onClose} className="absolute right-3 top-3 h-9 w-9 rounded-full border border-white/15 text-white/50 hover:text-white">×</button>
+
+        <div className="text-[7px] tracking-[.25em] text-[#FFD700] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          TNG WORKSHOP · BUILD IN PROGRESS
+        </div>
+        <h2 className="mt-3 pr-10 text-3xl uppercase text-white" style={{ fontFamily: "'Rye', serif" }}>{game.title}</h2>
+        <div className="mt-1 text-xs uppercase" style={{ color: game.color }}>{game.tagline}</div>
+
+        <p className="mt-5 leading-relaxed text-white/60">{game.description}</p>
+
+        <div className="mt-5 rounded-xl border border-white/10 bg-white/[.025] p-4">
+          <div className="text-[7px] tracking-widest text-kinetic-orange uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>CURRENT BUILD FOCUS</div>
+          <div className="mt-2 text-sm text-white/65">{detail.status}</div>
+        </div>
+
+        <div className="mt-5">
+          <div className="text-[7px] tracking-widest text-cyber-purple uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>HOW THE GAME WORKS</div>
+          <div className="mt-3 space-y-3">
+            {detail.how.map((item, index) => (
+              <div key={item} className="flex gap-3 rounded-lg border border-white/8 bg-black/35 p-3">
+                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-[8px]" style={{ borderColor: game.color, color: game.color, fontFamily: "'Press Start 2P', monospace" }}>
+                  {index + 1}
+                </div>
+                <p className="text-sm leading-relaxed text-white/55">{item}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-6 w-full rounded-xl border border-[#FFD700]/50 px-4 py-3 text-[8px] tracking-widest text-[#FFD700] uppercase hover:bg-[#FFD700]/10"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
+          BACK TO THE ARCADE
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Coming Soon Cabinet ──────────────────────────────────────────────────────
 function ComingSoonCabinet({ title, emoji, color = '#4a4a6a' }) {
   const [hovered, setHovered] = useState(false);
@@ -366,7 +452,7 @@ const GAMES = [
   },
   {
     id: 'see-that',
-    title: 'See That!',
+    title: 'See That?',
     tagline: 'Hidden Object Challenge',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/bdb921a37_generated_image.png',
     color: '#4ade80',
@@ -394,7 +480,7 @@ const GAMES = [
   },
   {
     id: 'txd',
-    title: 'TXD Dominoes',
+    title: 'TND — TexasNomad Dominoes',
     tagline: 'Texas Domino Showdown',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9f8b50e18_crowned_b.png',
     color: '#FFD700',
@@ -408,10 +494,47 @@ const GAMES = [
   },
 ];
 
+const IN_CONSTRUCTION_IDS = ['sudoku', 'see-that', 'word-wrangler', 'txd'];
+
+const CONSTRUCTION_DETAILS = {
+  sudoku: {
+    status: 'Puzzle systems + multiplayer race tuning',
+    how: [
+      'Every player gets a valid Sudoku board built for the same round.',
+      'Players race the clock while mistakes add pressure and penalties.',
+      'The finished version will support clean solo play plus competitive live-room races.',
+    ],
+  },
+  'see-that': {
+    status: 'Scene production + hidden-object interaction',
+    how: [
+      'A detailed scene hides a fixed set of objects in known locations.',
+      'Players scan the image and tap what they find before the timer expires.',
+      'Future scenes can rotate themes, object lists, difficulty and score challenges.',
+    ],
+  },
+  'word-wrangler': {
+    status: 'Board generation + special-tile rules',
+    how: [
+      'Players connect adjacent letters to build valid words from the live grid.',
+      'Found words score by length while letters cascade and reshape the board.',
+      'Special tiles — including bonus and bomb-style pieces — turn each board into controlled chaos.',
+    ],
+  },
+  txd: {
+    status: 'Domino placement + table geometry',
+    how: [
+      'Players receive real domino hands and play only legal matches onto the shared table.',
+      'The board detects valid placements, spinners and edge turns while keeping every tile in frame.',
+      'If you cannot play, you knock; first player out — or the best hand when blocked — takes the round.',
+    ],
+  },
+};
+
 const COMING_SOON = [
   { title: 'Name That Track', emoji: '🎵', color: '#5a1a5a' },
   { title: 'VIRAL!', emoji: '🚀', color: '#5a1a5a' },
-  { title: 'TN Originals', emoji: '🤠', color: '#5a3a1a' },
+  { title: '1 Player Games', emoji: '🎮', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
 
@@ -425,6 +548,7 @@ export default function Games() {
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
+  const [constructionGame, setConstructionGame] = useState(null);
 
   const generateRoomCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -591,8 +715,9 @@ export default function Games() {
   };
 
   // Featured game first in display order
-  const featuredGame = GAMES.find(g => g.featured);
-  const otherGames = GAMES.filter(g => !g.featured);
+  const featuredGame = GAMES.find(g => g.featured && !IN_CONSTRUCTION_IDS.includes(g.id));
+  const otherGames = GAMES.filter(g => !g.featured && !IN_CONSTRUCTION_IDS.includes(g.id));
+  const constructionGames = GAMES.filter(g => IN_CONSTRUCTION_IDS.includes(g.id));
 
   return (
     <div className="min-h-screen bg-midnight-void text-white overflow-x-hidden">
@@ -698,7 +823,31 @@ export default function Games() {
           </div>
         </section>
 
-        {/* ── Western Divider ── */}
+        <div className="relative py-8 px-4 text-center overflow-hidden">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, #FFD70055, #FF5F1F55, transparent)' }} />
+          </div>
+          <div className="relative inline-flex items-center gap-4 px-6 py-2 bg-midnight-void">
+            <span className="text-[#FFD700] text-xl">🚧</span>
+            <span className="text-lg tracking-[0.22em] uppercase text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>IN CONSTRUCTION</span>
+            <span className="text-kinetic-orange text-xl">🛠️</span>
+          </div>
+          <p className="relative mt-2 text-[8px] tracking-widest uppercase text-white/30" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            THEY EXIST. THEY ARE JUST CURRENTLY COVERED IN DIGITAL SAWDUST.
+          </p>
+        </div>
+
+        <section className="px-4 pb-10">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 justify-items-center">
+              {constructionGames.map(game => (
+                <ConstructionCabinet key={game.id} game={game} onOpen={setConstructionGame} />
+              ))}
+            </div>
+          </div>
+        </section>
+
+                {/* ── Western Divider ── */}
         <div className="relative py-6 px-4 text-center overflow-hidden">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, #BC13FE60, #FF5F1F60, transparent)' }} />
@@ -726,6 +875,10 @@ export default function Games() {
           </div>
         </section>
       </div>
+
+      {constructionGame && (
+        <ConstructionModal game={constructionGame} onClose={() => setConstructionGame(null)} />
+      )}
 
       {/* CPU Opponent Select Overlay */}
       {cpuSelectGame && (
