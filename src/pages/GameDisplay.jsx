@@ -14,6 +14,7 @@ import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
+import { DisplayNotificationStack } from '@/components/social/TngNotificationToaster';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -1072,6 +1073,7 @@ export default function GameDisplay() {
   const [code, setCode] = useState('');
   const [display, setDisplay] = useState(initial);
   const [room, setRoom] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [status, setStatus] = useState(initial ? 'connecting' : 'unpaired');
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
@@ -1097,6 +1099,19 @@ export default function GameDisplay() {
 
         setStatus(payload.status || 'connected');
         setRoom(payload.room || null);
+        if (Array.isArray(payload.notifications) && payload.notifications.length > 0) {
+          setNotifications((current) => {
+            const seen = new Set(current.map((item) => item.id));
+            const merged = [...current, ...payload.notifications.filter((item) => !seen.has(item.id))];
+            return merged.slice(-3);
+          });
+
+          payload.notifications.forEach((item) => {
+            window.setTimeout(() => {
+              setNotifications((current) => current.filter((row) => row.id !== item.id));
+            }, 7500);
+          });
+        }
         setError('');
       } catch (stateError) {
         if (cancelled) return;
@@ -1108,6 +1123,7 @@ export default function GameDisplay() {
           localStorage.removeItem('tng_display_token');
           setDisplay(null);
           setRoom(null);
+          setNotifications([]);
           setStatus('unpaired');
         }
       }
@@ -1223,6 +1239,8 @@ export default function GameDisplay() {
           {error}
         </div>
       )}
+
+      <DisplayNotificationStack notifications={notifications} />
 
       <div className={`relative z-10 overflow-hidden ${squareBizMode ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)]'}`}>
         {!room && (
