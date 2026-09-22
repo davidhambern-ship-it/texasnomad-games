@@ -1694,6 +1694,71 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
 }
 
 
+async function reconcileBffTimers(room) {
+  if (!room?.id) return room;
+
+  const client = await bffPool.connect();
+
+  try {
+    await client.query('begin');
+
+    const locked = await client.query(
+      'select id, room_code, game_id, status, revision, display_state, created_at, updated_at from public.game_rooms where id = $1::uuid for update',
+      [room.id],
+    );
+
+    const lockedRoom = locked.rows[0] || room;
+    const current = extractBffGameState(lockedRoom.display_state || {});
+    const deadline = Number(current.answer_deadline_at || 0);
+
+    if (!deadline || Date.now() < deadline) {
+      await client.query('commit');
+      return lockedRoom;
+    }
+
+    const players = await loadBffParticipants(room.id, current);
+    let changed = false;
+
+    if (current.round_stage === 'faceoff_answer' && current.active_player_id) {
+      bffAdvanceFaceoffAfterMiss(current, players, current.active_player_id, { showX: false });
+      changed = true;
+    } else if (current.round_stage === 'family_play' && current.active_player_id) {
+      bffFamilyTimeout(current, players);
+      changed = true;
+    } else if (current.round_stage === 'steal_answer') {
+      current.sound_cue = { name: 'wrong_awww', at: Date.now() };
+      bffCompleteRound(current, Number(current.original_playing_team || 0));
+      changed = true;
+    } else if (current.round_stage === 'dysfunction_defense') {
+      await bffAdvanceDysfunctionAfterDefense(current);
+      changed = true;
+    }
+
+    if (!changed) {
+      await client.query('commit');
+      return lockedRoom;
+    }
+
+    const nextDisplayState = wrapBffGameState(
+      lockedRoom.display_state || {},
+      current,
+    );
+
+    const updated = await client.query(
+      'update public.game_rooms set display_state = $2::jsonb, revision = revision + 1, updated_at = now() where id = $1::uuid returning id, room_code, game_id, status, revision, display_state, created_at, updated_at',
+      [room.id, JSON.stringify(nextDisplayState)],
+    );
+
+    await client.query('commit');
+    return updated.rows[0] || lockedRoom;
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function handleBffApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const path = sourceUrl.pathname.replace(/^\/bff-api/, '') || '/';
@@ -1725,7 +1790,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    const room = await loadRailwayBffPlayerRoom(roomCode);
+    let room = await loadRailwayBffPlayerRoom(roomCode);
     if (!room) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
@@ -1733,6 +1798,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
+    room = await reconcileBffTimers(room);
     let internalState = extractBffGameState(room.display_state || {});
     let players = await loadBffParticipants(room.id, internalState);
 
@@ -1794,7 +1860,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    const room = await loadRailwayBffPlayerRoom(roomCode);
+    let room = await loadRailwayBffPlayerRoom(roomCode);
     if (!room) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
@@ -1869,7 +1935,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    const room = await loadRailwayBffHostRoom(controllerId);
+    let room = await loadRailwayBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
@@ -1880,6 +1946,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
+    room = await reconcileBffTimers(room);
     await assignBffSeats(room.id);
     let internalState = extractBffGameState(room.display_state || {});
     let players = await loadBffParticipants(room.id, internalState);
@@ -1922,7 +1989,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    const room = await loadRailwayBffHostRoom(controllerId);
+    let room = await loadRailwayBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
@@ -1933,6 +2000,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
+    room = await reconcileBffTimers(room);
     const body = await readJsonBody(req).catch(() => ({}));
     await assignBffSeats(room.id);
     const actionPlayers = await loadBffParticipants(
