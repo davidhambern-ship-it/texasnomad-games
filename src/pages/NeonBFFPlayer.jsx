@@ -6,6 +6,7 @@ import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
+import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -257,17 +258,6 @@ export default function NeonBFFPlayer({ roomCode }) {
   const [busy, setBusy] = useState(false);
   const [flashCue, setFlashCue] = useState(null);
   const lastSoundCueRef = useRef(null);
-  const voicePcRef = useRef(null);
-  const voiceStreamRef = useRef(null);
-  const appliedVoiceAnswerRef = useRef('');
-  const remoteAudioRef = useRef(null);
-  const [micOn, setMicOn] = useState(false);
-  const [micBusy, setMicBusy] = useState(false);
-  const [voiceConnectionState, setVoiceConnectionState] = useState('off');
-  const micAutoAttemptedRef = useRef(false);
-  const currentVoiceOfferAtRef = useRef(null);
-
-
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
   const players = Array.isArray(gameState.players) ? gameState.players : [];
@@ -302,12 +292,24 @@ export default function NeonBFFPlayer({ roomCode }) {
         : isFaceoffPlayer
     )
   );
-  const isActiveSpeaker = Boolean(
-    micOn
-    && myAccountId
+  const isActiveTurn = Boolean(
+    myAccountId
     && String(gameState.active_player_id || '') === String(myAccountId)
     && ['faceoff_answer', 'play_pass', 'family_play', 'steal_answer', 'dysfunction_defense'].includes(roundStage)
   );
+
+  const voiceRelay = useBffVoiceRelay({
+    roomCode,
+    role: 'player',
+    identity: deviceId,
+    shouldSend: isActiveTurn,
+    autoStart: Boolean(deviceId && participant),
+  });
+
+  const micOn = voiceRelay.micReady;
+  const micBusy = voiceRelay.status === 'connecting';
+  const voiceConnectionState = voiceRelay.status;
+  const isActiveSpeaker = Boolean(micOn && isActiveTurn);
   const showPlayPass = Boolean(
     roundStage === 'play_pass'
     && String(gameState.faceoff_winner_id || '') === String(myAccountId || '')
@@ -365,220 +367,15 @@ export default function NeonBFFPlayer({ roomCode }) {
     return () => window.clearTimeout(timeout);
   }, [gameState.sound_cue]);
 
-  useEffect(() => {
-    const track = voiceStreamRef.current?.getAudioTracks?.()[0];
-    if (!track) return;
-    track.enabled = Boolean(isActiveSpeaker);
-  }, [isActiveSpeaker]);
-
-  useEffect(() => {
-    const voiceAnswer = gameState.voice_answer;
-    const pc = voicePcRef.current;
-    if (!voiceAnswer?.sdp || !pc) return;
-
-    const currentOfferAt = Number(
-      gameState.voice_offer_at || currentVoiceOfferAtRef.current || 0,
-    );
-    const answerOfferAt = Number(voiceAnswer.offerAt || 0);
-
-    if (answerOfferAt && currentOfferAt && answerOfferAt !== currentOfferAt) {
-      return;
-    }
-
-    const key = `${voiceAnswer.at || ''}:${voiceAnswer.sdp.length}`;
-    if (appliedVoiceAnswerRef.current === key) return;
-    if (pc.signalingState !== 'have-local-offer') return;
-
-    appliedVoiceAnswerRef.current = key;
-
-    pc.setRemoteDescription({ type: 'answer', sdp: voiceAnswer.sdp })
-      .then(() => {
-        if (voicePcRef.current === pc) {
-          setVoiceConnectionState(
-            pc.connectionState === 'connected' ? 'live' : 'connecting',
-          );
-        }
-      })
-      .catch((voiceError) => {
-        console.warn('[BFF Voice] Player could not apply Host answer', voiceError);
-        if (voicePcRef.current === pc) {
-          setVoiceConnectionState('failed');
-          setError('Your microphone link could not finish. Toggle MIC OFF, then MIC ON to retry.');
-        }
-      });
-  }, [gameState.voice_answer, gameState.voice_offer_at]);
-
-  useEffect(() => () => {
-    voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-    voicePcRef.current?.close?.();
-  }, []);
-
   const enableMic = useCallback(async () => {
-    if (!deviceId || !roomCode || micBusy || micOn) return;
-
-    setMicBusy(true);
     setError('');
+    const ok = await voiceRelay.start();
+    if (!ok && voiceRelay.error) setError(voiceRelay.error);
+  }, [voiceRelay]);
 
-    try {
-      if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('This browser does not support live microphone audio.');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
-        video: false,
-      });
-
-      voiceStreamRef.current = stream;
-
-      const pc = new RTCPeerConnection({
-        iceServers: [
-          { urls: 'stun:stun.l.google.com:19302' },
-          { urls: 'stun:stun1.l.google.com:19302' },
-        ],
-      });
-
-      const oldPc = voicePcRef.current;
-      voicePcRef.current = pc;
-      oldPc?.close?.();
-      appliedVoiceAnswerRef.current = '';
-      currentVoiceOfferAtRef.current = null;
-      setVoiceConnectionState('connecting');
-
-      const localTrack = stream.getAudioTracks()[0];
-      if (!localTrack) {
-        throw new Error('No microphone track was available.');
-      }
-
-      localTrack.enabled = false;
-      pc.addTransceiver(localTrack, {
-        direction: 'sendonly',
-        streams: [stream],
-      });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
-
-      pc.ontrack = (event) => {
-        if (!remoteAudioRef.current) return;
-
-        let audio = remoteAudioRef.current.querySelector(
-          `audio[data-track-id="${event.track.id}"]`,
-        );
-
-        if (!audio) {
-          audio = document.createElement('audio');
-          audio.autoplay = true;
-          audio.playsInline = true;
-          audio.dataset.trackId = event.track.id;
-          remoteAudioRef.current.appendChild(audio);
-        }
-
-        audio.srcObject = new MediaStream([event.track]);
-        audio.play().catch(() => {});
-      };
-
-      const syncConnectionState = () => {
-        if (voicePcRef.current !== pc) return;
-
-        if (
-          pc.connectionState === 'connected'
-          || pc.iceConnectionState === 'connected'
-          || pc.iceConnectionState === 'completed'
-        ) {
-          setVoiceConnectionState('live');
-          setError('');
-          return;
-        }
-
-        if (pc.connectionState === 'failed' || pc.iceConnectionState === 'failed') {
-          setVoiceConnectionState('failed');
-          setError('Mic link dropped. Your game stays active; toggle MIC OFF / ON only if you need to reconnect audio.');
-          return;
-        }
-
-        if (pc.connectionState === 'closed') {
-          setVoiceConnectionState('off');
-          return;
-        }
-
-        setVoiceConnectionState('connecting');
-      };
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      await waitForIceComplete(pc);
-
-      if (voicePcRef.current !== pc || !pc.localDescription?.sdp) {
-        throw new Error('Microphone connection could not create an offer.');
-      }
-
-      const payload = await tngApi.bff.playerAction(deviceId, roomCode, 'voice_offer', {
-        sdp: pc.localDescription.sdp,
-      });
-
-      setRoom(payload.room || null);
-      setParticipant(payload.participant || null);
-      currentVoiceOfferAtRef.current = Number(
-        payload.room?.gameState?.voice_offer_at || 0,
-      ) || null;
-      setMicOn(true);
-      setVoiceConnectionState('connecting');
-    } catch (voiceError) {
-      voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-      voiceStreamRef.current = null;
-      voicePcRef.current?.close?.();
-      voicePcRef.current = null;
-      setMicOn(false);
-      setVoiceConnectionState('failed');
-      setError(voiceError?.message || 'Microphone permission or connection failed.');
-    } finally {
-      setMicBusy(false);
-    }
-  }, [deviceId, micBusy, micOn, roomCode]);
-
-  const disableMic = useCallback(async () => {
-    if (micBusy) return;
-
-    setMicBusy(true);
-
-    try {
-      voiceStreamRef.current?.getTracks?.().forEach((track) => track.stop());
-      voiceStreamRef.current = null;
-      voicePcRef.current?.close?.();
-      voicePcRef.current = null;
-      appliedVoiceAnswerRef.current = '';
-
-      if (deviceId && roomCode) {
-        await tngApi.bff.playerAction(deviceId, roomCode, 'voice_stop').catch(() => {});
-      }
-
-      setMicOn(false);
-      setVoiceConnectionState('off');
-      currentVoiceOfferAtRef.current = null;
-    } finally {
-      setMicBusy(false);
-    }
-  }, [deviceId, micBusy, roomCode]);
-
-  useEffect(() => {
-    if (
-      micAutoAttemptedRef.current
-      || !participant
-      || micOn
-      || micBusy
-      || !deviceId
-      || !roomCode
-    ) {
-      return;
-    }
-
-    micAutoAttemptedRef.current = true;
-    enableMic();
-  }, [deviceId, enableMic, micBusy, micOn, participant, roomCode]);
+  const disableMic = useCallback(() => {
+    voiceRelay.stop();
+  }, [voiceRelay]);
 
   const buzz = useCallback(async () => {
     if (!deviceId || !roomCode || !canBuzz || busy) return;
@@ -673,7 +470,6 @@ export default function NeonBFFPlayer({ roomCode }) {
   return (
     <div className="min-h-[100dvh] bg-[#070311] text-white">
       <TngNotificationToaster />
-      <div ref={remoteAudioRef} className="hidden" aria-hidden="true" />
 
       <div className="mx-auto flex min-h-[100dvh] max-w-[1500px] flex-col gap-2 p-2 sm:p-3">
         <header className="sticky top-0 z-30 rounded-xl border border-[#BC13FE]/25 bg-[#080512]/95 px-3 py-2.5 backdrop-blur-xl">
@@ -754,11 +550,11 @@ export default function NeonBFFPlayer({ roomCode }) {
           {!micOn
             ? 'MIC REQUIRED · TURN IT ON TO PLAY'
             : voiceConnectionState === 'failed'
-              ? 'MIC LINK FAILED · HOST CHECKING CONNECTION'
+              ? 'VOICE RELAY ERROR · RETRY MIC'
               : voiceConnectionState === 'recovering'
-                ? 'MIC RECONNECTING · HOLD ON'
+                ? 'VOICE RECONNECTING · HOLD ON'
                 : voiceConnectionState !== 'live'
-                  ? 'MIC CONNECTING · KEEP THIS PAGE OPEN'
+                  ? 'VOICE CONNECTING · KEEP THIS PAGE OPEN'
                 : isActiveSpeaker
                   ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
                   : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'}
