@@ -469,6 +469,127 @@ function IntroArt({ type }) {
   );
 }
 
+export function SquareBizJingle({
+  gameState = {},
+  enabled = true,
+  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
+}) {
+  const audioRef = useRef(null);
+  const ownerRef = useRef(`sb-jingle-${Math.random().toString(36).slice(2)}-${Date.now()}`);
+  const phase = gameState.phase || 'lobby';
+  const start = Number(gameState.introStartedAt || 0);
+  const end = Number(gameState.introEndsAt || 0);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !enabled || phase !== 'intro' || !start) return undefined;
+
+    const owner = ownerRef.current;
+    const lockKey = 'tng_square_biz_jingle_owner_v2';
+    const expiresAt = Math.max(Date.now() + 5_000, end + 3_000);
+    let cancelled = false;
+    let ownsAudio = false;
+
+    const claim = () => {
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        const sameIntro = Number(current?.start || 0) === start;
+        const alive = Number(current?.expiresAt || 0) > Date.now();
+
+        if (current?.owner && current.owner !== owner && sameIntro && alive) {
+          return false;
+        }
+
+        localStorage.setItem(lockKey, JSON.stringify({
+          owner,
+          start,
+          expiresAt,
+        }));
+        ownsAudio = true;
+        return true;
+      } catch {
+        ownsAudio = true;
+        return true;
+      }
+    };
+
+    const release = () => {
+      if (!ownsAudio) return;
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        if (current?.owner === owner) localStorage.removeItem(lockKey);
+      } catch {}
+    };
+
+    const begin = async () => {
+      if (cancelled || !claim()) return;
+
+      try {
+        const target = Math.max(0, (Date.now() - start) / 1000);
+        if (Number.isFinite(target) && target > 0) {
+          audio.currentTime = target;
+        }
+        await audio.play();
+      } catch {
+        // No player-facing fallback control: Square Biz show audio is Host-driven.
+      }
+    };
+
+    if (audio.readyState >= 2) {
+      begin();
+    } else {
+      audio.addEventListener('canplay', begin, { once: true });
+      audio.load();
+    }
+
+    const onStorage = (event) => {
+      if (event.key !== lockKey || cancelled) return;
+      try {
+        const current = event.newValue ? JSON.parse(event.newValue) : null;
+        if (
+          current?.owner &&
+          current.owner !== owner &&
+          Number(current.start || 0) === start
+        ) {
+          audio.pause();
+          ownsAudio = false;
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', onStorage);
+
+    return () => {
+      cancelled = true;
+      audio.removeEventListener('canplay', begin);
+      window.removeEventListener('storage', onStorage);
+      audio.pause();
+      audio.currentTime = 0;
+      release();
+    };
+  }, [enabled, end, phase, start]);
+
+  useEffect(() => {
+    if (phase === 'intro') return;
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.pause();
+    audio.currentTime = 0;
+  }, [phase]);
+
+  return (
+    <audio
+      ref={audioRef}
+      src={audioSrc}
+      preload="auto"
+      playsInline
+      aria-hidden="true"
+    />
+  );
+}
+
 export function SquareBizIntro({
   gameState = {},
   now = Date.now(),
