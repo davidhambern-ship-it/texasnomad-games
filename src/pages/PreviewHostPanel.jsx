@@ -26,6 +26,7 @@ export default function PreviewHostPanel() {
   const [roomState, setRoomState] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
   const [error, setError] = useState('');
+  const [roomPollError, setRoomPollError] = useState('');
   const [busy, setBusy] = useState(false);
   const authRecoveryStartedRef = useRef(false);
 
@@ -261,12 +262,13 @@ export default function PreviewHostPanel() {
         if (!cancelled) {
           setRoomState(payload.room);
           setActiveRoom((current) => ({ ...current, ...payload.room }));
+          setRoomPollError('');
         }
       } catch (roomError) {
         if (recoverExpiredPreviewSession(roomError)) return;
 
         if (!cancelled) {
-          setError(roomError.message || 'The live room state could not be loaded.');
+          setRoomPollError(roomError.message || 'The live room state could not be loaded.');
         }
       }
     }
@@ -647,6 +649,9 @@ export default function PreviewHostPanel() {
             </div>
 
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
+            {!roomState && roomPollError && (
+              <p className="text-red-400 mb-4 text-center">{roomPollError}</p>
+            )}
 
             {!roomState && (
               <div className="py-16 text-center">
