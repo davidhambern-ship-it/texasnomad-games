@@ -1210,9 +1210,19 @@ export default function NeonBFFHostPanel({ controllerId }) {
         <aside className="rounded-xl border border-[#FF5F1F]/25 bg-black/60 p-2.5">
           <div className="mb-2 grid grid-cols-2 gap-1.5">
             <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
-              micsReady && liveMicsReady ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
+              voiceSessionLocked || (micsReady && liveMicsReady)
+                ? 'border-[#4ADE80]/30 text-[#4ADE80]'
+                : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
             }`} style={PS2}>
-              PLAYERS {micsReady && liveMicsReady ? 'MIC READY' : 'NEED MICS'}
+              PLAYERS {
+                voiceSessionLocked
+                  ? missingMicNames.length
+                    ? 'VOICE LOCKED'
+                    : 'MIC READY'
+                  : micsReady && liveMicsReady
+                    ? 'MIC READY'
+                    : 'NEED MICS'
+              }
             </div>
             <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
               hostMicReady && !hostMuted ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
