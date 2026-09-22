@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getSquareBizAudio } from '@/lib/squareBizAudio';
 
 const DISPLAY = { fontFamily: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" };
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
@@ -470,123 +469,15 @@ function IntroArt({ type }) {
   );
 }
 
-export function SquareBizJingle({
-  gameState = {},
-  enabled = true,
-  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
-}) {
-  const ownerRef = useRef(`sb-jingle-${Math.random().toString(36).slice(2)}-${Date.now()}`);
-  const phase = gameState.phase || 'lobby';
-  const start = Number(gameState.introStartedAt || 0);
-  const end = Number(gameState.introEndsAt || 0);
-
-  useEffect(() => {
-    const audio = getSquareBizAudio(audioSrc);
-    if (!audio || !enabled || phase !== 'intro' || !start) return undefined;
-
-    const owner = ownerRef.current;
-    const lockKey = 'tng_square_biz_jingle_owner_v3';
-    const expiresAt = Math.max(Date.now() + 5_000, end + 3_000);
-    let cancelled = false;
-    let ownsAudio = false;
-
-    const claim = () => {
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        const sameIntro = Number(current?.start || 0) === start;
-        const alive = Number(current?.expiresAt || 0) > Date.now();
-
-        if (current?.owner && current.owner !== owner && sameIntro && alive) {
-          return false;
-        }
-
-        localStorage.setItem(lockKey, JSON.stringify({
-          owner,
-          start,
-          expiresAt,
-        }));
-        ownsAudio = true;
-        return true;
-      } catch {
-        ownsAudio = true;
-        return true;
-      }
-    };
-
-    const release = () => {
-      if (!ownsAudio) return;
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        if (current?.owner === owner) localStorage.removeItem(lockKey);
-      } catch {}
-    };
-
-    const begin = async () => {
-      if (cancelled || !claim()) return;
-
-      try {
-        const target = Math.max(0, (Date.now() - start) / 1000);
-        if (Number.isFinite(target) && target > 0) {
-          audio.currentTime = target;
-        }
-        audio.volume = 1;
-        await audio.play();
-      } catch {
-        // Player-facing audio stays automatic and Host-driven; no playback control is exposed.
-      }
-    };
-
-    if (audio.readyState >= 2) {
-      begin();
-    } else {
-      audio.addEventListener('canplay', begin, { once: true });
-      audio.load();
-    }
-
-    const onStorage = (event) => {
-      if (event.key !== lockKey || cancelled) return;
-      try {
-        const current = event.newValue ? JSON.parse(event.newValue) : null;
-        if (
-          current?.owner &&
-          current.owner !== owner &&
-          Number(current.start || 0) === start
-        ) {
-          audio.pause();
-          ownsAudio = false;
-        }
-      } catch {}
-    };
-
-    window.addEventListener('storage', onStorage);
-
-    return () => {
-      cancelled = true;
-      audio.removeEventListener('canplay', begin);
-      window.removeEventListener('storage', onStorage);
-      audio.pause();
-      audio.currentTime = 0;
-      release();
-    };
-  }, [audioSrc, enabled, end, phase, start]);
-
-  useEffect(() => {
-    if (phase === 'intro') return;
-    const audio = getSquareBizAudio(audioSrc);
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
-  }, [audioSrc, phase]);
-
-  return null;
-}
-
 export function SquareBizIntro({
   gameState = {},
   now = Date.now(),
+  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
+  playAudio = false,
 }) {
+  const audioRef = useRef(null);
+  const audioOwnerRef = useRef(`sb-audio-${Math.random().toString(36).slice(2)}-${Date.now()}`);
+  const [audioSuppressed, setAudioSuppressed] = useState(false);
   const start = Number(gameState.introStartedAt || now);
   const end = Number(gameState.introEndsAt || start + 30_800);
   const duration = Math.max(1, end - start);
@@ -595,8 +486,100 @@ export function SquareBizIntro({
   const index = ratio < .34 ? 0 : ratio < .67 ? 1 : 2;
   const slide = INTRO_SLIDES[index];
 
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio || !playAudio) return undefined;
+
+    let cancelled = false;
+    const owner = audioOwnerRef.current;
+    const lockKey = 'tng_square_biz_intro_audio_lock';
+    const targetTime = Math.max(0, elapsed / 1000);
+    const lockExpiry = Math.max(Date.now() + 5_000, end + 3_000);
+
+    const claimAudio = () => {
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        const sameIntro = Number(current?.start || 0) === start;
+        const lockAlive = Number(current?.expiresAt || 0) > Date.now();
+
+        if (current?.owner && current.owner !== owner && sameIntro && lockAlive) {
+          setAudioSuppressed(true);
+          return false;
+        }
+
+        localStorage.setItem(lockKey, JSON.stringify({
+          owner,
+          start,
+          expiresAt: lockExpiry,
+        }));
+        setAudioSuppressed(false);
+        return true;
+      } catch {
+        setAudioSuppressed(false);
+        return true;
+      }
+    };
+
+    const releaseAudio = () => {
+      try {
+        const raw = localStorage.getItem(lockKey);
+        const current = raw ? JSON.parse(raw) : null;
+        if (current?.owner === owner) {
+          localStorage.removeItem(lockKey);
+        }
+      } catch {}
+    };
+
+    const begin = async () => {
+      if (cancelled || !claimAudio()) return;
+
+      try {
+        if (Math.abs(audio.currentTime - targetTime) > 1.25) {
+          audio.currentTime = targetTime;
+        }
+        await audio.play();
+      } catch {
+        // No player-facing audio controls. If a browser blocks autoplay,
+        // the next Host-started round will retry from the shared intro event.
+      }
+    };
+
+    if (audio.readyState >= 3) {
+      begin();
+    } else {
+      audio.addEventListener('canplaythrough', begin, { once: true });
+      audio.load();
+    }
+
+    const handleStorage = (event) => {
+      if (event.key !== lockKey || cancelled) return;
+      try {
+        const current = event.newValue ? JSON.parse(event.newValue) : null;
+        if (current?.owner && current.owner !== owner && Number(current.start || 0) === start) {
+          audio.pause();
+          setAudioSuppressed(true);
+        }
+      } catch {}
+    };
+
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      cancelled = true;
+      audio.removeEventListener('canplaythrough', begin);
+      window.removeEventListener('storage', handleStorage);
+      audio.pause();
+      releaseAudio();
+    };
+  // This is the known-good post-choppy behavior: one audio owner per browser,
+  // synchronized to the shared intro timestamp.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [start, end, playAudio]);
+
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
+      <audio ref={audioRef} src={audioSrc} preload="auto" playsInline />
       <div className="absolute inset-0 opacity-45" style={{
         background:
           'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
