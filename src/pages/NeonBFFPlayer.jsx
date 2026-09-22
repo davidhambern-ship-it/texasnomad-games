@@ -108,6 +108,12 @@ export default function NeonBFFPlayer({ roomCode }) {
     const cue = gameState.sound_cue;
     if (!cue?.at || cue.at === lastSoundCueRef.current) return;
 
+    const cueAge = Date.now() - Number(cue.at);
+    if (!Number.isFinite(cueAge) || cueAge > 8000) {
+      lastSoundCueRef.current = cue.at;
+      return;
+    }
+
     lastSoundCueRef.current = cue.at;
     const cueName = String(cue.name || '');
     setFlashCue(cueName.toUpperCase());
