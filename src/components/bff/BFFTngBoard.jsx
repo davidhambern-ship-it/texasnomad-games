@@ -137,9 +137,9 @@ function StrikeMeter({ count = 0 }) {
         STRIKES
       </div>
       <div className="flex justify-center gap-2">
-        {[0, 1, 2].map(i => (
+        {['B', 'Y', 'E'].map((letter, i) => (
           <div
-            key={i}
+            key={letter}
             className="flex h-10 w-10 items-center justify-center rounded-xl border-2 font-heading text-2xl"
             style={{
               borderColor: i < count ? '#FF174D' : 'rgba(255,255,255,.10)',
@@ -148,7 +148,7 @@ function StrikeMeter({ count = 0 }) {
               textShadow: i < count ? '0 0 12px #FF174D' : 'none',
             }}
           >
-            X
+            {letter}
           </div>
         ))}
       </div>
