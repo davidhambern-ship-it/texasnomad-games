@@ -1,9 +1,57 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-function selectedCells(a, b) {
-  if (!a || !b) return [];
-  const dy = b.y - a.y;
+function snapEndCell(a, b, size) {
+  if (!a || !b) return b;
+
   const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const adx = Math.abs(dx);
+  const ady = Math.abs(dy);
+
+  if (dx === 0 || dy === 0 || adx === ady) return b;
+  if (adx === 0 && ady === 0) return b;
+
+  let sx = Math.sign(dx);
+  let sy = Math.sign(dy);
+  let steps;
+
+  // Thumb drags are rarely pixel-perfect. Treat a clearly dominant axis as
+  // horizontal/vertical; otherwise snap to the nearest 45-degree diagonal.
+  if (adx > ady * 1.6) {
+    sy = 0;
+    steps = adx;
+  } else if (ady > adx * 1.6) {
+    sx = 0;
+    steps = ady;
+  } else {
+    steps = Math.max(adx, ady);
+  }
+
+  const maxXSteps = sx > 0
+    ? size - 1 - a.x
+    : sx < 0
+      ? a.x
+      : Number.POSITIVE_INFINITY;
+  const maxYSteps = sy > 0
+    ? size - 1 - a.y
+    : sy < 0
+      ? a.y
+      : Number.POSITIVE_INFINITY;
+
+  steps = Math.max(0, Math.min(steps, maxXSteps, maxYSteps));
+
+  return {
+    x: a.x + sx * steps,
+    y: a.y + sy * steps,
+  };
+}
+
+function selectedCells(a, b, size) {
+  if (!a || !b) return [];
+
+  const end = snapEndCell(a, b, size);
+  const dy = end.y - a.y;
+  const dx = end.x - a.x;
   const adx = Math.abs(dx);
   const ady = Math.abs(dy);
 
@@ -127,13 +175,13 @@ export default function NeonWordSearchBoard({
 
   function move(y, x) {
     if (!canInteract || !selecting || !start) return;
-    setPreview(selectedCells(start, { y, x }));
+    setPreview(selectedCells(start, { y, x }, size));
   }
 
   async function finish(y, x) {
     if (!selecting || !start) return;
 
-    const cells = selectedCells(start, { y, x });
+    const cells = selectedCells(start, { y, x }, size);
     setSelecting(false);
     setStart(null);
     setPreview([]);
