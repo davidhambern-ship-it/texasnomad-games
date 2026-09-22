@@ -1,12 +1,9 @@
-import React, { useState } from 'react';
-import { createRoomAndJoin } from '@/lib/roomUtils';
-import { base44 } from '@/api/base44Client';
-import { isNeonStaging } from '@/lib/neonAuth';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+
+import { tngApi } from '@/api/tngApi';
 import Header from '../components/home/Header';
 import Hero from '../components/home/Hero';
-import FeaturedGames from '../components/home/FeaturedGames';
-import JoinGame from '../components/home/JoinGame';
-import LiveStatus from '../components/home/LiveStatus';
 import AboutSection from '../components/home/AboutSection';
 import Footer from '../components/home/Footer';
 
@@ -20,25 +17,59 @@ const GAME_IMAGES = [
   'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/b32b97429_generated_image.png',
 ];
 
+const FEATURED = [
+  { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD' },
+  { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS' },
+  { id: 'hangman', title: 'HANGMAN', subtitle: 'GUESS THE WORD' },
+];
+
+const GAME_NAME_MAP = {
+  bff: 'BFF',
+  'square-biz': 'SQUARE BIZ!',
+  spades: 'SPADES',
+  'word-search': 'WORD SEARCH',
+  hangman: 'HANGMAN',
+  sudoku: 'SUDOKU',
+  viral: 'VIRAL!',
+  'name-that-track': 'NAME THAT TRACK',
+};
+
+const GAME_SUB_MAP = {
+  bff: 'FAMILY FEUD',
+  'square-biz': 'TRIVIA + TACTICS',
+  spades: 'CARD GAME',
+  'word-search': 'WORD HUNT',
+  hangman: 'WORD GUESS',
+  sudoku: 'PUZZLE',
+  viral: 'BOARD GAME',
+  'name-that-track': 'MUSIC',
+};
+
+const PIXEL_DUST_STORY = [
+  'TexasNomad loves going LIVE. The problem? Every time he hit that button, he kept feeling like he was hanging out instead of putting on an actual show.',
+  'Then he started meeting other streamers, joining families, sitting on panels, and hearing the same thing over and over: people wanted real games to play together — but the streaming platforms did not exactly come stocked with a killer game closet.',
+  'One night TexasNomad was sitting on a panel with about five people and casually asked, “Y’all play Spades?” Of course they did. Who does not love Spades? The only problem was… there were no cards.',
+  'At first the idea was simple: design some cards, turn them into SVGs, boom — Spades. Then came the thought that the platforms would probably lock them up, monetize the life out of them, and definitely not just hand them to everybody.',
+  'Then TexasNomad remembered: “AI’s a thing…” He was already deep into AI, but games? Could AI help build actual live-stream games? He ignored the panel and fell straight down the rabbit hole.',
+  'Spades led to Hangman. Hangman led to BFF. BFF led to Square Biz! And somewhere along the way, TexasNomad looked up and realized he was no longer building a game. He was wandering around a whole digital arcade.',
+];
+
 export default function Home() {
+  const [featuredGame, setFeaturedGame] = useState(null);
+
   return (
     <div className="min-h-screen bg-midnight-void text-white">
       <Header />
       <Hero heroBg={HERO_BG} crownLogo={CROWN_LOGO} />
 
-      {/* Three-column panel: Featured | Join | Live Status */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Featured Games - takes full width on mobile, 1 col on desktop */}
-          <div className="lg:col-span-1">
-            <FeaturedGamesInline gameImages={GAME_IMAGES} />
-          </div>
-          <div className="lg:col-span-1">
-            <JoinGameInline />
-          </div>
-          <div className="lg:col-span-1">
-            <LiveStatusInline />
-          </div>
+          <FeaturedGamesInline
+            gameImages={GAME_IMAGES}
+            onSelect={setFeaturedGame}
+          />
+          <JoinGameInline />
+          <LiveStatusInline />
         </div>
       </div>
 
@@ -47,41 +78,47 @@ export default function Home() {
       </div>
 
       <Footer />
+
+      {featuredGame && (
+        <FeaturedJoinModal
+          game={featuredGame}
+          onClose={() => setFeaturedGame(null)}
+        />
+      )}
     </div>
   );
 }
 
-/* Inline versions without the max-w wrapper for grid layout */
-function FeaturedGamesInline({ gameImages }) {
+function FeaturedGamesInline({ gameImages, onSelect }) {
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
       <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
         FEATURED GAMES
       </h3>
+
       <div className="grid grid-cols-3 gap-2">
-        {[
-          { id: 'bff', title: 'BFF', subtitle: 'BIGO FAMILY FEUD' },
-          { id: 'square-biz', title: 'SQUARE BIZ!', subtitle: 'TRIVIA + TACTICS' },
-          { id: 'hangman', title: 'HANGMAN', subtitle: 'GUESS THE WORD' },
-        ].map((game, i) => (
+        {FEATURED.map((game, i) => (
           <button
             key={game.id}
-            onClick={() => {
-              if (isNeonStaging) {
-                window.location.href = '/host';
-                return;
-              }
-              createRoomAndJoin(game.id);
-            }}
+            type="button"
+            onClick={() => onSelect(game)}
             className="group flex flex-col items-center p-2 border border-cyber-purple/20 rounded bg-black/60 hover:border-outlaw-gold hover:box-glow-gold transition-all duration-300"
           >
             <div className="w-16 h-16 md:w-20 md:h-20 mb-2 rounded overflow-hidden">
-              <img src={gameImages[i]} alt={game.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+              <img
+                src={gameImages[i]}
+                alt={game.title}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+              />
             </div>
-            <span className="text-[8px] md:text-[9px] tracking-wider text-white uppercase text-center leading-tight" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.title}</span>
-            <span className="text-[6px] tracking-widest text-outlaw-gold/70 uppercase text-center mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{game.subtitle}</span>
+            <span className="text-[8px] md:text-[9px] tracking-wider text-white uppercase text-center leading-tight" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              {game.title}
+            </span>
+            <span className="text-[6px] tracking-widest text-outlaw-gold/70 uppercase text-center mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              {game.subtitle}
+            </span>
             <span className="mt-2 px-2 py-1 border border-outlaw-gold text-outlaw-gold text-[6px] tracking-widest uppercase rounded group-hover:bg-outlaw-gold group-hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-              Create Room
+              JOIN LIVE
             </span>
           </button>
         ))}
@@ -90,10 +127,84 @@ function FeaturedGamesInline({ gameImages }) {
   );
 }
 
+function FeaturedJoinModal({ game, onClose }) {
+  const [roomCode, setRoomCode] = useState('');
+  const [error, setError] = useState('');
+
+  const join = () => {
+    const code = roomCode.trim().toUpperCase();
+    if (!code) {
+      setError('Drop the room code in first.');
+      return;
+    }
+    window.location.href = `/join/${code}`;
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-4 backdrop-blur-md" onMouseDown={onClose}>
+      <div
+        className="relative w-full max-w-md overflow-hidden rounded-2xl border-2 border-cyber-purple/60 bg-[#08030f] p-6 text-center shadow-[0_0_55px_rgba(188,19,254,.24)]"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-3 top-3 h-9 w-9 rounded-full border border-white/15 text-white/45 hover:border-white/40 hover:text-white"
+        >
+          ×
+        </button>
+
+        <div className="text-[8px] tracking-[.28em] text-kinetic-orange uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          FEATURED GAME
+        </div>
+        <h2 className="mt-3 text-3xl text-outlaw-gold uppercase" style={{ fontFamily: "'Rye', serif" }}>
+          {game.title}
+        </h2>
+        <p className="mt-2 text-sm text-white/50">
+          Got a live room code? Jump in. Looking for something else? Hit the arcade.
+        </p>
+
+        <input
+          value={roomCode}
+          onChange={(event) => {
+            setRoomCode(event.target.value.toUpperCase());
+            setError('');
+          }}
+          onKeyDown={(event) => event.key === 'Enter' && join()}
+          maxLength={8}
+          placeholder="ROOM ID"
+          className="mt-5 w-full rounded-xl border-2 border-cyber-purple/40 bg-black/65 px-4 py-4 text-center font-mono text-xl tracking-[.25em] text-white outline-none focus:border-outlaw-gold"
+          autoFocus
+        />
+
+        {error && <div className="mt-2 text-xs text-kinetic-orange">{error}</div>}
+
+        <button
+          type="button"
+          onClick={join}
+          className="mt-4 w-full rounded-xl border-2 border-kinetic-orange bg-kinetic-orange/10 px-4 py-3 text-xs tracking-widest text-kinetic-orange uppercase hover:bg-kinetic-orange hover:text-black"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
+          JOIN LIVE ROOM
+        </button>
+
+        <Link
+          to="/games"
+          onClick={onClose}
+          className="mt-2 block w-full rounded-xl border border-outlaw-gold/45 px-4 py-3 text-[8px] tracking-widest text-outlaw-gold uppercase hover:bg-outlaw-gold/10"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
+          BROWSE ALL GAMES →
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function JoinGameInline() {
-  const [roomCode, setRoomCode] = React.useState('');
-  const [error, setError] = React.useState(false);
-  const [shaking, setShaking] = React.useState(false);
+  const [roomCode, setRoomCode] = useState('');
+  const [error, setError] = useState(false);
+  const [shaking, setShaking] = useState(false);
 
   const handleJoin = () => {
     if (!roomCode.trim()) {
@@ -102,6 +213,7 @@ function JoinGameInline() {
       setTimeout(() => setShaking(false), 400);
       return;
     }
+
     setError(false);
     window.location.href = `/join/${roomCode.trim().toUpperCase()}`;
   };
@@ -111,90 +223,101 @@ function JoinGameInline() {
       <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-3 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
         JOIN LIVE
       </h3>
-      <p className="text-[8px] tracking-widest text-white/60 uppercase mb-3" style={{ fontFamily: "'Press Start 2P', monospace" }}>ENTER ROOM CODE</p>
+      <p className="text-[8px] tracking-widest text-white/60 uppercase mb-3" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+        ENTER ROOM CODE
+      </p>
       <input
         type="text"
         value={roomCode}
-        onChange={(e) => { setRoomCode(e.target.value.toUpperCase()); if (error) setError(false); }}
+        onChange={(event) => {
+          setRoomCode(event.target.value.toUpperCase());
+          if (error) setError(false);
+        }}
+        onKeyDown={(event) => event.key === 'Enter' && handleJoin()}
         placeholder="EX: TN817"
-        className={`w-full max-w-[200px] px-3 py-2.5 rounded bg-black/80 border-2 text-center font-mono text-base tracking-widest text-white placeholder:text-white/30 focus:outline-none focus:border-outlaw-gold transition-colors ${
-          error ? 'border-kinetic-orange' : 'border-cyber-purple/50'
-        } ${shaking ? 'animate-shake' : ''}`}
+        maxLength={8}
+        className={`w-full max-w-[200px] px-3 py-2.5 rounded bg-black/80 border-2 text-center font-mono text-base tracking-widest text-white placeholder:text-white/30 focus:outline-none focus:border-outlaw-gold transition-colors ${error ? 'border-kinetic-orange' : 'border-cyber-purple/50'} ${shaking ? 'animate-shake' : ''}`}
       />
       {error && <p className="text-kinetic-orange text-xs mt-1.5">Enter a room code to join!</p>}
       <button
+        type="button"
         onClick={handleJoin}
         className="mt-4 px-6 py-2.5 border-2 border-kinetic-orange text-kinetic-orange text-xs tracking-widest uppercase rounded hover:bg-kinetic-orange hover:text-black hover:shadow-[0_0_20px_rgba(255,95,31,0.5)] transition-all duration-300"
         style={{ fontFamily: "'Press Start 2P', monospace" }}
       >
         JOIN GAME
       </button>
-      <p className="mt-3 text-[7px] text-outlaw-gold/50 tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>★ BE PART OF THE ACTION ★</p>
+      <p className="mt-3 text-[7px] text-outlaw-gold/50 tracking-widest" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+        ★ BE PART OF THE ACTION ★
+      </p>
     </div>
   );
 }
 
-const GAME_NAME_MAP = {
-  'bff': 'BFF', 'square-biz': 'SQUARE BIZ!', 'spades': 'SPADES',
-  'word-search': 'WORD SEARCH', 'sudoku': 'SUDOKU', 'hangman': 'HANGMAN',
-  'viral': 'VIRAL', 'name-that-track': 'NAME THAT TRACK',
-};
-const GAME_SUB_MAP = {
-  'bff': 'FAMILY FEUD', 'square-biz': 'TRIVIA', 'spades': 'CARD GAME',
-  'word-search': 'WORD HUNT', 'sudoku': 'PUZZLE', 'hangman': 'WORD GUESS',
-  'viral': 'BOARD GAME', 'name-that-track': 'MUSIC',
-};
-
 function RoomRow({ room }) {
-  const isLive = room.status === 'active';
-  const players = room.players_connected || 0;
+  const isLive = room.status === 'live';
+  const statusLabel = room.status === 'lobby' ? 'OPEN' : room.status === 'paused' ? 'PAUSED' : 'LIVE';
+
   return (
-    <div className="flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50 mb-2 shrink-0">
-      <div className="flex items-center gap-2">
-        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-white/10'}`} />
-        <div>
-          <span className="text-[8px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{GAME_NAME_MAP[room.game_id] || room.game_id}</span>
-          <span className="block text-[6px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>{GAME_SUB_MAP[room.game_id] || ''} · {room.room_code}</span>
+    <button
+      type="button"
+      onClick={() => { window.location.href = `/join/${room.roomCode}`; }}
+      className="w-full flex items-center justify-between px-3 py-2 border border-cyber-purple/20 rounded bg-black/50 mb-2 shrink-0 text-left hover:border-outlaw-gold/60 transition-colors"
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isLive ? 'bg-kinetic-orange animate-pulse-glow' : 'bg-outlaw-gold/60'}`} />
+        <div className="min-w-0">
+          <span className="block truncate text-[8px] tracking-wider text-white uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            {GAME_NAME_MAP[room.gameId] || room.gameId}
+          </span>
+          <span className="block text-[6px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+            {GAME_SUB_MAP[room.gameId] || 'TNG'} · {room.roomCode}
+          </span>
         </div>
       </div>
-      <div className="flex items-center gap-2">
+
+      <div className="flex items-center gap-2 shrink-0">
         <div className="text-right">
-          <span className="text-base text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{players}</span>
+          <span className="text-base text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>{room.players || 0}</span>
           <span className="block text-[5px] tracking-widest text-white/30 uppercase mt-0.5" style={{ fontFamily: "'Press Start 2P', monospace" }}>PLR</span>
         </div>
-        <span className={`px-1.5 py-0.5 rounded text-[6px] tracking-wider ${isLive ? 'bg-cyber-purple/20 border border-cyber-purple/50 text-cyber-purple animate-pulse-glow' : 'bg-white/5 border border-white/10 text-white/20'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          {isLive ? 'LIVE' : String(room.status || 'OFFLINE').toUpperCase()}
+        <span className={`px-1.5 py-0.5 rounded text-[6px] tracking-wider border ${isLive ? 'bg-cyber-purple/20 border-cyber-purple/50 text-cyber-purple' : 'bg-outlaw-gold/5 border-outlaw-gold/25 text-outlaw-gold/65'}`} style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          {statusLabel}
         </span>
       </div>
-    </div>
+    </button>
   );
 }
 
 function LiveStatusInline() {
-  const [rooms, setRooms] = React.useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  React.useEffect(() => {
-    if (isNeonStaging) {
-      // The staging site must not poll Base44. Public Neon live-room
-      // discovery will be wired to the TNG API separately.
-      setRooms([]);
-      return undefined;
-    }
+  useEffect(() => {
+    let cancelled = false;
 
     async function fetchLive() {
-      const all = await base44.entities.GameRoom.list('-updated_date', 20);
-      setRooms(all);
+      try {
+        const payload = await tngApi.public.liveRooms();
+        if (!cancelled) setRooms(Array.isArray(payload.rooms) ? payload.rooms : []);
+      } catch {
+        if (!cancelled) setRooms([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
     fetchLive();
-    const interval = setInterval(fetchLive, 15000);
-    return () => clearInterval(interval);
+    const interval = window.setInterval(fetchLive, 10000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
 
-  // Duplicate rooms so the scroll loops seamlessly
   const scrollItems = rooms.length > 0 ? [...rooms, ...rooms] : [];
-  // Speed: ~40px per second, estimate row height ~52px
-  const duration = rooms.length * 3; // 3s per room, feels natural
+  const duration = Math.max(8, rooms.length * 3);
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col">
@@ -208,28 +331,55 @@ function LiveStatusInline() {
       `}</style>
 
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>LIVE ROOMS</h3>
-        <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>{rooms.length} ROOMS</span>
+        <h3 className="text-sm tracking-[0.1em] text-outlaw-gold uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
+          LIVE ROOMS
+        </h3>
+        <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+          {loading ? 'CHECKING…' : `${rooms.length} ROOM${rooms.length === 1 ? '' : 'S'}`}
+        </span>
       </div>
 
-      {/* Scrolling feed */}
-      <div className="overflow-hidden relative" style={{ height: 120 }}>
-        {rooms.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-white/20 text-[6px] tracking-widest uppercase text-center px-3" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-            {isNeonStaging ? 'NEON LIVE TEST — ROOM FEED COMING ONLINE' : 'No rooms yet'}
+      {rooms.length > 0 ? (
+        <>
+          <div className="overflow-hidden relative" style={{ height: 180 }}>
+            <div className="live-scroll">
+              {scrollItems.map((room, index) => (
+                <RoomRow key={`${room.id}-${index}`} room={room} />
+              ))}
+            </div>
           </div>
-        ) : (
-          <div className="live-scroll">
-            {scrollItems.map((room, i) => <RoomRow key={`${room.id}-${i}`} room={room} />)}
+          <div className="mt-auto pt-3 text-center">
+            <span className="text-[6px] tracking-widest text-white/30 uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              TAP A ROOM TO JOIN
+            </span>
           </div>
-        )}
-      </div>
+        </>
+      ) : (
+        <div className="flex-1 min-h-[260px] overflow-y-auto rounded-lg border border-outlaw-gold/15 bg-black/35 p-3">
+          <div className="text-center">
+            <div className="text-2xl">🕸️</div>
+            <div className="mt-2 text-xs text-kinetic-orange uppercase" style={{ fontFamily: "'Rye', serif" }}>
+              THE GREAT PIXEL DUSTBOWL™
+            </div>
+            <p className="mt-2 text-[10px] leading-relaxed text-white/55">
+              Somebody poured blood, sweat, caffeine and an unreasonable number of browser tabs into this digital arcade… just for it to sit here collecting premium-grade pixel dust.
+            </p>
+          </div>
 
-      <div className="mt-3 text-center">
-        <a href={isNeonStaging ? '/host' : '/live-status'} className="inline-block px-4 py-1.5 border border-outlaw-gold/60 text-outlaw-gold text-[6px] tracking-widest uppercase rounded hover:bg-outlaw-gold hover:text-black transition-all" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-          {isNeonStaging ? 'HOST PANEL →' : 'VIEW ALL →'}
-        </a>
-      </div>
+          <div className="mt-3 space-y-2 text-[10px] leading-relaxed text-white/45">
+            {PIXEL_DUST_STORY.slice(0, 3).map((paragraph) => (
+              <p key={paragraph}>{paragraph}</p>
+            ))}
+          </div>
+
+          <div className="mt-3 flex items-center justify-between gap-2">
+            <span className="text-[9px] italic text-cyber-purple/75">— Dexter</span>
+            <Link to="/about" className="text-[7px] tracking-widest text-outlaw-gold uppercase hover:text-white" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+              READ THE WHOLE RABBIT HOLE →
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
