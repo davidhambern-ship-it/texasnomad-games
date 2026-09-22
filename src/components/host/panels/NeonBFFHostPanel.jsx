@@ -421,6 +421,11 @@ export default function NeonBFFHostPanel({ controllerId }) {
   useEffect(() => {
     const cue = gameState.sound_cue;
     if (!cue?.at || cue.at === lastSoundCueRef.current) return;
+    const cueAge = Date.now() - Number(cue.at);
+    if (!Number.isFinite(cueAge) || cueAge > 8000) {
+      lastSoundCueRef.current = cue.at;
+      return;
+    }
     lastSoundCueRef.current = cue.at;
     playBffSound(String(cue.name || ''));
   }, [gameState.sound_cue]);
