@@ -342,7 +342,7 @@ export default async function handler(request, response) {
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentParticipant.id));
 
-      await recordWordSearchRound(nextRoom, nextState, participants, transaction);
+      await recordWordSearchRound(nextRoom, result.state, participants, transaction);
 
       return nextRoom;
     });
