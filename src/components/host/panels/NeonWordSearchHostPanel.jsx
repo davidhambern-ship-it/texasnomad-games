@@ -106,7 +106,11 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
   const [difficulty, setDifficulty] = useState('simpleton');
   const [category, setCategory] = useState('random');
   const [clock, setClock] = useState(Date.now());
-  const [zoom, setZoom] = useState(1);
+  const [zoom, setZoom] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    if (window.innerWidth >= 768 && window.innerWidth < 1024) return 0.7;
+    return 1;
+  });
 
   const gameState = room?.gameState || {};
   const phase = gameState.phase || 'setup';
@@ -290,7 +294,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                       WORD LIST
                     </div>
                     <div className="mt-1 text-[10px] text-white/30">
-                      Always visible beside the board on wide screens.
+                      Visible beside the board on tablets and larger screens.
                     </div>
                   </div>
                   <span className="text-[7px] text-[#FFD700]" style={PS2}>
