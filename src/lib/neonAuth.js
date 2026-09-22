@@ -42,17 +42,24 @@ export async function getNeonSession() {
 }
 
 export async function getNeonAuthToken() {
-  // Neon Functions expect a short-lived bearer JWT. Ask Neon Auth for a
-  // current token instead of reusing the JWT cached inside getSession().
-  // The SDK handles token refresh/expiration for token().
+  // Neon Functions require a short-lived bearer JWT. Always ask the Auth SDK
+  // for its token surface instead of reusing a JWT cached in getSession().
+  //
+  // @neondatabase/auth 0.5.x exposes getJWTToken(); newer client surfaces may
+  // expose token(). Support both so this stays safe across the SDK migration.
+  if (typeof authClient.getJWTToken === 'function') {
+    const tokenResult = await authClient.getJWTToken();
+    const freshToken = unwrapToken(tokenResult);
+    if (freshToken) return freshToken;
+  }
+
   if (typeof authClient.token === 'function') {
     const tokenResult = await authClient.token();
     const freshToken = unwrapToken(tokenResult);
     if (freshToken) return freshToken;
   }
 
-  // Compatibility fallback for older SDK shapes. This should normally never
-  // be used now that @neondatabase/auth exposes token().
+  // Last-resort compatibility fallback only.
   const session = await getNeonSession();
   return (
     session?.token ||
