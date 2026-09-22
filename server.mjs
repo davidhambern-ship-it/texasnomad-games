@@ -560,13 +560,6 @@ function relayBffVoiceFrame(sender, data) {
     return;
   }
 
-  if (sender.role === 'player') {
-    const activePlayerId = bffVoiceActivePlayerByRoom.get(sender.roomCode);
-    if (!activePlayerId || String(activePlayerId) !== String(sender.playerId)) {
-      return;
-    }
-  }
-
   const sourceKind = sender.role === 'host' ? 1 : 2;
   const source = Buffer.isBuffer(data)
     ? data
@@ -738,13 +731,15 @@ function bffMicsReady(players = [], gameState = {}) {
   const verified = gameState.voice_verified || {};
   const relayConnected = gameState.voice_relay_connected || {};
 
-  return assigned.every((player) => {
-    const playerId = String(player.playerId);
-    return Boolean(
-      relayConnected[playerId] === true
-      || verified[playerId] === true
+  if (gameState.voice_transport === 'railway-websocket') {
+    return assigned.every((player) =>
+      relayConnected[String(player.playerId)] === true
     );
-  });
+  }
+
+  return assigned.every((player) =>
+    verified[String(player.playerId)] === true
+  );
 }
 
 function bffFaceoffAttempted(gameState = {}, team) {
