@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { base44 } from '@/api/base44Client';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
-import { primeSquareBizAudio } from '@/lib/squareBizAudio';
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -63,12 +62,9 @@ function validatePlayerJoin(payload, roomCode) {
 
 export default function JoinRoom() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
-  const navigate = useNavigate();
   const path = window.location.pathname;
   const roomCode = path.split('/join/')[1]?.toUpperCase() || 'UNKNOWN';
   const [error, setError] = useState(null);
-  const [pendingSquareBizPath, setPendingSquareBizPath] = useState('');
-  const [enteringSquareBiz, setEnteringSquareBiz] = useState(false);
 
   useEffect(() => {
     if (roomCode === 'UNKNOWN') {
@@ -76,7 +72,7 @@ export default function JoinRoom() {
       return;
     }
 
-    if (isLoadingAuth || pendingSquareBizPath) return;
+    if (isLoadingAuth) return;
 
     async function findAndJoin() {
       setError(null);
@@ -103,13 +99,7 @@ export default function JoinRoom() {
               return;
             }
 
-            const destination = `${gamePath}?room=${roomCode}&neon=1`;
-            if (payload.room?.gameId === 'square-biz') {
-              setPendingSquareBizPath(destination);
-              return;
-            }
-
-            window.location.replace(destination);
+            window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
             return;
           } catch (joinError) {
             if (
@@ -129,13 +119,7 @@ export default function JoinRoom() {
                 return;
               }
 
-              const destination = `${gamePath}?room=${roomCode}&neon=1`;
-              if (payload.room?.gameId === 'square-biz') {
-                setPendingSquareBizPath(destination);
-                return;
-              }
-
-              window.location.replace(destination);
+              window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
               return;
             }
 
@@ -166,7 +150,7 @@ export default function JoinRoom() {
     }
 
     findAndJoin();
-  }, [roomCode, user?.id, isAuthenticated, isLoadingAuth, pendingSquareBizPath]);
+  }, [roomCode, user?.id, isAuthenticated, isLoadingAuth]);
 
   return (
     <div className="min-h-screen bg-midnight-void flex flex-col items-center justify-center px-4 text-center">
@@ -180,26 +164,6 @@ export default function JoinRoom() {
 
       {error ? (
         <p className="mt-4 text-red-400 font-body">{error}</p>
-      ) : pendingSquareBizPath ? (
-        <div className="mt-6">
-          <p className="text-white/60 font-body">
-            Connected to Square Biz. Enter the game and wait for the Host to start the show.
-          </p>
-          <button
-            type="button"
-            disabled={enteringSquareBiz}
-            onClick={async () => {
-              setEnteringSquareBiz(true);
-              try {
-                await primeSquareBizAudio();
-              } catch {}
-              navigate(pendingSquareBizPath, { replace: true });
-            }}
-            className="mt-5 px-8 py-4 border-2 border-outlaw-gold text-outlaw-gold font-heading text-sm tracking-[0.16em] uppercase rounded-lg hover:bg-outlaw-gold hover:text-black transition-all disabled:opacity-50"
-          >
-            {enteringSquareBiz ? 'ENTERING…' : 'ENTER SQUARE BIZ'}
-          </button>
-        </div>
       ) : (
         <p className="mt-4 text-white/60 font-body animate-pulse">
           {isBase44Preview || isNeonStaging ? 'Connecting to live Neon room…' : 'Looking up game session…'}
