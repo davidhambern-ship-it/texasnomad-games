@@ -468,6 +468,17 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const isMatchComplete = Boolean(gameState.match_complete);
   const isMatchTie = roundStage === 'match_tie' || Boolean(gameState.match_tied);
   const dysfunction = gameState.dysfunction || null;
+  const canJudgeAnswer = ['faceoff_answer', 'family_play', 'steal_answer'].includes(roundStage);
+  const selectedSlot = answers[selectedAnswer] || null;
+  const canRevealSelected = Boolean(canJudgeAnswer && selectedSlot && !selectedSlot.revealed);
+  const canHideSelected = Boolean(selectedSlot?.revealed);
+  const canManualAwardBank = ['family_play', 'steal_ready', 'steal_buzz', 'steal_answer', 'round_complete'].includes(roundStage);
+  const canStartDysfunction = Boolean(
+    isMatchComplete
+    && !dysfunction
+    && [1, 2].includes(Number(gameState.winning_team))
+    && (Number(gameState.winning_team) === 1 ? team1.length : team2.length) >= 4
+  );
 
   const ensureSilentTrack = useCallback(() => {
     if (!silentAudioRef.current) {
@@ -933,8 +944,10 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 type="button"
                 disabled={busy}
                 onClick={() => act('start_dysfunction')}
+                disabled={busy || !canStartDysfunction}
                 className="rounded-lg border border-[#F472B6]/50 bg-[#F472B6]/10 px-3 py-2 text-[6px] text-[#F472B6] disabled:opacity-30"
                 style={PS2}
+                title={canStartDysfunction ? 'Start Family Dysfunction' : 'Winning family needs at least 4 connected mic-ready players'}
               >
                 START FAMILY DYSFUNCTION
               </button>
@@ -956,10 +969,22 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   <div className="rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/5 px-3 py-2 text-center">
                     <div className="text-[5px] text-[#BC13FE]" style={PS2}>SIDE A</div>
                     <div className="mt-1 font-heading text-2xl">{Number(dysfunction.scoreA) || 0}</div>
+                    <div className="mt-1 text-[8px] text-white/35">
+                      {players
+                        .filter((player) => dysfunction.side_assignments?.[String(player.playerId)] === 'A')
+                        .map((player) => player.playerName || player.name)
+                        .join(' · ') || '—'}
+                    </div>
                   </div>
                   <div className="rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 px-3 py-2 text-center">
                     <div className="text-[5px] text-[#FF5F1F]" style={PS2}>SIDE B</div>
                     <div className="mt-1 font-heading text-2xl">{Number(dysfunction.scoreB) || 0}</div>
+                    <div className="mt-1 text-[8px] text-white/35">
+                      {players
+                        .filter((player) => dysfunction.side_assignments?.[String(player.playerId)] === 'B')
+                        .map((player) => player.playerName || player.name)
+                        .join(' · ') || '—'}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -967,6 +992,25 @@ export default function NeonBFFHostPanel({ controllerId }) {
               {roundStage === 'dysfunction_vote' && (
                 <div className="mt-2 text-[10px] text-white/40">
                   Waiting for secret votes. Votes remain hidden until everybody has voted.
+                </div>
+              )}
+
+              {dysfunction.votes_revealed && (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <div className={`rounded-lg border px-2 py-2 text-center text-[6px] ${
+                    Number(dysfunction.last_pointsA) === 3
+                      ? 'border-[#FFD700]/50 bg-[#FFD700]/10 text-[#FFD700]'
+                      : 'border-white/10 text-white/35'
+                  }`} style={PS2}>
+                    {Number(dysfunction.last_pointsA) === 3 ? 'DYSFUNCTION!' : `SIDE A +${Number(dysfunction.last_pointsA) || 0}`}
+                  </div>
+                  <div className={`rounded-lg border px-2 py-2 text-center text-[6px] ${
+                    Number(dysfunction.last_pointsB) === 3
+                      ? 'border-[#FFD700]/50 bg-[#FFD700]/10 text-[#FFD700]'
+                      : 'border-white/10 text-white/35'
+                  }`} style={PS2}>
+                    {Number(dysfunction.last_pointsB) === 3 ? 'DYSFUNCTION!' : `SIDE B +${Number(dysfunction.last_pointsB) || 0}`}
+                  </div>
                 </div>
               )}
 
@@ -1111,14 +1155,14 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Eye}
               accent="#BC13FE"
               onClick={() => act('reveal_answer', { index: selectedAnswer })}
-              disabled={busy}
+              disabled={busy || !canRevealSelected}
             />
             <ControlButton
               label="Hide"
               icon={EyeOff}
               accent="#8B5CF6"
               onClick={() => act('hide_answer', { index: selectedAnswer })}
-              disabled={busy}
+              disabled={busy || !canHideSelected}
             />
             <ControlButton
               label="+ Points"
@@ -1176,14 +1220,14 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Trophy}
               accent="#BC13FE"
               onClick={() => act('award_bank', { team: 1 })}
-              disabled={busy}
+              disabled={busy || !canManualAwardBank}
             />
             <ControlButton
               label="Bank → T2"
               icon={Trophy}
               accent="#FF5F1F"
               onClick={() => act('award_bank', { team: 2 })}
-              disabled={busy}
+              disabled={busy || !canManualAwardBank}
             />
 
           </div>
