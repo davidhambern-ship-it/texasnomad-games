@@ -5,8 +5,21 @@ import { Gamepad2, Loader2, ShieldCheck, UserRound } from 'lucide-react';
 import Header from '@/components/home/Header';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
+import TngSocialPanel from '@/components/social/TngSocialPanel';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+const GAME_LABELS = {
+  'square-biz': 'Square Biz!',
+  spades: 'Spades',
+  hangman: 'Hangman',
+  'word-search': 'Word Search',
+  bff: 'BFF',
+  sudoku: 'Sudoku TN',
+  'see-that': 'See That?',
+  'word-wrangler': 'Word Wrangler',
+  txd: 'TND Dominoes',
+};
 
 function StatCard({ label, value }) {
   return (
@@ -51,28 +64,36 @@ export default function NeonPlayerProfile() {
   }, []);
 
   const profile = payload?.profile || null;
-  const gameStats = payload?.gameStats || payload?.stats?.games || [];
-  const hostStats = payload?.hostStats || payload?.stats?.host || {};
+  const gameStats = Array.isArray(profile?.playerStats) ? profile.playerStats : [];
+  const hostStats = profile?.hostStats || {};
 
-  const totals = useMemo(() => {
-    if (!Array.isArray(gameStats)) {
-      return {
-        gamesPlayed: Number(gameStats?.gamesPlayed || 0),
-        wins: Number(gameStats?.wins || 0),
-        losses: Number(gameStats?.losses || 0),
-      };
-    }
-
-    return gameStats.reduce(
+  const totals = useMemo(() => (
+    gameStats.reduce(
       (acc, item) => {
         acc.gamesPlayed += Number(item?.gamesPlayed || item?.games_played || 0);
         acc.wins += Number(item?.wins || 0);
         acc.losses += Number(item?.losses || 0);
+        acc.totalScore += Number(item?.totalScore || item?.total_score || 0);
         return acc;
       },
-      { gamesPlayed: 0, wins: 0, losses: 0 },
-    );
-  }, [gameStats]);
+      { gamesPlayed: 0, wins: 0, losses: 0, totalScore: 0 },
+    )
+  ), [gameStats]);
+
+  const mostPlayed = useMemo(() => (
+    [...gameStats].sort(
+      (a, b) => Number(b?.gamesPlayed || b?.games_played || 0) - Number(a?.gamesPlayed || a?.games_played || 0),
+    )[0] || null
+  ), [gameStats]);
+
+  const highScores = useMemo(() => (
+    [...gameStats]
+      .sort((a, b) => Number(b?.bestScore || b?.best_score || 0) - Number(a?.bestScore || a?.best_score || 0))
+  ), [gameStats]);
+
+  const winRate = totals.gamesPlayed > 0
+    ? Math.round((totals.wins / totals.gamesPlayed) * 100)
+    : 0;
 
   if (loading) {
     return (
@@ -177,11 +198,54 @@ export default function NeonPlayerProfile() {
           )}
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <section className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
           <StatCard label="GAMES PLAYED" value={totals.gamesPlayed} />
           <StatCard label="WINS" value={totals.wins} />
           <StatCard label="LOSSES" value={totals.losses} />
+          <StatCard label="WIN RATE" value={`${winRate}%`} />
           <StatCard label="HOST SESSIONS" value={hostSessions} />
+        </section>
+
+        <section className="mt-5 grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
+          <div className="rounded-2xl border border-[#FF5F1F]/20 bg-[#FF5F1F]/[.03] p-5">
+            <div className="text-[7px] tracking-widest text-[#FF5F1F]" style={PS2}>MOST PLAYED</div>
+            {mostPlayed ? (
+              <>
+                <div className="mt-4 text-3xl font-black text-white">
+                  {GAME_LABELS[mostPlayed.gameId] || mostPlayed.gameId}
+                </div>
+                <div className="mt-2 text-sm text-white/45">
+                  {Number(mostPlayed.gamesPlayed || 0)} games · {Number(mostPlayed.wins || 0)} wins · {Number(mostPlayed.losses || 0)} losses
+                </div>
+              </>
+            ) : (
+              <div className="mt-4 text-sm text-white/30">No completed games recorded yet.</div>
+            )}
+          </div>
+
+          <div className="rounded-2xl border border-[#FFD700]/20 bg-[#FFD700]/[.025] p-5">
+            <div className="text-[7px] tracking-widest text-[#FFD700]" style={PS2}>HIGH SCORES BY GAME</div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {highScores.length > 0 ? highScores.map((item) => (
+                <div key={item.gameId} className="rounded-xl border border-white/8 bg-black/30 p-3">
+                  <div className="text-sm font-black text-white/80">{GAME_LABELS[item.gameId] || item.gameId}</div>
+                  <div className="mt-2 flex items-end justify-between gap-3">
+                    <div>
+                      <div className="text-[6px] tracking-widest text-white/25" style={PS2}>BEST SCORE</div>
+                      <div className="mt-1 text-2xl font-black text-[#FFD700]">
+                        {Number(item.bestScore || item.best_score || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="text-right text-xs text-white/30">
+                      Total {Number(item.totalScore || item.total_score || 0).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+              )) : (
+                <div className="text-sm text-white/30">Your high-score wall wakes up after completed games are recorded.</div>
+              )}
+            </div>
+          </div>
         </section>
 
         <section className="mt-5 rounded-2xl border border-[#FFD700]/20 bg-black/35 p-5">
@@ -203,6 +267,8 @@ export default function NeonPlayerProfile() {
             Stats update from Neon as TNG records completed multiplayer activity. During live testing, unfinished or abandoned rooms are not counted as completed games.
           </p>
         </section>
+
+        <TngSocialPanel />
       </main>
     </div>
   );
