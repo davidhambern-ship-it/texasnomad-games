@@ -1264,6 +1264,11 @@ async function applyBffHostAction(room, body = {}, players = []) {
       throw new Error('Family Dysfunction needs at least two connected members from the winning family.');
     }
 
+    const voiceOffers = next.voice_offers || {};
+    if (!roster.every((player) => Boolean(voiceOffers[String(player.playerId)]?.sdp))) {
+      throw new Error('Every Family Dysfunction player must have their microphone on before the finale starts.');
+    }
+
     const sideAssignments = {};
     roster.forEach((player, index) => {
       sideAssignments[String(player.playerId)] = index % 2 === 0 ? 'A' : 'B';
