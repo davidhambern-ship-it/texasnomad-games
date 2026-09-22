@@ -1,25 +1,9 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-export const DIRECT_NEON_AUTH_URL =
+export const NEON_AUTH_URL =
   import.meta.env.VITE_NEON_AUTH_URL ||
   'https://ep-hidden-wave-avehvh0z.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
-
-function browserAuthUrl() {
-  if (typeof window === 'undefined') return DIRECT_NEON_AUTH_URL;
-
-  const host = window.location.hostname.toLowerCase();
-  const useSameOriginProxy =
-    host.endsWith('.vercel.app') ||
-    host === 'texasnomadgames.com' ||
-    host === 'www.texasnomadgames.com';
-
-  return useSameOriginProxy
-    ? `${window.location.origin}/api/auth`
-    : DIRECT_NEON_AUTH_URL;
-}
-
-export const NEON_AUTH_URL = browserAuthUrl();
 
 export const isNeonStaging = true;
 
