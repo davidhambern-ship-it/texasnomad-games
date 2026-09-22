@@ -22,6 +22,7 @@ import {
   validateSpadesPlay,
 } from '../../server/games/spades.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const CPU_SEATS = [
@@ -273,6 +274,14 @@ export default async function handler(request, response) {
     if (action === 'deal') {
       const current = room.displayState || {};
       const currentGameState = current.gameState || defaultSpadesState();
+
+      if (currentGameState.phase === 'finished') {
+        const error = new Error('This Spades match is finished. Start a new table before dealing again.');
+        error.statusCode = 409;
+        error.code = 'SPADES_MATCH_FINISHED';
+        throw error;
+      }
+
       const players = Array.isArray(currentGameState.players)
         ? currentGameState.players
         : [];
@@ -651,6 +660,12 @@ export default async function handler(request, response) {
             score1: Number(gameState.score1 || 0),
             score2: Number(gameState.score2 || 0),
           };
+      const targetScore = Number(gameState.targetScore || 500);
+      const reachedTarget = score.score1 >= targetScore || score.score2 >= targetScore;
+      const matchComplete = handComplete && reachedTarget && score.score1 !== score.score2;
+      const winningTeam = matchComplete
+        ? (score.score1 > score.score2 ? 1 : 2)
+        : null;
       const now = new Date();
 
       const [updatedRoom] = await db.update(gameRooms).set({
@@ -665,8 +680,9 @@ export default async function handler(request, response) {
             tricksPlayed,
             currentTrick: [],
             trickWinnerSeat: null,
-            phase: handComplete ? 'round_over' : 'playing',
+            phase: matchComplete ? 'finished' : handComplete ? 'round_over' : 'playing',
             currentTurnSeat: handComplete ? null : winnerSeat,
+            winnerTeam: winningTeam,
             currentBidderSeat: null,
             dealerSeat: handComplete
               ? nextSpadesSeat(gameState.dealerSeat || 1)
@@ -686,6 +702,29 @@ export default async function handler(request, response) {
         revision: room.revision + 1,
         updatedAt: now,
       }).where(eq(gameRooms.id, room.id)).returning();
+
+      if (matchComplete && winningTeam) {
+        await recordGameStatEvent({
+          room: updatedRoom,
+          statKey: `match:${updatedRoom.revision}`,
+          entries: players
+            .filter((player) => player.playerType === 'human' && player.accountId)
+            .map((player) => {
+              const team = spadesTeamForSeat(Number(player.seatNumber));
+              return {
+                accountId: player.accountId,
+                score: team === 1 ? score.score1 : score.score2,
+                won: team === winningTeam,
+              };
+            }),
+          result: {
+            winningTeam,
+            score1: score.score1,
+            score2: score.score2,
+            targetScore,
+          },
+        });
+      }
 
       return sendJson(response, 200, await payload(updatedRoom, account.id));
     }
