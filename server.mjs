@@ -485,6 +485,147 @@ function bffNextPlayerId(players = [], gameState = {}, team, currentPlayerId) {
   return roster[(currentIndex + 1) % roster.length]?.playerId || roster[0].playerId;
 }
 
+function bffAssignedPlayers(players = [], gameState = {}) {
+  return players.filter((player) => [1, 2].includes(bffTeamForPlayer(gameState, player.playerId)));
+}
+
+function bffMicsReady(players = [], gameState = {}) {
+  const assigned = bffAssignedPlayers(players, gameState);
+  if (!assigned.length) return false;
+
+  const hasTeam1 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 1);
+  const hasTeam2 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 2);
+  if (!hasTeam1 || !hasTeam2) return false;
+
+  const offers = gameState.voice_offers || {};
+  return assigned.every((player) => Boolean(offers[String(player.playerId)]?.sdp));
+}
+
+function bffFaceoffAttempted(gameState = {}, team) {
+  const attempted = gameState.faceoff_attempted || {};
+  return Array.isArray(attempted[String(team)])
+    ? attempted[String(team)].map(String)
+    : [];
+}
+
+function bffMarkFaceoffAttempt(gameState, playerId) {
+  const team = bffTeamForPlayer(gameState, playerId);
+  if (!team) return;
+
+  const attempted = {
+    ...(gameState.faceoff_attempted || {}),
+    [String(team)]: bffFaceoffAttempted(gameState, team),
+  };
+  const id = String(playerId);
+  if (!attempted[String(team)].includes(id)) attempted[String(team)].push(id);
+  gameState.faceoff_attempted = attempted;
+}
+
+function bffNextUnattemptedPlayer(players, gameState, team, currentPlayerId) {
+  const roster = bffTeamRoster(players, gameState, team);
+  if (!roster.length) return null;
+
+  const attempted = new Set(bffFaceoffAttempted(gameState, team));
+  const currentIndex = Math.max(
+    0,
+    roster.findIndex((player) => String(player.playerId) === String(currentPlayerId || '')),
+  );
+
+  for (let offset = 1; offset <= roster.length; offset += 1) {
+    const player = roster[(currentIndex + offset) % roster.length];
+    if (player && !attempted.has(String(player.playerId))) return player.playerId;
+  }
+
+  return null;
+}
+
+function bffStartFamilyTurn(gameState, playerId) {
+  gameState.active_player_id = playerId || null;
+  gameState.answer_deadline_at = playerId ? Date.now() + 20000 : null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+  gameState.round_stage = playerId ? 'family_play' : gameState.round_stage;
+}
+
+function bffEnterSteal(gameState) {
+  const originalTeam = Number(gameState.control_team || gameState.active_turn || 1) === 2 ? 2 : 1;
+  const stealTeam = originalTeam === 1 ? 2 : 1;
+
+  gameState.original_playing_team = originalTeam;
+  gameState.steal_team = stealTeam;
+  gameState.steal_mode = true;
+  gameState.round_stage = 'steal_ready';
+  gameState.active_player_id = null;
+  gameState.answer_deadline_at = null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+  gameState.buzz_winner = null;
+}
+
+function bffApplyMatchCompletion(gameState) {
+  if (Number(gameState.round_number || 1) < 5) return;
+
+  const score1 = Number(gameState.score1 || 0);
+  const score2 = Number(gameState.score2 || 0);
+
+  gameState.match_complete = score1 !== score2;
+  gameState.match_tied = score1 === score2;
+  gameState.winning_team = score1 > score2 ? 1 : score2 > score1 ? 2 : null;
+  gameState.round_stage = score1 === score2 ? 'match_tie' : 'match_complete';
+}
+
+function bffCompleteRound(gameState, awardedTeam = null) {
+  const bank = Math.max(0, Number(gameState.round_bank || 0));
+
+  if ([1, 2].includes(Number(awardedTeam))) {
+    const scoreKey = Number(awardedTeam) === 2 ? 'score2' : 'score1';
+    gameState[scoreKey] = Math.max(0, Number(gameState[scoreKey] || 0) + bank);
+  }
+
+  gameState.round_bank = 0;
+  gameState.phase = 'round_over';
+  gameState.round_stage = 'round_complete';
+  gameState.active_player_id = null;
+  gameState.answer_deadline_at = null;
+  gameState.buzzer_open = false;
+  gameState.buzzer_phase = 'board_shown';
+  gameState.buzz_winner = null;
+  gameState.steal_mode = false;
+  gameState.consecutive_timeouts = 0;
+  gameState.original_playing_team = null;
+  gameState.steal_team = null;
+
+  bffApplyMatchCompletion(gameState);
+}
+
+function bffFamilyTimeout(gameState, players) {
+  if (gameState.round_stage !== 'family_play' || !gameState.active_player_id) return;
+
+  const team = bffTeamForPlayer(gameState, gameState.active_player_id) || gameState.control_team;
+  let streak = Number(gameState.consecutive_timeouts || 0) + 1;
+
+  if (streak >= 2) {
+    gameState.bye_count = Math.min(3, Number(gameState.bye_count || 0) + 1);
+    gameState.sound_cue = { name: 'wrong_awww', at: Date.now() };
+    streak = 0;
+  }
+
+  gameState.consecutive_timeouts = streak;
+
+  if (Number(gameState.bye_count || 0) >= 3) {
+    bffEnterSteal(gameState);
+    return;
+  }
+
+  const nextPlayer = bffNextPlayerId(
+    players,
+    gameState,
+    team,
+    gameState.active_player_id,
+  );
+  bffStartFamilyTurn(gameState, nextPlayer);
+}
+
 function bffFaceoffPlayerIds(gameState = {}) {
   const pair = gameState.faceoff_players || {};
   return [pair['1'] || pair[1] || null, pair['2'] || pair[2] || null].filter(Boolean);
