@@ -302,7 +302,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                   </span>
                 </div>
 
-                <div className="grid max-h-[78vh] grid-cols-2 gap-1.5 overflow-y-auto p-2.5 sm:p-3">
+                <div className="grid max-h-[68vh] grid-cols-1 gap-1.5 overflow-y-auto p-2 sm:p-2.5 xl:grid-cols-2">
                   {words.map((word) => {
                     const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
                     const color = word.revealed ? '#777777' : finder?.color || '#BC13FE';
@@ -337,6 +337,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
               title="MATCH STATUS"
               accent="#FFD700"
               value={phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
+              className="min-[680px]:col-span-1"
             >
               <div className="mt-2 grid grid-cols-2 gap-2 text-center">
                 <div className="rounded-lg border border-white/10 bg-white/[.02] p-2">
@@ -350,9 +351,16 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                   </div>
                 </div>
               </div>
+              <div className="mt-2 text-[9px] leading-relaxed text-white/35">
+                {currentMode === 'turn' && phase === 'playing'
+                  ? canInteract
+                    ? 'Seat 1 live — drag across one word.'
+                    : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`
+                  : 'All active players are searching.'}
+              </div>
             </HostControlCard>
 
-            <HostControlCard title="PLAYER SCORES" accent="#BC13FE" className="sm:col-span-2 xl:col-span-2">
+            <HostControlCard title="PLAYER SCORES" accent="#BC13FE" className="col-span-2 min-[680px]:col-span-2">
               <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
                   const seat = Number(player.seatNumber);
@@ -384,7 +392,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
               </div>
             </HostControlCard>
 
-            <HostControlCard title="GAME CONTROLS" accent="#FF5F1F">
+            <HostControlCard title="GAME CONTROLS" accent="#FF5F1F" className="min-[680px]:col-span-1">
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
@@ -416,18 +424,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
               </div>
             </HostControlCard>
 
-            <HostControlCard title="TURN / SCORING" accent="#22D3EE">
-              <div className="mt-2 text-[10px] leading-relaxed text-white/40">
-                {currentMode === 'turn' && phase === 'playing'
-                  ? canInteract
-                    ? 'Seat 1 is live — drag across one word.'
-                    : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`
-                  : 'Race mode keeps every active player searching at the same time.'}
-              </div>
-              <div className="mt-2 rounded-lg border border-white/10 bg-white/[.02] p-2 text-[9px] leading-relaxed text-white/30">
-                10 pts per letter + placement + difficulty bonus. Wrong selection −20. Turn timeout −10.
-              </div>
-            </HostControlCard>
+
           </HostControlDeck>
 
           {phase === 'finished' && (
