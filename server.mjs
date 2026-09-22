@@ -1268,6 +1268,58 @@ async function applyBffHostAction(room, body = {}, players = []) {
     return next;
   }
 
+  if (action === 'reset_game') {
+    // Preserve room membership, family setup, assignments, and voice relay/session.
+    // Reset the actual match so this room can immediately run a fresh game.
+    next.phase = 'waiting';
+    next.round_stage = 'setup';
+    next.round_number = 1;
+    next.score1 = 0;
+    next.score2 = 0;
+    next.round_bank = 0;
+    next.bye_count = 0;
+    next.consecutive_timeouts = 0;
+
+    next.current_question = '';
+    next.current_survey_id = null;
+    next.answers = [];
+    next.answer_count = 0;
+    next.used_survey_ids = [];
+
+    next.faceoff_players = {};
+    next.faceoff_results = {};
+    next.faceoff_attempted = { 1: [], 2: [] };
+    next.faceoff_x_event = null;
+    next.faceoff_winner_id = null;
+    next.faceoff_winner_team = null;
+    next.play_pass_choice = null;
+
+    next.buzzer_open = false;
+    next.buzzer_scope = null;
+    next.buzzer_phase = 'board_shown';
+    next.buzz_winner = null;
+
+    next.active_player_id = null;
+    next.answer_deadline_at = null;
+    next.control_team = null;
+    next.active_turn = null;
+
+    next.steal_mode = false;
+    next.steal_team = null;
+    next.original_playing_team = null;
+
+    next.match_complete = false;
+    next.match_tied = false;
+    next.winning_team = null;
+    next.is_tiebreak = false;
+    next.dysfunction = null;
+
+    next.sound_cue = null;
+    delete next._hostUndo;
+
+    return next;
+  }
+
   if (action === 'reset_round') {
     next.phase = 'playing';
     next.is_tiebreak = false;
@@ -1276,20 +1328,27 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.bye_count = 0;
     next.consecutive_timeouts = 0;
     next.steal_mode = false;
+    next.steal_team = null;
+    next.original_playing_team = null;
     next.buzzer_open = false;
+    next.buzzer_scope = null;
     next.buzzer_phase = 'board_shown';
     next.buzz_winner = null;
     next.active_player_id = null;
     next.answer_deadline_at = null;
+    next.faceoff_players = {};
     next.faceoff_results = {};
     next.faceoff_attempted = { 1: [], 2: [] };
     next.faceoff_x_event = null;
     next.faceoff_winner_id = null;
     next.faceoff_winner_team = null;
     next.play_pass_choice = null;
+    next.control_team = null;
+    next.active_turn = null;
     next.answers = normalizeBffRankedAnswers(getBffAnswers(next));
     next.answer_count = next.answers.length;
     next.sound_cue = null;
+    delete next._hostUndo;
     return next;
   }
 
