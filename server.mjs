@@ -370,6 +370,33 @@ function bffUndoSnapshot(gameState = {}) {
 }
 
 
+function bffRankPoints(answerCount, index) {
+  const scales = {
+    1: [100],
+    2: [65, 35],
+    3: [50, 30, 20],
+    4: [40, 30, 20, 10],
+    5: [35, 25, 18, 13, 9],
+    6: [30, 23, 18, 13, 9, 7],
+    7: [28, 22, 17, 13, 9, 6, 5],
+    8: [25, 20, 16, 13, 10, 7, 5, 4],
+  };
+
+  const scale = scales[Math.max(1, Math.min(8, Number(answerCount) || 1))] || scales[8];
+  return Number(scale[index] ?? 0);
+}
+
+function normalizeBffRankedAnswers(rawAnswers = []) {
+  const answers = Array.isArray(rawAnswers) ? rawAnswers.slice(0, 8) : [];
+
+  return answers.map((answer, index) => ({
+    ...answer,
+    text: String(answer?.text || answer?.answer || ''),
+    points: bffRankPoints(answers.length, index),
+    revealed: false,
+  }));
+}
+
 async function pickBffSurvey(gameState = {}) {
   const used = Array.isArray(gameState.used_survey_ids)
     ? gameState.used_survey_ids.map((id) => Number(id)).filter(Number.isFinite)
@@ -408,11 +435,7 @@ async function pickBffSurvey(gameState = {}) {
   return {
     id: Number(survey.id),
     question: String(survey.question || ''),
-    answers: answers.map((answer) => ({
-      text: String(answer?.text || answer?.answer || ''),
-      points: Math.max(0, Number(answer?.points) || 0),
-      revealed: false,
-    })),
+    answers: normalizeBffRankedAnswers(answers),
   };
 }
 
@@ -475,6 +498,20 @@ async function applyBffHostAction(room, body = {}) {
     next.answers = survey.answers;
     next.answer_count = survey.answers.length;
     next.sound_cue = { name: 'round_start', at: Date.now() };
+    return next;
+  }
+
+  if (action === 'reset_round') {
+    next.phase = 'playing';
+    next.round_bank = 0;
+    next.bye_count = 0;
+    next.steal_mode = false;
+    next.buzzer_open = false;
+    next.buzzer_phase = 'board_shown';
+    next.buzz_winner = null;
+    next.answers = normalizeBffRankedAnswers(getBffAnswers(next));
+    next.answer_count = next.answers.length;
+    next.sound_cue = null;
     return next;
   }
 
