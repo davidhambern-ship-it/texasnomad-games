@@ -430,7 +430,7 @@ export default function PreviewHostPanel() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
-      <header className="h-14 border-b border-[#BC13FE]/40 flex items-center justify-between px-4">
+      <header className="fixed inset-x-0 top-0 z-50 h-14 border-b border-[#BC13FE]/40 bg-[#050505]/95 backdrop-blur-xl flex items-center justify-between px-4">
         <Link to="/" className="font-heading tracking-widest">
           TEXASNOMAD <span className="text-[#FF5F1F]">HOST</span>
         </Link>
@@ -445,7 +445,7 @@ export default function PreviewHostPanel() {
         </div>
       </header>
 
-      <main className="flex-1 p-3 sm:p-4">
+      <main className="flex-1 px-2 pb-3 pt-[68px] sm:px-3 sm:pb-4">
         {phase === 'loading' && (
           <div className="h-full flex items-center justify-center text-center">
             <div>
@@ -592,7 +592,8 @@ export default function PreviewHostPanel() {
 
         {phase === 'room' && activeRoom && (
           <div className="mx-auto max-w-[1650px]">
-            <div className="sticky top-14 z-30 mb-2 rounded-xl border border-[#BC13FE]/30 bg-black/90 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
+            <div className="fixed inset-x-2 top-14 z-40 sm:inset-x-3">
+              <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="text-xl">{roomGame?.emoji || '🎮'}</span>
@@ -655,7 +656,10 @@ export default function PreviewHostPanel() {
                   </button>
                 </div>
               </div>
+              </div>
             </div>
+
+            <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
 
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
