@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getSquareBizAudio } from '@/lib/squareBizAudio';
 
 const DISPLAY = { fontFamily: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" };
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
@@ -474,18 +475,17 @@ export function SquareBizJingle({
   enabled = true,
   audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
 }) {
-  const audioRef = useRef(null);
   const ownerRef = useRef(`sb-jingle-${Math.random().toString(36).slice(2)}-${Date.now()}`);
   const phase = gameState.phase || 'lobby';
   const start = Number(gameState.introStartedAt || 0);
   const end = Number(gameState.introEndsAt || 0);
 
   useEffect(() => {
-    const audio = audioRef.current;
+    const audio = getSquareBizAudio(audioSrc);
     if (!audio || !enabled || phase !== 'intro' || !start) return undefined;
 
     const owner = ownerRef.current;
-    const lockKey = 'tng_square_biz_jingle_owner_v2';
+    const lockKey = 'tng_square_biz_jingle_owner_v3';
     const expiresAt = Math.max(Date.now() + 5_000, end + 3_000);
     let cancelled = false;
     let ownsAudio = false;
@@ -531,9 +531,10 @@ export function SquareBizJingle({
         if (Number.isFinite(target) && target > 0) {
           audio.currentTime = target;
         }
+        audio.volume = 1;
         await audio.play();
       } catch {
-        // No player-facing fallback control: Square Biz show audio is Host-driven.
+        // Player-facing audio stays automatic and Host-driven; no playback control is exposed.
       }
     };
 
@@ -569,25 +570,17 @@ export function SquareBizJingle({
       audio.currentTime = 0;
       release();
     };
-  }, [enabled, end, phase, start]);
+  }, [audioSrc, enabled, end, phase, start]);
 
   useEffect(() => {
     if (phase === 'intro') return;
-    const audio = audioRef.current;
+    const audio = getSquareBizAudio(audioSrc);
     if (!audio) return;
     audio.pause();
     audio.currentTime = 0;
-  }, [phase]);
+  }, [audioSrc, phase]);
 
-  return (
-    <audio
-      ref={audioRef}
-      src={audioSrc}
-      preload="auto"
-      playsInline
-      aria-hidden="true"
-    />
-  );
+  return null;
 }
 
 export function SquareBizIntro({
