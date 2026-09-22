@@ -18,6 +18,7 @@ import squareBizQuestions from '../api/square-biz/questions.js';
 import squareBizHost from '../api/square-biz/host.js';
 import squareBizPlayer from '../api/square-biz/player.js';
 import publicLiveRooms from '../api/public/live-rooms.js';
+import social from '../api/social.js';
 
 const routes = new Map([
   ['/', health],
@@ -41,6 +42,7 @@ const routes = new Map([
   ['/square-biz/host', squareBizHost],
   ['/square-biz/player', squareBizPlayer],
   ['/public/live-rooms', publicLiveRooms],
+  ['/social', social],
 ]);
 
 function configuredOrigins() {
