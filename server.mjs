@@ -509,12 +509,274 @@ async function applyBffHostAction(room, body = {}) {
   return next;
 }
 
+
+async function verifyBffPlayerWithTngApi(req, deviceId, roomCode) {
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    return {
+      ok: false,
+      status: 401,
+      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
+    };
+  }
+
+  const response = await fetch(`${TNG_API_ORIGIN}/player/room`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+      'X-TNG-Device-Id': deviceId,
+      'X-TNG-Room-Code': roomCode,
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, payload };
+}
+
+async function loadRailwayBffPlayerRoom(roomCode) {
+  const { rows } = await bffPool.query(`
+    select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
+           gr.created_at, gr.updated_at
+    from public.game_rooms gr
+    where upper(gr.room_code) = upper($1)
+      and gr.game_id = 'bff'
+      and gr.status in ('lobby','live','paused')
+    order by gr.updated_at desc
+    limit 1
+  `, [roomCode]);
+
+  return rows[0] || null;
+}
+
+function sanitizeBffPlayerState(gameState = {}, players = []) {
+  const answers = getBffAnswers(gameState);
+  const answerCount = Math.max(
+    answers.length,
+    Number(gameState.answer_count || gameState.answerCount || 0),
+    8,
+  );
+
+  const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
+    const answer = answers[index] || {};
+    const revealed = Boolean(answer.revealed);
+    return {
+      index,
+      revealed,
+      points: revealed ? Number(answer.points) || 0 : 0,
+      ...(revealed
+        ? { text: String(answer.text || answer.answer || '') }
+        : {}),
+    };
+  });
+
+  return {
+    phase: gameState.phase || 'waiting',
+    family1: gameState.family1 || 'Family 1',
+    family2: gameState.family2 || 'Family 2',
+    score1: Number(gameState.score1) || 0,
+    score2: Number(gameState.score2) || 0,
+    round_number: Number(gameState.round_number || gameState.roundNumber || 1),
+    round_bank: Number(gameState.round_bank || gameState.roundBank || 0),
+    current_question:
+      gameState.current_question ||
+      gameState.currentQuestion ||
+      gameState.question ||
+      '',
+    control_team: Number(gameState.control_team || gameState.active_turn || 1),
+    active_turn: Number(gameState.active_turn || gameState.control_team || 1),
+    steal_mode: Boolean(gameState.steal_mode),
+    bye_count: Math.max(0, Math.min(3, Number(gameState.bye_count) || 0)),
+    buzzer_phase: gameState.buzzer_phase || null,
+    buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
+    buzz_winner: gameState.buzz_winner || null,
+    playerTeams: gameState.playerTeams || {},
+    sound_cue: gameState.sound_cue || null,
+    answers: safeAnswers,
+    players,
+  };
+}
+
+async function applyBffPlayerAction(room, participant, body = {}) {
+  const action = String(body.action || '').trim();
+  const current = extractBffGameState(room.display_state || {});
+
+  if (action === 'buzz') {
+    if (!(current.buzzer_open || current.buzzer_phase === 'buzzer_active')) {
+      return current;
+    }
+
+    if (current.buzz_winner) {
+      return current;
+    }
+
+    const teamMap = current.playerTeams || {};
+    const familyTeam = Number(teamMap[participant.accountId] || participant.familyTeam || 0) || null;
+
+    return {
+      ...current,
+      buzzer_open: false,
+      buzzer_phase: 'buzzed',
+      buzz_winner: {
+        playerId: participant.accountId,
+        playerName: participant.playerName || participant.name || 'Player',
+        seatNumber: participant.seatNumber,
+        familyTeam,
+        teamName:
+          familyTeam === 2
+            ? (current.family2 || 'Family 2')
+            : (current.family1 || 'Family 1'),
+        timestamp: Date.now(),
+      },
+    };
+  }
+
+  return current;
+}
+
 async function handleBffApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const path = sourceUrl.pathname.replace(/^\/bff-api/, '') || '/';
 
   if (req.method === 'GET' && path === '/health') {
     sendJson(res, 200, { ok: true, service: 'railway-bff-api' });
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/player') {
+    const deviceId = String(req.headers['x-tng-device-id'] || '');
+    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
+
+    if (!deviceId || !roomCode) {
+      sendJson(res, 400, {
+        error: {
+          code: 'PLAYER_ROOM_REQUIRED',
+          message: 'Player device and room code are required.',
+        },
+      });
+      return;
+    }
+
+    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
+    if (!verified.ok) {
+      sendJson(res, verified.status || 401, verified.payload || {
+        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
+      });
+      return;
+    }
+
+    const room = await loadRailwayBffPlayerRoom(roomCode);
+    if (!room) {
+      sendJson(res, 404, {
+        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
+      });
+      return;
+    }
+
+    let internalState = extractBffGameState(room.display_state || {});
+    let players = await loadBffParticipants(room.id, internalState);
+
+    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
+    internalState = assignmentResult.gameState;
+    const effectiveRoom = assignmentResult.room || room;
+    players = await loadBffParticipants(room.id, internalState);
+
+    const verifiedParticipant = verified.payload?.participant || null;
+    const participant = players.find((player) =>
+      String(player.deviceSessionId || '') === String(deviceId)
+      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
+    ) || verifiedParticipant;
+
+    if (!participant) {
+      sendJson(res, 404, {
+        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
+      });
+      return;
+    }
+
+    const gameState = sanitizeBffPlayerState(internalState, players);
+
+    sendJson(res, 200, {
+      room: {
+        id: effectiveRoom.id || room.id,
+        roomCode: effectiveRoom.room_code || room.room_code,
+        gameId: effectiveRoom.game_id || room.game_id,
+        status: effectiveRoom.status || room.status,
+        revision: effectiveRoom.revision || room.revision,
+        gameState,
+        createdAt: effectiveRoom.created_at || room.created_at,
+        updatedAt: effectiveRoom.updated_at || room.updated_at,
+      },
+      participant,
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/player') {
+    const deviceId = String(req.headers['x-tng-device-id'] || '');
+    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
+
+    if (!deviceId || !roomCode) {
+      sendJson(res, 400, {
+        error: {
+          code: 'PLAYER_ROOM_REQUIRED',
+          message: 'Player device and room code are required.',
+        },
+      });
+      return;
+    }
+
+    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
+    if (!verified.ok) {
+      sendJson(res, verified.status || 401, verified.payload || {
+        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
+      });
+      return;
+    }
+
+    const room = await loadRailwayBffPlayerRoom(roomCode);
+    if (!room) {
+      sendJson(res, 404, {
+        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
+      });
+      return;
+    }
+
+    let internalState = extractBffGameState(room.display_state || {});
+    let players = await loadBffParticipants(room.id, internalState);
+    const verifiedParticipant = verified.payload?.participant || null;
+    const participant = players.find((player) =>
+      String(player.deviceSessionId || '') === String(deviceId)
+      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
+    ) || verifiedParticipant;
+
+    if (!participant) {
+      sendJson(res, 404, {
+        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
+      });
+      return;
+    }
+
+    const body = await readJsonBody(req).catch(() => ({}));
+    const nextGameState = await applyBffPlayerAction(room, participant, body || {});
+    const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
+
+    players = await loadBffParticipants(room.id, nextGameState);
+    const gameState = sanitizeBffPlayerState(nextGameState, players);
+
+    sendJson(res, 200, {
+      room: {
+        id: savedRoom?.id || room.id,
+        roomCode: savedRoom?.room_code || room.room_code,
+        gameId: savedRoom?.game_id || room.game_id,
+        status: savedRoom?.status || room.status,
+        revision: savedRoom?.revision || room.revision,
+        gameState,
+        createdAt: savedRoom?.created_at || room.created_at,
+        updatedAt: savedRoom?.updated_at || room.updated_at,
+      },
+      participant,
+    });
     return;
   }
 
