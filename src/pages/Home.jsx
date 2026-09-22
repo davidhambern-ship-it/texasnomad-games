@@ -56,7 +56,7 @@ export default function Home() {
       <Hero heroBg={HERO_BG} crownLogo={CROWN_LOGO} />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 -mt-8 relative z-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
           <FeaturedGamesInline
             gameImages={GAME_IMAGES}
             onSelect={setFeaturedGame}
@@ -84,7 +84,7 @@ export default function Home() {
 
 function FeaturedGamesInline({ gameImages, onSelect }) {
   return (
-    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full">
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px]">
       <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-4 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
         FEATURED GAMES
       </h3>
@@ -212,7 +212,7 @@ function JoinGameInline() {
   };
 
   return (
-    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col items-center justify-center">
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px] flex flex-col items-center justify-center">
       <h3 className="text-sm md:text-base tracking-[0.1em] text-outlaw-gold text-center mb-3 uppercase" style={{ fontFamily: "'Monoton', cursive" }}>
         JOIN LIVE
       </h3>
@@ -355,7 +355,7 @@ function LiveStatusInline() {
   const duration = Math.max(38, feed.length * 7);
 
   return (
-    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden h-full flex flex-col cursor-default">
+    <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px] flex flex-col cursor-default">
       <style>{`
         @keyframes tng-rss-scroll {
           0% { transform: translateY(0); }
@@ -380,7 +380,7 @@ function LiveStatusInline() {
         </span>
       </div>
 
-      <div className="relative flex-1 min-h-[300px] overflow-hidden rounded-lg border border-white/8 bg-black/30">
+      <div className="relative flex-1 min-h-0 overflow-hidden rounded-lg border border-white/8 bg-black/30">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-10 bg-gradient-to-b from-[#07030d] to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-[#07030d] to-transparent" />
 
