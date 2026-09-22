@@ -7,6 +7,7 @@ import {
   SquareBizBoard,
   SquareBizCueCard,
   SquareBizIntro,
+  SquareBizJingle,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
 
@@ -117,6 +118,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-[#05020a] text-white">
       <SquareBizShowStyles />
+      <SquareBizJingle gameState={gameState} />
 
       <div className="pointer-events-none absolute inset-0 opacity-60" style={{
         background:
