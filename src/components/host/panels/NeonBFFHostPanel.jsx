@@ -1069,6 +1069,18 @@ export default function NeonBFFHostPanel({ controllerId }) {
             />
 
             <ControlButton
+              label="Reset Game"
+              icon={RotateCcw}
+              accent="#FF174D"
+              onClick={() => {
+                const confirmed = window.confirm(
+                  'Reset the entire BFF game? Scores, rounds, survey history, strikes, faceoff and finale progress will reset. Connected players, family setup and voice stay intact.',
+                );
+                if (confirmed) act('reset_game');
+              }}
+              disabled={busy}
+            />
+            <ControlButton
               label="Undo"
               icon={Undo2}
               accent="#FFD700"
