@@ -42,11 +42,18 @@ export async function getNeonSession() {
 }
 
 export async function getNeonAuthToken() {
-  // Neon Auth injects the JWT into the normal session response.
-  // Do not call the Better Auth JWT plugin endpoint directly here:
-  // that extra route is unnecessary for TNG and can return HTTP 404.
-  const session = await getNeonSession();
+  // Neon Functions expect a short-lived bearer JWT. Ask Neon Auth for a
+  // current token instead of reusing the JWT cached inside getSession().
+  // The SDK handles token refresh/expiration for token().
+  if (typeof authClient.token === 'function') {
+    const tokenResult = await authClient.token();
+    const freshToken = unwrapToken(tokenResult);
+    if (freshToken) return freshToken;
+  }
 
+  // Compatibility fallback for older SDK shapes. This should normally never
+  // be used now that @neondatabase/auth exposes token().
+  const session = await getNeonSession();
   return (
     session?.token ||
     session?.jwt ||
