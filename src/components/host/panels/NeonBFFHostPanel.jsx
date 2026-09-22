@@ -19,7 +19,7 @@ import {
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
-import { playBffSound, preloadBffSounds } from '@/lib/bffSound';
+import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -382,6 +382,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
   useEffect(() => {
     preloadBffSounds();
+    armBffSoundUnlock();
   }, []);
 
   useEffect(() => {
@@ -541,7 +542,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy}
+              disabled={busy || gameState.phase === 'playing'}
             />
             <ControlButton
               label="Next Q"
