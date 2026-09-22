@@ -472,13 +472,7 @@ function IntroArt({ type }) {
 export function SquareBizIntro({
   gameState = {},
   now = Date.now(),
-  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
-  playAudio = false,
 }) {
-  const audioRef = useRef(null);
-  const audioOwnerRef = useRef(`sb-audio-${Math.random().toString(36).slice(2)}-${Date.now()}`);
-  const [audioBlocked, setAudioBlocked] = useState(false);
-  const [audioSuppressed, setAudioSuppressed] = useState(false);
   const start = Number(gameState.introStartedAt || now);
   const end = Number(gameState.introEndsAt || start + 30_800);
   const duration = Math.max(1, end - start);
@@ -487,100 +481,8 @@ export function SquareBizIntro({
   const index = ratio < .34 ? 0 : ratio < .67 ? 1 : 2;
   const slide = INTRO_SLIDES[index];
 
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !playAudio) return undefined;
-
-    let cancelled = false;
-    const owner = audioOwnerRef.current;
-    const lockKey = 'tng_square_biz_intro_audio_lock';
-    const targetTime = Math.max(0, elapsed / 1000);
-    const lockExpiry = Math.max(Date.now() + 5_000, end + 3_000);
-
-    const claimAudio = () => {
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        const sameIntro = Number(current?.start || 0) === start;
-        const lockAlive = Number(current?.expiresAt || 0) > Date.now();
-
-        if (current?.owner && current.owner !== owner && sameIntro && lockAlive) {
-          setAudioSuppressed(true);
-          return false;
-        }
-
-        localStorage.setItem(lockKey, JSON.stringify({
-          owner,
-          start,
-          expiresAt: lockExpiry,
-        }));
-        setAudioSuppressed(false);
-        return true;
-      } catch {
-        // If storage is unavailable, favor audio instead of silently muting the intro.
-        setAudioSuppressed(false);
-        return true;
-      }
-    };
-
-    const releaseAudio = () => {
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        if (current?.owner === owner) {
-          localStorage.removeItem(lockKey);
-        }
-      } catch {}
-    };
-
-    const begin = async () => {
-      if (cancelled || !claimAudio()) return;
-
-      try {
-        if (Math.abs(audio.currentTime - targetTime) > 1.25) {
-          audio.currentTime = targetTime;
-        }
-        await audio.play();
-        if (!cancelled) setAudioBlocked(false);
-      } catch {
-        if (!cancelled) setAudioBlocked(true);
-      }
-    };
-
-    if (audio.readyState >= 3) {
-      begin();
-    } else {
-      audio.addEventListener('canplaythrough', begin, { once: true });
-      audio.load();
-    }
-
-    const handleStorage = (event) => {
-      if (event.key !== lockKey || cancelled) return;
-      try {
-        const current = event.newValue ? JSON.parse(event.newValue) : null;
-        if (current?.owner && current.owner !== owner && Number(current.start || 0) === start) {
-          audio.pause();
-          setAudioSuppressed(true);
-        }
-      } catch {}
-    };
-
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      cancelled = true;
-      audio.removeEventListener('canplaythrough', begin);
-      window.removeEventListener('storage', handleStorage);
-      audio.pause();
-      releaseAudio();
-    };
-  // Re-run only when a new intro starts or this screen becomes audio-capable.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, end, playAudio]);
-
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
-      <audio ref={audioRef} src={audioSrc} preload="auto" playsInline />
       <div className="absolute inset-0 opacity-45" style={{
         background:
           'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
@@ -605,29 +507,6 @@ export function SquareBizIntro({
       <div className="absolute bottom-5 left-1/2 h-1.5 w-[min(560px,74vw)] -translate-x-1/2 overflow-hidden rounded-full bg-white/10">
         <div className="h-full rounded-full bg-gradient-to-r from-[#9f45ff] via-[#ff1593] to-[#ff781f]" style={{ width: `${Math.max(2, ratio * 100)}%` }} />
       </div>
-
-      {playAudio && !audioSuppressed && audioBlocked && (
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const lockKey = 'tng_square_biz_intro_audio_lock';
-              localStorage.setItem(lockKey, JSON.stringify({
-                owner: audioOwnerRef.current,
-                start,
-                expiresAt: Math.max(Date.now() + 5_000, end + 3_000),
-              }));
-              setAudioSuppressed(false);
-              await audioRef.current?.play();
-              setAudioBlocked(false);
-            } catch {}
-          }}
-          className="absolute bottom-10 right-4 z-20 rounded-full border border-[#ffd633]/50 bg-[#ffd633]/10 px-4 py-2 text-[8px] uppercase tracking-widest text-[#ffd633]"
-          style={MONO}
-        >
-          TAP FOR JINGLE
-        </button>
-      )}
     </div>
   );
 }
