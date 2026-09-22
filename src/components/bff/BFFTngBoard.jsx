@@ -1,8 +1,17 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-function TeamScore({ side, name, score, active, accent, players = [] }) {
+function TeamScore({
+  side,
+  name,
+  score,
+  active,
+  accent,
+  players = [],
+  selectedFaceoffId,
+  activePlayerId,
+}) {
   const members = players.slice(0, 6);
   const leftMembers = members.slice(0, 3);
   const rightMembers = members.slice(3, 6);
@@ -16,13 +25,35 @@ function TeamScore({ side, name, score, active, accent, players = [] }) {
             key={player?.playerId || `${side}-empty-${align}-${index}`}
             className="min-h-[22px] w-full max-w-[92px] rounded-md border px-1.5 py-1"
             style={{
-              borderColor: player ? `${accent}35` : 'rgba(255,255,255,.05)',
-              background: player ? `${accent}08` : 'rgba(255,255,255,.015)',
-              color: player ? 'rgba(255,255,255,.72)' : 'rgba(255,255,255,.08)',
+              borderColor: player
+                ? String(activePlayerId || '') === String(player.playerId)
+                  ? '#FFD700'
+                  : String(selectedFaceoffId || '') === String(player.playerId)
+                    ? '#22D3EE'
+                    : `${accent}35`
+                : 'rgba(255,255,255,.05)',
+              background: player
+                ? String(activePlayerId || '') === String(player.playerId)
+                  ? 'rgba(255,215,0,.14)'
+                  : String(selectedFaceoffId || '') === String(player.playerId)
+                    ? 'rgba(34,211,238,.10)'
+                    : `${accent}08`
+                : 'rgba(255,255,255,.015)',
+              color: player
+                ? String(activePlayerId || '') === String(player.playerId)
+                  ? '#FFD700'
+                  : String(selectedFaceoffId || '') === String(player.playerId)
+                    ? '#8DEEFF'
+                    : 'rgba(255,255,255,.72)'
+                : 'rgba(255,255,255,.08)',
+              boxShadow: player && String(activePlayerId || '') === String(player.playerId)
+                ? '0 0 10px rgba(255,215,0,.24)'
+                : 'none',
             }}
           >
             <div className="truncate text-[7px] font-semibold sm:text-[8px]">
               {player ? (player.playerName || player.name || 'Player') : '—'}
+              {player && String(selectedFaceoffId || '') === String(player.playerId) ? ' ★' : ''}
             </div>
           </div>
         );
@@ -207,7 +238,66 @@ function StrikeMeter({ count = 0 }) {
   );
 }
 
-export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
+function BuzzerPanel({
+  buzzerOpen,
+  canBuzz,
+  busy,
+  onBuzz,
+  buzzWinner,
+  activePlayerName,
+  answerSeconds,
+  isActivePlayer,
+}) {
+  const label = buzzerOpen
+    ? canBuzz
+      ? 'BUZZ!'
+      : 'FACE-OFF ONLY'
+    : activePlayerName
+      ? isActivePlayer
+        ? `ANSWER · ${answerSeconds ?? 0}s`
+        : `${activePlayerName} · ${answerSeconds ?? 0}s`
+      : buzzWinner?.playerName
+        ? `${buzzWinner.playerName} BUZZED`
+        : 'STANDBY';
+
+  const live = buzzerOpen && canBuzz;
+
+  return (
+    <button
+      type="button"
+      disabled={!live || busy}
+      onClick={onBuzz}
+      className="col-span-2 rounded-2xl border-2 px-3 py-4 text-center transition-transform active:scale-[.98] disabled:cursor-default lg:col-span-1"
+      style={{
+        borderColor: live ? '#FF174D' : 'rgba(255,255,255,.12)',
+        background: live ? 'rgba(255,23,77,.12)' : 'rgba(255,255,255,.025)',
+        boxShadow: live ? '0 0 26px rgba(255,23,77,.24), inset 0 0 18px rgba(255,23,77,.08)' : 'none',
+      }}
+    >
+      <div
+        className="text-[6px] uppercase tracking-[.18em]"
+        style={{ ...PS2, color: live ? '#FF174D' : 'rgba(255,255,255,.28)' }}
+      >
+        BUZZER
+      </div>
+      <div
+        className="mt-2 font-heading text-xl uppercase"
+        style={{ color: live ? '#FF174D' : isActivePlayer ? '#FFD700' : 'rgba(255,255,255,.28)' }}
+      >
+        {label}
+      </div>
+    </button>
+  );
+}
+
+export default function BFFTngBoard({
+  gs = {},
+  isVsAI = false,
+  onBuzz,
+  canBuzz = false,
+  buzzerBusy = false,
+  myPlayerId = null,
+}) {
   const answers = gs.answers || [];
   const family1 = gs.family1 || (isVsAI ? 'Your Family' : 'Family 1');
   const family2 = gs.family2 || (isVsAI ? 'TexasNomad Team' : 'Family 2');
@@ -217,6 +307,27 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
   const players = Array.isArray(gs.players) ? gs.players : [];
   const teamOnePlayers = players.filter((player) => Number(player.familyTeam) === 1).slice(0, 6);
   const teamTwoPlayers = players.filter((player) => Number(player.familyTeam) === 2).slice(0, 6);
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const faceoffPlayers = gs.faceoff_players || {};
+  const faceoffOne = faceoffPlayers['1'] || faceoffPlayers[1] || null;
+  const faceoffTwo = faceoffPlayers['2'] || faceoffPlayers[2] || null;
+  const activePlayer = players.find(
+    (player) => String(player.playerId) === String(gs.active_player_id || ''),
+  ) || null;
+  const answerSeconds = gs.answer_deadline_at
+    ? Math.max(0, Math.ceil((Number(gs.answer_deadline_at) - clockNow) / 1000))
+    : null;
+  const isActivePlayer = String(myPlayerId || '') === String(gs.active_player_id || '');
+  const showFaceoffX = Boolean(
+    gs.faceoff_x_event?.at
+    && clockNow - Number(gs.faceoff_x_event.at) >= 0
+    && clockNow - Number(gs.faceoff_x_event.at) < 1800
+  );
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, []);
 
   return (
     <section className="relative overflow-hidden rounded-[30px] border border-white/10 bg-[#080516]/95 p-3 sm:p-4">
@@ -244,6 +355,17 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
       <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-[#BC13FE]/25 blur-3xl" />
       <div className="pointer-events-none absolute bottom-[-90px] left-1/2 h-56 w-80 -translate-x-1/2 rounded-full bg-[#22D3EE]/10 blur-3xl" />
 
+      {showFaceoffX && (
+        <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-black/45">
+          <div
+            className="font-heading text-[10rem] leading-none text-red-500 sm:text-[14rem]"
+            style={{ textShadow: '0 0 30px rgba(239,68,68,.85)' }}
+          >
+            X
+          </div>
+        </div>
+      )}
+
       <div className="relative z-10 space-y-3">
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(180px,.8fr)_minmax(300px,1.45fr)_minmax(180px,.8fr)]">
           <TeamScore
@@ -253,6 +375,8 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
             active={activeTurn === 1}
             accent="#FF9A3D"
             players={teamOnePlayers}
+            selectedFaceoffId={faceoffOne}
+            activePlayerId={gs.active_player_id}
           />
           <Marquee />
           <TeamScore
@@ -262,6 +386,8 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
             active={activeTurn === 2}
             accent="#BC8CFF"
             players={teamTwoPlayers}
+            selectedFaceoffId={faceoffTwo}
+            activePlayerId={gs.active_player_id}
           />
         </div>
 
@@ -309,6 +435,17 @@ export default function BFFTngBoard({ gs = {}, isVsAI = false }) {
                 {gs.round_bank || 0}
               </div>
             </div>
+
+            <BuzzerPanel
+              buzzerOpen={Boolean(gs.buzzer_open)}
+              canBuzz={canBuzz}
+              busy={buzzerBusy}
+              onBuzz={onBuzz}
+              buzzWinner={gs.buzz_winner}
+              activePlayerName={activePlayer?.playerName || activePlayer?.name || null}
+              answerSeconds={answerSeconds}
+              isActivePlayer={isActivePlayer}
+            />
 
             <StrikeMeter count={byeCount} />
 
