@@ -295,7 +295,6 @@ function sanitizeBffHostState(gameState = {}, players = []) {
   const answerCount = Math.max(
     answers.length,
     Number(gameState.answer_count || gameState.answerCount || 0),
-    4,
   );
 
   const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
@@ -631,7 +630,6 @@ function sanitizeBffPlayerState(gameState = {}, players = []) {
   const answerCount = Math.max(
     answers.length,
     Number(gameState.answer_count || gameState.answerCount || 0),
-    4,
   );
 
   const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
