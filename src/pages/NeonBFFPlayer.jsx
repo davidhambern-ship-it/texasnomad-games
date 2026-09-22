@@ -66,6 +66,14 @@ function DysfunctionPlayerPanel({
     .filter(([, side]) => side === opponentSide)
     .map(([playerId]) => playerById[playerId])
     .filter(Boolean);
+  const sideAPlayers = Object.entries(assignments)
+    .filter(([, side]) => side === 'A')
+    .map(([playerId]) => playerById[playerId])
+    .filter(Boolean);
+  const sideBPlayers = Object.entries(assignments)
+    .filter(([, side]) => side === 'B')
+    .map(([playerId]) => playerById[playerId])
+    .filter(Boolean);
   const stage = gameState.round_stage || '';
   const [now, setNow] = useState(() => Date.now());
 
@@ -103,10 +111,16 @@ function DysfunctionPlayerPanel({
           <div className="rounded-xl border border-[#BC13FE]/35 bg-[#BC13FE]/5 p-3 text-center">
             <div className="text-[6px] text-[#BC13FE]" style={PS2}>SIDE A</div>
             <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreA) || 0}</div>
+            <div className="mt-2 text-[9px] text-white/40">
+              {sideAPlayers.map((player) => player.playerName || player.name).join(' · ') || '—'}
+            </div>
           </div>
           <div className="rounded-xl border border-[#FF5F1F]/35 bg-[#FF5F1F]/5 p-3 text-center">
             <div className="text-[6px] text-[#FF5F1F]" style={PS2}>SIDE B</div>
             <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreB) || 0}</div>
+            <div className="mt-2 text-[9px] text-white/40">
+              {sideBPlayers.map((player) => player.playerName || player.name).join(' · ') || '—'}
+            </div>
           </div>
         </div>
 
@@ -184,11 +198,23 @@ function DysfunctionPlayerPanel({
             </div>
 
             <div className="mt-2 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-lg border border-[#BC13FE]/20 p-2 text-[9px] text-[#BC13FE]">
-                SIDE A +{Number(dysfunction.last_pointsA) || 0}
+              <div className={`rounded-lg border p-2 text-[9px] ${
+                Number(dysfunction.last_pointsA) === 3
+                  ? 'border-[#FFD700]/55 bg-[#FFD700]/10 text-[#FFD700]'
+                  : 'border-[#BC13FE]/20 text-[#BC13FE]'
+              }`}>
+                {Number(dysfunction.last_pointsA) === 3
+                  ? 'DYSFUNCTION! +3'
+                  : `SIDE A +${Number(dysfunction.last_pointsA) || 0}`}
               </div>
-              <div className="rounded-lg border border-[#FF5F1F]/20 p-2 text-[9px] text-[#FF5F1F]">
-                SIDE B +{Number(dysfunction.last_pointsB) || 0}
+              <div className={`rounded-lg border p-2 text-[9px] ${
+                Number(dysfunction.last_pointsB) === 3
+                  ? 'border-[#FFD700]/55 bg-[#FFD700]/10 text-[#FFD700]'
+                  : 'border-[#FF5F1F]/20 text-[#FF5F1F]'
+              }`}>
+                {Number(dysfunction.last_pointsB) === 3
+                  ? 'DYSFUNCTION! +3'
+                  : `SIDE B +${Number(dysfunction.last_pointsB) || 0}`}
               </div>
             </div>
           </div>
