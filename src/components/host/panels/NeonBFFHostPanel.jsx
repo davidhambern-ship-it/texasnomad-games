@@ -35,7 +35,19 @@ const ANSWER_COLORS = [
   '#FB7185',
 ];
 
-function TeamCard({ team, name, score, players, active, accent, onRename }) {
+function TeamCard({
+  team,
+  name,
+  score,
+  players,
+  active,
+  accent,
+  onRename,
+  selectedFaceoffId,
+  activePlayerId,
+  onSelectFaceoff,
+  canSelectFaceoff,
+}) {
   return (
     <section
       className="relative min-w-0 overflow-hidden rounded-2xl border bg-black/60 p-3"
@@ -96,19 +108,38 @@ function TeamCard({ team, name, score, players, active, accent, onRename }) {
       </div>
 
       <div className="mt-2 flex min-h-[38px] flex-wrap content-start gap-1">
-        {players.length ? players.map((player) => (
-          <span
-            key={player.playerId}
-            className="max-w-full truncate rounded-md border px-1.5 py-1 text-[8px]"
-            style={{
-              borderColor: `${accent}35`,
-              background: `${accent}08`,
-              color: 'rgba(255,255,255,.70)',
-            }}
-          >
-            {player.playerName || player.name || 'Player'}
-          </span>
-        )) : (
+        {players.length ? players.map((player) => {
+          const selected = String(selectedFaceoffId || '') === String(player.playerId);
+          const isActive = String(activePlayerId || '') === String(player.playerId);
+
+          return (
+            <button
+              type="button"
+              key={player.playerId}
+              disabled={!canSelectFaceoff}
+              onClick={() => onSelectFaceoff?.(player.playerId)}
+              className="max-w-full truncate rounded-md border px-1.5 py-1 text-[8px] transition-transform active:scale-95 disabled:cursor-default"
+              style={{
+                borderColor: isActive ? '#FFD700' : selected ? '#22D3EE' : `${accent}35`,
+                background: isActive
+                  ? 'rgba(255,215,0,.14)'
+                  : selected
+                    ? 'rgba(34,211,238,.12)'
+                    : `${accent}08`,
+                color: isActive ? '#FFD700' : selected ? '#8DEEFF' : 'rgba(255,255,255,.70)',
+                boxShadow: isActive
+                  ? '0 0 12px rgba(255,215,0,.30)'
+                  : selected
+                    ? '0 0 10px rgba(34,211,238,.22)'
+                    : 'none',
+              }}
+              title={canSelectFaceoff ? 'Choose for faceoff' : undefined}
+            >
+              {player.playerName || player.name || 'Player'}
+              {selected ? ' ★' : ''}
+            </button>
+          );
+        }) : (
           <span className="text-[8px] italic text-white/18">No players assigned</span>
         )}
       </div>
@@ -374,6 +405,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const handledVoiceOffersRef = useRef(new Map());
   const voiceAudioRef = useRef(null);
   const [voiceConnected, setVoiceConnected] = useState({});
+  const [clockNow, setClockNow] = useState(() => Date.now());
+  const handledDeadlineRef = useRef(null);
 
   const gameState = room?.gameState || {};
   const players = Array.isArray(gameState.players)
@@ -395,6 +428,18 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const answers = Array.isArray(gameState.answers) ? gameState.answers : [];
   const byeCount = Math.max(0, Math.min(3, Number(gameState.bye_count) || 0));
   const controlTeam = Number(gameState.control_team || gameState.active_turn || 1) === 2 ? 2 : 1;
+  const roundStage = gameState.round_stage || 'setup';
+  const faceoffPlayers = gameState.faceoff_players || {};
+  const faceoffOne = faceoffPlayers['1'] || faceoffPlayers[1] || null;
+  const faceoffTwo = faceoffPlayers['2'] || faceoffPlayers[2] || null;
+  const faceoffReady = Boolean(faceoffOne && faceoffTwo && gameState.current_question);
+  const activePlayer = players.find(
+    (player) => String(player.playerId) === String(gameState.active_player_id || ''),
+  ) || null;
+  const answerSeconds = gameState.answer_deadline_at
+    ? Math.max(0, Math.ceil((Number(gameState.answer_deadline_at) - clockNow) / 1000))
+    : null;
+  const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
 
   const refresh = useCallback(async () => {
     if (!controllerId) return;
@@ -412,6 +457,11 @@ export default function NeonBFFHostPanel({ controllerId }) {
     const interval = window.setInterval(refresh, 800);
     return () => window.clearInterval(interval);
   }, [refresh]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClockNow(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     preloadBffSounds();
@@ -522,7 +572,24 @@ export default function NeonBFFHostPanel({ controllerId }) {
     }
   }, [busy, controllerId]);
 
+  useEffect(() => {
+    const deadline = Number(gameState.answer_deadline_at || 0);
+    if (
+      roundStage !== 'faceoff_answer'
+      || !deadline
+      || clockNow < deadline
+      || handledDeadlineRef.current === deadline
+    ) {
+      return;
+    }
+
+    handledDeadlineRef.current = deadline;
+    act('faceoff_timeout');
+  }, [act, clockNow, gameState.answer_deadline_at, roundStage]);
+
   const assignPlayer = (playerId, team) => act('assign_player', { playerId, team });
+  const selectFaceoffPlayer = (team, playerId) =>
+    act('set_faceoff_player', { team, playerId });
 
   const renameFamily = async (team) => {
     const current = team === 1
@@ -570,6 +637,10 @@ export default function NeonBFFHostPanel({ controllerId }) {
           active={controlTeam === 1}
           accent="#BC13FE"
           onRename={() => renameFamily(1)}
+          selectedFaceoffId={faceoffOne}
+          activePlayerId={gameState.active_player_id}
+          canSelectFaceoff={selectingFaceoff}
+          onSelectFaceoff={(playerId) => selectFaceoffPlayer(1, playerId)}
         />
 
         <BFFCenterCard
@@ -587,8 +658,55 @@ export default function NeonBFFHostPanel({ controllerId }) {
           active={controlTeam === 2}
           accent="#FF5F1F"
           onRename={() => renameFamily(2)}
+          selectedFaceoffId={faceoffTwo}
+          activePlayerId={gameState.active_player_id}
+          canSelectFaceoff={selectingFaceoff}
+          onSelectFaceoff={(playerId) => selectFaceoffPlayer(2, playerId)}
         />
       </div>
+
+      <section className="rounded-xl border border-[#22D3EE]/25 bg-[#22D3EE]/[.035] px-3 py-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[6px] uppercase tracking-[.18em] text-[#22D3EE]" style={PS2}>
+              FACEOFF
+            </div>
+            <div className="mt-1 text-[10px] text-white/45">
+              {faceoffReady
+                ? 'Faceoff pair selected.'
+                : gameState.current_question
+                  ? 'Choose one player from each family card.'
+                  : 'Start the round, then choose the faceoff pair.'}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {activePlayer && roundStage === 'faceoff_answer' && (
+              <div className="rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/10 px-3 py-2 text-center">
+                <div className="text-[5px] text-[#FFD700]/65" style={PS2}>ANSWERING</div>
+                <div className="mt-1 text-sm font-black text-[#FFD700]">
+                  {activePlayer.playerName || activePlayer.name}
+                </div>
+                <div className="mt-1 font-heading text-2xl text-white">
+                  {answerSeconds ?? 0}s
+                </div>
+              </div>
+            )}
+
+            {roundStage === 'faceoff_answer' && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => act('faceoff_wrong')}
+                className="flex h-[66px] w-[66px] items-center justify-center rounded-xl border-2 border-red-500 bg-red-500/10 font-heading text-5xl text-red-500 shadow-[0_0_18px_rgba(239,68,68,.25)] disabled:opacity-30"
+                title="Wrong faceoff answer"
+              >
+                X
+              </button>
+            )}
+          </div>
+        </div>
+      </section>
 
       <section
         className="rounded-xl border border-[#22D3EE]/30 bg-black/60 px-3 py-3 text-center"
@@ -648,12 +766,23 @@ export default function NeonBFFHostPanel({ controllerId }) {
             </div>
           </div>
 
-          <ByeMeter
-            count={byeCount}
-            busy={busy}
-            onStrike={() => act('add_bye')}
-            onUndo={() => act('undo_bye')}
-          />
+          {roundStage === 'family_play' || roundStage === 'steal' ? (
+            <ByeMeter
+              count={byeCount}
+              busy={busy}
+              onStrike={() => act('add_bye')}
+              onUndo={() => act('undo_bye')}
+            />
+          ) : (
+            <div className="rounded-xl border border-white/10 bg-white/[.02] px-3 py-3 text-center">
+              <div className="text-[5px] uppercase tracking-[.16em] text-white/25" style={PS2}>
+                B Y E STRIKES
+              </div>
+              <div className="mt-2 text-[9px] text-white/25">
+                Available after the faceoff.
+              </div>
+            </div>
+          )}
 
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             <ControlButton
@@ -661,7 +790,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy || gameState.phase === 'playing'}
+              disabled={busy || gameState.phase === 'playing' || !gameState.family_names_set}
             />
             <ControlButton
               label="Reset Round"
@@ -731,7 +860,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               accent="#22D3EE"
               active={Boolean(gameState.buzzer_open)}
               onClick={() => act('open_buzzers')}
-              disabled={busy || Boolean(gameState.buzzer_open)}
+              disabled={busy || Boolean(gameState.buzzer_open) || !faceoffReady || roundStage === 'faceoff_answer'}
             />
             <ControlButton
               label="Team 2 Ctrl"
@@ -743,7 +872,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
             />
 
             <ControlButton
-              label="Hide Buzz"
+              label="Deactivate Buzz"
               icon={EyeOff}
               accent="#64748B"
               onClick={() => act('hide_buzzers')}
@@ -765,20 +894,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
               disabled={busy}
             />
 
-            <ControlButton
-              label="Applause"
-              icon={Volume2}
-              accent="#FFD700"
-              onClick={() => act('sound', { name: 'applause' })}
-              disabled={busy}
-            />
-            <ControlButton
-              label="Awwww"
-              icon={Frown}
-              accent="#F472B6"
-              onClick={() => act('sound', { name: 'awww' })}
-              disabled={busy}
-            />
           </div>
 
           <div className="mt-2 flex items-center gap-2 rounded-lg border border-[#FFD700]/20 bg-[#FFD700]/[.03] p-2">
