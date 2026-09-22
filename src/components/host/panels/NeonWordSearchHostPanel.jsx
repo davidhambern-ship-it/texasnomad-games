@@ -1,9 +1,14 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Minus, Plus, RotateCcw, Pause, Play, Lightbulb } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
+import {
+  HostWorkspace,
+  HostControlDeck,
+  HostControlCard,
+} from '@/components/host/GameControllerLayout';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -38,17 +43,58 @@ function formatTime(ms) {
 function Select({ label, value, onChange, options }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-[6px] text-white/25 uppercase tracking-widest" style={PS2}>{label}</span>
+      <span className="mb-1 block text-[6px] uppercase tracking-widest text-white/25" style={PS2}>
+        {label}
+      </span>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-[#00c875]/30 bg-[#07040d] px-3 py-2 text-xs text-white outline-none"
+        className="w-full rounded-lg border border-[#00c875]/30 bg-[#07040d] px-3 py-2.5 text-xs text-white outline-none"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
     </label>
+  );
+}
+
+function ZoomControls({ zoom, setZoom }) {
+  const percent = Math.round(zoom * 100);
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => setZoom((value) => Math.max(0.7, Number((value - 0.15).toFixed(2))))}
+        className="rounded-lg border border-white/15 bg-black/45 p-2 text-white/60"
+        aria-label="Zoom out"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      <div
+        className="min-w-[72px] rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/5 px-2 py-2 text-center text-[6px] text-[#BC13FE]"
+        style={PS2}
+      >
+        {percent}%
+      </div>
+      <button
+        type="button"
+        onClick={() => setZoom((value) => Math.min(1.85, Number((value + 0.15).toFixed(2))))}
+        className="rounded-lg border border-white/15 bg-black/45 p-2 text-white/60"
+        aria-label="Zoom in"
+      >
+        <Plus className="h-4 w-4" />
+      </button>
+      <button
+        type="button"
+        onClick={() => setZoom(1)}
+        className="rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/5 px-2.5 py-2 text-[6px] text-[#FFD700]"
+        style={PS2}
+      >
+        RESET
+      </button>
+    </div>
   );
 }
 
@@ -60,6 +106,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
   const [difficulty, setDifficulty] = useState('simpleton');
   const [category, setCategory] = useState('random');
   const [clock, setClock] = useState(Date.now());
+  const [zoom, setZoom] = useState(1);
 
   const gameState = room?.gameState || {};
   const phase = gameState.phase || 'setup';
@@ -141,36 +188,40 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
   if (!room && !error) {
     return (
       <div className="py-16 text-center">
-        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-[#00c875]" />
+        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#00c875]" />
         <span className="text-sm text-white/40">Loading Word Search controls…</span>
       </div>
     );
   }
 
   return (
-    <div className="max-w-[1500px] mx-auto space-y-2">
+    <div className="mx-auto max-w-[1600px] space-y-3">
       {error && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400 text-center">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
           {error}
         </div>
       )}
 
-      <div className="rounded-xl border border-[#00c875]/25 bg-black/55 px-3 py-2.5 flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-2 rounded-xl border border-[#00c875]/25 bg-black/55 px-3 py-2.5 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <div className="text-[7px] tracking-widest text-[#00c875] uppercase" style={PS2}>WORD SEARCH HOST · SEAT 1</div>
+          <div className="text-[7px] uppercase tracking-widest text-[#00c875]" style={PS2}>
+            WORD SEARCH CONTROLLER
+          </div>
           <div className="mt-1 text-xs text-white/35">
-            Purple is your permanent board color. Every valid word you claim stays Purple.
+            Board + word list stay together. Game controls live in the controller deck below.
           </div>
         </div>
 
-        <div className="rounded-lg border px-3 py-2 text-[7px] uppercase tracking-widest"
-          style={{ ...PS2, borderColor: myColor, color: myColor }}>
+        <div
+          className="w-fit rounded-lg border px-3 py-2 text-[7px] uppercase tracking-widest"
+          style={{ ...PS2, borderColor: myColor, color: myColor }}
+        >
           {status}
         </div>
       </div>
 
       {phase === 'setup' && (
-        <div className="grid gap-2 lg:grid-cols-[1fr_1fr_1fr_auto] rounded-xl border border-[#00c875]/25 bg-black/55 p-3">
+        <section className="grid gap-2 rounded-xl border border-[#00c875]/25 bg-black/55 p-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
           <Select label="MODE" value={mode} onChange={setMode} options={MODES} />
           <Select label="DIFFICULTY" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES} />
           <Select label="CATEGORY" value={category} onChange={setCategory} options={CATEGORIES} />
@@ -178,65 +229,127 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
             type="button"
             disabled={busy || players.length < 1}
             onClick={() => act('start_game', { mode, difficulty, category })}
-            className="self-end rounded-lg border-2 border-[#00c875] bg-[#00c875]/10 px-5 py-2.5 text-[#00c875] disabled:opacity-40"
+            className="self-end rounded-lg border-2 border-[#00c875] bg-[#00c875]/10 px-5 py-3 text-[#00c875] disabled:opacity-40"
             style={{ ...PS2, fontSize: 7 }}
           >
             {busy ? 'STARTING…' : 'START GAME'}
           </button>
-        </div>
+        </section>
       )}
 
       {phase !== 'setup' && (
-        <div className="grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
+        <>
+          <HostWorkspace
+            primary={
+              <section className="relative overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/45">
+                <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+                  <div>
+                    <div className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
+                      GAME BOARD
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/30">
+                      Zoom on phones/tablets, then pan the board inside this frame.
+                    </div>
+                  </div>
+                  <ZoomControls zoom={zoom} setZoom={setZoom} />
+                </div>
 
-          <section className="relative rounded-xl border border-[#BC13FE]/20 bg-black/45 p-2 flex items-center justify-center overflow-auto">
-            <WordSearchTurnEffects
-              mode={currentMode}
-              phase={phase}
-              paused={paused}
-              activeSeat={activeSeat}
-              players={players}
-              viewerSeat={1}
-              timeRemaining={timeRemaining}
-              roundNumber={gameState.roundNumber || 1}
-            />
+                <div className="relative max-h-[78vh] min-h-[360px] overflow-auto p-2 sm:p-3">
+                  <WordSearchTurnEffects
+                    mode={currentMode}
+                    phase={phase}
+                    paused={paused}
+                    activeSeat={activeSeat}
+                    players={players}
+                    viewerSeat={1}
+                    timeRemaining={timeRemaining}
+                    roundNumber={gameState.roundNumber || 1}
+                  />
 
-            <NeonWordSearchBoard
-              grid={grid}
-              words={words}
-              players={players}
-              mySeat={1}
-              myColor={myColor}
-              canInteract={canInteract && !busy}
-              onSubmit={submitSelection}
-              maxBoardPx={720}
-            />
-          </section>
+                  <div className="flex min-w-max items-start justify-center">
+                    <NeonWordSearchBoard
+                      grid={grid}
+                      words={words}
+                      players={players}
+                      mySeat={1}
+                      myColor={myColor}
+                      canInteract={canInteract && !busy}
+                      onSubmit={submitSelection}
+                      maxBoardPx={760}
+                      zoom={zoom}
+                    />
+                  </div>
+                </div>
+              </section>
+            }
+            companion={
+              <section className="overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/55">
+                <div className="flex items-center justify-between border-b border-white/10 px-3 py-3">
+                  <div>
+                    <div className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
+                      WORD LIST
+                    </div>
+                    <div className="mt-1 text-[10px] text-white/30">
+                      Always visible beside the board on wide screens.
+                    </div>
+                  </div>
+                  <span className="text-[7px] text-[#FFD700]" style={PS2}>
+                    {foundCount}/{words.length}
+                  </span>
+                </div>
 
-          <aside className="flex min-h-0 flex-col gap-2">
+                <div className="grid max-h-[78vh] grid-cols-2 gap-1.5 overflow-y-auto p-2.5 sm:p-3">
+                  {words.map((word) => {
+                    const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
+                    const color = word.revealed ? '#777777' : finder?.color || '#BC13FE';
 
-            <section className="grid grid-cols-3 gap-1.5">
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
-                <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
-                <div className="mt-1 text-xl text-[#FFD700]" style={PS2}>
-                  {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
+                    return (
+                      <div
+                        key={word.word}
+                        className="rounded-lg border px-2 py-2 text-center"
+                        style={{
+                          borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)',
+                          background: word.found ? `${color}10` : 'rgba(255,255,255,.02)',
+                          color: word.found ? color : 'rgba(255,255,255,.48)',
+                          textDecoration: word.found ? 'line-through' : 'none',
+                        }}
+                      >
+                        <div className="text-[7px]" style={PS2}>{word.word}</div>
+                        {word.found && word.points != null && (
+                          <div className="mt-1 text-[5px] opacity-70" style={PS2}>
+                            {word.revealed ? 'REVEAL' : `+${word.points}`}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
+            }
+          />
+
+          <HostControlDeck>
+            <HostControlCard
+              title="MATCH STATUS"
+              accent="#FFD700"
+              value={phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
+            >
+              <div className="mt-2 grid grid-cols-2 gap-2 text-center">
+                <div className="rounded-lg border border-white/10 bg-white/[.02] p-2">
+                  <div className="text-[5px] text-white/25" style={PS2}>FOUND</div>
+                  <div className="mt-1 text-lg text-[#4ade80]" style={PS2}>{foundCount}/{words.length}</div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/[.02] p-2">
+                  <div className="text-[5px] text-white/25" style={PS2}>MODE</div>
+                  <div className="mt-1 text-[8px] text-[#00c875]" style={PS2}>
+                    {currentMode === 'race' ? 'RACE' : 'TURN'}
+                  </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
-                <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
-                <div className="mt-1 text-xl text-[#4ade80]" style={PS2}>{foundCount}/{words.length}</div>
-              </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
-                <div className="text-[5px] text-white/25 uppercase" style={PS2}>MODE</div>
-                <div className="mt-1 text-[8px] text-[#00c875]" style={PS2}>
-                  {currentMode === 'race' ? 'RACE' : 'TURN'}
-                </div>
-              </div>
-            </section>
+            </HostControlCard>
 
-            <section className="rounded-xl border border-white/10 bg-black/50 p-2.5">
-              <div className="mb-2 text-[6px] text-white/25 uppercase tracking-widest" style={PS2}>PLAYERS / COLORS / SCORES</div>
-              <div className="grid grid-cols-2 gap-1.5">
+            <HostControlCard title="PLAYER SCORES" accent="#BC13FE" className="sm:col-span-2 xl:col-span-2">
+              <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
                   const seat = Number(player.seatNumber);
                   const active = currentMode === 'race' ? phase === 'playing' : activeSeat === seat;
@@ -257,7 +370,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: player.color }} />
                             <span className="truncate text-[10px] text-white/70">{player.name}</span>
                           </div>
-                          <div className="mt-1 text-[5px] text-white/25 uppercase" style={PS2}>SEAT {seat}</div>
+                          <div className="mt-1 text-[5px] uppercase text-white/25" style={PS2}>SEAT {seat}</div>
                         </div>
                         <div className="text-lg" style={{ ...PS2, color: player.color }}>{player.score || 0}</div>
                       </div>
@@ -265,102 +378,72 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                   );
                 })}
               </div>
-            </section>
+            </HostControlCard>
 
-            <section className="rounded-xl border border-[#BC13FE]/20 bg-black/55 p-2.5">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-[6px] text-[#BC13FE] uppercase tracking-widest" style={PS2}>WORDS</span>
-                <span className="text-[6px] text-[#FFD700]" style={PS2}>{foundCount}/{words.length}</span>
-              </div>
-
-              <div className="grid max-h-[270px] grid-cols-2 gap-1.5 overflow-y-auto pr-1">
-                {words.map((word) => {
-                  const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
-                  const color = word.revealed ? '#777777' : finder?.color || '#BC13FE';
-
-                  return (
-                    <div
-                      key={word.word}
-                      className="rounded-md border px-2 py-1.5 text-center"
-                      style={{
-                        borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)',
-                        background: word.found ? `${color}10` : 'rgba(255,255,255,.02)',
-                        color: word.found ? color : 'rgba(255,255,255,.45)',
-                        textDecoration: word.found ? 'line-through' : 'none',
-                      }}
-                    >
-                      <div className="text-[7px]" style={PS2}>{word.word}</div>
-                      {word.found && word.points != null && (
-                        <div className="mt-1 text-[5px] opacity-70" style={PS2}>
-                          {word.revealed ? 'REVEAL' : `+${word.points}`}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="rounded-xl border border-white/10 bg-black/45 p-2.5">
-              <div className="grid grid-cols-3 gap-1.5">
+            <HostControlCard title="GAME CONTROLS" accent="#FF5F1F">
+              <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
                   disabled={busy || phase !== 'playing'}
                   onClick={() => act(paused ? 'resume' : 'pause')}
-                  className="rounded-lg border border-[#FF5F1F]/50 px-2 py-2 text-[10px] text-[#FF5F1F] disabled:opacity-30"
+                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FF5F1F]/50 bg-[#FF5F1F]/5 px-2 py-2 text-[9px] text-[#FF5F1F] disabled:opacity-30"
                 >
-                  {paused ? '▶ Resume' : '⏸ Pause'}
+                  {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+                  {paused ? 'Resume' : 'Pause'}
                 </button>
                 <button
                   type="button"
                   disabled={busy || phase !== 'playing' || foundCount >= words.length}
                   onClick={() => act('reveal_word')}
-                  className="rounded-lg border border-[#FFD700]/50 px-2 py-2 text-[10px] text-[#FFD700] disabled:opacity-30"
+                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2 py-2 text-[9px] text-[#FFD700] disabled:opacity-30"
                 >
-                  💡 Reveal
+                  <Lightbulb className="h-4 w-4" />
+                  Reveal
                 </button>
                 <button
                   type="button"
                   disabled={busy}
                   onClick={() => act('reset_match')}
-                  className="rounded-lg border border-red-500/50 px-2 py-2 text-[10px] text-red-400 disabled:opacity-30"
+                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-red-500/50 bg-red-500/5 px-2 py-2 text-[9px] text-red-400 disabled:opacity-30"
                 >
-                  ↺ Reset
+                  <RotateCcw className="h-4 w-4" />
+                  Reset
                 </button>
               </div>
+            </HostControlCard>
 
-              <div className="mt-2 text-[10px] leading-relaxed text-white/35">
-                Scoring: 10 pts per letter + placement bonus + difficulty bonus. Wrong selection −20. Turn timeout −10.
+            <HostControlCard title="TURN / SCORING" accent="#22D3EE">
+              <div className="mt-2 text-[10px] leading-relaxed text-white/40">
+                {currentMode === 'turn' && phase === 'playing'
+                  ? canInteract
+                    ? 'Seat 1 is live — drag across one word.'
+                    : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`
+                  : 'Race mode keeps every active player searching at the same time.'}
               </div>
+              <div className="mt-2 rounded-lg border border-white/10 bg-white/[.02] p-2 text-[9px] leading-relaxed text-white/30">
+                10 pts per letter + placement + difficulty bonus. Wrong selection −20. Turn timeout −10.
+              </div>
+            </HostControlCard>
+          </HostControlDeck>
+
+          {phase === 'finished' && (
+            <section className="rounded-xl border border-green-400/30 bg-green-400/5 p-3 text-center">
+              <div className="text-[7px] uppercase tracking-widest text-green-400" style={PS2}>GAME OVER</div>
+              <div className="mt-2 text-xs text-white/50">
+                {gameState.winnerSeat
+                  ? `Seat ${gameState.winnerSeat} wins with ${scores[String(gameState.winnerSeat)] || 0} points.`
+                  : gameState.message || 'Word Search complete.'}
+              </div>
+              <button
+                type="button"
+                onClick={() => act('reset_match')}
+                className="mt-3 rounded-lg border border-[#00c875]/50 px-4 py-2 text-[#00c875]"
+              >
+                NEW BOARD
+              </button>
             </section>
-
-            {currentMode === 'turn' && phase === 'playing' && (
-              <div className="text-center text-[10px] text-white/35">
-                {canInteract
-                  ? 'Seat 1 is live — drag across one word.'
-                  : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`}
-              </div>
-            )}
-
-            {phase === 'finished' && (
-              <section className="rounded-xl border border-green-400/30 bg-green-400/5 p-3 text-center">
-                <div className="text-[7px] text-green-400 uppercase tracking-widest" style={PS2}>GAME OVER</div>
-                <div className="mt-2 text-xs text-white/50">
-                  {gameState.winnerSeat
-                    ? `Seat ${gameState.winnerSeat} wins with ${scores[String(gameState.winnerSeat)] || 0} points.`
-                    : gameState.message || 'Word Search complete.'}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => act('reset_match')}
-                  className="mt-3 rounded-lg border border-[#00c875]/50 px-4 py-2 text-[#00c875]"
-                >
-                  NEW BOARD
-                </button>
-              </section>
-            )}
-          </aside>
-        </div>
+          )}
+        </>
       )}
     </div>
   );
