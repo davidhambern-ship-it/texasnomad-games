@@ -53,6 +53,9 @@ async function request(path, {
 }
 
 export const tngApi = {
+  public: {
+    liveRooms: () => request('/api/public/live-rooms', { authenticated:false }),
+  },
   profile: {
     get: () => request('/api/profile'),
     create: (data) => request('/api/profile', { method:'POST', body:data }),
