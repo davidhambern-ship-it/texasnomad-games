@@ -365,7 +365,13 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     sound_cue: gameState.sound_cue || null,
     voice_offers: gameState.voice_offers || {},
     voice_ready: gameState.voice_ready || {},
+    voice_verified: gameState.voice_verified || {},
     voice_status: gameState.voice_status || {},
+    voice_session_locked: Boolean(gameState.voice_session_locked),
+    voice_session_locked_at: Number(gameState.voice_session_locked_at) || null,
+    voice_session_players: Array.isArray(gameState.voice_session_players)
+      ? gameState.voice_session_players
+      : [],
     answers: safeAnswers,
     players,
   };
@@ -525,6 +531,17 @@ function bffMicsReady(players = [], gameState = {}) {
   const hasTeam1 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 1);
   const hasTeam2 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 2);
   if (!hasTeam1 || !hasTeam2) return false;
+
+  // Once the match voice roster has been verified and locked, gameplay no longer
+  // blocks on transient WebRTC state changes. Peers reconnect in the background.
+  if (gameState.voice_session_locked) {
+    const lockedIds = new Set(
+      Array.isArray(gameState.voice_session_players)
+        ? gameState.voice_session_players.map(String)
+        : [],
+    );
+    return assigned.every((player) => lockedIds.has(String(player.playerId)));
+  }
 
   const offers = gameState.voice_offers || {};
   const ready = gameState.voice_ready || {};
@@ -1025,6 +1042,13 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.phase = 'playing';
     next.is_tiebreak = false;
     next.family_names_set = true;
+
+    if (!next.voice_session_locked) {
+      next.voice_session_locked = true;
+      next.voice_session_locked_at = Date.now();
+      next.voice_session_players = bffAssignedPlayers(players, next)
+        .map((player) => String(player.playerId));
+    }
     next.round_stage = 'faceoff_setup';
     next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1));
     next.round_bank = 0;
@@ -1358,6 +1382,13 @@ async function applyBffHostAction(room, body = {}, players = []) {
       ...(next.voice_ready || {}),
       [playerId]: Boolean(body.ready),
     };
+
+    if (body.ready) {
+      next.voice_verified = {
+        ...(next.voice_verified || {}),
+        [playerId]: true,
+      };
+    }
 
     next.voice_status = {
       ...(next.voice_status || {}),
