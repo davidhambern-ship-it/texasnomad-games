@@ -7,6 +7,7 @@ import {
   integer,
   jsonb,
   pgEnum,
+  pgSchema,
   pgTable,
   primaryKey,
   text,
@@ -33,6 +34,23 @@ const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 };
+
+export const neonAuthSchema = pgSchema('neon_auth');
+
+export const neonAuthUsers = neonAuthSchema.table('user', {
+  id: uuid('id').primaryKey(),
+  email: text('email').notNull(),
+  emailVerified: boolean('emailVerified').notNull().default(false),
+});
+
+export const neonAuthSessions = neonAuthSchema.table('session', {
+  id: uuid('id').primaryKey(),
+  token: text('token').notNull(),
+  userId: uuid('userId').notNull(),
+  expiresAt: timestamp('expiresAt', { withTimezone: true }).notNull(),
+  createdAt: timestamp('createdAt', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updatedAt', { withTimezone: true }).notNull(),
+});
 
 export const accounts = pgTable('accounts', {
   id: uuid('id').primaryKey().defaultRandom(),
