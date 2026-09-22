@@ -297,6 +297,7 @@ export default function BFFTngBoard({
   canBuzz = false,
   buzzerBusy = false,
   myPlayerId = null,
+  showBuzzer = false,
 }) {
   const answers = gs.answers || [];
   const family1 = gs.family1 || (isVsAI ? 'Your Family' : 'Family 1');
@@ -436,16 +437,18 @@ export default function BFFTngBoard({
               </div>
             </div>
 
-            <BuzzerPanel
-              buzzerOpen={Boolean(gs.buzzer_open)}
-              canBuzz={canBuzz}
-              busy={buzzerBusy}
-              onBuzz={onBuzz}
-              buzzWinner={gs.buzz_winner}
-              activePlayerName={activePlayer?.playerName || activePlayer?.name || null}
-              answerSeconds={answerSeconds}
-              isActivePlayer={isActivePlayer}
-            />
+            {showBuzzer && (
+              <BuzzerPanel
+                buzzerOpen={Boolean(gs.buzzer_open)}
+                canBuzz={canBuzz}
+                busy={buzzerBusy}
+                onBuzz={onBuzz}
+                buzzWinner={gs.buzz_winner}
+                activePlayerName={activePlayer?.playerName || activePlayer?.name || null}
+                answerSeconds={answerSeconds}
+                isActivePlayer={isActivePlayer}
+              />
+            )}
 
             <StrikeMeter count={byeCount} />
 
