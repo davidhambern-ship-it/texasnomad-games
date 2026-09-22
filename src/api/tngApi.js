@@ -105,6 +105,13 @@ export const tngApi = {
       roomCode,
     }),
   },
+  social: {
+    get: () => request('/api/social'),
+    action: (action, payload = {}) => request('/api/social', {
+      method:'POST',
+      body:{ action, ...payload },
+    }),
+  },
   display: {
     pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
     getState: (displayId, displayToken) => request('/api/display/state', {
