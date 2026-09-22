@@ -26,67 +26,6 @@ function statusFor(gameState, myTeam, buzzWinner) {
   return String(phase).replace(/_/g, ' ').toUpperCase();
 }
 
-function FamilyBadge({ team, name, active }) {
-  const accent = team === 1 ? '#BC13FE' : '#FF5F1F';
-
-  return (
-    <div
-      className="rounded-lg border px-2.5 py-2 text-center"
-      style={{
-        borderColor: active ? accent : `${accent}40`,
-        background: active ? `${accent}12` : 'rgba(255,255,255,.02)',
-        boxShadow: active ? `0 0 14px ${accent}20` : 'none',
-      }}
-    >
-      <div className="text-[5px] uppercase tracking-widest text-white/25" style={PS2}>
-        YOUR FAMILY
-      </div>
-      <div className="mt-1 truncate text-sm font-black uppercase" style={{ color: accent }}>
-        {name}
-      </div>
-    </div>
-  );
-}
-
-function TeamPlayers({ players, team, familyName }) {
-  const accent = team === 1 ? '#BC13FE' : '#FF5F1F';
-  const familyPlayers = players.filter((player) => Number(player.familyTeam) === team);
-
-  return (
-    <section
-      className="rounded-xl border bg-black/50 p-2.5"
-      style={{ borderColor: `${accent}30` }}
-    >
-      <div className="mb-2 flex items-center justify-between">
-        <div className="truncate text-[7px] font-black uppercase" style={{ color: accent }}>
-          {familyName}
-        </div>
-        <div className="text-[5px] uppercase tracking-widest text-white/25" style={PS2}>
-          {familyPlayers.length} PLAYER{familyPlayers.length === 1 ? '' : 'S'}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-1.5">
-        {familyPlayers.length ? familyPlayers.map((player) => (
-          <span
-            key={player.playerId}
-            className="rounded-md border px-2 py-1 text-[9px]"
-            style={{
-              borderColor: `${accent}35`,
-              background: `${accent}08`,
-              color: 'rgba(255,255,255,.70)',
-            }}
-          >
-            {player.playerName || player.name || 'Player'}
-          </span>
-        )) : (
-          <span className="text-[9px] italic text-white/18">Waiting for family members…</span>
-        )}
-      </div>
-    </section>
-  );
-}
-
 export default function NeonBFFPlayer({ roomCode }) {
   const [room, setRoom] = useState(null);
   const [participant, setParticipant] = useState(null);
@@ -243,18 +182,6 @@ export default function NeonBFFPlayer({ roomCode }) {
           </div>
         )}
 
-        {myTeam ? (
-          <FamilyBadge
-            team={myTeam}
-            name={myFamilyName}
-            active={controlTeam === myTeam}
-          />
-        ) : (
-          <div className="rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/5 px-3 py-2 text-center text-[7px] uppercase tracking-widest text-[#FFD700]" style={PS2}>
-            WAITING FOR FAMILY ASSIGNMENT
-          </div>
-        )}
-
         {buzzerOpen && !buzzWinner && (
           <button
             type="button"
@@ -303,19 +230,6 @@ export default function NeonBFFPlayer({ roomCode }) {
             }}
           />
         </main>
-
-        <section className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <TeamPlayers
-            players={players}
-            team={1}
-            familyName={gameState.family1 || 'Family 1'}
-          />
-          <TeamPlayers
-            players={players}
-            team={2}
-            familyName={gameState.family2 || 'Family 2'}
-          />
-        </section>
 
         <footer className="flex items-center justify-between gap-3 rounded-xl border border-white/8 bg-black/45 px-3 py-2 text-[9px] text-white/35">
           <div className="flex items-center gap-1.5">
