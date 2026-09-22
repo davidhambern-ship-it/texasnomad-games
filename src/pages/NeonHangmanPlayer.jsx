@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -161,6 +162,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen md:h-[100dvh] md:overflow-hidden bg-[#070311] text-white">
+      <TngNotificationToaster />
       <div className="mx-auto flex min-h-screen md:h-full max-w-[1500px] flex-col gap-2 p-2 md:min-h-0">
 
         {/* Compact top bar */}
