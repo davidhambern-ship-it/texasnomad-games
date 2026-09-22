@@ -425,8 +425,17 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [clockNow, setClockNow] = useState(() => Date.now());
   const handledDeadlineRef = useRef(null);
   const hostMicAutoAttemptedRef = useRef(false);
+  const hostVoiceMountedRef = useRef(true);
+  const publishedVoiceAnswersRef = useRef(new Set());
 
   const gameState = room?.gameState || {};
+  const voiceOfferSignature = useMemo(
+    () => Object.entries(gameState.voice_offers || {})
+      .map(([playerId, offer]) => `${playerId}:${offer?.at || ''}:${offer?.sdp?.length || 0}`)
+      .sort()
+      .join('|'),
+    [gameState.voice_offers],
+  );
   const players = Array.isArray(gameState.players)
     ? gameState.players
     : Array.isArray(room?.players)
@@ -635,7 +644,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
   useEffect(() => {
     const offers = gameState.voice_offers || {};
-    let cancelled = false;
 
     Object.entries(offers).forEach(async ([playerId, offer]) => {
       if (!offer?.sdp) return;
@@ -660,7 +668,10 @@ export default function NeonBFFHostPanel({ controllerId }) {
         const silentSpeakerTrack = silentBase.clone();
 
         const reportPeerState = () => {
-          if (cancelled) return;
+          if (!hostVoiceMountedRef.current) return;
+
+          const currentMeta = voicePeersRef.current.get(playerId);
+          if (currentMeta?.pc && currentMeta.pc !== pc) return;
 
           const live =
             pc.connectionState === 'connected'
@@ -668,6 +679,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
             || pc.iceConnectionState === 'completed';
 
           setVoiceConnected((prev) => ({ ...prev, [playerId]: live }));
+
+          if (!publishedVoiceAnswersRef.current.has(String(playerId))) return;
 
           tngApi.bff.hostAction(controllerId, 'voice_peer_status', {
             playerId,
@@ -684,7 +697,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
         pc.onicegatheringstatechange = reportPeerState;
 
         pc.ontrack = (event) => {
-          if (cancelled || event.track.kind !== 'audio') return;
+          if (!hostVoiceMountedRef.current || event.track.kind !== 'audio') return;
 
           playerVoiceTracksRef.current.set(String(playerId), event.track);
 
@@ -751,26 +764,28 @@ export default function NeonBFFHostPanel({ controllerId }) {
         await pc.setLocalDescription(answer);
         await waitForIceComplete(pc);
 
-        if (cancelled || !pc.localDescription?.sdp) return;
+        if (!hostVoiceMountedRef.current || !pc.localDescription?.sdp) return;
 
         await tngApi.bff.hostAction(controllerId, 'voice_answer', {
           playerId,
+          offerAt: Number(offer.at),
           sdp: pc.localDescription.sdp,
         });
 
+        publishedVoiceAnswersRef.current.add(String(playerId));
+        reportPeerState();
         routeActiveSpeaker(activePlayerIdRef.current);
       } catch (voiceError) {
         console.warn('[BFF Voice] Host could not connect player audio', playerId, voiceError);
+        handledVoiceOffersRef.current.delete(playerId);
+        publishedVoiceAnswersRef.current.delete(String(playerId));
         setVoiceConnected((prev) => ({ ...prev, [playerId]: false }));
       }
     });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [controllerId, ensureSilentTrack, gameState.voice_offers, routeActiveSpeaker]);
+  }, [controllerId, ensureSilentTrack, routeActiveSpeaker, voiceOfferSignature]);
 
   useEffect(() => () => {
+    hostVoiceMountedRef.current = false;
     voicePeersRef.current.forEach((meta) => {
       meta?.pc?.close?.();
       meta?.silentHostTrack?.stop?.();
