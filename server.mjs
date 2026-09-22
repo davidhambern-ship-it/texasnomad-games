@@ -199,6 +199,283 @@ async function loadBffParticipants(roomId, gameState = {}) {
   }));
 }
 
+
+function extractBffGameState(displayState = {}) {
+  if (
+    displayState &&
+    typeof displayState === 'object' &&
+    displayState.gameState &&
+    typeof displayState.gameState === 'object'
+  ) {
+    return { ...displayState.gameState };
+  }
+
+  return displayState && typeof displayState === 'object'
+    ? { ...displayState }
+    : {};
+}
+
+function wrapBffGameState(displayState = {}, gameState = {}) {
+  const base = displayState && typeof displayState === 'object'
+    ? { ...displayState }
+    : {};
+
+  if (base.gameState && typeof base.gameState === 'object') {
+    return {
+      ...base,
+      gameId: base.gameId || 'bff',
+      screen: base.screen || 'game',
+      gameState,
+    };
+  }
+
+  return {
+    ...base,
+    ...gameState,
+    gameId: 'bff',
+  };
+}
+
+function getBffAnswers(gameState = {}) {
+  const raw = Array.isArray(gameState.answers) ? gameState.answers : [];
+  return raw.map((answer, index) => {
+    if (typeof answer === 'string') {
+      return {
+        text: answer,
+        points: 0,
+        revealed: false,
+        index,
+      };
+    }
+
+    return {
+      ...answer,
+      index,
+      revealed: Boolean(answer?.revealed),
+      points: Number(answer?.points) || 0,
+    };
+  });
+}
+
+function sanitizeBffHostState(gameState = {}, players = []) {
+  const answers = getBffAnswers(gameState);
+  const answerCount = Math.max(
+    answers.length,
+    Number(gameState.answer_count || gameState.answerCount || 0),
+    8,
+  );
+
+  const safeAnswers = Array.from({ length: answerCount }, (_, index) => {
+    const answer = answers[index] || {};
+    return {
+      index,
+      revealed: Boolean(answer.revealed),
+      points: Number(answer.points) || 0,
+    };
+  });
+
+  return {
+    phase: gameState.phase || 'waiting',
+    family1: gameState.family1 || 'Family 1',
+    family2: gameState.family2 || 'Family 2',
+    score1: Number(gameState.score1) || 0,
+    score2: Number(gameState.score2) || 0,
+    round_number: Number(gameState.round_number || gameState.roundNumber || 1),
+    round_bank: Number(gameState.round_bank || gameState.roundBank || 0),
+    current_question:
+      gameState.current_question ||
+      gameState.currentQuestion ||
+      gameState.question ||
+      '',
+    control_team: Number(gameState.control_team || gameState.active_turn || 1),
+    active_turn: Number(gameState.active_turn || gameState.control_team || 1),
+    steal_mode: Boolean(gameState.steal_mode),
+    bye_count: Math.max(0, Math.min(3, Number(gameState.bye_count) || 0)),
+    buzzer_phase: gameState.buzzer_phase || null,
+    buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
+    playerTeams: gameState.playerTeams || {},
+    sound_cue: gameState.sound_cue || null,
+    answers: safeAnswers,
+    players,
+  };
+}
+
+async function saveBffGameState(roomId, originalDisplayState, nextGameState) {
+  const nextDisplayState = wrapBffGameState(originalDisplayState, nextGameState);
+
+  const { rows } = await bffPool.query(`
+    update public.game_rooms
+    set display_state = $2::jsonb,
+        revision = revision + 1,
+        updated_at = now()
+    where id = $1::uuid
+    returning id, room_code, game_id, status, revision, display_state, created_at, updated_at
+  `, [roomId, JSON.stringify(nextDisplayState)]);
+
+  return rows[0] || null;
+}
+
+function ensureBffAnswerSlot(answers, index) {
+  const next = answers.map((answer) => ({ ...answer }));
+  while (next.length <= index) {
+    next.push({
+      text: '',
+      answer: '',
+      points: 0,
+      revealed: false,
+    });
+  }
+  return next;
+}
+
+function bffUndoSnapshot(gameState = {}) {
+  const snapshot = JSON.parse(JSON.stringify(gameState || {}));
+  delete snapshot._hostUndo;
+  return snapshot;
+}
+
+async function applyBffHostAction(room, body = {}) {
+  const action = String(body.action || '').trim();
+  const current = extractBffGameState(room.display_state || {});
+
+  if (action === 'undo_last_action') {
+    if (!current._hostUndo) return current;
+    const restored = JSON.parse(JSON.stringify(current._hostUndo));
+    restored._hostUndo = bffUndoSnapshot(current);
+    return restored;
+  }
+
+  const next = {
+    ...current,
+    _hostUndo: bffUndoSnapshot(current),
+  };
+
+  if (action === 'set_family_names') {
+    next.family1 = String(body.family1 || '').trim() || next.family1 || 'Family 1';
+    next.family2 = String(body.family2 || '').trim() || next.family2 || 'Family 2';
+    return next;
+  }
+
+  if (action === 'assign_player') {
+    const playerId = String(body.playerId || '');
+    const team = body.team == null ? null : Number(body.team);
+    const map = { ...(next.playerTeams || {}) };
+    if (!playerId) return next;
+    if (team === 1 || team === 2) map[playerId] = team;
+    else delete map[playerId];
+    next.playerTeams = map;
+    return next;
+  }
+
+  if (action === 'start_round') {
+    next.phase = 'playing';
+    next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1));
+    next.round_bank = 0;
+    next.bye_count = 0;
+    next.steal_mode = false;
+    next.buzzer_open = false;
+    return next;
+  }
+
+  if (action === 'next_question') {
+    next.phase = 'waiting';
+    next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1) + 1);
+    next.round_bank = 0;
+    next.bye_count = 0;
+    next.steal_mode = false;
+    next.buzzer_open = false;
+    if (Array.isArray(next.answers)) {
+      next.answers = next.answers.map((answer) => ({ ...answer, revealed: false }));
+    }
+    return next;
+  }
+
+  if (action === 'reveal_answer' || action === 'hide_answer') {
+    const index = Math.max(0, Number(body.index) || 0);
+    const answers = ensureBffAnswerSlot(getBffAnswers(next), index);
+    const answer = answers[index];
+    const reveal = action === 'reveal_answer';
+    const wasRevealed = Boolean(answer.revealed);
+
+    answers[index] = {
+      ...answer,
+      revealed: reveal,
+    };
+    next.answers = answers;
+
+    if (reveal && !wasRevealed) {
+      next.round_bank = Math.max(0, Number(next.round_bank || 0) + Number(answer.points || 0));
+    }
+    if (!reveal && wasRevealed) {
+      next.round_bank = Math.max(0, Number(next.round_bank || 0) - Number(answer.points || 0));
+    }
+    return next;
+  }
+
+  if (action === 'add_points') {
+    const amount = Number(body.amount) || 0;
+    next.round_bank = Math.max(0, Number(next.round_bank || 0) + amount);
+    return next;
+  }
+
+  if (action === 'add_bye') {
+    next.bye_count = Math.min(3, Number(next.bye_count || 0) + 1);
+    next.sound_cue = { name: 'bye', at: Date.now() };
+    return next;
+  }
+
+  if (action === 'undo_bye') {
+    next.bye_count = Math.max(0, Number(next.bye_count || 0) - 1);
+    return next;
+  }
+
+  if (action === 'set_control_team') {
+    const team = Number(body.team) === 2 ? 2 : 1;
+    next.control_team = team;
+    next.active_turn = team;
+    return next;
+  }
+
+  if (action === 'toggle_steal') {
+    next.steal_mode = !Boolean(next.steal_mode);
+    return next;
+  }
+
+  if (action === 'award_bank') {
+    const team = Number(body.team) === 2 ? 2 : 1;
+    const bank = Math.max(0, Number(next.round_bank || 0));
+    const scoreKey = team === 2 ? 'score2' : 'score1';
+    next[scoreKey] = Math.max(0, Number(next[scoreKey] || 0) + bank);
+    next.round_bank = 0;
+    next.phase = 'round_over';
+    return next;
+  }
+
+  if (action === 'open_buzzers') {
+    next.buzzer_open = true;
+    next.buzzer_phase = 'buzzer_active';
+    next.buzz_winner = null;
+    return next;
+  }
+
+  if (action === 'reset_buzzers') {
+    next.buzzer_open = false;
+    next.buzzer_phase = 'board_shown';
+    next.buzz_winner = null;
+    return next;
+  }
+
+  if (action === 'sound') {
+    next.sound_cue = {
+      name: String(body.name || 'correct'),
+      at: Date.now(),
+    };
+    return next;
+  }
+
+  return next;
+}
+
 async function handleBffApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const path = sourceUrl.pathname.replace(/^\/bff-api/, '') || '/';
@@ -235,8 +512,9 @@ async function handleBffApi(req, res) {
     }
 
     await assignBffSeats(room.id);
-    const players = await loadBffParticipants(room.id, room.display_state || {});
-    const gameState = { ...(room.display_state || {}), players };
+    const internalState = extractBffGameState(room.display_state || {});
+    const players = await loadBffParticipants(room.id, internalState);
+    const gameState = sanitizeBffHostState(internalState, players);
 
     sendJson(res, 200, {
       room: {
@@ -249,6 +527,55 @@ async function handleBffApi(req, res) {
         players,
         createdAt: room.created_at,
         updatedAt: room.updated_at,
+      },
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/host') {
+    const controllerId = String(req.headers['x-tng-device-id'] || '');
+    if (!controllerId) {
+      sendJson(res, 400, { error: { code: 'CONTROLLER_REQUIRED', message: 'Host controller is missing.' } });
+      return;
+    }
+
+    const verified = await verifyBffHostWithTngApi(req, controllerId);
+    if (!verified.ok) {
+      sendJson(res, verified.status || 401, verified.payload || {
+        error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+      });
+      return;
+    }
+
+    const room = await loadRailwayBffHostRoom(controllerId);
+    if (!room) {
+      sendJson(res, 404, {
+        error: {
+          code: 'ROOM_NOT_FOUND',
+          message: 'No active BFF room is attached to this Host Controller.',
+        },
+      });
+      return;
+    }
+
+    const body = await readJsonBody(req).catch(() => ({}));
+    const nextGameState = await applyBffHostAction(room, body || {});
+    const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
+    await assignBffSeats(room.id);
+    const players = await loadBffParticipants(room.id, nextGameState);
+    const gameState = sanitizeBffHostState(nextGameState, players);
+
+    sendJson(res, 200, {
+      room: {
+        id: savedRoom?.id || room.id,
+        roomCode: savedRoom?.room_code || room.room_code,
+        gameId: savedRoom?.game_id || room.game_id,
+        status: savedRoom?.status || room.status,
+        revision: savedRoom?.revision || room.revision,
+        gameState,
+        players,
+        createdAt: savedRoom?.created_at || room.created_at,
+        updatedAt: savedRoom?.updated_at || room.updated_at,
       },
     });
     return;
