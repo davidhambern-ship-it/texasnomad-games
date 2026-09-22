@@ -199,6 +199,39 @@ async function loadBffParticipants(roomId, gameState = {}) {
   }));
 }
 
+async function ensureBffTeamAssignments(room, gameState = {}, players = []) {
+  const teamMap = { ...(gameState.playerTeams || {}) };
+  let team1Count = Object.values(teamMap).filter((value) => Number(value) === 1).length;
+  let team2Count = Object.values(teamMap).filter((value) => Number(value) === 2).length;
+  let changed = false;
+
+  for (const player of players) {
+    const playerId = String(player.playerId || '');
+    if (!playerId || Object.prototype.hasOwnProperty.call(teamMap, playerId)) continue;
+
+    const team = team1Count <= team2Count ? 1 : 2;
+    teamMap[playerId] = team;
+    if (team === 1) team1Count += 1;
+    else team2Count += 1;
+    changed = true;
+  }
+
+  if (!changed) {
+    return { gameState, room };
+  }
+
+  const nextGameState = {
+    ...gameState,
+    playerTeams: teamMap,
+  };
+
+  const savedRoom = await saveBffGameState(room.id, room.display_state || {}, nextGameState);
+  return {
+    gameState: nextGameState,
+    room: savedRoom ? { ...room, ...savedRoom } : room,
+  };
+}
+
 
 function extractBffGameState(displayState = {}) {
   if (
@@ -362,7 +395,7 @@ async function applyBffHostAction(room, body = {}) {
     const map = { ...(next.playerTeams || {}) };
     if (!playerId) return next;
     if (team === 1 || team === 2) map[playerId] = team;
-    else delete map[playerId];
+    else map[playerId] = 0;
     next.playerTeams = map;
     return next;
   }
@@ -512,21 +545,27 @@ async function handleBffApi(req, res) {
     }
 
     await assignBffSeats(room.id);
-    const internalState = extractBffGameState(room.display_state || {});
-    const players = await loadBffParticipants(room.id, internalState);
+    let internalState = extractBffGameState(room.display_state || {});
+    let players = await loadBffParticipants(room.id, internalState);
+
+    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
+    internalState = assignmentResult.gameState;
+    const effectiveRoom = assignmentResult.room || room;
+    players = await loadBffParticipants(room.id, internalState);
+
     const gameState = sanitizeBffHostState(internalState, players);
 
     sendJson(res, 200, {
       room: {
-        id: room.id,
-        roomCode: room.room_code,
-        gameId: room.game_id,
-        status: room.status,
-        revision: room.revision,
+        id: effectiveRoom.id || room.id,
+        roomCode: effectiveRoom.room_code || room.room_code,
+        gameId: effectiveRoom.game_id || room.game_id,
+        status: effectiveRoom.status || room.status,
+        revision: effectiveRoom.revision || room.revision,
         gameState,
         players,
-        createdAt: room.created_at,
-        updatedAt: room.updated_at,
+        createdAt: effectiveRoom.created_at || room.created_at,
+        updatedAt: effectiveRoom.updated_at || room.updated_at,
       },
     });
     return;
