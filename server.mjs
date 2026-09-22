@@ -301,6 +301,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     const answer = answers[index] || {};
     return {
       index,
+      text: String(answer.text || answer.answer || ''),
       revealed: Boolean(answer.revealed),
       points: Number(answer.points) || 0,
     };
@@ -328,6 +329,7 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     buzz_winner: gameState.buzz_winner || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
+    voice_offers: gameState.voice_offers || {},
     answers: safeAnswers,
     players,
   };
@@ -507,7 +509,7 @@ async function applyBffHostAction(room, body = {}) {
 
     if (reveal && !wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) + Number(answer.points || 0));
-      next.sound_cue = { name: 'correct', at: Date.now() };
+      next.sound_cue = { name: 'correct_applause', at: Date.now() };
     }
     if (!reveal && wasRevealed) {
       next.round_bank = Math.max(0, Number(next.round_bank || 0) - Number(answer.points || 0));
@@ -523,7 +525,7 @@ async function applyBffHostAction(room, body = {}) {
 
   if (action === 'add_bye') {
     next.bye_count = Math.min(3, Number(next.bye_count || 0) + 1);
-    next.sound_cue = { name: 'bye', at: Date.now() };
+    next.sound_cue = { name: 'wrong_awww', at: Date.now() };
     return next;
   }
 
@@ -571,6 +573,21 @@ async function applyBffHostAction(room, body = {}) {
     next.buzzer_open = false;
     next.buzzer_phase = 'board_shown';
     next.buzz_winner = null;
+    return next;
+  }
+
+  if (action === 'voice_answer') {
+    const playerId = String(body.playerId || '');
+    const sdp = String(body.sdp || '');
+    if (!playerId || !sdp) return next;
+
+    next.voice_answers = {
+      ...(next.voice_answers || {}),
+      [playerId]: {
+        sdp,
+        at: Date.now(),
+      },
+    };
     return next;
   }
 
@@ -625,7 +642,7 @@ async function loadRailwayBffPlayerRoom(roomCode) {
   return rows[0] || null;
 }
 
-function sanitizeBffPlayerState(gameState = {}, players = []) {
+function sanitizeBffPlayerState(gameState = {}, players = [], participant = null) {
   const answers = getBffAnswers(gameState);
   const answerCount = Math.max(
     answers.length,
@@ -667,6 +684,9 @@ function sanitizeBffPlayerState(gameState = {}, players = []) {
     buzz_winner: gameState.buzz_winner || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
+    voice_answer: participant
+      ? (gameState.voice_answers || {})[participant.accountId || participant.playerId] || null
+      : null,
     answers: safeAnswers,
     players,
   };
@@ -790,6 +810,39 @@ async function applyBffPlayerAction(room, participant, body = {}) {
     };
   }
 
+  if (action === 'voice_offer') {
+    const sdp = String(body.sdp || '');
+    const playerId = String(participant.accountId || participant.playerId || '');
+    if (!sdp || !playerId) return current;
+
+    return {
+      ...current,
+      voice_offers: {
+        ...(current.voice_offers || {}),
+        [playerId]: {
+          sdp,
+          playerId,
+          playerName: participant.playerName || participant.name || 'Player',
+          at: Date.now(),
+        },
+      },
+    };
+  }
+
+  if (action === 'voice_stop') {
+    const playerId = String(participant.accountId || participant.playerId || '');
+    const offers = { ...(current.voice_offers || {}) };
+    const answers = { ...(current.voice_answers || {}) };
+    delete offers[playerId];
+    delete answers[playerId];
+
+    return {
+      ...current,
+      voice_offers: offers,
+      voice_answers: answers,
+    };
+  }
+
   return current;
 }
 
@@ -853,7 +906,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    const gameState = sanitizeBffPlayerState(internalState, players);
+    const gameState = sanitizeBffPlayerState(internalState, players, participant);
 
     sendJson(res, 200, {
       room: {
@@ -935,7 +988,7 @@ async function handleBffApi(req, res) {
     }
 
     players = await loadBffParticipants(room.id, nextGameState);
-    const gameState = sanitizeBffPlayerState(nextGameState, players);
+    const gameState = sanitizeBffPlayerState(nextGameState, players, participant);
 
     sendJson(res, 200, {
       room: {
