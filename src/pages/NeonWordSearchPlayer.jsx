@@ -5,6 +5,7 @@ import { Loader2 } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
+import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -127,6 +128,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen lg:h-[100dvh] lg:overflow-hidden bg-[#070311] text-white">
+      <TngNotificationToaster />
       <div className="mx-auto flex min-h-screen lg:h-full max-w-[1500px] flex-col gap-2 p-2 lg:min-h-0">
 
         <header className="shrink-0 rounded-xl border bg-black/60 px-3 py-2.5 flex items-center justify-between gap-3"
