@@ -597,25 +597,6 @@ export default function NeonBFFPlayer({ roomCode }) {
       pc.oniceconnectionstatechange = syncConnectionStateWithRetry;
 
       await publishFreshOffer();
-
-      await pc.setLocalDescription(offer);
-      await waitForIceComplete(pc);
-
-      if (!pc.localDescription?.sdp) {
-        throw new Error('Microphone connection could not create an offer.');
-      }
-
-      const payload = await tngApi.bff.playerAction(deviceId, roomCode, 'voice_offer', {
-        sdp: pc.localDescription.sdp,
-      });
-
-      setRoom(payload.room || null);
-      setParticipant(payload.participant || null);
-      currentVoiceOfferAtRef.current = Number(
-        payload.room?.gameState?.voice_offer_at || 0,
-      ) || null;
-      setMicOn(true);
-      setVoiceConnectionState('connecting');
     } catch (voiceError) {
       if (voiceRetryTimerRef.current) {
         window.clearTimeout(voiceRetryTimerRef.current);
