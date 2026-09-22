@@ -13,7 +13,7 @@ import { tngApi } from '@/api/tngApi';
 import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
-import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
+import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizJingle, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -983,6 +983,7 @@ function SquareBizDisplay({ room }) {
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#05020a]">
       <SquareBizShowStyles />
+      <SquareBizJingle gameState={state} />
 
       <div
         className="pointer-events-none absolute inset-0 opacity-60"
