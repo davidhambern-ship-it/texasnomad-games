@@ -1,10 +1,9 @@
 import React from 'react';
 
-export function HostWorkspace({ primary, companion, companionWidth = '360px', className = '' }) {
+export function HostWorkspace({ primary, companion, className = '' }) {
   return (
     <section
-      className={`grid min-w-0 gap-3 xl:items-start ${className}`}
-      style={{ gridTemplateColumns: `minmax(0, 1fr) minmax(300px, ${companionWidth})` }}
+      className={`grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(320px,380px)] xl:items-start ${className}`}
     >
       <div className="min-w-0">{primary}</div>
       <div className="min-w-0">{companion}</div>
