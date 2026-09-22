@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
@@ -71,7 +71,6 @@ export default function NeonSquareBizHostPanel({ controllerId }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(Date.now());
-  const jingleRef = useRef(null);
 
   const gameState = room?.gameState || {};
   const phase = gameState.phase || 'lobby';
@@ -104,66 +103,23 @@ export default function NeonSquareBizHostPanel({ controllerId }) {
     return () => window.clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (phase !== 'intro') {
-      const audio = jingleRef.current;
-      if (audio && !audio.paused) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
-    }
-  }, [phase]);
-
-  const stopJingle = useCallback(() => {
-    const audio = jingleRef.current;
-    if (!audio) return;
-    audio.pause();
-    audio.currentTime = 0;
-  }, []);
-
-  const startJingle = useCallback(async () => {
-    const audio = jingleRef.current;
-    if (!audio) return false;
-
-    try {
-      audio.pause();
-      audio.currentTime = 0;
-      await audio.play();
-      return true;
-    } catch {
-      return false;
-    }
-  }, []);
-
   const act = useCallback(async (action, payload = {}) => {
     if (!controllerId || busy) return false;
 
     setBusy(true);
     setError('');
 
-    const shouldStartJingle = action === 'start_round' || action === 'replay_intro';
-    const shouldStopJingle = action === 'skip_intro' || action === 'reset_board';
-
-    if (shouldStartJingle) {
-      // Start from the Host's click gesture before any network await, so browsers
-      // treat this as intentional media playback rather than blocked autoplay.
-      startJingle();
-    } else if (shouldStopJingle) {
-      stopJingle();
-    }
-
     try {
       const response = await tngApi.squareBiz.hostAction(controllerId, action, payload);
       setRoom(response.room || null);
       return true;
     } catch (actionError) {
-      if (shouldStartJingle) stopJingle();
       setError(actionError?.message || 'That Square Biz Host action could not be completed.');
       return false;
     } finally {
       setBusy(false);
     }
-  }, [busy, controllerId, startJingle, stopJingle]);
+  }, [busy, controllerId]);
 
   const status = useMemo(() => {
     if (phase === 'lobby') return players.length >= 2 ? 'READY TO START' : 'WAITING FOR PLAYERS';
@@ -188,12 +144,6 @@ export default function NeonSquareBizHostPanel({ controllerId }) {
   return (
     <div className="mx-auto max-w-[1500px] space-y-2">
       <SquareBizShowStyles />
-      <audio
-        ref={jingleRef}
-        src="/assets/square-biz/Square%20Biz!.mp3"
-        preload="auto"
-        playsInline
-      />
 
       {error && (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-center text-xs text-red-400">
