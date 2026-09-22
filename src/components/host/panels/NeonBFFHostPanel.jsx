@@ -469,6 +469,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
     : null;
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
   const micsReady = Boolean(gameState.mics_ready);
+  const voiceSessionLocked = Boolean(gameState.voice_session_locked);
   const assignedPlayers = [...team1, ...team2];
   const backendVoiceReady = gameState.voice_ready || {};
   const liveMicsReady = Boolean(
@@ -875,7 +876,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
       )}
 
       <section className={`rounded-xl border px-3 py-2 ${
-        gameState.family_names_set && liveMicsReady && hostMicReady
+        gameState.family_names_set && hostMicReady && (voiceSessionLocked || liveMicsReady)
           ? 'border-[#4ADE80]/35 bg-[#4ADE80]/[.05]'
           : 'border-[#FF5F1F]/35 bg-[#FF5F1F]/[.05]'
       }`}>
@@ -889,9 +890,13 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 ? 'Enter both family names.'
                 : !hostMicReady
                   ? 'Enable the Host microphone.'
-                  : missingMicNames.length
-                    ? `Waiting on mic connection: ${missingMicNames.join(', ')}`
-                    : 'READY · Start Round is unlocked.'}
+                  : voiceSessionLocked
+                    ? missingMicNames.length
+                      ? `VOICE LOCKED · Reconnecting in background: ${missingMicNames.join(', ')}`
+                      : 'VOICE LOCKED · All players live.'
+                    : missingMicNames.length
+                      ? `Waiting on mic connection: ${missingMicNames.join(', ')}`
+                      : 'READY · Start Round is unlocked.'}
             </div>
           </div>
 
@@ -1262,14 +1267,21 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   ? 'Need Names'
                   : !hostMicReady
                     ? 'Host Mic'
-                    : !liveMicsReady
+                    : !voiceSessionLocked && !liveMicsReady
                       ? 'Need Mics'
                       : 'Start Round'
               }
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
-              disabled={busy || gameState.phase === 'playing' || Boolean(gameState.current_question) || !gameState.family_names_set || !micsReady || !liveMicsReady || !hostMicReady}
+              disabled={
+                busy
+                || gameState.phase === 'playing'
+                || Boolean(gameState.current_question)
+                || !gameState.family_names_set
+                || !hostMicReady
+                || (!voiceSessionLocked && (!micsReady || !liveMicsReady))
+              }
             />
             <ControlButton
               label="Reset Round"
