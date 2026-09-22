@@ -1,7 +1,7 @@
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
 import { db } from '../../server/db/client.js';
-import { deviceSessions, gameRooms, hostSessions, playerProfiles, roomParticipants } from '../../server/db/schema.js';
+import { deviceSessions, gameRooms, hostSessions, playerProfiles, roomParticipants, socialNotifications } from '../../server/db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
 import { hashDisplayToken } from '../../server/pairing.js';
 
@@ -162,6 +162,63 @@ async function squareBizParticipants(roomId) {
   });
 }
 
+
+async function claimHostDisplayNotifications(hostAccountId) {
+  if (!hostAccountId) return [];
+
+  return db.transaction(async (transaction) => {
+    const rows = await transaction.select().from(socialNotifications).where(and(
+      eq(socialNotifications.recipientAccountId, hostAccountId),
+      isNull(socialNotifications.deliveredAt),
+    )).orderBy(socialNotifications.createdAt).limit(3);
+
+    if (!rows.length) return [];
+
+    const ids = rows.map((row) => row.id);
+    const actorIds = rows.map((row) => row.actorAccountId).filter(Boolean);
+    const actors = actorIds.length
+      ? await transaction.select({
+          accountId: playerProfiles.accountId,
+          displayName: playerProfiles.displayName,
+          handle: playerProfiles.handle,
+        }).from(playerProfiles).where(inArray(playerProfiles.accountId, actorIds))
+      : [];
+
+    const actorById = new Map(actors.map((actor) => [actor.accountId, actor]));
+    const deliveredAt = new Date();
+
+    await transaction.update(socialNotifications).set({
+      deliveredAt,
+    }).where(inArray(socialNotifications.id, ids));
+
+    return rows.map((row) => {
+      const actor = row.actorAccountId ? actorById.get(row.actorAccountId) : null;
+      const payload = row.payload || {};
+      const safePayload = row.type === 'message'
+        ? {}
+        : {
+            ...(payload.roomCode ? { roomCode: payload.roomCode } : {}),
+            ...(payload.gameId ? { gameId: payload.gameId } : {}),
+          };
+
+      return {
+        id: row.id,
+        type: row.type,
+        actor: actor
+          ? {
+              accountId: actor.accountId,
+              displayName: actor.displayName,
+              handle: actor.handle,
+            }
+          : null,
+        payload: safePayload,
+        deliveredAt,
+        createdAt: row.createdAt,
+      };
+    });
+  });
+}
+
 async function projectRoom(room) {
   const source = room.displayState || {};
   const gameState = source.gameState || {};
@@ -230,6 +287,7 @@ export default async function handler(request, response) {
     return sendJson(response, 200, {
       room: room ? await projectRoom(room) : null,
       status: room ? 'connected' : 'waiting_for_room',
+      notifications: await claimHostDisplayNotifications(hostSession.hostAccountId),
     });
   } catch (error) {
     return sendError(response, error);
