@@ -10,6 +10,7 @@ import {
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
 const X_COLOR = '#ff1593';
@@ -178,7 +179,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
                 <div className="mt-6 grid gap-2 sm:grid-cols-2">
                   {players.slice(0, 6).map((player) => (
                     <div key={player.accountId} className="rounded-xl border border-white/10 bg-white/[.025] px-3 py-2 text-left">
-                      <div className="truncate text-sm font-bold text-white/80">{player.name}</div>
+                      <div className="truncate text-sm font-bold text-white/80">{getPublicTngName(player)}</div>
                       <div className="mt-1 text-[8px] uppercase tracking-widest" style={{ ...MONO, color: player.mark === 'X' ? X_COLOR : player.mark === 'O' ? O_COLOR : '#ffd63399' }}>
                         {player.mark ? `PLAYER ${player.mark}` : player.queuePosition ? `QUEUE #${player.queuePosition}` : 'VIEWER'}
                       </div>
@@ -235,7 +236,7 @@ export default function NeonSquareBizPlayer({ roomCode }) {
             {mark
               ? gameState.currentMark === mark
                 ? phase === 'board' ? 'Your turn — choose an open square.' : phase === 'answering' ? 'Your question — choose wisely.' : 'You’re live.'
-                : `Waiting for ${currentPlayer?.name || `Player ${gameState.currentMark || 'X'}`}.`
+                : `Waiting for ${getPublicTngName(currentPlayer, `Player ${gameState.currentMark || 'X'}`)}.`
               : 'Watching this round.'}
           </span>
           {busy && <span className="text-[#ffd633]">SYNCING…</span>}
