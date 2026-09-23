@@ -441,6 +441,8 @@ async function setBffVoiceRelayPresence(roomId, roomCode, role, playerId, connec
 
     if (role === 'host') {
       gameState.voice_relay_host_connected = Boolean(connected);
+    } else if (role === 'display') {
+      gameState.voice_relay_display_connected = Boolean(connected);
     } else if (playerId) {
       gameState.voice_relay_connected = {
         ...(gameState.voice_relay_connected || {}),
@@ -487,7 +489,7 @@ async function resolveBffVoiceSocket(url) {
   const role = String(url.searchParams.get('role') || '');
   const identity = String(url.searchParams.get('id') || '');
 
-  if (!roomCode || !['host', 'player'].includes(role) || !isUuid(identity)) {
+  if (!roomCode || !['host', 'player', 'display'].includes(role) || !isUuid(identity)) {
     return null;
   }
 
@@ -518,6 +520,31 @@ async function resolveBffVoiceSocket(url) {
       roomId: room.id,
       roomCode,
       role: 'host',
+      identity,
+      playerId: null,
+    };
+  }
+
+  if (role === 'display') {
+    const { rows } = await bffPool.query(`
+      select gr.id, gr.room_code, gr.display_state
+      from public.host_sessions hs
+      join public.game_rooms gr on gr.host_session_id = hs.id
+      where hs.display_device_id = $1::uuid
+        and gr.room_code = $2
+        and gr.game_id = 'bff'
+        and gr.status in ('lobby','live','paused')
+      order by gr.updated_at desc
+      limit 1
+    `, [identity, roomCode]);
+
+    const room = rows[0];
+    if (!room) return null;
+
+    return {
+      roomId: room.id,
+      roomCode,
+      role: 'display',
       identity,
       playerId: null,
     };
@@ -556,6 +583,7 @@ async function resolveBffVoiceSocket(url) {
 
 function relayBffVoiceFrame(sender, data) {
   const room = voiceRoomSet(sender.roomCode);
+  if (sender.role === 'display') return;
   if (!Buffer.isBuffer(data) && !(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) {
     return;
   }
@@ -2160,6 +2188,43 @@ async function handleBffApi(req, res) {
 
   if (req.method === 'GET' && path === '/health') {
     sendJson(res, 200, { ok: true, service: 'railway-bff-api' });
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/display') {
+    const roomCode = String(sourceUrl.searchParams.get('room') || '').toUpperCase();
+    if (!roomCode) {
+      sendJson(res, 400, {
+        error: { code: 'ROOM_REQUIRED', message: 'BFF display room code is required.' },
+      });
+      return;
+    }
+
+    let room = await loadRailwayBffPlayerRoom(roomCode);
+    if (!room) {
+      sendJson(res, 404, {
+        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
+      });
+      return;
+    }
+
+    room = await reconcileBffTimers(room);
+    const internalState = extractBffGameState(room.display_state || {});
+    const players = await loadBffParticipants(room.id, internalState);
+    const gameState = sanitizeBffPlayerState(internalState, players, null);
+
+    sendJson(res, 200, {
+      room: {
+        id: room.id,
+        roomCode: room.room_code,
+        gameId: room.game_id,
+        status: room.status,
+        revision: room.revision,
+        gameState,
+        createdAt: room.created_at,
+        updatedAt: room.updated_at,
+      },
+    });
     return;
   }
 
