@@ -7,6 +7,7 @@ import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
+import { quitTngGame } from '@/lib/quitTngGame';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -509,14 +510,14 @@ export default function NeonBFFPlayer({ roomCode }) {
                 {micBusy ? 'MIC…' : micOn ? 'MIC ON' : 'MIC OFF'}
               </button>
 
-              <Link
-                to="/"
-                replace
+              <button
+                type="button"
+                onClick={() => quitTngGame(roomCode)}
                 className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] uppercase tracking-widest text-white/40"
                 style={PS2}
               >
                 EXIT
-              </Link>
+              </button>
             </div>
           </div>
         </header>
