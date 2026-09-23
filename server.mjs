@@ -58,6 +58,140 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
+async function handleTngAccountRoute(req, res) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
+    });
+    return;
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    sendJson(res, 401, {
+      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+    });
+    return;
+  }
+
+  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+    },
+  });
+
+  if (!profileResponse.ok) {
+    const payload = await profileResponse.json().catch(() => ({}));
+    sendJson(res, profileResponse.status, payload?.error
+      ? payload
+      : {
+          error: {
+            code: 'PROFILE_LOOKUP_FAILED',
+            message: 'TNG could not identify this signed-in account.',
+          },
+        });
+    return;
+  }
+
+  const payload = await profileResponse.json().catch(() => ({}));
+  const profile = payload?.profile || {};
+  let accountId =
+    profile.accountId ||
+    profile.account_id ||
+    payload.accountId ||
+    payload.account_id ||
+    null;
+
+  if (!accountId) {
+    const handle = String(
+      profile.handle ||
+      profile.normalizedHandle ||
+      profile.normalized_handle ||
+      ''
+    ).replace(/^@/, '').trim().toLowerCase();
+
+    if (handle) {
+      const { rows } = await bffPool.query(`
+        select account_id
+        from public.player_profiles
+        where normalized_handle = $1
+           or lower(handle) = $1
+        limit 1
+      `, [handle]);
+      accountId = rows[0]?.account_id || null;
+    }
+  }
+
+  if (!accountId) {
+    const email = String(
+      profile.email ||
+      payload.email ||
+      ''
+    ).trim().toLowerCase();
+
+    if (email) {
+      const { rows } = await bffPool.query(`
+        select id
+        from public.accounts
+        where lower(email) = $1
+        limit 1
+      `, [email]);
+      accountId = rows[0]?.id || null;
+    }
+  }
+
+  if (!accountId || !isUuid(accountId)) {
+    sendJson(res, 200, {
+      route: 'default',
+      activeHost: false,
+    });
+    return;
+  }
+
+  const currentDeviceId = String(req.headers['x-tng-device-id'] || '');
+
+  const { rows } = await bffPool.query(`
+    select
+      hs.id,
+      hs.status::text as status,
+      hs.controller_device_id,
+      hs.display_device_id,
+      hs.updated_at
+    from public.host_sessions hs
+    join public.device_sessions ds
+      on ds.id = hs.controller_device_id
+    where hs.host_account_id = $1::uuid
+      and hs.ended_at is null
+      and hs.status::text in ('pairing', 'ready', 'live')
+      and ds.status::text = 'active'
+      and (ds.expires_at is null or ds.expires_at > now())
+    order by hs.updated_at desc
+    limit 1
+  `, [accountId]);
+
+  const session = rows[0] || null;
+  if (!session) {
+    sendJson(res, 200, {
+      route: 'default',
+      activeHost: false,
+    });
+    return;
+  }
+
+  const sameController =
+    isUuid(currentDeviceId) &&
+    String(session.controller_device_id) === currentDeviceId;
+
+  sendJson(res, 200, {
+    route: sameController ? 'host' : 'display',
+    activeHost: true,
+    sameController,
+    displayPaired: Boolean(session.display_device_id),
+  });
+}
+
 async function proxyTngApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
@@ -2499,6 +2633,11 @@ async function handleBffApi(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if ((req.url || '').startsWith('/tng-api/account-route')) {
+      await handleTngAccountRoute(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-api')) {
       await proxyTngApi(req, res);
       return;
