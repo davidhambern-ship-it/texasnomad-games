@@ -393,104 +393,6 @@ async function handleTngStats(req, res) {
   });
 }
 
-async function resetMulattoAccountData() {
-  const targetEmail = 'mulattonomad@icloud.com';
-  const client = await bffPool.connect();
-
-  try {
-    await client.query('begin');
-
-    const publicAccount = await client.query(
-      `select id from public.accounts where lower(email) = lower($1) limit 1 for update`,
-      [targetEmail],
-    );
-
-    if (publicAccount.rowCount > 0) {
-      await client.query(
-        `delete from public.accounts where lower(email) = lower($1)`,
-        [targetEmail],
-      );
-    }
-
-    const authUser = await client.query(
-      `select id from neon_auth."user" where lower(email) = lower($1) limit 1 for update`,
-      [targetEmail],
-    );
-
-    const authUserId = authUser.rows[0]?.id || null;
-
-    if (authUserId) {
-      const childColumns = await client.query(
-        `select table_name, column_name
-         from information_schema.columns
-         where table_schema = 'neon_auth'
-           and column_name in ('userId', 'user_id')
-           and table_name <> 'user'`,
-      );
-
-      for (const row of childColumns.rows) {
-        if (!/^[A-Za-z0-9_]+$/.test(row.table_name)) continue;
-        if (!/^(userId|user_id)$/.test(row.column_name)) continue;
-        await client.query(
-          `delete from neon_auth."${row.table_name}" where "${row.column_name}" = $1`,
-          [authUserId],
-        );
-      }
-
-      const verificationIdentifier = await client.query(
-        `select 1
-         from information_schema.columns
-         where table_schema = 'neon_auth'
-           and table_name = 'verification'
-           and column_name = 'identifier'
-         limit 1`,
-      );
-
-      if (verificationIdentifier.rowCount > 0) {
-        await client.query(
-          `delete from neon_auth.verification where lower(identifier) = lower($1)`,
-          [targetEmail],
-        );
-      }
-
-      await client.query(
-        `delete from neon_auth."user" where id = $1`,
-        [authUserId],
-      );
-    }
-
-    await client.query(
-      `delete from public.legacy_player_stats where lower(email) = lower($1)`,
-      [targetEmail],
-    ).catch(() => {});
-
-    await client.query('commit');
-
-    return {
-      email: targetEmail,
-      deletedPublicAccount: publicAccount.rowCount > 0,
-      deletedAuthUser: Boolean(authUserId),
-    };
-  } catch (error) {
-    await client.query('rollback').catch(() => {});
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
-async function handleOneTimeMulattoReset(req, res) {
-  if (!['GET', 'POST'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
-    });
-    return;
-  }
-
-  const result = await resetMulattoAccountData();
-  sendJson(res, 200, { ok: true, ...result });
-}
-
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, {
@@ -3097,11 +2999,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if ((req.url || '') === '/__tng-reset-mulattonomad-4ec98f2d7b6a') {
-      await handleOneTimeMulattoReset(req, res);
-      return;
-    }
-
     if ((req.url || '').startsWith('/tng-stats')) {
       await handleTngStats(req, res);
       return;
@@ -3203,13 +3100,6 @@ server.on('upgrade', async (request, socket, head) => {
   }
 });
 
-server.listen(port, '0.0.0.0', async () => {
+server.listen(port, '0.0.0.0', () => {
   console.log(`TNG staging frontend listening on port ${port}`);
-
-  try {
-    const resetResult = await resetMulattoAccountData();
-    console.log('[TNG one-time Mulatto reset]', JSON.stringify(resetResult));
-  } catch (error) {
-    console.error('[TNG one-time Mulatto reset failed]', error);
-  }
 });
