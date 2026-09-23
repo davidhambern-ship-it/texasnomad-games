@@ -1,7 +1,8 @@
-import React, { useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { authClient } from "@/lib/neonAuth";
 import { useAuth } from "@/lib/AuthContext";
+import { tngApi } from "@/api/tngApi";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -42,9 +43,64 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [routing, setRouting] = useState(false);
+
+  useEffect(() => {
+    if (isLoadingAuth || !isAuthenticated || routing) return undefined;
+
+    let cancelled = false;
+
+    async function routeSignedInDevice() {
+      setRouting(true);
+
+      let destination = nextPath;
+
+      try {
+        const isExplicitPlayerJoin = nextPath.startsWith('/join/');
+        const savedRole = localStorage.getItem('tng_connection_role');
+        const currentDeviceId = localStorage.getItem('tng_device_id');
+
+        if (!isExplicitPlayerJoin && savedRole !== 'player') {
+          const route = await tngApi.host.getAccountRoute(currentDeviceId);
+
+          if (!cancelled && route?.route === 'display') {
+            // A second signed-in device for an already-active Host account
+            // becomes the Game Display. Force a fresh pairing screen instead
+            // of reusing an old/stale display token from this browser.
+            localStorage.removeItem('tng_display_device_id');
+            localStorage.removeItem('tng_display_token');
+            destination = '/display';
+          } else if (!cancelled && route?.route === 'host' && nextPath === '/') {
+            destination = '/host';
+          }
+        }
+      } catch (routeError) {
+        console.warn('[TNG Login] account device routing check failed:', routeError);
+      }
+
+      if (!cancelled) {
+        window.location.replace(destination);
+      }
+    }
+
+    routeSignedInDevice();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, isLoadingAuth, nextPath, routing]);
 
   if (!isLoadingAuth && isAuthenticated) {
-    return <Navigate to={nextPath} replace />;
+    return (
+      <div className="min-h-screen bg-[#05030b] flex items-center justify-center px-4 text-center">
+        <div>
+          <Loader2 className="w-10 h-10 mx-auto mb-5 text-[#BC13FE] animate-spin" />
+          <div style={{ ...PS2, fontSize: 8, color: '#BC13FE' }}>
+            ROUTING THIS DEVICE…
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const handleSubmit = async (e) => {
@@ -54,7 +110,8 @@ export default function Login() {
     try {
       const result = await authClient.signIn.email({ email, password });
       if (result?.error) throw new Error(result.error.message || "Invalid email or password");
-      window.location.replace(nextPath);
+      const next = encodeURIComponent(nextPath);
+      window.location.replace(`/login?next=${next}`);
     } catch (err) {
       setError(err.message || "Invalid email or password");
     } finally {
@@ -68,7 +125,7 @@ export default function Login() {
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: `${window.location.origin}${nextPath}`,
+        callbackURL: `${window.location.origin}/login?next=${encodeURIComponent(nextPath)}`,
         additionalParams: {
           prompt: "select_account",
         },
