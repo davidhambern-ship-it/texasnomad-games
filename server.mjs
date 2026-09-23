@@ -38,6 +38,10 @@ const TNG_API_ORIGIN =
   process.env.TNG_API_ORIGIN ||
   'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech';
 
+const NEON_AUTH_ORIGIN =
+  process.env.NEON_AUTH_ORIGIN ||
+  'https://ep-little-base-aveev14q.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
+
 const LIVE_BROWSER_ORIGINS = new Set(
   (process.env.TNG_LIVE_ALLOWED_ORIGINS ||
     'https://texasnomadgames.com,https://www.texasnomadgames.com')
@@ -61,6 +65,76 @@ function isAllowedBrowserOrigin(origin) {
   } catch {
     return false;
   }
+}
+
+async function readRawBody(req) {
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  return chunks.length ? Buffer.concat(chunks) : null;
+}
+
+function rewriteAuthCookie(cookie) {
+  return String(cookie || '')
+    .replace(/;\s*Domain=[^;]+/ig, '')
+    .replace(/;\s*Path=[^;]+/ig, '; Path=/');
+}
+
+async function proxyNeonAuth(req, res) {
+  const sourceUrl = new URL(req.url || '/', 'http://localhost');
+  const suffix = sourceUrl.pathname.replace(/^\/neon-auth/, '') || '/';
+  const targetUrl = `${NEON_AUTH_ORIGIN}${suffix}${sourceUrl.search}`;
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value == null) continue;
+    const lower = key.toLowerCase();
+    if (['host', 'content-length', 'connection'].includes(lower)) continue;
+    headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
+  }
+
+  // Preserve the real TexasNomadGames browser origin so Neon Auth can enforce
+  // its trusted-origin checks, while telling upstream which first-party host
+  // the browser actually contacted.
+  headers.set('x-forwarded-host', String(req.headers.host || 'auth.texasnomadgames.com'));
+  headers.set('x-forwarded-proto', 'https');
+
+  const body =
+    ['GET', 'HEAD'].includes(String(req.method || 'GET').toUpperCase())
+      ? undefined
+      : await readRawBody(req);
+
+  const response = await fetch(targetUrl, {
+    method: req.method || 'GET',
+    headers,
+    body,
+    redirect: 'manual',
+  });
+
+  const passthroughHeaders = [
+    'content-type',
+    'cache-control',
+    'location',
+    'etag',
+    'last-modified',
+  ];
+
+  for (const name of passthroughHeaders) {
+    const value = response.headers.get(name);
+    if (value) res.setHeader(name, value);
+  }
+
+  const setCookies =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
+
+  if (setCookies.length) {
+    res.setHeader('Set-Cookie', setCookies.map(rewriteAuthCookie));
+  }
+
+  const payload = Buffer.from(await response.arrayBuffer());
+  res.writeHead(response.status);
+  res.end(payload);
 }
 
 const { Pool } = pg;
@@ -2970,10 +3044,12 @@ const server = http.createServer(async (req, res) => {
   const origin = String(req.headers.origin || '');
   if (isAllowedBrowserOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Vary', 'Origin');
     res.setHeader(
       'Access-Control-Allow-Headers',
-      'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code',
+      String(req.headers['access-control-request-headers'] ||
+        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
@@ -2989,6 +3065,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if ((req.url || '').startsWith('/neon-auth')) {
+      await proxyNeonAuth(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-api/account-route')) {
       await handleTngAccountRoute(req, res);
       return;
