@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import { base44 } from '@/api/base44Client';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
-import CPUOpponentSelect from '@/components/cpu/CPUOpponentSelect';
 
 // ── Particle System ──────────────────────────────────────────────────────────
 function Particles() {
@@ -92,7 +91,7 @@ function NeonSign({ text, color = '#BC13FE', size = 'md' }) {
 }
 
 // ── Arcade Cabinet ───────────────────────────────────────────────────────────
-function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSinglePlayer, creating, roomCode, setRoomCode }) {
+function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creating, roomCode, setRoomCode }) {
   const [hovered, setHovered] = useState(false);
   const [joining, setJoining] = useState(false);
 
@@ -197,19 +196,6 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, onSin
             }}
           >
             {creating === game.id ? '⚙ CREATING…' : '⚡ CREATE ROOM'}
-          </button>
-
-          {/* VS CPU — Single Player */}
-          <button
-            onClick={() => onSinglePlayer?.(game)}
-            className="w-full py-2.5 rounded-lg font-heading text-xs tracking-[0.1em] uppercase transition-all duration-200 active:scale-95"
-            style={{
-              background: 'transparent',
-              border: `1px solid #FFD70040`,
-              color: '#FFD700aa',
-            }}
-          >
-            🤖 {game.id === 'word-search' || game.id === 'viral' ? 'VS AI — Single Player' : 'VS CPU — Single Player'}
           </button>
 
           <div className="flex gap-2">
@@ -538,16 +524,12 @@ const COMING_SOON = [
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
 
-// Map game ID to gameKey used in character system
-const GAME_ID_TO_KEY = { 'square-biz': 'squareBiz', bff: 'bff', hangman: 'hangman', spades: 'spades', 'word-search': 'wordSearch', viral: 'viral', 'name-that-track': 'nameThatTrack', sudoku: 'sudoku' };
-
 export default function Games() {
   const navigate = useNavigate();
   const [creating, setCreating] = useState(null);
   const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
-  const [cpuSelectGame, setCpuSelectGame] = useState(null); // { id, title, gameKey }
   const [constructionGame, setConstructionGame] = useState(null);
 
   const generateRoomCode = () => {
@@ -594,120 +576,6 @@ export default function Games() {
 
   const setRoomCode = (gameId, val) => {
     setRoomCodes(prev => ({ ...prev, [gameId]: val }));
-  };
-
-  const handleSinglePlayer = async (game) => {
-    // See That! — pure single-player, navigate directly
-    if (game.id === 'see-that') {
-      navigate('/games/see-that');
-      return;
-    }
-    // Sudoku solo — no CPU picker, just create a room and go
-    if (game.id === 'sudoku') {
-      setCreating('sudoku');
-      try {
-        const code = generateRoomCode();
-        await base44.entities.GameRoom.create({
-          room_code: code,
-          game_id: 'sudoku',
-          status: 'waiting',
-          host_connected: false,
-          screen_connected: false,
-          players_connected: 0,
-          created_from_host_panel: false,
-          game_state: { single_player: true },
-        });
-        navigate(`/games/sudoku?room=${code}&creator=1`);
-      } catch (e) {
-        console.error('Failed to create Sudoku room', e);
-      } finally {
-        setCreating(null);
-      }
-      return;
-    }
-    // BFF has a special "vs AI Team" mode — skip character picker and go directly
-    if (game.id === 'bff') {
-      setCreating('bff');
-      try {
-        const code = generateRoomCode();
-        await base44.entities.GameRoom.create({
-          room_code: code,
-          game_id: 'bff',
-          status: 'waiting',
-          host_connected: false,
-          screen_connected: false,
-          players_connected: 0,
-          created_from_host_panel: false,
-          game_state: { vs_ai: true },
-        });
-        navigate(`/games/bff?room=${code}&creator=1&vsai=1`);
-      } catch (e) {
-        console.error('Failed to create BFF vs AI room', e);
-      } finally {
-        setCreating(null);
-      }
-      return;
-    }
-    // TXD Dominoes — goes to host panel with CPU auto-added
-    if (game.id === 'txd') {
-      navigate('/games/dominoes/host');
-      return;
-    }
-    // VIRAL! uses in-game AI selector - create room with default AI
-    if (game.id === 'viral') {
-      setCreating('viral');
-      try {
-        const code = generateRoomCode();
-        await base44.entities.GameRoom.create({
-          room_code: code,
-          game_id: 'viral',
-          status: 'waiting',
-          host_connected: false,
-          screen_connected: false,
-          players_connected: 0,
-          created_from_host_panel: false,
-          game_state: { single_player: true },
-        });
-        navigate(`/games/viral?room=${code}&creator=1&cpu=dexter`);
-      } catch (e) {
-        console.error('Failed to create VIRAL room', e);
-      } finally {
-        setCreating(null);
-      }
-      return;
-    }
-    // Other games use character picker
-    const gameKey = GAME_ID_TO_KEY[game.id];
-    if (!gameKey) {
-      console.error('No gameKey found for game:', game.id);
-      return;
-    }
-    console.log('Setting CPU select game:', { id: game.id, title: game.title, gameKey, path: game.path });
-    setCpuSelectGame({ id: game.id, title: game.title, gameKey, path: game.path });
-  };
-
-  const handleCpuSelected = async (character) => {
-    if (!cpuSelectGame) return;
-    // Create a room and navigate with CPU opponent param
-    const code = generateRoomCode();
-    try {
-      await base44.entities.GameRoom.create({
-        room_code: code,
-        game_id: cpuSelectGame.id,
-        status: 'waiting',
-        host_connected: false,
-        screen_connected: false,
-        players_connected: 0,
-        created_from_host_panel: false,
-        game_state: { cpu_opponent_id: character.id, single_player: true },
-      });
-      navigate(`${cpuSelectGame.path}?room=${code}&creator=1&cpu=${character.id}`);
-      // Don't setCpuSelectGame(null) here — navigation unmounts the page anyway,
-      // and calling it before navigation causes the overlay to disappear first.
-    } catch (e) {
-      console.error('Failed to create CPU room', e);
-      setCpuSelectGame(null);
-    }
   };
 
   const toggleMute = () => {
@@ -787,7 +655,6 @@ export default function Games() {
                   featured={true}
                   onCreateRoom={handleCreateRoom}
                   onJoinRoom={handleJoinRoom}
-                  onSinglePlayer={handleSinglePlayer}
                   creating={creating}
                   roomCode={roomCodes[featuredGame.id]}
                   setRoomCode={(v) => setRoomCode(featuredGame.id, v)}
@@ -813,7 +680,6 @@ export default function Games() {
                   featured={false}
                   onCreateRoom={handleCreateRoom}
                   onJoinRoom={handleJoinRoom}
-                  onSinglePlayer={handleSinglePlayer}
                   creating={creating}
                   roomCode={roomCodes[game.id]}
                   setRoomCode={(v) => setRoomCode(game.id, v)}
@@ -878,18 +744,6 @@ export default function Games() {
 
       {constructionGame && (
         <ConstructionModal game={constructionGame} onClose={() => setConstructionGame(null)} />
-      )}
-
-      {/* CPU Opponent Select Overlay */}
-      {cpuSelectGame && (
-        <div className="fixed inset-0 z-[200] overflow-y-auto">
-          <CPUOpponentSelect
-            gameKey={cpuSelectGame.gameKey}
-            gameName={cpuSelectGame.title}
-            onSelect={handleCpuSelected}
-            onBack={() => setCpuSelectGame(null)}
-          />
-        </div>
       )}
 
       {/* Mute button */}
