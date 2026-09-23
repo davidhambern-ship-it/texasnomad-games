@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { authClient } from "@/lib/neonAuth";
+import { authClient, waitForNeonSession } from "@/lib/neonAuth";
 import { useAuth } from "@/lib/AuthContext";
 import { tngApi } from "@/api/tngApi";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
@@ -46,43 +46,61 @@ export default function Login() {
   const [routing, setRouting] = useState(false);
   const routeAttemptedRef = useRef(false);
 
+  async function routeSignedInDevice() {
+    setRouting(true);
+
+    const session = await waitForNeonSession();
+    if (!session?.user) {
+      throw new Error('TNG could not confirm your signed-in session. Please try again.');
+    }
+
+    try {
+      await tngApi.profile.get();
+    } catch (profileError) {
+      if (profileError?.code === 'PROFILE_NOT_FOUND' || profileError?.status === 404) {
+        const next = encodeURIComponent(nextPath);
+        window.location.replace(`/onboarding?next=${next}`);
+        return;
+      }
+      throw profileError;
+    }
+
+    let destination = nextPath;
+
+    try {
+      const isExplicitPlayerJoin = nextPath.startsWith('/join/');
+      const currentDeviceId = localStorage.getItem('tng_device_id');
+
+      if (!isExplicitPlayerJoin) {
+        const route = await tngApi.host.getAccountRoute(currentDeviceId);
+
+        if (route?.route === 'display') {
+          localStorage.setItem('tng_connection_role', 'display');
+          localStorage.removeItem('tng_display_device_id');
+          localStorage.removeItem('tng_display_token');
+          destination = '/display';
+        } else if (route?.route === 'host') {
+          localStorage.setItem('tng_connection_role', 'host_controller');
+          if (nextPath === '/') destination = '/host';
+        }
+      }
+    } catch (routeError) {
+      console.warn('[TNG Login] account device routing check failed:', routeError);
+    }
+
+    window.location.replace(destination);
+  }
+
   useEffect(() => {
     if (isLoadingAuth || !isAuthenticated || routeAttemptedRef.current) return;
 
     routeAttemptedRef.current = true;
-    setRouting(true);
-
-    async function routeSignedInDevice() {
-      let destination = nextPath;
-
-      try {
-        const isExplicitPlayerJoin = nextPath.startsWith('/join/');
-        const currentDeviceId = localStorage.getItem('tng_device_id');
-
-        if (!isExplicitPlayerJoin) {
-          // The live account session is authoritative. A stale role saved in
-          // this browser must never override the fact that this same account
-          // is already hosting from another device.
-          const route = await tngApi.host.getAccountRoute(currentDeviceId);
-
-          if (route?.route === 'display') {
-            localStorage.setItem('tng_connection_role', 'display');
-            localStorage.removeItem('tng_display_device_id');
-            localStorage.removeItem('tng_display_token');
-            destination = '/display';
-          } else if (route?.route === 'host') {
-            localStorage.setItem('tng_connection_role', 'host_controller');
-            if (nextPath === '/') destination = '/host';
-          }
-        }
-      } catch (routeError) {
-        console.warn('[TNG Login] account device routing check failed:', routeError);
-      }
-
-      window.location.replace(destination);
-    }
-
-    routeSignedInDevice();
+    routeSignedInDevice().catch((routeError) => {
+      console.error('[TNG Login] post-auth routing failed:', routeError);
+      routeAttemptedRef.current = false;
+      setRouting(false);
+      setError(routeError?.message || 'TNG could not finish signing you in.');
+    });
   }, [isAuthenticated, isLoadingAuth, nextPath]);
 
   if (!isLoadingAuth && isAuthenticated) {
@@ -113,8 +131,7 @@ export default function Login() {
       });
 
       if (!signInResult?.error) {
-        const next = encodeURIComponent(nextPath);
-        window.location.replace(`/login?next=${next}`);
+        await routeSignedInDevice();
         return;
       }
 
@@ -128,6 +145,10 @@ export default function Login() {
       });
 
       if (!signUpResult?.error) {
+        const session = await waitForNeonSession();
+        if (!session?.user) {
+          throw new Error('Your TNG login was created, but the session did not finish starting. Please try Continue once more.');
+        }
         const next = encodeURIComponent(nextPath);
         window.location.replace(`/onboarding?next=${next}`);
         return;
