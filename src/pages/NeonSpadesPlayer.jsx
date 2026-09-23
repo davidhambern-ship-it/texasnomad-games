@@ -7,6 +7,7 @@ import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { quitTngGame } from '@/lib/quitTngGame';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -422,14 +423,14 @@ export default function NeonSpadesPlayer({ roomCode }) {
                   <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/25">
                     Player View
                   </div>
-                  <Link
-                    to="/"
-                    replace
+                  <button
+                    type="button"
+                    onClick={() => quitTngGame(roomCode)}
                     className="mt-2 inline-flex rounded-md border border-white/15 px-2.5 py-1.5 text-[7px] uppercase tracking-widest text-white/45 transition hover:border-[#FFD700]/50 hover:text-[#FFD700]"
                     style={PS2}
                   >
                     EXIT VIEW
-                  </Link>
+                  </button>
                 </div>
               </div>
             </div>
