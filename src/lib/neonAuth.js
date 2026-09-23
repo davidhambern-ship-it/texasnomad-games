@@ -32,6 +32,25 @@ export async function getNeonSession() {
   return unwrapSession(result);
 }
 
+export async function waitForNeonSession({
+  attempts = 12,
+  initialDelayMs = 150,
+} = {}) {
+  let lastSession = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    lastSession = await getNeonSession().catch(() => null);
+    if (lastSession?.user) return lastSession;
+
+    if (attempt < attempts - 1) {
+      const delay = initialDelayMs + Math.min(attempt * 175, 850);
+      await new Promise((resolve) => window.setTimeout(resolve, delay));
+    }
+  }
+
+  return lastSession;
+}
+
 export async function getNeonAuthToken() {
   // TNG backend deployment 29 verifies Neon Auth's active opaque session
   // token directly. Do not call the optional JWT/token plugin routes:

@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 import {
   authClient,
   getNeonSession,
+  waitForNeonSession,
   mapNeonUser,
 } from '@/lib/neonAuth';
 
@@ -20,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const isLoadingPublicSettings = false;
   const appPublicSettings = null;
 
-  const checkUserAuth = async () => {
+  const checkUserAuth = useCallback(async () => {
     setIsLoadingAuth(true);
     setAuthError(null);
 
@@ -30,19 +31,9 @@ export const AuthProvider = ({ children }) => {
         window.location.pathname.startsWith('/login') ||
         window.location.pathname.startsWith('/register');
 
-      const attempts = isAuthHandoff ? 5 : 1;
-      let session = null;
-
-      for (let attempt = 0; attempt < attempts; attempt += 1) {
-        session = await getNeonSession();
-        if (session?.user) break;
-
-        if (attempt < attempts - 1) {
-          await new Promise((resolve) =>
-            window.setTimeout(resolve, 250 + (attempt * 350))
-          );
-        }
-      }
+      const session = isAuthHandoff
+        ? await waitForNeonSession({ attempts: 12, initialDelayMs: 150 })
+        : await getNeonSession();
 
       const neonUser = session?.user || null;
 
@@ -65,13 +56,13 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  };
+  }, []);
 
   const checkAppState = checkUserAuth;
 
   useEffect(() => {
     checkUserAuth();
-  }, []);
+  }, [checkUserAuth]);
 
   const logout = async (shouldRedirect = true) => {
     try {
