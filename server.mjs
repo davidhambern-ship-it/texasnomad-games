@@ -285,7 +285,7 @@ async function handleTngStats(req, res) {
       await client.query('begin');
 
       const roomResult = await client.query(
-        `select id, game_id, status::text as status, started_at, completed_at
+        `select id, game_id, status::text as status, started_at, completed_at, display_state
          from public.game_rooms
          where room_code = $1
          order by created_at desc
@@ -333,10 +333,22 @@ async function handleTngStats(req, res) {
           [room.id],
         );
 
+        const state = room.display_state?.gameState || room.display_state || {};
+        const phase = String(state?.phase || state?.round_stage || '').toLowerCase();
+        const stateCompleted =
+          state?.match_complete === true ||
+          state?.matchComplete === true ||
+          ['finished', 'complete', 'completed', 'game_over', 'game-over'].includes(phase);
+        const roomCompleted =
+          Boolean(room.completed_at) ||
+          room.status === 'completed' ||
+          completedStat.rowCount > 0 ||
+          stateCompleted;
+
         const qualifies =
           participant.role === 'player' &&
           Boolean(room.started_at) &&
-          completedStat.rowCount === 0;
+          !roomCompleted;
 
         if (qualifies) {
           const quitEvent = await client.query(
