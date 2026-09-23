@@ -7,6 +7,7 @@ import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { getPublicTngName } from '@/lib/publicTngName';
+import { quitTngGame } from '@/lib/quitTngGame';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -152,14 +153,14 @@ export default function NeonWordSearchPlayer({ roomCode }) {
             >
               {status}
             </div>
-            <Link
-              to="/"
-              replace
+            <button
+              type="button"
+              onClick={() => quitTngGame(roomCode)}
               className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] tracking-widest uppercase text-white/40"
               style={PS2}
             >
               EXIT
-            </Link>
+            </button>
           </div>
         </header>
 
