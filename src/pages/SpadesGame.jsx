@@ -6,9 +6,7 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesRoundSummary from '@/components/spades/SpadesRoundSummary';
 import SpadesMatchOver from '@/components/spades/SpadesMatchOver';
-import CPUOpponentSelect from '@/components/cpu/CPUOpponentSelect';
-import { fillEmptySeatsWithTNCharacters, selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
-import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
+import { selectCPUCard, CPU_ACTION_DELAY, replaceCPUWithHuman } from '@/lib/spadesCPU';
 import NeonSpadesPlayer from '@/pages/NeonSpadesPlayer';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateFullDeck, shuffleDeck, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat, calculateScore } from '@/lib/spadesRules';
@@ -61,7 +59,7 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_spades_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_spades_${roomCode}`, '1'); setShowInstructions(false); };
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'spades', 'viewer');
-  const isSinglePlayer = !!(cpuId);
+  const isSinglePlayer = false; // Active Spades is real-player multiplayer only.
   const cpuCharacter = isSinglePlayer
     ? TEXASNOMAD_CHARACTERS.find(c => c.id === cpuId) || null
     : null;
@@ -132,15 +130,14 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         setJoinFlow('spectating');
       }
     } else if (isCreator) {
-      // Room creator — ask for name first, sit, then auto-fill CPU opponents (no partner picker)
+      // Room creator — ask for name, take a real seat, then wait for real players.
       const firstEmpty = emptySeatsIn(players);
       const seatTarget = firstEmpty.length > 0 ? firstEmpty[0] : null;
       requireName(async () => {
         if (seatTarget) {
           await sitInSeat(seatTarget);
         }
-        // Auto-fill remaining seats with random CPU characters, no prompt
-        setJoinFlow('cpu_auto');
+        setJoinFlow('seated');
       });
     } else {
       // Joiner — show Play/Spectate
@@ -156,14 +153,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     if (myRole === 'player' && playerId) registerUser(playerId, 'player', mySeatNumber);
     else if (myRole === 'spectator' && playerId) registerUser(playerId, 'spectator');
   }, [myRole, playerId, mySeatNumber, registerUser]);
-
-  // ── Auto-fill CPU seats when creator skips partner picker ──
-  useEffect(() => {
-    if (joinFlow !== 'cpu_auto' || !room) return;
-    if (!mySeatNumber) return; // wait until we're seated
-    // Pass the chosen CPU partner character (from URL param) and the current seat number
-    handlePlayAgainstCPU(cpuCharacter, mySeatNumber);
-  }, [joinFlow, mySeatNumber, room]);
 
   // ── Keep mySeatNumber in sync if the game state updates my seat ──
   useEffect(() => {
@@ -604,49 +593,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
     setJoinFlow('spectating');
   };
 
-  // After sitting, if there are empty seats → show CPU choice
-  const handleAfterSit = () => {
-    const emptySeats = emptySeatsIn(players);
-    if (emptySeats.length > 0 && !gs.cpu_enabled) {
-      setJoinFlow('cpu');
-    } else {
-      setJoinFlow('seated');
-    }
-  };
-
-  // CPU choice handlers — use TexasNomad characters
-  const handlePlayAgainstCPU = async (partnerCharacter = null, knownSeatNumber = null) => {
-    if (!room) return;
-    const currentPlayers = gs.players || [];
-
-    // Use knownSeatNumber if passed (avoids stale mySeatNumber state), fall back to state
-    const activeSeat = knownSeatNumber ?? mySeatNumber;
-
-    // If a partner character was chosen, assign them to the player's partner seat
-    const specificAssignments = {};
-    if (partnerCharacter && activeSeat) {
-      const partnerSeat = activeSeat === 1 ? 3 : activeSeat === 3 ? 1 : activeSeat === 2 ? 4 : 2;
-      specificAssignments[partnerSeat] = partnerCharacter.id;
-    }
-
-    const filledPlayers = fillEmptySeatsWithTNCharacters(currentPlayers, gs, specificAssignments);
-    await updateState({
-      players: filledPlayers,
-      cpu_enabled: true,
-      dealer_seat: gs.dealer_seat || mySeatNumber || 1,
-      phase: 'setup',
-    });
-    setJoinFlow('seated');
-  };
-
-  const handleWaitForRealPlayers = async () => {
-    setJoinFlow('seated');
-    if (audioRef.current) {
-      audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(() => {});
-    }
-  };
-
   // Play a card
   const handlePlayCard = async (card) => {
     if (!room || myRole !== 'player' || gs.phase !== 'playing') return;
@@ -801,8 +747,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
   const joinable = joinableSeatsFor(players);
   const emptySeats = emptySeatsIn(players);
 
-  // CPU choice dialog: removed — now auto-fills randomly
-  const showCPUChoice = false;
   // Play/Spectate dialog: shown to new visitors
   const showJoinChoice = joinFlow === 'choose' && !loading && room;
 
@@ -888,29 +832,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
         </div>
       )}
 
-      {/* ── CPU choice dialog: partner picker ────────────────────────────── */}
-      {showCPUChoice && (
-        <div className="fixed inset-0 z-[200] overflow-y-auto bg-black/80 backdrop-blur-sm">
-          <div className="relative">
-            {/* "Wait for Players" escape hatch at top */}
-            <div className="absolute top-4 right-4 z-10">
-              <button
-                onClick={handleWaitForRealPlayers}
-                className="px-4 py-2 rounded-xl border border-white/20 text-white/50 text-[7px] tracking-widest uppercase hover:border-white/40 hover:text-white/80 transition-all"
-                style={PS2}>
-                👥 Wait for Players Instead
-              </button>
-            </div>
-            <CPUOpponentSelect
-              gameKey="spades"
-              gameName="Spades"
-              onSelect={(character) => handlePlayAgainstCPU(character, mySeatNumber)}
-              onBack={() => setJoinFlow('choose')}
-            />
-          </div>
-        </div>
-      )}
-
       <SpadesHeader
         roomCode={roomCode}
         room={room}
@@ -943,10 +864,6 @@ function SpadesViewer({ roomCode, isCreator, cpuId }) {
             emptySeats={emptySeats}
             onSitInSeat={sitInSeat}
             roomCode={roomCode}
-            // CPU choice is handled locally — never pass it down to SpadesTable
-            cpuChoiceShown={false}
-            onPlayAgainstCPU={handlePlayAgainstCPU}
-            onWaitForRealPlayers={handleWaitForRealPlayers}
             onChooseSpectate={handleChooseSpectate}
             onChooseSit={handleChooseSit}
             onPlayCard={handlePlayCard}
