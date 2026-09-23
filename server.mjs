@@ -84,6 +84,312 @@ function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
 }
 
+async function resolveAuthenticatedTngAccount(req) {
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    return {
+      ok: false,
+      status: 401,
+      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
+    };
+  }
+
+  const response = await fetch(`${TNG_API_ORIGIN}/profile`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      payload: payload?.error
+        ? payload
+        : { error: { code: 'PROFILE_LOOKUP_FAILED', message: 'TNG could not identify this signed-in account.' } },
+    };
+  }
+
+  const profile = payload?.profile || {};
+  let accountId =
+    profile.id ||
+    profile.accountId ||
+    profile.account_id ||
+    payload.accountId ||
+    payload.account_id ||
+    null;
+
+  if (!accountId) {
+    const handle = String(
+      profile.handle ||
+      profile.normalizedHandle ||
+      profile.normalized_handle ||
+      ''
+    ).replace(/^@/, '').trim().toLowerCase();
+
+    if (handle) {
+      const { rows } = await bffPool.query(
+        `select account_id from public.player_profiles
+         where normalized_handle = $1 or lower(handle) = $1
+         limit 1`,
+        [handle],
+      );
+      accountId = rows[0]?.account_id || null;
+    }
+  }
+
+  if (!accountId || !isUuid(accountId)) {
+    return {
+      ok: false,
+      status: 404,
+      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'Create your TNG profile first.' } },
+    };
+  }
+
+  const { rows } = await bffPool.query(
+    `select id, lower(email) as email
+     from public.accounts
+     where id = $1::uuid
+     limit 1`,
+    [accountId],
+  );
+
+  const account = rows[0] || null;
+  if (!account) {
+    return {
+      ok: false,
+      status: 404,
+      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'TNG account record was not found.' } },
+    };
+  }
+
+  return { ok: true, account };
+}
+
+async function claimLegacyPlayerStats(accountId, email) {
+  const client = await bffPool.connect();
+  try {
+    await client.query('begin');
+
+    const legacy = await client.query(
+      `select email, game_id, games_played, wins, losses, quit_games, total_score, best_score
+       from public.legacy_player_stats
+       where lower(email) = lower($1)
+         and claimed_at is null
+       for update`,
+      [email],
+    );
+
+    for (const row of legacy.rows) {
+      await client.query(
+        `insert into public.player_game_stats
+          (account_id, game_id, games_played, wins, losses, quit_games, total_score, best_score, updated_at)
+         values ($1::uuid, $2, $3, $4, $5, $6, $7, $8, now())
+         on conflict (account_id, game_id) do update set
+           games_played = public.player_game_stats.games_played + excluded.games_played,
+           wins = public.player_game_stats.wins + excluded.wins,
+           losses = public.player_game_stats.losses + excluded.losses,
+           quit_games = public.player_game_stats.quit_games + excluded.quit_games,
+           total_score = public.player_game_stats.total_score + excluded.total_score,
+           best_score = greatest(public.player_game_stats.best_score, excluded.best_score),
+           updated_at = now()`,
+        [
+          accountId,
+          row.game_id,
+          Number(row.games_played || 0),
+          Number(row.wins || 0),
+          Number(row.losses || 0),
+          Number(row.quit_games || 0),
+          Number(row.total_score || 0),
+          Number(row.best_score || 0),
+        ],
+      );
+    }
+
+    if (legacy.rows.length > 0) {
+      await client.query(
+        `update public.legacy_player_stats
+         set claimed_at = now(), updated_at = now()
+         where lower(email) = lower($1)
+           and claimed_at is null`,
+        [email],
+      );
+    }
+
+    await client.query('commit');
+    return legacy.rows.length;
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function handleTngStats(req, res) {
+  const sourceUrl = new URL(req.url || '/', 'http://localhost');
+  const path = sourceUrl.pathname.replace(/^\/tng-stats/, '') || '/';
+
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  const { account } = resolved;
+
+  if (req.method === 'GET' && path === '/profile') {
+    await claimLegacyPlayerStats(account.id, account.email);
+
+    const { rows } = await bffPool.query(
+      `select game_id, games_played, wins, losses, quit_games, total_score, best_score, updated_at
+       from public.player_game_stats
+       where account_id = $1::uuid
+       order by game_id`,
+      [account.id],
+    );
+
+    sendJson(res, 200, {
+      playerStats: rows.map((row) => ({
+        gameId: row.game_id,
+        gamesPlayed: Number(row.games_played || 0),
+        wins: Number(row.wins || 0),
+        losses: Number(row.losses || 0),
+        quitGames: Number(row.quit_games || 0),
+        totalScore: Number(row.total_score || 0),
+        bestScore: Number(row.best_score || 0),
+        updatedAt: row.updated_at || null,
+      })),
+    });
+    return;
+  }
+
+  if (req.method === 'POST' && path === '/quit') {
+    const body = await readJsonBody(req).catch(() => ({}));
+    const roomCode = String(body?.roomCode || req.headers['x-tng-room-code'] || '')
+      .trim()
+      .toUpperCase();
+
+    if (!/^[A-Z0-9]{4,8}$/.test(roomCode)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_ROOM_CODE', message: 'A valid TNG room code is required.' },
+      });
+      return;
+    }
+
+    const client = await bffPool.connect();
+    try {
+      await client.query('begin');
+
+      const roomResult = await client.query(
+        `select id, game_id, status::text as status, started_at, completed_at
+         from public.game_rooms
+         where room_code = $1
+         order by created_at desc
+         limit 1
+         for update`,
+        [roomCode],
+      );
+      const room = roomResult.rows[0] || null;
+
+      if (!room) {
+        await client.query('rollback');
+        sendJson(res, 404, {
+          error: { code: 'ROOM_NOT_FOUND', message: 'That TNG room was not found.' },
+        });
+        return;
+      }
+
+      const participantResult = await client.query(
+        `select id, role::text as role, left_at
+         from public.room_participants
+         where room_id = $1::uuid
+           and account_id = $2::uuid
+         limit 1
+         for update`,
+        [room.id, account.id],
+      );
+      const participant = participantResult.rows[0] || null;
+
+      if (!participant) {
+        await client.query('rollback');
+        sendJson(res, 404, {
+          error: { code: 'PLAYER_NOT_IN_ROOM', message: 'This TNG account is not in that room.' },
+        });
+        return;
+      }
+
+      let countedQuit = false;
+
+      if (!participant.left_at) {
+        const completedStat = await client.query(
+          `select 1
+           from public.game_stat_events
+           where room_id = $1::uuid
+           limit 1`,
+          [room.id],
+        );
+
+        const qualifies =
+          participant.role === 'player' &&
+          Boolean(room.started_at) &&
+          completedStat.rowCount === 0;
+
+        if (qualifies) {
+          const quitEvent = await client.query(
+            `insert into public.player_quit_events (room_id, account_id, game_id)
+             values ($1::uuid, $2::uuid, $3)
+             on conflict (room_id, account_id) do nothing
+             returning room_id`,
+            [room.id, account.id, room.game_id],
+          );
+
+          if (quitEvent.rowCount > 0) {
+            countedQuit = true;
+            await client.query(
+              `insert into public.player_game_stats
+                (account_id, game_id, games_played, wins, losses, quit_games, total_score, best_score, updated_at)
+               values ($1::uuid, $2, 0, 0, 0, 1, 0, 0, now())
+               on conflict (account_id, game_id) do update set
+                 quit_games = public.player_game_stats.quit_games + 1,
+                 updated_at = now()`,
+              [account.id, room.game_id],
+            );
+          }
+        }
+
+        await client.query(
+          `update public.room_participants
+           set left_at = now(), last_heartbeat_at = now()
+           where id = $1::uuid`,
+          [participant.id],
+        );
+      }
+
+      await client.query('commit');
+      sendJson(res, 200, {
+        leftRoom: true,
+        countedQuit,
+        gameId: room.game_id,
+        roomCode,
+      });
+      return;
+    } catch (error) {
+      await client.query('rollback').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  sendJson(res, 405, {
+    error: { code: 'METHOD_NOT_ALLOWED', message: 'Unsupported TNG stats operation.' },
+  });
+}
+
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, {
@@ -2687,6 +2993,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/tng-api')) {
       await proxyTngApi(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/tng-stats')) {
+      await handleTngStats(req, res);
       return;
     }
 
