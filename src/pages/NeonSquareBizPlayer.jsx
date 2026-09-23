@@ -11,6 +11,7 @@ import {
 } from '@/components/square-biz/SquareBizShow';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { getPublicTngName } from '@/lib/publicTngName';
+import { quitTngGame } from '@/lib/quitTngGame';
 
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
 const X_COLOR = '#ff1593';
@@ -148,9 +149,9 @@ export default function NeonSquareBizPlayer({ roomCode }) {
             <div className="rounded-lg border px-2.5 py-2 text-[6px] uppercase tracking-widest" style={{ ...MONO, borderColor: `${markColor}66`, color: markColor }}>
               {statusFor(gameState)}
             </div>
-            <Link to="/" replace className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] uppercase tracking-widest text-white/40" style={MONO}>
+            <button type="button" onClick={() => quitTngGame(roomCode)} className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] uppercase tracking-widest text-white/40" style={MONO}>
               EXIT
-            </Link>
+            </button>
           </div>
         </header>
 
