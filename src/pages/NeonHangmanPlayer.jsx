@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -416,7 +417,7 @@ export default function NeonHangmanPlayer({ roomCode }) {
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <div className="text-[6px] text-white/25 uppercase" style={PS2}>SEAT {seat}</div>
-                          <div className="mt-1 truncate text-[11px] text-white/70">{player.name || `Seat ${seat}`}</div>
+                          <div className="mt-1 truncate text-[11px] text-white/70">{getPublicTngName(player, `Seat ${seat}`)}</div>
                         </div>
                         <div className="text-lg text-[#FFD700]" style={PS2}>{Number(scores?.[String(seat)] || 0)}</div>
                       </div>
