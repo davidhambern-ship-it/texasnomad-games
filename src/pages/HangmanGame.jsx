@@ -117,7 +117,7 @@ function HangmanViewer({ roomCode, cpuId }) {
   const gs = room?.game_state || {};
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_hangman_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_hangman_${roomCode}`, '1'); setShowInstructions(false); };
-  const isSinglePlayer = !!(cpuId || gs.single_player);
+  const isSinglePlayer = false; // Active Hangman uses human players only.
   const { recordStat, resetStat } = useGameStats('hangman');
   const statRecordedRef = useRef(false);
 
