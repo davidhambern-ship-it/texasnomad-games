@@ -310,14 +310,14 @@ function LiveStatusInline() {
     .filter(Boolean)
     .join('\n\n');
 
-  const crawlDuration = Math.max(360, Math.ceil(storyText.length / 6));
+  const crawlDuration = Math.max(180, Math.ceil(storyText.length / 12));
 
   return (
     <div className="border border-cyber-purple/40 rounded-lg p-4 bg-midnight-void/80 box-glow-purple scanline-overlay relative overflow-hidden lg:h-[340px] flex flex-col cursor-default">
       <style>{`
         @keyframes tng-story-crawl {
           0% {
-            transform: rotateX(12deg) translateY(92%);
+            transform: rotateX(12deg) translateY(18px);
           }
           100% {
             transform: rotateX(12deg) translateY(-115%);
@@ -336,7 +336,7 @@ function LiveStatusInline() {
           width: 94%;
           max-width: 620px;
           margin: 0 auto;
-          padding-top: 72%;
+          padding-top: 8px;
           white-space: pre-line;
           text-align: center;
           color: rgba(255, 204, 0, 0.9);
