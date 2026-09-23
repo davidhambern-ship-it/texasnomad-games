@@ -23,6 +23,7 @@ import {
 import { tngApi } from '@/api/tngApi';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -137,7 +138,7 @@ function TeamCard({
               }}
               title={canSelectFaceoff ? 'Choose for faceoff' : undefined}
             >
-              {player.playerName || player.name || 'Player'}
+              {getPublicTngName(player)}
               {selected ? ' ★' : ''}
             </button>
           );
@@ -329,7 +330,7 @@ function PlayerRow({ player, team, onAssign, busy, voiceLive }) {
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
           <div className="truncate text-[10px] font-bold text-white/75">
-            {player.playerName || player.name || 'Player'}
+            {getPublicTngName(player)}
           </div>
           <div className="mt-0.5 text-[5px] uppercase text-white/22" style={PS2}>
             SEAT {player.seatNumber ?? '—'}
@@ -488,7 +489,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
     const verified = Boolean(backendVoiceVerified[playerId]);
     return {
       playerId,
-      name: player.playerName || player.name || 'Player',
+      name: getPublicTngName(player),
       status: live ? 'live' : verified ? 'reconnecting' : 'off',
     };
   });
@@ -775,7 +776,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   {roundStage === 'dysfunction_defense' ? 'DEFENDING' : 'ANSWERING'}
                 </div>
                 <div className="mt-1 text-sm font-black text-[#FFD700]">
-                  {activePlayer.playerName || activePlayer.name}
+                  {getPublicTngName(activePlayer)}
                 </div>
                 <div className="mt-1 font-heading text-2xl text-white">
                   {answerSeconds ?? 0}s
@@ -806,7 +807,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 FACEOFF WON
               </div>
               <div className="mt-2 text-sm font-black text-white">
-                {activePlayer?.playerName || activePlayer?.name || 'Winner'} chooses PLAY or PASS on their device.
+                {getPublicTngName(activePlayer, 'Winner')} chooses PLAY or PASS on their device.
               </div>
             </div>
           )}
@@ -873,7 +874,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                     <div className="mt-1 text-[8px] text-white/35">
                       {players
                         .filter((player) => dysfunction.side_assignments?.[String(player.playerId)] === 'A')
-                        .map((player) => player.playerName || player.name)
+                        .map((player) => getPublicTngName(player))
                         .join(' · ') || '—'}
                     </div>
                   </div>
@@ -883,7 +884,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                     <div className="mt-1 text-[8px] text-white/35">
                       {players
                         .filter((player) => dysfunction.side_assignments?.[String(player.playerId)] === 'B')
-                        .map((player) => player.playerName || player.name)
+                        .map((player) => getPublicTngName(player))
                         .join(' · ') || '—'}
                     </div>
                   </div>
@@ -917,7 +918,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
               {roundStage === 'dysfunction_defense' && (
                 <div className="mt-2 text-[10px] text-[#FFD700]">
-                  Defense mic is live for {activePlayer?.playerName || activePlayer?.name || 'the selected family member'}.
+                  Defense mic is live for {getPublicTngName(activePlayer, 'the selected family member')}.
                 </div>
               )}
 
@@ -1006,7 +1007,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 {gameState.buzzer_open
                   ? 'BUZZERS LIVE'
                   : gameState.buzz_winner
-                    ? `${gameState.buzz_winner.playerName || 'PLAYER'} BUZZED`
+                    ? `${getPublicTngName(gameState.buzz_winner, 'PLAYER')} BUZZED`
                     : 'BUZZERS HIDDEN'}
               </div>
             </div>
