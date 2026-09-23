@@ -325,14 +325,6 @@ async function handleTngStats(req, res) {
       let countedQuit = false;
 
       if (!participant.left_at) {
-        const completedStat = await client.query(
-          `select 1
-           from public.game_stat_events
-           where room_id = $1::uuid
-           limit 1`,
-          [room.id],
-        );
-
         const state = room.display_state?.gameState || room.display_state || {};
         const phase = String(state?.phase || state?.round_stage || '').toLowerCase();
         const stateCompleted =
@@ -342,7 +334,6 @@ async function handleTngStats(req, res) {
         const roomCompleted =
           Boolean(room.completed_at) ||
           room.status === 'completed' ||
-          completedStat.rowCount > 0 ||
           stateCompleted;
 
         const qualifies =
