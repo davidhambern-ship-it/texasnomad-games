@@ -7,6 +7,7 @@ import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -33,7 +34,7 @@ function statusFor(gameState, myTeam, buzzWinner) {
   const phase = gameState.phase || 'waiting';
 
   if (buzzWinner) {
-    return buzzWinner.playerName ? `${buzzWinner.playerName} BUZZED` : 'BUZZ LOCKED';
+    return `${getPublicTngName(buzzWinner, 'PLAYER')} BUZZED`;
   }
   if (gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active') return 'BUZZERS OPEN';
   if (gameState.steal_mode) return myTeam === gameState.control_team ? 'DEFEND THE BANK' : 'STEAL CHANCE';
@@ -113,14 +114,14 @@ function DysfunctionPlayerPanel({
             <div className="text-[6px] text-[#BC13FE]" style={PS2}>SIDE A</div>
             <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreA) || 0}</div>
             <div className="mt-2 text-[9px] text-white/40">
-              {sideAPlayers.map((player) => player.playerName || player.name).join(' · ') || '—'}
+              {sideAPlayers.map((player) => getPublicTngName(player)).join(' · ') || '—'}
             </div>
           </div>
           <div className="rounded-xl border border-[#FF5F1F]/35 bg-[#FF5F1F]/5 p-3 text-center">
             <div className="text-[6px] text-[#FF5F1F]" style={PS2}>SIDE B</div>
             <div className="mt-1 font-heading text-3xl text-white">{Number(dysfunction.scoreB) || 0}</div>
             <div className="mt-2 text-[9px] text-white/40">
-              {sideBPlayers.map((player) => player.playerName || player.name).join(' · ') || '—'}
+              {sideBPlayers.map((player) => getPublicTngName(player)).join(' · ') || '—'}
             </div>
           </div>
         </div>
@@ -166,7 +167,7 @@ function DysfunctionPlayerPanel({
                     }}
                   >
                     <div className="font-heading text-base">
-                      {player.playerName || player.name || 'Player'}
+                      {getPublicTngName(player) || 'Player'}
                     </div>
                   </button>
                 );
@@ -189,10 +190,10 @@ function DysfunctionPlayerPanel({
             <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
               {Object.entries(votes).map(([voterId, targetId]) => (
                 <div key={voterId} className="rounded-lg border border-white/8 bg-white/[.02] px-2 py-2 text-[10px] text-white/55">
-                  <strong>{playerById[voterId]?.playerName || playerById[voterId]?.name || 'Player'}</strong>
+                  <strong>{getPublicTngName(playerById[voterId])}</strong>
                   {' → '}
                   <strong className="text-[#FFD700]">
-                    {playerById[String(targetId)]?.playerName || playerById[String(targetId)]?.name || 'Player'}
+                    {getPublicTngName(playerById[String(targetId)])}
                   </strong>
                 </div>
               ))}
@@ -227,7 +228,7 @@ function DysfunctionPlayerPanel({
               THE DEFENSE
             </div>
             <div className="mt-2 font-heading text-2xl text-white">
-              {defensePlayer?.playerName || defensePlayer?.name || 'Player'}
+              {getPublicTngName(defensePlayer)}
             </div>
             <div className="mt-2 font-heading text-4xl text-[#FFD700]">{defenseSeconds ?? 0}s</div>
             <div className="mt-2 text-[10px] text-white/40">
