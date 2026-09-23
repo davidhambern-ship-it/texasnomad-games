@@ -50,7 +50,7 @@ export default function TngOnboarding() {
           return;
         }
 
-        setStage('profile');
+        setStage('invite');
       } catch (initializeError) {
         if (cancelled) return;
         setError(initializeError.message || 'TNG onboarding could not load.');
@@ -99,12 +99,66 @@ export default function TngOnboarding() {
     return <Status text={error || 'TNG ONBOARDING IS UNAVAILABLE'} error />;
   }
 
+  if (stage === 'invite') {
+    return (
+      <AuthLayout
+        icon={UserRound}
+        title="Create Your FREE TNG Account"
+        subtitle="Unlock the community side of TexasNomad Games"
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[.04] p-5">
+            <div className="text-[7px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+              FREE PLAYER ACCOUNT
+            </div>
+
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              Playing is one thing. A TNG account is what lets you become part of the community.
+              There is no charge and no subscription.
+            </p>
+
+            <div className="mt-4 grid gap-2 text-sm text-white/65">
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                <span className="text-[#FFD700]">@handle</span> — your public TNG name that other players see
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Add and keep <span className="text-white">friends</span>, including players and hosts
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Send <span className="text-white">direct messages</span> to your TNG friends
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Send and receive <span className="text-white">game invites</span>
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Keep your <span className="text-white">game stats, wins, scores, and host history</span> tied to one permanent TNG ID
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setStage('profile')}
+            className="w-full h-12 rounded-lg border-2 border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/15 transition-colors"
+            style={{ ...PS2, fontSize: 8 }}
+          >
+            CREATE MY FREE TNG ACCOUNT →
+          </button>
+
+          <p className="text-center text-[10px] leading-relaxed text-white/25">
+            Your real account name stays private to your TNG account. The community sees your public @handle.
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (stage === 'profile') {
     return (
       <AuthLayout
         icon={UserRound}
-        title="Create Your TNG ID"
-        subtitle="Your permanent game identity"
+        title="Choose Your TNG Identity"
+        subtitle="Your @handle is what the community sees"
       >
         <form onSubmit={createProfile} className="space-y-4">
           {error && (
@@ -163,7 +217,7 @@ export default function TngOnboarding() {
             className="w-full h-12 rounded-lg border-2 border-[#BC13FE] bg-[#BC13FE]/20 text-[#BC13FE] disabled:opacity-50"
             style={{ ...PS2, fontSize: 8 }}
           >
-            {submitting ? 'CREATING…' : 'CREATE TNG PROFILE'}
+            {submitting ? 'CREATING…' : 'CREATE FREE TNG ACCOUNT'}
           </button>
         </form>
       </AuthLayout>
