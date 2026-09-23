@@ -134,7 +134,7 @@ function WordSearchViewer({ roomCode, cpuId }) {
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_word-search_${roomCode}`, '1'); setShowInstructions(false); };
   const { room, loading, updateState, registerUser } = useGameRoom(roomCode, 'word-search', 'viewer');
   const gs = room?.game_state || {};
-  const isSinglePlayer = !!(cpuId || gs.single_player);
+  const isSinglePlayer = false; // AI opponents are reserved for dedicated 1-player games.
   const { recordStat, resetStat } = useGameStats('word-search');
   const statRecordedRef = useRef(false);
 
@@ -592,17 +592,14 @@ function WordSearchViewer({ roomCode, cpuId }) {
 
 // ── Setup Panel ───────────────────────────────────────────────────────────────
 function SetupPanel({ isSinglePlayer, cpuCharacter, onStart, seatNumber }) {
-  const [mode, setMode] = useState(isSinglePlayer ? 'ai' : 'single');
+  const [mode, setMode] = useState('single');
   const [difficulty, setDifficulty] = useState('simpleton');
   const [category, setCategory] = useState('random');
 
-  const modeOptions = isSinglePlayer
-    ? [{ value: 'ai', label: 'Player vs AI' }]
-    : [
-        { value: 'single', label: 'Single Player' },
-        { value: 'multi', label: 'Multiplayer' },
-        { value: 'ai', label: 'Player vs AI' },
-      ];
+  const modeOptions = [
+    { value: 'single', label: 'Single Player' },
+    { value: 'multi', label: 'Multiplayer' },
+  ];
 
   const diffOptions = [
     { value: 'simpleton', label: 'Simpleton — 10 words' },
