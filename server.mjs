@@ -1616,9 +1616,15 @@ async function applyBffHostAction(room, body = {}, players = []) {
       throw new Error('Family Dysfunction needs at least four connected members from the winning family for a 2v2 finale.');
     }
 
-    const voiceOffers = next.voice_offers || {};
-    if (!roster.every((player) => Boolean(voiceOffers[String(player.playerId)]?.sdp))) {
-      throw new Error('Every Family Dysfunction player must have their microphone on before the finale starts.');
+    const relayConnected = next.voice_relay_connected || {};
+    const verified = next.voice_verified || {};
+    if (!roster.every((player) =>
+      Boolean(
+        relayConnected[String(player.playerId)]
+        || verified[String(player.playerId)]
+      )
+    )) {
+      throw new Error('Every Family Dysfunction player must be connected to room audio before the finale starts.');
     }
 
     const sideAssignments = {};
