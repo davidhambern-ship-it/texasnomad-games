@@ -64,7 +64,7 @@ function SquareBizViewer({ roomCode, cpuId }) {
   const gs = room?.game_state || {};
   const [showInstructions, setShowInstructions] = useState(() => !sessionStorage.getItem(`tn_instructions_square-biz_${roomCode}`));
   const dismissInstructions = () => { sessionStorage.setItem(`tn_instructions_square-biz_${roomCode}`, '1'); setShowInstructions(false); };
-  const isSinglePlayer = !!(cpuId || gs.single_player);
+  const isSinglePlayer = false; // Active Square Biz is human-vs-human only.
   const cpuCharacter = isSinglePlayer
     ? TEXASNOMAD_CHARACTERS.find(c => c.id === (cpuId || gs.cpu_opponent_id)) || TEXASNOMAD_CHARACTERS[0]
     : null;
