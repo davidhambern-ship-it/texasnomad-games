@@ -22,7 +22,7 @@ const TN_TEAM = TEXASNOMAD_CHARACTERS;
 export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
-  const isVsAI = params.get('vsai') === '1';
+  const isVsAI = false; // Active BFF is multiplayer-only; AI is reserved for dedicated 1-player games.
   const isNeonRoom = params.get('neon') === '1';
   if (!roomCode) { window.location.href = '/'; return null; }
   if (isNeonRoom && !isVsAI) return <NeonBFFPlayer roomCode={roomCode.toUpperCase()} />;
