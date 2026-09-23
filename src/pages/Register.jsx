@@ -105,7 +105,7 @@ export default function Register() {
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Join the Arena"
+      title="Create Your TNG Login"
       footer={
         <>
           Already have an account?{' '}
@@ -115,10 +115,10 @@ export default function Register() {
     >
       <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,215,0,0.4)', background: 'rgba(255,215,0,0.06)', textAlign: 'center' }}>
         <div style={{ ...PS2, fontSize: 8, background: 'linear-gradient(90deg, #BC13FE, #FFD700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 6 }}>
-          ⚡ TNG LIVE TEST
+          ⚡ TNG ACCOUNT
         </div>
         <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.65)', lineHeight: 1.9, margin: 0 }}>
-          Create your own test account. No Base44 access is required.
+          This login belongs to the new TNG system and will carry into your TNG profile.
         </p>
       </div>
 
@@ -195,7 +195,7 @@ export default function Register() {
           }}
         >
           {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
-          {loading ? 'CREATING ACCOUNT…' : 'CREATE TEST ACCOUNT →'}
+          {loading ? 'CREATING ACCOUNT…' : 'CREATE TNG ACCOUNT →'}
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </button>
       </form>
