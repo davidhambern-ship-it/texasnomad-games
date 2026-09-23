@@ -6,6 +6,7 @@ import Header from '@/components/home/Header';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import TngSocialPanel from '@/components/social/TngSocialPanel';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -142,8 +143,8 @@ export default function NeonPlayerProfile() {
   }
 
   const joined = profile.createdAt || profile.created_at || profile.onboardingCompletedAt || profile.onboarding_completed_at;
-  const displayName = profile.displayName || profile.display_name || user?.full_name || 'Nomad';
-  const handle = profile.handle || '';
+  const accountName = profile.displayName || profile.display_name || user?.full_name || 'Nomad';
+  const publicName = getPublicTngName(profile, 'Nomad');
   const hostSessions = Number(hostStats?.sessionsHosted || hostStats?.sessions_hosted || 0);
   const hostedGames = Number(hostStats?.gamesCompleted || hostStats?.games_completed || 0);
 
@@ -162,9 +163,9 @@ export default function NeonPlayerProfile() {
                 <div className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
                   PERMANENT TNG ID
                 </div>
-                <h1 className="mt-2 text-4xl font-bold">{displayName}</h1>
-                <div className="mt-1 font-mono text-lg text-[#FFD700]">
-                  {handle ? `@${handle}` : 'Handle unavailable'}
+                <h1 className="mt-2 text-4xl font-bold text-[#FFD700]">{publicName}</h1>
+                <div className="mt-2 text-xs text-white/30">
+                  Account name: {accountName}
                 </div>
               </div>
             </div>
