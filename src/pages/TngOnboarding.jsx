@@ -5,6 +5,7 @@ import { Gamepad2, Loader2, MonitorUp, UserRound } from 'lucide-react';
 import AuthLayout from '@/components/AuthLayout';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
+import { waitForNeonSession } from '@/lib/neonAuth';
 import {
   createPreviewTngProfile,
   getPreviewTngProfile,
@@ -15,7 +16,7 @@ const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 export default function TngOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, isAuthenticated, isLoadingAuth } = useAuth();
+  const { user, isAuthenticated, isLoadingAuth, checkUserAuth } = useAuth();
 
   const requestedNext = new URLSearchParams(location.search).get('next');
   const nextPath =
@@ -36,6 +37,16 @@ export default function TngOnboarding() {
 
     async function initialize() {
       if (!isAuthenticated || !user) {
+        const recoveredSession = await waitForNeonSession({
+          attempts: 12,
+          initialDelayMs: 150,
+        });
+
+        if (recoveredSession?.user) {
+          await checkUserAuth();
+          return;
+        }
+
         navigate('/login', { replace: true });
         return;
       }
@@ -63,7 +74,7 @@ export default function TngOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, isLoadingAuth, navigate, nextPath, user]);
+  }, [checkUserAuth, isAuthenticated, isLoadingAuth, navigate, nextPath, user]);
 
   async function createProfile(event) {
     event.preventDefault();
