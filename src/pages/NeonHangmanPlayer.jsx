@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { quitTngGame } from '@/lib/quitTngGame';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -186,14 +187,14 @@ export default function NeonHangmanPlayer({ roomCode }) {
             >
               {statusLabel}
             </div>
-            <Link
-              to="/"
-              replace
+            <button
+              type="button"
+              onClick={() => quitTngGame(roomCode)}
               className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] tracking-widest uppercase text-white/40"
               style={PS2}
             >
               EXIT
-            </Link>
+            </button>
           </div>
         </header>
 
