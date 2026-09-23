@@ -115,7 +115,7 @@ export default function TngOnboarding() {
 
           <label className="block">
             <span className="block mb-2 text-white/50 uppercase" style={{ ...PS2, fontSize: 7 }}>
-              Display Name
+              Account Name
             </span>
             <input
               value={displayName}
@@ -124,13 +124,13 @@ export default function TngOnboarding() {
               maxLength={50}
               required
               className="w-full h-12 px-4 rounded-lg border border-[#BC13FE]/40 bg-black/60 text-white outline-none focus:border-[#BC13FE]"
-              placeholder="The name players will see"
+              placeholder="Your name (kept with your account)"
             />
           </label>
 
           <label className="block">
             <span className="block mb-2 text-white/50 uppercase" style={{ ...PS2, fontSize: 7 }}>
-              Unique TNG Handle
+              Public TNG Handle
             </span>
             <div className="flex h-12 rounded-lg border border-[#FFD700]/40 bg-black/60 focus-within:border-[#FFD700]">
               <span className="flex items-center pl-4 text-[#FFD700]">@</span>
@@ -153,8 +153,9 @@ export default function TngOnboarding() {
           </label>
 
           <p className="text-xs leading-relaxed text-white/35">
-            Your TNG profile is a system-owned live stats identity. Creating a Google/Neon Auth
-            login does not complete TNG setup.
+            Your <span className="text-[#FFD700]">@handle</span> is your public TNG identity. It is what other
+            players see in rooms, friends, messages, invites, profiles, and community activity.
+            Your account name stays attached to your private TNG account record.
           </p>
 
           <button
