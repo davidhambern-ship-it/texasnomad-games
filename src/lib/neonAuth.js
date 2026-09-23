@@ -1,9 +1,8 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-// Live-test staging is intentionally pinned to the Neon development Auth
-// endpoint. Do not proxy Auth through Vercel and do not let a stale Vercel
-// environment variable silently point this build at another Neon branch.
+// Use the current production Neon Auth endpoint until the first-party
+// auth.texasnomadgames.com DNS path has been verified live.
 export const NEON_AUTH_URL =
   'https://ep-little-base-aveev14q.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
 
