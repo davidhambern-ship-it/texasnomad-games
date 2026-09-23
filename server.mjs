@@ -165,7 +165,7 @@ async function handleTngAccountRoute(req, res) {
     where hs.host_account_id = $1::uuid
       and hs.ended_at is null
       and hs.status::text in ('pairing', 'ready', 'live')
-      and ds.status::text = 'active'
+      and ds.status::text in ('connected', 'active')
       and (ds.expires_at is null or ds.expires_at > now())
     order by hs.updated_at desc
     limit 1
