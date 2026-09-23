@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 
 import {
   authClient,
@@ -21,7 +21,7 @@ export const AuthProvider = ({ children }) => {
   const isLoadingPublicSettings = false;
   const appPublicSettings = null;
 
-  const checkUserAuth = async () => {
+  const checkUserAuth = useCallback(async () => {
     setIsLoadingAuth(true);
     setAuthError(null);
 
@@ -56,13 +56,13 @@ export const AuthProvider = ({ children }) => {
       setIsLoadingAuth(false);
       setAuthChecked(true);
     }
-  };
+  }, []);
 
   const checkAppState = checkUserAuth;
 
   useEffect(() => {
     checkUserAuth();
-  }, []);
+  }, [checkUserAuth]);
 
   const logout = async (shouldRedirect = true) => {
     try {
