@@ -16,6 +16,12 @@ const BFF_API_BASE =
     ? '/bff-api'
     : 'https://tng-live-production.up.railway.app/bff-api');
 
+const STATS_API_BASE =
+  import.meta.env.VITE_TNG_STATS_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-stats'
+    : 'https://tng-live-production.up.railway.app/tng-stats');
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -93,6 +99,15 @@ export const tngApi = {
   profile: {
     get: () => request('/api/profile'),
     create: (data) => request('/api/profile', { method:'POST', body:data }),
+  },
+  stats: {
+    getProfile: () => request('/profile', { apiBase:STATS_API_BASE }),
+    quitGame: (roomCode) => request('/quit', {
+      method:'POST',
+      roomCode,
+      apiBase:STATS_API_BASE,
+      body:{ roomCode },
+    }),
   },
   devices: {
     create: (data) => request('/api/device-session', { method:'POST', body:data }),
