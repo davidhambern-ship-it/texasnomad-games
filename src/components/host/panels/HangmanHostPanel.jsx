@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -31,7 +32,7 @@ function Scoreboard({ players, scores, setterSeat, currentTurnSeat }) {
             }}
           >
             <div className="text-[7px] text-white/30 uppercase" style={PS2}>Seat {seat}</div>
-            <div className="mt-2 text-sm text-white/75 truncate">{player.name || `Seat ${seat}`}</div>
+            <div className="mt-2 text-sm text-white/75 truncate">{getPublicTngName(player, `Seat ${seat}`)}</div>
             <div className="mt-2 text-2xl text-[#FFD700]" style={PS2}>{Number(scores?.[String(seat)] || 0)}</div>
             <div className="mt-2 text-[6px] uppercase tracking-widest" style={{ ...PS2, color: isSetter ? '#BC13FE' : isTurn ? '#4ade80' : 'rgba(255,255,255,.25)' }}>
               {isSetter ? 'BOARD SETTER' : isTurn ? 'TURN' : 'WAITING'}

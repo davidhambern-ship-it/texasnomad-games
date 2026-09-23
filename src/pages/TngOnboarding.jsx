@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Gamepad2, Loader2, MonitorUp, UserRound } from 'lucide-react';
 
 import AuthLayout from '@/components/AuthLayout';
+import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import {
   createPreviewTngProfile,
@@ -50,7 +51,7 @@ export default function TngOnboarding() {
           return;
         }
 
-        setStage('profile');
+        setStage('invite');
       } catch (initializeError) {
         if (cancelled) return;
         setError(initializeError.message || 'TNG onboarding could not load.');
@@ -71,6 +72,7 @@ export default function TngOnboarding() {
 
     try {
       await createPreviewTngProfile(user, { displayName, handle });
+      await tngApi.stats.getProfile().catch(() => null);
       setStage('welcome');
     } catch (profileError) {
       setError(profileError.message || 'Your TNG profile could not be created.');
@@ -99,12 +101,66 @@ export default function TngOnboarding() {
     return <Status text={error || 'TNG ONBOARDING IS UNAVAILABLE'} error />;
   }
 
+  if (stage === 'invite') {
+    return (
+      <AuthLayout
+        icon={UserRound}
+        title="Create Your FREE TNG Account"
+        subtitle="Unlock the community side of TexasNomad Games"
+      >
+        <div className="space-y-5">
+          <div className="rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[.04] p-5">
+            <div className="text-[7px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
+              FREE PLAYER ACCOUNT
+            </div>
+
+            <p className="mt-3 text-sm leading-relaxed text-white/60">
+              Playing is one thing. A TNG account is what lets you become part of the community.
+              There is no charge and no subscription.
+            </p>
+
+            <div className="mt-4 grid gap-2 text-sm text-white/65">
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                <span className="text-[#FFD700]">@handle</span> — your public TNG name that other players see
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Add and keep <span className="text-white">friends</span>, including players and hosts
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Send <span className="text-white">direct messages</span> to your TNG friends
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Send and receive <span className="text-white">game invites</span>
+              </div>
+              <div className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">
+                Keep your <span className="text-white">game stats, wins, scores, and host history</span> tied to one permanent TNG ID
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setStage('profile')}
+            className="w-full h-12 rounded-lg border-2 border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/15 transition-colors"
+            style={{ ...PS2, fontSize: 8 }}
+          >
+            CREATE MY FREE TNG ACCOUNT →
+          </button>
+
+          <p className="text-center text-[10px] leading-relaxed text-white/25">
+            TNG keeps your account name on your profile record, but the community sees your public @handle.
+          </p>
+        </div>
+      </AuthLayout>
+    );
+  }
+
   if (stage === 'profile') {
     return (
       <AuthLayout
         icon={UserRound}
-        title="Create Your TNG ID"
-        subtitle="Your permanent game identity"
+        title="Choose Your TNG Identity"
+        subtitle="Your @handle is what the community sees"
       >
         <form onSubmit={createProfile} className="space-y-4">
           {error && (
@@ -115,7 +171,7 @@ export default function TngOnboarding() {
 
           <label className="block">
             <span className="block mb-2 text-white/50 uppercase" style={{ ...PS2, fontSize: 7 }}>
-              Display Name
+              Account Name
             </span>
             <input
               value={displayName}
@@ -124,13 +180,13 @@ export default function TngOnboarding() {
               maxLength={50}
               required
               className="w-full h-12 px-4 rounded-lg border border-[#BC13FE]/40 bg-black/60 text-white outline-none focus:border-[#BC13FE]"
-              placeholder="The name players will see"
+              placeholder="Your name (kept with your account)"
             />
           </label>
 
           <label className="block">
             <span className="block mb-2 text-white/50 uppercase" style={{ ...PS2, fontSize: 7 }}>
-              Unique TNG Handle
+              Public TNG Handle
             </span>
             <div className="flex h-12 rounded-lg border border-[#FFD700]/40 bg-black/60 focus-within:border-[#FFD700]">
               <span className="flex items-center pl-4 text-[#FFD700]">@</span>
@@ -153,8 +209,9 @@ export default function TngOnboarding() {
           </label>
 
           <p className="text-xs leading-relaxed text-white/35">
-            Your TNG profile is a system-owned live stats identity. Creating a Google/Neon Auth
-            login does not complete TNG setup.
+            Your <span className="text-[#FFD700]">@handle</span> is your public TNG identity. It is what other
+            players see in rooms, friends, messages, invites, profiles, and community activity.
+            Your account name stays attached to your TNG account record; your @handle is the name shown publicly.
           </p>
 
           <button
@@ -162,7 +219,7 @@ export default function TngOnboarding() {
             className="w-full h-12 rounded-lg border-2 border-[#BC13FE] bg-[#BC13FE]/20 text-[#BC13FE] disabled:opacity-50"
             style={{ ...PS2, fontSize: 8 }}
           >
-            {submitting ? 'CREATING…' : 'CREATE TNG PROFILE'}
+            {submitting ? 'CREATING…' : 'CREATE FREE TNG ACCOUNT'}
           </button>
         </form>
       </AuthLayout>

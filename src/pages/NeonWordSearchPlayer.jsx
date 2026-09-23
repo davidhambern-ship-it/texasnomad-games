@@ -6,6 +6,8 @@ import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { getPublicTngName } from '@/lib/publicTngName';
+import { quitTngGame } from '@/lib/quitTngGame';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -151,14 +153,14 @@ export default function NeonWordSearchPlayer({ roomCode }) {
             >
               {status}
             </div>
-            <Link
-              to="/"
-              replace
+            <button
+              type="button"
+              onClick={() => quitTngGame(roomCode)}
               className="rounded-lg border border-white/15 px-2.5 py-2 text-[6px] tracking-widest uppercase text-white/40"
               style={PS2}
             >
               EXIT
-            </Link>
+            </button>
           </div>
         </header>
 
@@ -276,7 +278,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: player.color }} />
-                            <span className="truncate text-[10px] text-white/70">{player.name}</span>
+                            <span className="truncate text-[10px] text-white/70">{getPublicTngName(player)}</span>
                           </div>
                           <div className="mt-1 text-[5px] text-white/25 uppercase" style={PS2}>SEAT {seat}</div>
                         </div>
@@ -365,7 +367,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
               <div className="shrink-0 text-center text-[10px] text-white/35">
                 {canInteract
                   ? 'Drag across a word. Your selection ends the turn.'
-                  : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`}
+                  : `Waiting for ${getPublicTngName(activePlayer, `Seat ${activeSeat}`)}.`}
               </div>
             )}
           </aside>

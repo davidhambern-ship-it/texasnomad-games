@@ -7,6 +7,7 @@ import {
   SquareBizCueCard,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
 const X_COLOR = '#ff1593';
@@ -45,9 +46,9 @@ function PlayerCard({ player, mark, current }) {
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[7px] uppercase tracking-[.18em]" style={{ ...MONO, color }}>PLAYER {mark}</div>
-          <div className="mt-1 truncate text-base font-black text-white">{player?.name || 'WAITING…'}</div>
+          <div className="mt-1 truncate text-base font-black text-white">{player ? getPublicTngName(player) : 'WAITING…'}</div>
           <div className="mt-1 text-[10px] text-white/35">
-            {player?.handle ? `@${player.handle}` : player ? 'CONNECTED' : 'OPEN'}
+            {player ? 'CONNECTED' : 'OPEN'}
           </div>
         </div>
         <div
@@ -220,7 +221,7 @@ export default function NeonSquareBizHostPanel({ controllerId }) {
             <div className="mt-2 max-h-[125px] space-y-1 overflow-y-auto pr-1">
               {queued.length ? queued.map((player) => (
                 <div key={player.accountId} className="flex items-center justify-between rounded-lg border border-white/8 bg-white/[.02] px-2 py-1.5 text-[10px]">
-                  <span className="truncate text-white/55">{player.name}</span>
+                  <span className="truncate text-white/55">{getPublicTngName(player)}</span>
                   <span className="ml-2 text-[8px] text-[#ffd633]/60">#{player.queuePosition || '—'}</span>
                 </div>
               )) : (

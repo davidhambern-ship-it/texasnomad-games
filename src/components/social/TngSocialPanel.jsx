@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Check, Mail, MessageCircle, Search, Send, UserPlus, Users, X } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -157,8 +158,7 @@ export default function TngSocialPanel() {
                 {social.incomingRequests.map((request) => (
                   <div key={request.friendshipId} className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-black/30 p-2.5">
                     <div className="min-w-0">
-                      <div className="truncate font-bold text-white/85">{request.displayName}</div>
-                      <div className="text-xs text-[#FFD700]/70">@{request.handle}</div>
+                      <div className="truncate font-bold text-[#FFD700]">{getPublicTngName(request)}</div>
                     </div>
                     <div className="flex gap-1.5">
                       <MiniButton
@@ -194,7 +194,7 @@ export default function TngSocialPanel() {
               <div className="space-y-2">
                 {social.invites.map((invite) => (
                   <div key={invite.id} className="rounded-lg border border-white/8 bg-black/30 p-2.5">
-                    <div className="text-sm font-bold text-white/80">{invite.sender.displayName}</div>
+                    <div className="text-sm font-bold text-[#FFD700]">{getPublicTngName(invite.sender)}</div>
                     <div className="mt-1 text-xs text-white/35">
                       {GAME_LABELS[invite.gameId] || invite.gameId} · Room {invite.roomCode}
                     </div>
@@ -236,7 +236,7 @@ export default function TngSocialPanel() {
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onKeyDown={(event) => event.key === 'Enter' && search()}
-                placeholder="Search name or @handle"
+                placeholder="Search @handle"
                 className="min-w-0 flex-1 rounded-lg border border-[#BC13FE]/25 bg-black/45 px-3 py-2 text-sm text-white outline-none focus:border-[#BC13FE]"
               />
               <button
@@ -254,8 +254,7 @@ export default function TngSocialPanel() {
                 {results.map((player) => (
                   <div key={player.accountId} className="flex items-center justify-between gap-2 rounded-lg border border-white/8 bg-black/25 p-2">
                     <div className="min-w-0">
-                      <div className="truncate text-sm text-white/80">{player.displayName}</div>
-                      <div className="text-xs text-white/30">@{player.handle}</div>
+                      <div className="truncate text-sm text-[#FFD700]">{getPublicTngName(player)}</div>
                     </div>
                     {player.friendship ? (
                       <span className="text-[8px] uppercase text-white/25">{player.friendship.status}</span>
@@ -290,8 +289,7 @@ export default function TngSocialPanel() {
                 <div key={friend.accountId} className="rounded-lg border border-white/8 bg-black/25 p-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate font-bold text-white/85">{friend.displayName}</div>
-                      <div className="text-xs text-white/30">@{friend.handle}</div>
+                      <div className="truncate font-bold text-[#FFD700]">{getPublicTngName(friend)}</div>
                     </div>
                     <div className="flex flex-wrap justify-end gap-1.5">
                       <MiniButton
@@ -402,9 +400,7 @@ export default function TngSocialPanel() {
 
             <div className="mt-2 max-h-[210px] space-y-1.5 overflow-y-auto">
               {(social?.notifications || []).slice(0, 12).map((notification) => {
-                const actor = notification.actor?.handle
-                  ? `@${notification.actor.handle}`
-                  : notification.actor?.displayName || 'TNG';
+                const actor = getPublicTngName(notification.actor, 'TNG');
                 const label = notification.type.replace(/_/g, ' ').toUpperCase();
                 return (
                   <div key={notification.id} className="rounded-lg border border-white/8 bg-black/25 px-3 py-2">

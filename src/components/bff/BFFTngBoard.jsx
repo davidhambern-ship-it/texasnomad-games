@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -52,7 +53,7 @@ function TeamScore({
             }}
           >
             <div className="truncate text-[7px] font-semibold sm:text-[8px]">
-              {player ? (player.playerName || player.name || 'Player') : '—'}
+              {player ? (getPublicTngName(player)) : '—'}
               {player && String(selectedFaceoffId || '') === String(player.playerId) ? ' ★' : ''}
             </div>
           </div>
@@ -256,8 +257,8 @@ function BuzzerPanel({
       ? isActivePlayer
         ? `ANSWER · ${answerSeconds ?? 0}s`
         : `${activePlayerName} · ${answerSeconds ?? 0}s`
-      : buzzWinner?.playerName
-        ? `${buzzWinner.playerName} BUZZED`
+      : buzzWinner
+        ? `${getPublicTngName(buzzWinner)} BUZZED`
         : 'STANDBY';
 
   const live = buzzerOpen && canBuzz;
@@ -444,7 +445,7 @@ export default function BFFTngBoard({
                 busy={buzzerBusy}
                 onBuzz={onBuzz}
                 buzzWinner={gs.buzz_winner}
-                activePlayerName={activePlayer?.playerName || activePlayer?.name || null}
+                activePlayerName={activePlayer ? getPublicTngName(activePlayer) : null}
                 answerSeconds={answerSeconds}
                 isActivePlayer={isActivePlayer}
               />

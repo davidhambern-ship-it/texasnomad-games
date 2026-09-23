@@ -4,6 +4,7 @@ import { Loader2, LockKeyhole, Shuffle, Users } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import { getCardImage } from '@/lib/spadesCardImages';
 import { getActiveSuit, isValidPlay } from '@/lib/spadesRules';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const SUIT_ORDER = { '♣': 0, '♦': 1, '♥': 2, '♠': 3, Joker: 4 };
@@ -327,7 +328,7 @@ export default function NeonSpadesHostPanel({ controllerId }) {
                 SEAT {seat} · TEAM {team}
               </div>
               <div className="mt-2 text-lg text-white">
-                {player?.name || 'Empty'}
+                {player ? getPublicTngName(player) : 'Empty'}
               </div>
               <div className="mt-1 text-xs text-white/35">
                 {player?.playerType === 'cpu' ? 'CPU' : isHost ? 'Host Player' : 'Player'}

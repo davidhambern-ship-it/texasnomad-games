@@ -6,6 +6,7 @@ import Header from '@/components/home/Header';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import TngSocialPanel from '@/components/social/TngSocialPanel';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -46,9 +47,20 @@ export default function NeonPlayerProfile() {
       setError('');
 
       try {
-        const result = await tngApi.profile.get();
+        const [result, restoredStats] = await Promise.all([
+          tngApi.profile.get(),
+          tngApi.stats.getProfile().catch(() => null),
+        ]);
         if (cancelled) return;
-        setPayload(result || {});
+
+        const next = result || {};
+        if (next.profile && Array.isArray(restoredStats?.playerStats)) {
+          next.profile = {
+            ...next.profile,
+            playerStats: restoredStats.playerStats,
+          };
+        }
+        setPayload(next);
       } catch (profileError) {
         if (cancelled) return;
         setError(profileError?.message || 'TNG could not load your Neon profile.');
@@ -70,20 +82,30 @@ export default function NeonPlayerProfile() {
   const totals = useMemo(() => (
     gameStats.reduce(
       (acc, item) => {
-        acc.gamesPlayed += Number(item?.gamesPlayed || item?.games_played || 0);
+        const completed = Number(item?.gamesPlayed || item?.games_played || 0);
+        const quits = Number(item?.quitGames || item?.quit_games || 0);
+        acc.completedGames += completed;
+        acc.quitGames += quits;
+        acc.gamesPlayed += completed + quits;
         acc.wins += Number(item?.wins || 0);
         acc.losses += Number(item?.losses || 0);
         acc.totalScore += Number(item?.totalScore || item?.total_score || 0);
         return acc;
       },
-      { gamesPlayed: 0, wins: 0, losses: 0, totalScore: 0 },
+      { gamesPlayed: 0, completedGames: 0, quitGames: 0, wins: 0, losses: 0, totalScore: 0 },
     )
   ), [gameStats]);
 
   const mostPlayed = useMemo(() => (
-    [...gameStats].sort(
-      (a, b) => Number(b?.gamesPlayed || b?.games_played || 0) - Number(a?.gamesPlayed || a?.games_played || 0),
-    )[0] || null
+    [...gameStats].sort((a, b) => {
+      const aPlayed =
+        Number(a?.gamesPlayed || a?.games_played || 0) +
+        Number(a?.quitGames || a?.quit_games || 0);
+      const bPlayed =
+        Number(b?.gamesPlayed || b?.games_played || 0) +
+        Number(b?.quitGames || b?.quit_games || 0);
+      return bPlayed - aPlayed;
+    })[0] || null
   ), [gameStats]);
 
   const highScores = useMemo(() => (
@@ -142,8 +164,8 @@ export default function NeonPlayerProfile() {
   }
 
   const joined = profile.createdAt || profile.created_at || profile.onboardingCompletedAt || profile.onboarding_completed_at;
-  const displayName = profile.displayName || profile.display_name || user?.full_name || 'Nomad';
-  const handle = profile.handle || '';
+  const accountName = profile.displayName || profile.display_name || user?.full_name || 'Nomad';
+  const publicName = getPublicTngName(profile, 'Nomad');
   const hostSessions = Number(hostStats?.sessionsHosted || hostStats?.sessions_hosted || 0);
   const hostedGames = Number(hostStats?.gamesCompleted || hostStats?.games_completed || 0);
 
@@ -162,9 +184,9 @@ export default function NeonPlayerProfile() {
                 <div className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
                   PERMANENT TNG ID
                 </div>
-                <h1 className="mt-2 text-4xl font-bold">{displayName}</h1>
-                <div className="mt-1 font-mono text-lg text-[#FFD700]">
-                  {handle ? `@${handle}` : 'Handle unavailable'}
+                <h1 className="mt-2 text-4xl font-bold text-[#FFD700]">{publicName}</h1>
+                <div className="mt-2 text-xs text-white/30">
+                  Account name: {accountName}
                 </div>
               </div>
             </div>
@@ -198,12 +220,13 @@ export default function NeonPlayerProfile() {
           )}
         </section>
 
-        <section className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
+        <section className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-6">
           <StatCard label="GAMES PLAYED" value={totals.gamesPlayed} />
+          <StatCard label="COMPLETED" value={totals.completedGames} />
           <StatCard label="WINS" value={totals.wins} />
           <StatCard label="LOSSES" value={totals.losses} />
+          <StatCard label="QUIT GAMES" value={totals.quitGames} />
           <StatCard label="WIN RATE" value={`${winRate}%`} />
-          <StatCard label="HOST SESSIONS" value={hostSessions} />
         </section>
 
         <section className="mt-5 grid gap-4 lg:grid-cols-[.7fr_1.3fr]">
@@ -215,7 +238,7 @@ export default function NeonPlayerProfile() {
                   {GAME_LABELS[mostPlayed.gameId] || mostPlayed.gameId}
                 </div>
                 <div className="mt-2 text-sm text-white/45">
-                  {Number(mostPlayed.gamesPlayed || 0)} games · {Number(mostPlayed.wins || 0)} wins · {Number(mostPlayed.losses || 0)} losses
+                  {Number(mostPlayed.gamesPlayed || mostPlayed.games_played || 0) + Number(mostPlayed.quitGames || mostPlayed.quit_games || 0)} games · {Number(mostPlayed.wins || 0)} wins · {Number(mostPlayed.losses || 0)} losses · {Number(mostPlayed.quitGames || mostPlayed.quit_games || 0)} quits
                 </div>
               </>
             ) : (
@@ -264,7 +287,7 @@ export default function NeonPlayerProfile() {
           </div>
 
           <p className="mt-4 text-xs leading-relaxed text-white/25">
-            Stats update from Neon as TNG records completed multiplayer activity. During live testing, unfinished or abandoned rooms are not counted as completed games.
+            TNG keeps completed games and quit games separate. A quit is only recorded when a player intentionally exits a started multiplayer game before it is completed; refreshes and connection drops do not automatically count as quits.
           </p>
         </section>
 
