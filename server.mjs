@@ -393,14 +393,7 @@ async function handleTngStats(req, res) {
   });
 }
 
-async function handleOneTimeMulattoReset(req, res) {
-  if (!['GET', 'POST'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
-    });
-    return;
-  }
-
+async function resetMulattoAccountData() {
   const targetEmail = 'mulattonomad@icloud.com';
   const client = await bffPool.connect();
 
@@ -473,18 +466,29 @@ async function handleOneTimeMulattoReset(req, res) {
 
     await client.query('commit');
 
-    sendJson(res, 200, {
-      ok: true,
+    return {
       email: targetEmail,
       deletedPublicAccount: publicAccount.rowCount > 0,
       deletedAuthUser: Boolean(authUserId),
-    });
+    };
   } catch (error) {
     await client.query('rollback').catch(() => {});
     throw error;
   } finally {
     client.release();
   }
+}
+
+async function handleOneTimeMulattoReset(req, res) {
+  if (!['GET', 'POST'].includes(req.method || '')) {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
+    });
+    return;
+  }
+
+  const result = await resetMulattoAccountData();
+  sendJson(res, 200, { ok: true, ...result });
 }
 
 async function handleTngAccountRoute(req, res) {
@@ -3199,7 +3203,13 @@ server.on('upgrade', async (request, socket, head) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
+server.listen(port, '0.0.0.0', async () => {
   console.log(`TNG staging frontend listening on port ${port}`);
 
+  try {
+    const resetResult = await resetMulattoAccountData();
+    console.log('[TNG one-time Mulatto reset]', JSON.stringify(resetResult));
+  } catch (error) {
+    console.error('[TNG one-time Mulatto reset failed]', error);
+  }
 });
