@@ -148,15 +148,20 @@ export function useBffVoiceRelay({
   }, [identity, playIncoming, role, roomCode]);
 
   const start = useCallback(async () => {
+    stoppedRef.current = false;
+    setError('');
+    setStatus('connecting');
+
+    if (role === 'display') {
+      connectSocket();
+      return true;
+    }
+
     if (!navigator.mediaDevices?.getUserMedia) {
       setError('This browser does not support microphone audio.');
       setStatus('error');
       return false;
     }
-
-    stoppedRef.current = false;
-    setError('');
-    setStatus('connecting');
 
     try {
       let stream = streamRef.current;
@@ -213,7 +218,7 @@ export function useBffVoiceRelay({
       setError(startError?.message || 'Microphone could not be started.');
       return false;
     }
-  }, [connectSocket, ensureContext]);
+  }, [connectSocket, ensureContext, role]);
 
   const stop = useCallback(() => {
     stoppedRef.current = true;
