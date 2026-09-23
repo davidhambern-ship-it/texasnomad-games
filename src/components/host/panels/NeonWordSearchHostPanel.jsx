@@ -8,6 +8,7 @@ import {
   HostControlDeck,
   HostControlCard,
 } from '@/components/host/GameControllerLayout';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -343,7 +344,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                 {currentMode === 'turn' && phase === 'playing'
                   ? canInteract
                     ? 'Seat 1 live — drag across one word.'
-                    : `Waiting for ${activePlayer?.name || `Seat ${activeSeat}`}.`
+                    : `Waiting for ${getPublicTngName(activePlayer, `Seat ${activeSeat}`)}.`
                   : 'All active players are searching.'}
               </div>
             </HostControlCard>
@@ -368,7 +369,7 @@ export default function NeonWordSearchHostPanel({ controllerId }) {
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: player.color }} />
-                            <span className="truncate text-[10px] text-white/70">{player.name}</span>
+                            <span className="truncate text-[10px] text-white/70">{getPublicTngName(player)}</span>
                           </div>
                           <div className="mt-1 text-[5px] uppercase text-white/25" style={PS2}>SEAT {seat}</div>
                         </div>
