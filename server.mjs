@@ -394,9 +394,9 @@ async function handleTngStats(req, res) {
 }
 
 async function handleOneTimeMulattoReset(req, res) {
-  if (req.method !== 'POST') {
+  if (!['GET', 'POST'].includes(req.method || '')) {
     sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST required.' },
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
     });
     return;
   }
