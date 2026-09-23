@@ -7,6 +7,7 @@ import SpadesDealAnimation from './SpadesDealAnimation';
 import SpadesBidTimer from './SpadesBidTimer';
 import HandSetup from './HandSetup';
 import { useSuitOrder } from '@/hooks/useSuitOrder';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -203,7 +204,7 @@ export default function SpadesTable({
       {/* ── Bidding banner ───────────────────────────────────────── */}
       {showTableHud && isBidding && !gs.first_hand_no_bid && (() => {
         const bidder = players.find(p => p.seatNumber === gs.current_bidder_seat);
-        const bidderName = bidder?.playerName || bidder?.name || `Seat ${gs.current_bidder_seat || '?'}`;
+        const bidderName = getPublicTngName(bidder, `Seat ${gs.current_bidder_seat || '?'}`);
         const isMyBidTurn = gs.current_bidder_seat === mySeatNumber;
         return (
           <div className="w-full px-3 py-2 rounded-xl border-2 border-[#FF5F1F]/60 bg-[#FF5F1F]/10 text-center"
