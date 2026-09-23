@@ -4,7 +4,7 @@ import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { authClient } from "@/lib/neonAuth";
+import { authClient, waitForNeonSession } from "@/lib/neonAuth";
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -57,9 +57,13 @@ export default function Register() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const finishAuth = () => {
+  const finishAuth = async () => {
+    const session = await waitForNeonSession();
+    if (!session?.user) {
+      throw new Error('Your TNG login was created, but the session did not finish starting.');
+    }
     const next = encodeURIComponent(nextPath);
-    window.location.href = `/onboarding?next=${next}`;
+    window.location.replace(`/onboarding?next=${next}`);
   };
 
   const handleSubmit = async (event) => {
@@ -79,7 +83,7 @@ export default function Register() {
         name: email.split('@')[0] || 'Nomad',
       });
       if (result?.error) throw new Error(result.error.message || "Registration failed");
-      finishAuth();
+      await finishAuth();
     } catch (err) {
       setError(err.message || "Registration failed");
       setLoading(false);
