@@ -146,7 +146,7 @@ export default function TngOnboarding() {
           </button>
 
           <p className="text-center text-[10px] leading-relaxed text-white/25">
-            Your real account name stays private to your TNG account. The community sees your public @handle.
+            TNG keeps your account name on your profile record, but the community sees your public @handle.
           </p>
         </div>
       </AuthLayout>
@@ -209,7 +209,7 @@ export default function TngOnboarding() {
           <p className="text-xs leading-relaxed text-white/35">
             Your <span className="text-[#FFD700]">@handle</span> is your public TNG identity. It is what other
             players see in rooms, friends, messages, invites, profiles, and community activity.
-            Your account name stays attached to your private TNG account record.
+            Your account name stays attached to your TNG account record; your @handle is the name shown publicly.
           </p>
 
           <button
