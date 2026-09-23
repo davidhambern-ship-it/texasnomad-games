@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { isNeonStaging } from '@/lib/neonAuth';
 
 const NAV_ITEMS = [
   { label: 'HOME', path: '/' },
@@ -14,42 +12,7 @@ const NAV_ITEMS = [
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [legacyUser, setLegacyUser] = useState(null);
-  const { user: neonUser, logout } = useAuth();
-  const user = isNeonStaging ? neonUser : legacyUser;
-
-  useEffect(() => {
-    if (isNeonStaging) return undefined;
-
-    let heartbeatInterval;
-    async function initProfile() {
-      try {
-        const u = await base44.auth.me();
-        setLegacyUser(u);
-        // Ensure PlayerProfile exists for this user (idempotent)
-        const profiles = await base44.entities.PlayerProfile.filter({ user_id: u.id });
-        if (profiles.length === 0) {
-          await base44.functions.invoke('initPlayerProfile', { data: { id: u.id, email: u.email, full_name: u.full_name } });
-        }
-        // Presence heartbeat — upsert every 60s
-        async function heartbeat() {
-          try {
-            const existing = await base44.entities.PlayerPresence.filter({ user_id: u.id });
-            const username = profiles[0]?.username || u.full_name || 'Player';
-            if (existing.length > 0) {
-              await base44.entities.PlayerPresence.update(existing[0].id, { is_online: true, last_seen: new Date().toISOString(), username });
-            } else {
-              await base44.entities.PlayerPresence.create({ user_id: u.id, username, is_online: true, last_seen: new Date().toISOString() });
-            }
-          } catch (_) {}
-        }
-        heartbeat();
-        heartbeatInterval = setInterval(heartbeat, 60000);
-      } catch (_) {}
-    }
-    initProfile();
-    return () => clearInterval(heartbeatInterval);
-  }, []);
+  const { user, logout } = useAuth();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-cyber-purple/30 bg-midnight-void/80 backdrop-blur-xl">
@@ -80,17 +43,15 @@ export default function Header() {
         </nav>
 
         {/* Profile Link - Desktop */}
-        {user && (
-          <Link
-            to="/profile"
-            className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/70 rounded text-[9px] tracking-widest uppercase hover:bg-[#FFD700]/10 hover:border-[#FFD700] transition-all mr-1"
-            style={{ fontFamily: "'Press Start 2P', monospace" }}
-          >
-            👤 PROFILE
-          </Link>
-        )}
+        <Link
+          to="/profile"
+          className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#FFD700]/40 text-[#FFD700]/70 rounded text-[9px] tracking-widest uppercase hover:bg-[#FFD700]/10 hover:border-[#FFD700] transition-all mr-1"
+          style={{ fontFamily: "'Press Start 2P', monospace" }}
+        >
+          👤 PROFILE
+        </Link>
 
-        {user && isNeonStaging && (
+        {user && (
           <button
             type="button"
             onClick={() => logout()}
@@ -156,16 +117,14 @@ export default function Header() {
                 {item.label}
               </Link>
             ))}
-            {user && (
-              <Link
-                to="/profile"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block px-4 py-3 text-sm tracking-widest text-[#FFD700]/70 hover:text-[#FFD700] hover:bg-[#FFD700]/10 rounded-lg transition-colors uppercase border border-[#FFD700]/30"
-                style={{ fontFamily: "'Press Start 2P', monospace" }}
-              >
-                👤 PROFILE
-              </Link>
-            )}
+            <Link
+              to="/profile"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-4 py-3 text-sm tracking-widest text-[#FFD700]/70 hover:text-[#FFD700] hover:bg-[#FFD700]/10 rounded-lg transition-colors uppercase border border-[#FFD700]/30"
+              style={{ fontFamily: "'Press Start 2P', monospace" }}
+            >
+              👤 PROFILE
+            </Link>
 
             <Link
               to="/host"
@@ -176,7 +135,7 @@ export default function Header() {
               🎛 HOST
             </Link>
 
-            {user && isNeonStaging && (
+            {user && (
               <button
                 type="button"
                 onClick={() => {
