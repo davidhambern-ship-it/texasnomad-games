@@ -102,13 +102,49 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
+
+    const cleanEmail = email.trim().toLowerCase();
+
     try {
-      const result = await authClient.signIn.email({ email, password });
-      if (result?.error) throw new Error(result.error.message || "Invalid email or password");
-      const next = encodeURIComponent(nextPath);
-      window.location.replace(`/login?next=${next}`);
+      // Existing Neon/TNG account: ordinary sign-in.
+      const signInResult = await authClient.signIn.email({
+        email: cleanEmail,
+        password,
+      });
+
+      if (!signInResult?.error) {
+        const next = encodeURIComponent(nextPath);
+        window.location.replace(`/login?next=${next}`);
+        return;
+      }
+
+      // First visit from the legacy LIVE site: activate the same email in the
+      // new Neon/TNG auth system instead of making the user understand that
+      // LIVE and LIVE TEST previously had separate identity stores.
+      const signUpResult = await authClient.signUp.email({
+        email: cleanEmail,
+        password,
+        name: cleanEmail.split('@')[0] || 'Nomad',
+      });
+
+      if (!signUpResult?.error) {
+        const next = encodeURIComponent(nextPath);
+        window.location.replace(`/onboarding?next=${next}`);
+        return;
+      }
+
+      // If sign-up also fails, this is normally an existing Neon account with
+      // the wrong password (or another credential problem). Do not create a
+      // duplicate identity; send the user toward recovery.
+      throw new Error(
+        signInResult?.error?.message
+        || 'We could not sign you in. Check your password or use Forgot.'
+      );
     } catch (err) {
-      setError(err.message || "Invalid email or password");
+      setError(
+        err?.message
+        || 'We could not sign you in. Check your password or use Forgot.'
+      );
     } finally {
       setLoading(false);
     }
@@ -135,12 +171,12 @@ export default function Login() {
   return (
     <AuthLayout
       icon={LogIn}
-      title="Welcome Back"
-      subtitle="Log in to your account"
+      title="Enter TNG"
+      subtitle="Sign in or activate your TNG account"
       footer={
         <>
           Don't have an account?{' '}
-          <Link to="/register" style={{ color: '#BC13FE', fontWeight: 600 }}>Create one free</Link>
+          <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Create one free</Link>
         </>
       }
     >
@@ -173,6 +209,10 @@ export default function Login() {
         </div>
       )}
 
+      <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 9, border: '1px solid rgba(34,211,238,0.24)', background: 'rgba(34,211,238,0.05)', color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.55 }}>
+        First time on the new TNG system? Use the email and password you want for TNG. If your TNG login does not exist yet, it will be activated automatically and you’ll create your TNG ID next.
+      </div>
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <label htmlFor="email" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>EMAIL</label>
@@ -181,7 +221,7 @@ export default function Login() {
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
             <label htmlFor="password" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)' }}>PASSWORD</label>
-            <Link to="/forgot-password" style={{ ...PS2, fontSize: 6, color: '#BC13FE', textDecoration: 'none' }}>Forgot?</Link>
+            <Link to={`/forgot-password?next=${encodeURIComponent(nextPath)}`} style={{ ...PS2, fontSize: 6, color: '#BC13FE', textDecoration: 'none' }}>Forgot?</Link>
           </div>
           <TNGInput id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} autoComplete="current-password" />
         </div>
@@ -198,7 +238,7 @@ export default function Login() {
             }}
           >
             {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
-            {loading ? 'LOGGING IN…' : 'LOG IN →'}
+            {loading ? 'ENTERING TNG…' : 'CONTINUE →'}
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </button>
         </div>
