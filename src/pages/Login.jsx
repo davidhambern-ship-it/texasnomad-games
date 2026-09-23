@@ -57,21 +57,22 @@ export default function Login() {
 
       try {
         const isExplicitPlayerJoin = nextPath.startsWith('/join/');
-        const savedRole = localStorage.getItem('tng_connection_role');
         const currentDeviceId = localStorage.getItem('tng_device_id');
 
-        if (!isExplicitPlayerJoin && savedRole !== 'player') {
+        if (!isExplicitPlayerJoin) {
+          // The live account session is authoritative. A stale role saved in
+          // this browser must never override the fact that this same account
+          // is already hosting from another device.
           const route = await tngApi.host.getAccountRoute(currentDeviceId);
 
           if (route?.route === 'display') {
-            // A second signed-in device for an already-active Host account
-            // becomes the Game Display. Force a fresh pairing screen instead
-            // of reusing an old/stale display token from this browser.
+            localStorage.setItem('tng_connection_role', 'display');
             localStorage.removeItem('tng_display_device_id');
             localStorage.removeItem('tng_display_token');
             destination = '/display';
-          } else if (route?.route === 'host' && nextPath === '/') {
-            destination = '/host';
+          } else if (route?.route === 'host') {
+            localStorage.setItem('tng_connection_role', 'host_controller');
+            if (nextPath === '/') destination = '/host';
           }
         }
       } catch (routeError) {
