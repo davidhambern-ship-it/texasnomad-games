@@ -7,6 +7,7 @@ import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
+import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -554,7 +555,7 @@ export default function NeonSpadesPlayer({ roomCode }) {
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-[11px] text-white/70">
-                        {isMe ? 'YOU' : (player.name || `Seat ${seat}`)}
+                        {isMe ? 'YOU' : getPublicTngName(player, `Seat ${seat}`)}
                       </div>
                       <div className="mt-1 text-[8px] text-white/25">
                         S{seat} · {player.playerType === 'cpu' ? 'CPU' : seat === 1 ? 'HOST' : 'PLAYER'}
