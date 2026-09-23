@@ -228,6 +228,10 @@ export const tngApi = {
       roomCode,
       apiBase:BFF_API_BASE,
     }),
+    getDisplayState: (roomCode) => request(`/display?room=${encodeURIComponent(roomCode)}`, {
+      authenticated:false,
+      apiBase:BFF_API_BASE,
+    }),
     playerAction: (deviceId, roomCode, action, payload = {}) => request('/player', {
       method:'POST',
       deviceId,
