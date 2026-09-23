@@ -98,6 +98,9 @@ export const tngApi = {
     create: (data) => request('/api/device-session', { method:'POST', body:data }),
   },
   host: {
+    getAccountRoute: (deviceId) => request('/api/account-route', {
+      deviceId: deviceId || undefined,
+    }),
     startSession: (deviceId, reclaimController = false, resumeTestRoom = false) => request('/api/host/session', {
       method:'POST',
       deviceId,
