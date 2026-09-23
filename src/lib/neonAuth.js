@@ -1,17 +1,18 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-// Live-test staging is intentionally pinned to the Neon development Auth
-// endpoint. Do not proxy Auth through Vercel and do not let a stale Vercel
-// environment variable silently point this build at another Neon branch.
+// Production auth is proxied through a first-party TexasNomadGames subdomain
+// so browsers keep the session under texasnomadgames.com instead of treating
+// Neon Auth as a third-party site.
 export const NEON_AUTH_URL =
-  'https://ep-little-base-aveev14q.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
+  'https://auth.texasnomadgames.com/neon-auth';
 
 export const isNeonStaging = true;
 
 export const authClient = createAuthClient(NEON_AUTH_URL, {
   adapter: BetterAuthReactAdapter({
     fetchOptions: {
+      credentials: 'include',
       onRequest: (request) => {
         try {
           localStorage.setItem('tng_last_auth_request', request.url.toString());
