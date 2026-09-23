@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Gamepad2, Loader2, MonitorUp, UserRound } from 'lucide-react';
 
 import AuthLayout from '@/components/AuthLayout';
+import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import {
   createPreviewTngProfile,
@@ -71,6 +72,7 @@ export default function TngOnboarding() {
 
     try {
       await createPreviewTngProfile(user, { displayName, handle });
+      await tngApi.stats.getProfile().catch(() => null);
       setStage('welcome');
     } catch (profileError) {
       setError(profileError.message || 'Your TNG profile could not be created.');
