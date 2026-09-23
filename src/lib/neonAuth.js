@@ -1,18 +1,16 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-// Production auth is proxied through a first-party TexasNomadGames subdomain
-// so browsers keep the session under texasnomadgames.com instead of treating
-// Neon Auth as a third-party site.
+// Use the current production Neon Auth endpoint until the first-party
+// auth.texasnomadgames.com DNS path has been verified live.
 export const NEON_AUTH_URL =
-  'https://auth.texasnomadgames.com/neon-auth';
+  'https://ep-little-base-aveev14q.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
 
 export const isNeonStaging = true;
 
 export const authClient = createAuthClient(NEON_AUTH_URL, {
   adapter: BetterAuthReactAdapter({
     fetchOptions: {
-      credentials: 'include',
       onRequest: (request) => {
         try {
           localStorage.setItem('tng_last_auth_request', request.url.toString());
