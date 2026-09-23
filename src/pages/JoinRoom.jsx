@@ -60,6 +60,66 @@ function validatePlayerJoin(payload, roomCode) {
   return payload;
 }
 
+async function claimSpadesSeat(deviceId, roomCode, joinedPayload) {
+  const existingSeat = Number(joinedPayload?.participant?.seatNumber || 0);
+  if ([2, 3, 4].includes(existingSeat)) return joinedPayload;
+
+  const statePayload = await tngApi.spades.getPlayerState(deviceId, roomCode);
+  const gameState = statePayload?.room?.gameState || {};
+  const players = Array.isArray(gameState.players) ? gameState.players : [];
+
+  const candidates = [2, 3, 4]
+    .map((seatNumber) => {
+      const occupant = players.find((player) => Number(player?.seatNumber) === seatNumber);
+      return {
+        seatNumber,
+        priority: occupant?.playerType === 'cpu' ? 0 : occupant ? 2 : 1,
+      };
+    })
+    .filter((candidate) => candidate.priority < 2)
+    .sort((a, b) => a.priority - b.priority || a.seatNumber - b.seatNumber);
+
+  if (candidates.length === 0) {
+    throw new TngApiError(
+      'This Spades table has no open or CPU-controlled seats available.',
+      {
+        code: 'SPADES_TABLE_FULL',
+        status: 409,
+      },
+    );
+  }
+
+  let lastSeatError = null;
+
+  for (const candidate of candidates) {
+    try {
+      return await tngApi.spades.playerAction(
+        deviceId,
+        roomCode,
+        'sit',
+        { seatNumber: candidate.seatNumber },
+      );
+    } catch (seatError) {
+      if (
+        seatError instanceof TngApiError &&
+        seatError.code === 'SPADES_SEAT_TAKEN'
+      ) {
+        lastSeatError = seatError;
+        continue;
+      }
+      throw seatError;
+    }
+  }
+
+  throw lastSeatError || new TngApiError(
+    'The available Spades seats were claimed before you could join.',
+    {
+      code: 'SPADES_TABLE_FULL',
+      status: 409,
+    },
+  );
+}
+
 export default function JoinRoom() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const path = window.location.pathname;
@@ -88,10 +148,15 @@ export default function JoinRoom() {
           let deviceId = await ensurePlayerDevice(user?.id);
 
           try {
-            const payload = validatePlayerJoin(
+            let payload = validatePlayerJoin(
               await tngApi.player.joinRoom(deviceId, roomCode),
               roomCode,
             );
+
+            if (payload.room?.gameId === 'spades') {
+              payload = await claimSpadesSeat(deviceId, roomCode, payload);
+            }
+
             const gamePath = GAME_PATHS[payload.room?.gameId];
 
             if (!gamePath) {
@@ -108,10 +173,15 @@ export default function JoinRoom() {
             ) {
               localStorage.removeItem('tng_player_device_id');
               deviceId = await ensurePlayerDevice(user?.id);
-              const payload = validatePlayerJoin(
-              await tngApi.player.joinRoom(deviceId, roomCode),
-              roomCode,
-            );
+              let payload = validatePlayerJoin(
+                await tngApi.player.joinRoom(deviceId, roomCode),
+                roomCode,
+              );
+
+              if (payload.room?.gameId === 'spades') {
+                payload = await claimSpadesSeat(deviceId, roomCode, payload);
+              }
+
               const gamePath = GAME_PATHS[payload.room?.gameId];
 
               if (!gamePath) {
