@@ -84,6 +84,8 @@ export default function TngOnboarding() {
 
     if (role === 'host_controller') {
       navigate('/host', { replace: true });
+    } else if (nextPath.startsWith('/join/')) {
+      navigate(nextPath, { replace: true });
     } else {
       navigate('/games', { replace: true });
     }
@@ -151,7 +153,7 @@ export default function TngOnboarding() {
           </label>
 
           <p className="text-xs leading-relaxed text-white/35">
-            Your TNG profile is a system-owned live stats identity. Creating a Google/Base44
+            Your TNG profile is a system-owned live stats identity. Creating a Google/Neon Auth
             login does not complete TNG setup.
           </p>
 

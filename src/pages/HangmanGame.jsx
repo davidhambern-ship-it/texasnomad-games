@@ -9,6 +9,7 @@ import SeatBadge from '@/components/game/SeatBadge.jsx';
 import SinglePlayerPanel from '@/components/game/SinglePlayerPanel.jsx';
 import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
+import NeonHangmanPlayer from '@/pages/NeonHangmanPlayer';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -99,9 +100,13 @@ export default function HangmanGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const cpuId = params.get('cpu');
+  const useNeonPlayer = params.get('neon') === '1';
   if (!roomCode) {
     window.location.href = '/';
     return null;
+  }
+  if (useNeonPlayer) {
+    return <NeonHangmanPlayer roomCode={roomCode.toUpperCase()} />;
   }
   return <HangmanViewer roomCode={roomCode} cpuId={cpuId} />;
 }

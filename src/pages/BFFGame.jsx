@@ -10,6 +10,8 @@ import { base44 } from '@/api/base44Client';
 import BFFVsAISetup from '@/components/bff/BFFVsAISetup.jsx';
 import BFFTeamRoster from '@/components/bff/BFFTeamRoster.jsx';
 import BFFBuzzer from '@/components/bff/BFFBuzzer.jsx';
+import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
+import NeonBFFPlayer from '@/pages/NeonBFFPlayer.jsx';
 import { useBFFVsAI } from '@/hooks/useBFFVsAI.js';
 import GameInstructions from '@/components/game/GameInstructions.jsx';
 import useGameStats from '@/hooks/useGameStats';
@@ -21,7 +23,9 @@ export default function BFFGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const isVsAI = params.get('vsai') === '1';
+  const isNeonRoom = params.get('neon') === '1';
   if (!roomCode) { window.location.href = '/'; return null; }
+  if (isNeonRoom && !isVsAI) return <NeonBFFPlayer roomCode={roomCode.toUpperCase()} />;
   return <BFFViewer roomCode={roomCode} isVsAI={isVsAI} />;
 }
 
@@ -512,35 +516,6 @@ function BFFViewer({ roomCode, isVsAI }) {
             <BFFTeamRoster gs={gs} playerId={playerId} humanPlayers={humanPlayers} />
           )}
 
-          {/* Scores — non-vsAI */}
-          {!isVsAI && (
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                { name: gs.family1 || 'Family 1', score: gs.score1 || 0, turn: 1, color: '#BC13FE' },
-                { name: gs.family2 || 'Family 2', score: gs.score2 || 0, turn: 2, color: '#FF5F1F' },
-              ].map(f => (
-                <div key={f.turn} className="p-3 border-2 rounded-xl text-center"
-                  style={{ borderColor: gs.active_turn === f.turn ? '#FFD700' : `${f.color}30` }}>
-                  <div className="font-heading text-sm text-white uppercase truncate">{f.name}</div>
-                  <div className="font-heading text-3xl text-[#FFD700]">{f.score}</div>
-                  {gs.active_turn === f.turn && <div className="text-[8px] text-[#FFD700]/70 uppercase" style={PS2}>▶ Active</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Round info strip */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="px-3 py-1.5 rounded-lg border border-[#FF5F1F]/30 bg-[#FF5F1F]/5 text-center flex-1">
-              <span className="text-[7px] text-[#FF5F1F]/60 uppercase tracking-widest mr-2" style={PS2}>Bank</span>
-              <span className="font-heading text-xl text-[#FF5F1F]">{gs.round_bank || 0}</span>
-            </div>
-            <div className="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 text-center">
-              <span className="text-[6px] text-white/30 uppercase tracking-widest mr-1" style={PS2}>Round</span>
-              <span className="text-[8px] text-white/60" style={PS2}>{gs.round_number || 1}</span>
-            </div>
-          </div>
-
           {/* Buzzer phase */}
           {isVsAI && (buzzerPhase === 'get_ready' || buzzerPhase === 'board_shown' || buzzerPhase === 'buzzer_active' || buzzerPhase === 'buzzed') && (
             <BFFBuzzer
@@ -558,45 +533,8 @@ function BFFViewer({ roomCode, isVsAI }) {
             </div>
           )}
 
-          {/* Question */}
-          {gs.current_question && (
-            <div className="px-5 py-4 border border-[#FFD700]/30 rounded-xl bg-[#FFD700]/5 text-center">
-              <div className="text-[7px] tracking-widest text-[#FFD700]/50 uppercase mb-2" style={PS2}>★ Survey Says</div>
-              <div className="font-heading text-xl tracking-wide text-[#FFD700] leading-snug">{gs.current_question}</div>
-            </div>
-          )}
-
-          {/* Answer Board */}
-          {answers.length > 0 && (
-            <div className="border border-[#BC13FE]/30 rounded-xl overflow-hidden">
-              {answers.map((ans, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-0"
-                  style={{ background: ans.revealed ? 'rgba(255,215,0,0.07)' : 'rgba(188,19,254,0.03)' }}>
-                  <div className="w-6 h-6 rounded flex items-center justify-center shrink-0 font-heading text-xs"
-                    style={{ background: ans.revealed ? '#FFD700' : '#BC13FE20', color: ans.revealed ? '#000' : '#BC13FE60' }}>{i + 1}</div>
-                  <div className="flex-1 font-heading text-base tracking-wide uppercase"
-                    style={{ color: ans.revealed ? '#FFD700' : '#ffffff20' }}>
-                    {ans.revealed ? (ans.text || ans.answer) : '? ? ? ? ?'}
-                  </div>
-                  {ans.revealed && <div className="font-heading text-sm shrink-0 text-[#FF5F1F]">{ans.points} pts</div>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* BYE Display */}
-          <div className="text-center">
-            <BYEDisplay byeCount={byeCount} byeFlash={gs.bye_flash || 0} />
-          </div>
-
-          {/* Steal Banner */}
-          {stealMode && (
-            <div className="px-4 py-3 rounded-xl border-2 border-[#FF5F1F] bg-[#FF5F1F]/10 text-center"
-              style={{ boxShadow: '0 0 20px rgba(255,95,31,0.3)' }}>
-              <div className="font-heading text-xl text-[#FF5F1F] uppercase tracking-widest">🎯 Steal Opportunity!</div>
-              {amInSteal && <div className="text-[8px] text-[#FF5F1F]/80 tracking-widest uppercase mt-1" style={PS2}>Your chance — give your best answer!</div>}
-            </div>
-          )}
+          {/* TNG BFF Board — adapted from the v7.3 visual package */}
+          <BFFTngBoard gs={gs} isVsAI={isVsAI} />
 
           {/* AI Thinking */}
           {isAIThinking && aiCharacter && (

@@ -18,6 +18,8 @@ import JoinRoom from '@/pages/JoinRoom';
 import PlaceholderPage from '@/pages/PlaceholderPage';
 import HostPanel from '@/pages/HostPanel';
 import Games from '@/pages/Games';
+import About from '@/pages/About';
+import Contact from '@/pages/Contact';
 import WordSearchGame from '@/pages/WordSearchGame';
 import ViralGame from '@/pages/ViralGame';
 import NameThatTrackGame from '@/pages/NameThatTrackGame';
@@ -27,6 +29,7 @@ import WordWranglerGame from '@/pages/WordWranglerGame';
 import DominoHost from '@/pages/DominoHost';
 import DominoGame from '@/pages/DominoGame';
 import PlayerProfile from '@/pages/PlayerProfile';
+import NeonPlayerProfile from '@/pages/NeonPlayerProfile';
 import Register from '@/pages/Register';
 import Login from '@/pages/Login';
 import ForgotPassword from '@/pages/ForgotPassword';
@@ -34,6 +37,7 @@ import ResetPassword from '@/pages/ResetPassword';
 import TngOnboarding from '@/pages/TngOnboarding';
 import GameDisplay from '@/pages/GameDisplay';
 import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
+import { isNeonStaging } from '@/lib/neonAuth';
 
 function HomeGate() {
   const seen = localStorage.getItem('tn_welcome_seen');
@@ -44,6 +48,7 @@ function HomeGate() {
 const AuthenticatedApp = () => {
   const { user, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
   const location = useLocation();
+  const profileGateEnabled = isBase44Preview || isNeonStaging;
   const [profileState, setProfileState] = useState('idle');
   const [profileError, setProfileError] = useState('');
 
@@ -51,7 +56,7 @@ const AuthenticatedApp = () => {
     let cancelled = false;
 
     async function checkPreviewProfile() {
-      if (!isBase44Preview || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
+      if (!profileGateEnabled || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
         setProfileState('idle');
         setProfileError('');
         return;
@@ -81,13 +86,14 @@ const AuthenticatedApp = () => {
     isLoadingAuth,
     isLoadingPublicSettings,
     location.pathname,
+    profileGateEnabled,
   ]);
 
   // Show loading spinner while checking app public settings, auth, or Preview TNG profile
   if (
     isLoadingPublicSettings ||
     isLoadingAuth ||
-    (isBase44Preview && isAuthenticated && profileState === 'checking')
+    (profileGateEnabled && isAuthenticated && profileState === 'checking')
   ) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -116,7 +122,7 @@ const AuthenticatedApp = () => {
   ]);
 
   if (
-    isBase44Preview &&
+    profileGateEnabled &&
     isAuthenticated &&
     profileState === 'missing' &&
     !onboardingExemptPaths.has(location.pathname)
@@ -126,7 +132,7 @@ const AuthenticatedApp = () => {
   }
 
   if (
-    isBase44Preview &&
+    profileGateEnabled &&
     isAuthenticated &&
     profileState === 'error' &&
     location.pathname !== '/onboarding'
@@ -164,8 +170,8 @@ const AuthenticatedApp = () => {
       <Route path="/games/spades" element={<SpadesGame />} />
       <Route path="/join/:roomCode" element={<JoinRoom />} />
       <Route path="/live-status" element={<PlaceholderPage />} />
-      <Route path="/about" element={<PlaceholderPage />} />
-      <Route path="/contact" element={<PlaceholderPage />} />
+      <Route path="/about" element={<About />} />
+      <Route path="/contact" element={<Contact />} />
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/games/name-that-track" element={<NameThatTrackGame />} />
@@ -174,7 +180,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
       <Route path="/games/dominoes/host" element={<DominoHost />} />
       <Route path="/games/dominoes" element={<DominoGame />} />
-      <Route path="/profile" element={<PlayerProfile />} />
+      <Route path="/profile" element={isNeonStaging ? <NeonPlayerProfile /> : <PlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
       <Route path="*" element={<PageNotFound />} />
     </Routes>

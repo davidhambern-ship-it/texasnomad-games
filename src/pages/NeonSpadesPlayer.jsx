@@ -6,8 +6,15 @@ import { tngApi } from '@/api/tngApi';
 import SpadesTable from '@/components/spades/SpadesTable';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
+import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+function isValidPlayerParticipant(participant) {
+  const role = String(participant?.role || '').toLowerCase();
+  const seatNumber = Number(participant?.seatNumber || 0);
+  return role === 'player' && seatNumber !== 1;
+}
 
 export default function NeonSpadesPlayer({ roomCode }) {
   const [room, setRoom] = useState(null);
@@ -49,6 +56,17 @@ export default function NeonSpadesPlayer({ roomCode }) {
 
     try {
       const payload = await tngApi.spades.getPlayerState(deviceId, roomCode);
+
+      if (payload?.participant && !isValidPlayerParticipant(payload.participant)) {
+        setRoom(payload.room || null);
+        setParticipant(null);
+        setHand([]);
+        setError(
+          'This TNG account is the Host for this room. Use a different TNG account to join as a player.',
+        );
+        return;
+      }
+
       setRoom(payload.room);
       setParticipant(payload.participant);
       setHand(payload.hand || []);
@@ -72,6 +90,16 @@ export default function NeonSpadesPlayer({ roomCode }) {
         action,
         payload,
       );
+
+      if (result?.participant && !isValidPlayerParticipant(result.participant)) {
+        setParticipant(null);
+        setHand([]);
+        setError(
+          'This TNG account is the Host for this room. Use a different TNG account to join as a player.',
+        );
+        return false;
+      }
+
       setRoom(result.room);
       setParticipant(result.participant);
       setHand(result.hand || []);
@@ -240,6 +268,33 @@ export default function NeonSpadesPlayer({ roomCode }) {
     );
   }
 
+  if (error && !participant) {
+    return (
+      <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center px-4 text-center">
+        <div className="max-w-lg rounded-2xl border border-red-500/35 bg-red-500/5 p-6">
+          <div className="mb-3 text-sm font-bold tracking-widest text-red-400 uppercase" style={PS2}>
+            PLAYER SESSION BLOCKED
+          </div>
+          <div className="text-sm leading-relaxed text-white/70">{error}</div>
+          <div className="mt-5 flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              to={`/join/${roomCode}`}
+              className="rounded-lg border border-[#FFD700]/60 px-4 py-2 text-[#FFD700]"
+            >
+              TRY PLAYER JOIN AGAIN
+            </Link>
+            <Link
+              to="/login"
+              className="rounded-lg border border-[#BC13FE]/60 px-4 py-2 text-[#BC13FE]"
+            >
+              SIGN IN WITH ANOTHER ACCOUNT
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!room && !error) {
     return (
       <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center">
@@ -269,6 +324,7 @@ export default function NeonSpadesPlayer({ roomCode }) {
 
   return (
     <div className="min-h-screen bg-[#070311] text-white lg:h-screen lg:overflow-hidden">
+      <TngNotificationToaster />
       <main className="mx-auto flex min-h-screen max-w-[1700px] flex-col gap-3 p-3 lg:h-full lg:min-h-0 lg:flex-row lg:gap-4 lg:p-4">
         <section className="order-1 min-w-0 flex-1 lg:flex lg:h-full lg:items-center lg:justify-center lg:overflow-hidden">
           <div
@@ -365,6 +421,14 @@ export default function NeonSpadesPlayer({ roomCode }) {
                   <div className="mt-1 text-[9px] uppercase tracking-[0.12em] text-white/25">
                     Player View
                   </div>
+                  <Link
+                    to="/"
+                    replace
+                    className="mt-2 inline-flex rounded-md border border-white/15 px-2.5 py-1.5 text-[7px] uppercase tracking-widest text-white/45 transition hover:border-[#FFD700]/50 hover:text-[#FFD700]"
+                    style={PS2}
+                  >
+                    EXIT VIEW
+                  </Link>
                 </div>
               </div>
             </div>

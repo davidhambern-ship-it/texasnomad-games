@@ -13,6 +13,11 @@ import { tngApi } from '@/api/tngApi';
 import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
+import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
+import { DisplayNotificationStack } from '@/components/social/TngNotificationToaster';
+import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
+import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
+import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -968,11 +973,399 @@ function SpadesDisplay({ room }) {
   );
 }
 
+
+function SquareBizDisplay({ room }) {
+  const state = room.state || {};
+  const [clock, setClock] = useState(Date.now());
+  const phase = state.phase || 'lobby';
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(Date.now()), 100);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="relative h-full w-full overflow-hidden bg-[#05020a]">
+      <SquareBizShowStyles />
+
+      <div
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          background:
+            'radial-gradient(circle at 12% 16%, rgba(159,69,255,.18), transparent 24%), radial-gradient(circle at 86% 72%, rgba(255,21,147,.15), transparent 26%), radial-gradient(circle at 58% 46%, rgba(255,120,31,.08), transparent 42%)',
+        }}
+      />
+
+      {phase === 'lobby' ? (
+        <div className="relative z-10 flex h-full items-center justify-center px-8 text-center">
+          <div className="w-full max-w-[1120px]">
+            <div className="text-[9px] uppercase tracking-[.34em] text-[#ffd633]/65" style={PS2}>
+              ROOM {room.roomCode} · STAND BY
+            </div>
+            <div className="mt-3">
+              <SquareBizBoard
+                gameState={{ ...state, canSelectSquare: false }}
+                interactive={false}
+                hostLabel="SHOW HOST"
+              />
+            </div>
+            <div className="mt-4 text-lg font-semibold text-white/45">
+              Contestants are connecting. The Host starts the show.
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="absolute inset-0 z-10">
+          <div className={`absolute inset-5 flex min-h-0 min-w-0 items-center justify-center transition-all duration-300 ${['question_read','answering','result'].includes(phase) ? 'scale-[.985] blur-[2px] brightness-50' : ''}`}>
+            <SquareBizBoard
+              gameState={{ ...state, canSelectSquare: false }}
+              interactive={false}
+              hostLabel="SHOW HOST"
+            />
+          </div>
+
+          <SquareBizCueCard
+            gameState={{ ...state, canAnswer: false }}
+            now={clock}
+            busy
+          />
+
+          {phase === 'finished' && (
+            <div className="pointer-events-none absolute inset-0 z-30 flex items-center justify-center bg-[#05020a]/32">
+              <div
+                className="sb-result-pop rounded-[34px] border-2 bg-[#0b0414]/92 px-12 py-8 text-center backdrop-blur-lg"
+                style={{
+                  borderColor: state.winner === 'X' ? '#ff1593' : '#25b9ff',
+                  boxShadow: `0 0 70px ${state.winner === 'X' ? 'rgba(255,21,147,.30)' : 'rgba(37,185,255,.30)'}`,
+                }}
+              >
+                <div className="text-[8px] uppercase tracking-[.3em] text-[#ffd633]" style={PS2}>
+                  ROUND {state.roundNumber}
+                </div>
+                <div
+                  className="mt-4 text-[clamp(4rem,9vw,8rem)] font-black uppercase leading-[.86]"
+                  style={{
+                    fontFamily: 'Impact, sans-serif',
+                    color: state.winner === 'X' ? '#ff1593' : '#25b9ff',
+                    textShadow: '0 0 30px currentColor',
+                  }}
+                >
+                  PLAYER {state.winner}<br />TAKES THE BIZ!
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {phase === 'intro' && (
+        <SquareBizIntro gameState={state} now={clock} playAudio />
+      )}
+
+      {phase !== 'intro' && (
+        <div className="pointer-events-none absolute right-4 top-4 z-40 rounded-full border border-white/10 bg-[#0b0414]/75 px-3 py-2 text-[6px] uppercase tracking-widest text-white/30" style={PS2}>
+          ROOM {room.roomCode}
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+function BFFDysfunctionDisplay({ gameState }) {
+  const dysfunction = gameState.dysfunction || {};
+  const players = Array.isArray(gameState.players) ? gameState.players : [];
+  const byId = Object.fromEntries(
+    players.map((player) => [String(player.playerId), player]),
+  );
+  const assignments = dysfunction.side_assignments || {};
+  const sideA = Object.entries(assignments)
+    .filter(([, side]) => side === 'A')
+    .map(([id]) => byId[id])
+    .filter(Boolean);
+  const sideB = Object.entries(assignments)
+    .filter(([, side]) => side === 'B')
+    .map(([id]) => byId[id])
+    .filter(Boolean);
+  const defensePlayer = byId[String(dysfunction.defense_player_id || '')] || null;
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const defenseSeconds = gameState.answer_deadline_at
+    ? Math.max(0, Math.ceil((Number(gameState.answer_deadline_at) - now) / 1000))
+    : null;
+
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#07030d] p-5 sm:p-8">
+      <div className="pointer-events-none absolute inset-0 opacity-70"
+        style={{
+          background:
+            'radial-gradient(circle at 20% 20%, rgba(188,19,254,.22), transparent 28%), radial-gradient(circle at 80% 20%, rgba(255,95,31,.18), transparent 28%), radial-gradient(circle at 50% 85%, rgba(255,215,0,.08), transparent 35%)',
+        }}
+      />
+
+      <div className="relative z-10 flex items-start justify-between gap-4">
+        <div>
+          <div className="text-[8px] uppercase tracking-[.28em] text-[#F472B6]" style={PS2}>
+            BFF FINALE
+          </div>
+          <div className="mt-2 font-heading text-4xl uppercase text-white sm:text-6xl">
+            FAMILY <span className="text-[#FFD700]">DYSFUNCTION</span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/5 px-5 py-3 text-center">
+          <div className="text-[6px] uppercase tracking-[.18em] text-[#FFD700]/60" style={PS2}>
+            PROMPT
+          </div>
+          <div className="mt-1 font-heading text-3xl text-[#FFD700]">
+            {Number(dysfunction.prompt_number) || 1}/5
+          </div>
+        </div>
+      </div>
+
+      <div className="relative z-10 mt-5 grid min-h-0 flex-1 grid-cols-[1fr_minmax(280px,1.4fr)_1fr] gap-4">
+        <div className="flex min-h-0 flex-col rounded-3xl border border-[#BC13FE]/35 bg-[#BC13FE]/[.06] p-4">
+          <div className="text-center text-[7px] uppercase tracking-[.2em] text-[#BC13FE]" style={PS2}>
+            SIDE A
+          </div>
+          <div className="mt-2 text-center font-heading text-5xl text-white">
+            {Number(dysfunction.scoreA) || 0}
+          </div>
+          <div className="mt-4 space-y-2">
+            {sideA.map((player) => (
+              <div key={player.playerId} className="rounded-xl border border-[#BC13FE]/20 bg-black/30 px-3 py-3 text-center text-lg font-bold">
+                {player.playerName || player.name || 'Player'}
+              </div>
+            ))}
+          </div>
+          {Number(dysfunction.last_pointsA) === 3 && dysfunction.votes_revealed && (
+            <div className="mt-auto pt-4 text-center font-heading text-3xl text-[#FFD700]">
+              DYSFUNCTION!
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-h-0 flex-col items-center justify-center rounded-3xl border border-white/10 bg-black/45 p-6 text-center">
+          <div className="text-[7px] uppercase tracking-[.2em] text-white/30" style={PS2}>
+            {gameState.round_stage === 'dysfunction_defense'
+              ? 'THE DEFENSE'
+              : dysfunction.votes_revealed
+                ? 'VOTES REVEALED'
+                : 'SECRET VOTE'}
+          </div>
+
+          <div className="mt-5 font-heading text-3xl leading-tight text-white sm:text-5xl">
+            {dysfunction.prompt || 'Waiting for the next dysfunctional family prompt…'}
+          </div>
+
+          {gameState.round_stage === 'dysfunction_vote' && (
+            <div className="mt-6 rounded-full border border-white/10 bg-white/[.03] px-5 py-2 text-sm text-white/40">
+              Everybody is voting privately…
+            </div>
+          )}
+
+          {gameState.round_stage === 'dysfunction_defense' && defensePlayer && (
+            <div className="mt-7 rounded-2xl border border-[#FFD700]/40 bg-[#FFD700]/10 px-8 py-5">
+              <div className="text-[7px] uppercase tracking-[.18em] text-[#FFD700]/65" style={PS2}>
+                DEFEND YOURSELF
+              </div>
+              <div className="mt-2 font-heading text-4xl text-[#FFD700]">
+                {defensePlayer.playerName || defensePlayer.name}
+              </div>
+              <div className="mt-2 font-heading text-5xl text-white">
+                {defenseSeconds ?? 10}s
+              </div>
+            </div>
+          )}
+
+          {gameState.round_stage === 'dysfunction_complete' && (
+            <div className="mt-7 font-heading text-4xl text-[#FFD700]">
+              FAMILY DYSFUNCTION COMPLETE
+            </div>
+          )}
+        </div>
+
+        <div className="flex min-h-0 flex-col rounded-3xl border border-[#FF5F1F]/35 bg-[#FF5F1F]/[.06] p-4">
+          <div className="text-center text-[7px] uppercase tracking-[.2em] text-[#FF5F1F]" style={PS2}>
+            SIDE B
+          </div>
+          <div className="mt-2 text-center font-heading text-5xl text-white">
+            {Number(dysfunction.scoreB) || 0}
+          </div>
+          <div className="mt-4 space-y-2">
+            {sideB.map((player) => (
+              <div key={player.playerId} className="rounded-xl border border-[#FF5F1F]/20 bg-black/30 px-3 py-3 text-center text-lg font-bold">
+                {player.playerName || player.name || 'Player'}
+              </div>
+            ))}
+          </div>
+          {Number(dysfunction.last_pointsB) === 3 && dysfunction.votes_revealed && (
+            <div className="mt-auto pt-4 text-center font-heading text-3xl text-[#FFD700]">
+              DYSFUNCTION!
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BFFDisplay({ room, displayId }) {
+  const [liveRoom, setLiveRoom] = useState(null);
+  const [error, setError] = useState('');
+  const lastSoundCueRef = useRef(null);
+  const roomCode = room?.roomCode || '';
+
+  useBffVoiceRelay({
+    roomCode,
+    role: 'display',
+    identity: displayId,
+    shouldSend: false,
+    autoStart: Boolean(roomCode && displayId),
+  });
+
+  useEffect(() => {
+    preloadBffSounds();
+    armBffSoundUnlock();
+  }, []);
+
+  useEffect(() => {
+    if (!roomCode) return undefined;
+
+    let cancelled = false;
+
+    async function refreshBffDisplay() {
+      try {
+        const payload = await tngApi.bff.getDisplayState(roomCode);
+        if (cancelled) return;
+        setLiveRoom(payload.room || null);
+        setError('');
+      } catch (displayError) {
+        if (cancelled) return;
+        setError(displayError?.message || 'BFF display state could not be loaded.');
+      }
+    }
+
+    refreshBffDisplay();
+    const interval = window.setInterval(refreshBffDisplay, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [roomCode]);
+
+  const gameState = liveRoom?.gameState || {};
+  const soundCue = gameState.sound_cue;
+
+  useEffect(() => {
+    if (!soundCue?.at || soundCue.at === lastSoundCueRef.current) return;
+
+    const age = Date.now() - Number(soundCue.at);
+    lastSoundCueRef.current = soundCue.at;
+    if (!Number.isFinite(age) || age > 8000) return;
+
+    playBffSound(String(soundCue.name || ''));
+  }, [soundCue]);
+
+  if (error && !liveRoom) {
+    return (
+      <div className="flex h-full items-center justify-center px-6 text-center">
+        <div>
+          <div className="font-heading text-4xl text-red-400">BFF DISPLAY ERROR</div>
+          <div className="mt-4 text-white/40">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!liveRoom) {
+    return (
+      <div className="flex h-full items-center justify-center text-center">
+        <div>
+          <Loader2 className="mx-auto h-14 w-14 animate-spin text-[#BC13FE]" />
+          <div className="mt-5 text-[8px] uppercase tracking-[.2em] text-white/35" style={PS2}>
+            LOADING BFF LIVE BOARD
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (String(gameState.round_stage || '').startsWith('dysfunction')) {
+    return <BFFDysfunctionDisplay gameState={gameState} />;
+  }
+
+  const players = Array.isArray(gameState.players) ? gameState.players : [];
+  const activePlayer = players.find(
+    (player) => String(player.playerId) === String(gameState.active_player_id || ''),
+  );
+  const stageLabel = {
+    setup: 'GAME SETUP',
+    faceoff_setup: 'SELECT FACEOFF PLAYERS',
+    faceoff_ready: 'FACEOFF READY',
+    faceoff_buzz: 'FACEOFF · BUZZERS LIVE',
+    faceoff_answer: 'FACEOFF · ANSWERING',
+    play_pass: 'PLAY OR PASS',
+    family_play: 'FAMILY PLAY',
+    steal_ready: 'STEAL READY',
+    steal_buzz: 'STEAL · BUZZERS LIVE',
+    steal_answer: 'STEAL ANSWER',
+    round_complete: 'ROUND COMPLETE',
+    match_tie: 'MATCH TIED',
+    match_complete: 'REGULAR GAME COMPLETE',
+  }[gameState.round_stage] || String(gameState.round_stage || 'BFF').replaceAll('_', ' ').toUpperCase();
+
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden p-3 sm:p-4">
+      <div className="w-full max-w-[1800px]">
+        <div className="mb-2 flex items-center justify-between gap-3 px-2">
+          <div className="rounded-full border border-[#22D3EE]/25 bg-[#22D3EE]/[.06] px-4 py-2 text-[7px] uppercase tracking-[.18em] text-[#8DEEFF]" style={PS2}>
+            {stageLabel}
+          </div>
+
+          {activePlayer && (
+            <div className="rounded-full border border-[#FFD700]/30 bg-[#FFD700]/[.07] px-4 py-2 text-sm font-bold text-[#FFD700]">
+              {activePlayer.playerName || activePlayer.name} IS UP
+            </div>
+          )}
+
+          <div className="rounded-full border border-green-400/25 bg-green-400/[.05] px-4 py-2 text-[7px] uppercase tracking-[.16em] text-green-400" style={PS2}>
+            AUDIO RELAY LIVE
+          </div>
+        </div>
+
+        <BFFTngBoard gs={gameState} />
+
+        {gameState.round_stage === 'match_complete' && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-10 z-40 flex justify-center">
+            <div className="rounded-2xl border border-[#FFD700]/45 bg-black/90 px-8 py-4 text-center shadow-[0_0_40px_rgba(255,215,0,.18)]">
+              <div className="text-[7px] uppercase tracking-[.2em] text-[#FFD700]/60" style={PS2}>
+                REGULAR GAME WINNER
+              </div>
+              <div className="mt-2 font-heading text-3xl text-[#FFD700]">
+                {Number(gameState.winning_team) === 2 ? gameState.family2 : gameState.family1}
+              </div>
+              <div className="mt-1 text-white/35">Family Dysfunction is next.</div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function GameDisplay() {
   const initial = useMemo(savedDisplay, []);
   const [code, setCode] = useState('');
   const [display, setDisplay] = useState(initial);
   const [room, setRoom] = useState(null);
+  const [notifications, setNotifications] = useState([]);
   const [status, setStatus] = useState(initial ? 'connecting' : 'unpaired');
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
@@ -998,6 +1391,19 @@ export default function GameDisplay() {
 
         setStatus(payload.status || 'connected');
         setRoom(payload.room || null);
+        if (Array.isArray(payload.notifications) && payload.notifications.length > 0) {
+          setNotifications((current) => {
+            const seen = new Set(current.map((item) => item.id));
+            const merged = [...current, ...payload.notifications.filter((item) => !seen.has(item.id))];
+            return merged.slice(-3);
+          });
+
+          payload.notifications.forEach((item) => {
+            window.setTimeout(() => {
+              setNotifications((current) => current.filter((row) => row.id !== item.id));
+            }, 7500);
+          });
+        }
         setError('');
       } catch (stateError) {
         if (cancelled) return;
@@ -1009,6 +1415,7 @@ export default function GameDisplay() {
           localStorage.removeItem('tng_display_token');
           setDisplay(null);
           setRoom(null);
+          setNotifications([]);
           setStatus('unpaired');
         }
       }
@@ -1112,10 +1519,12 @@ export default function GameDisplay() {
     );
   }
 
+  const squareBizMode = room?.gameId === 'square-biz';
+
   return (
     <div className="relative h-[100dvh] overflow-hidden bg-[#030207] text-white">
-      <AmbientBackdrop />
-      <DisplayHud room={room} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />
+      {!squareBizMode && <AmbientBackdrop />}
+      {!squareBizMode && <DisplayHud room={room} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />}
 
       {error && (
         <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-lg border border-red-500/40 bg-black/90 px-4 py-2 text-sm text-red-400 shadow-xl">
@@ -1123,7 +1532,9 @@ export default function GameDisplay() {
         </div>
       )}
 
-      <div className="relative z-10 h-[calc(100dvh-4rem)] overflow-hidden">
+      <DisplayNotificationStack notifications={notifications} />
+
+      <div className={`relative z-10 overflow-hidden ${squareBizMode ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)]'}`}>
         {!room && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
@@ -1153,8 +1564,12 @@ export default function GameDisplay() {
 
         {room?.gameId === 'hangman' && <HangmanDisplay room={room} />}
         {room?.gameId === 'spades' && <SpadesDisplay room={room} />}
+        {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
+        {room?.gameId === 'bff' && (
+          <BFFDisplay room={room} displayId={display?.deviceId} />
+        )}
 
-        {room && !['hangman', 'spades'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'bff'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>

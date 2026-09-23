@@ -10,6 +10,7 @@ import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { WORD_POOL, CATEGORY_MAP } from '@/data/wordSearchPool';
 import { runAITurn, validateAISubmission } from '@/lib/wordSearchAI';
+import NeonWordSearchPlayer from '@/pages/NeonWordSearchPlayer';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -113,7 +114,17 @@ export default function WordSearchGame() {
   const params = new URLSearchParams(window.location.search);
   const roomCode = params.get('room');
   const cpuId = params.get('cpu');
-  if (!roomCode) { window.location.href = '/'; return null; }
+  const useNeonPlayer = params.get('neon') === '1';
+
+  if (!roomCode) {
+    window.location.href = '/';
+    return null;
+  }
+
+  if (useNeonPlayer) {
+    return <NeonWordSearchPlayer roomCode={roomCode.toUpperCase()} />;
+  }
+
   return <WordSearchViewer roomCode={roomCode} cpuId={cpuId} />;
 }
 

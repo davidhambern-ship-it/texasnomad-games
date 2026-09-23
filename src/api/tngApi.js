@@ -1,6 +1,20 @@
-import { appParams } from '@/lib/app-params';
+import { getNeonAuthToken } from '@/lib/neonAuth';
 
-const API_BASE = 'https://br-polished-glade-avfsrygs-tngapi.compute.c-11.us-east-1.aws.neon.tech';
+const IS_RAILWAY_TEMP_HOST =
+  typeof window !== 'undefined' &&
+  window.location.hostname.endsWith('.up.railway.app');
+
+const API_BASE =
+  import.meta.env.VITE_TNG_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-api'
+    : 'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech');
+
+const BFF_API_BASE =
+  import.meta.env.VITE_BFF_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/bff-api'
+    : 'https://tng-live-production.up.railway.app/bff-api');
 
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
@@ -20,11 +34,18 @@ async function request(path, {
   displayToken,
   roomCode,
   authenticated=true,
+  apiBase=API_BASE,
 } = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
-    if (!appParams.token) throw new TngApiError('Your TNG session is missing.', { code:'AUTH_REQUIRED', status:401 });
-    headers.Authorization = `Bearer ${appParams.token}`;
+    const token = await getNeonAuthToken();
+    if (!token) {
+      throw new TngApiError('Your TNG session is missing.', {
+        code: 'AUTH_REQUIRED',
+        status: 401,
+      });
+    }
+    headers.Authorization = `Bearer ${token}`;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (displayId) headers['X-TNG-Display-Id'] = displayId;
@@ -32,9 +53,30 @@ async function request(path, {
   if (roomCode) headers['X-TNG-Room-Code'] = roomCode;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
-  const response = await fetch(`${API_BASE}${path.replace(/^\/api/, '')}`, {
-    method, headers, body: body === undefined ? undefined : JSON.stringify(body)
+  const url = `${apiBase}${path.replace(/^\/api/, '')}`;
+  const requestBody = body === undefined ? undefined : JSON.stringify(body);
+
+  let response = await fetch(url, {
+    method,
+    headers,
+    body: requestBody,
   });
+
+  // Neon Auth JWTs are intentionally short-lived. If a request happens on the
+  // edge of a token refresh, fetch one fresh token and retry once before
+  // treating the user as signed out.
+  if (authenticated && response.status === 401) {
+    const freshToken = await getNeonAuthToken().catch(() => null);
+    if (freshToken) {
+      headers.Authorization = `Bearer ${freshToken}`;
+      response = await fetch(url, {
+        method,
+        headers,
+        body: requestBody,
+      });
+    }
+  }
+
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new TngApiError(payload.error?.message || 'The TNG service is unavailable.', {
@@ -45,6 +87,9 @@ async function request(path, {
 }
 
 export const tngApi = {
+  public: {
+    liveRooms: () => request('/api/public/live-rooms', { authenticated:false }),
+  },
   profile: {
     get: () => request('/api/profile'),
     create: (data) => request('/api/profile', { method:'POST', body:data }),
@@ -53,6 +98,9 @@ export const tngApi = {
     create: (data) => request('/api/device-session', { method:'POST', body:data }),
   },
   host: {
+    getAccountRoute: (deviceId) => request('/api/account-route', {
+      deviceId: deviceId || undefined,
+    }),
     startSession: (deviceId, reclaimController = false, resumeTestRoom = false) => request('/api/host/session', {
       method:'POST',
       deviceId,
@@ -64,7 +112,11 @@ export const tngApi = {
       deviceId,
       body:{ replaceDisplay },
     }),
-    createRoom: (deviceId, gameId) => request('/api/host/room', { method:'POST', deviceId, body:{gameId} }),
+    createRoom: (deviceId, gameId) => request('/api/host/room', {
+      method:'POST',
+      deviceId,
+      body:{ gameId },
+    }),
     endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
     getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
     updateRoomState: (deviceId, statePatch) => request('/api/host/room-state', {
@@ -88,6 +140,13 @@ export const tngApi = {
     getRoom: (deviceId, roomCode) => request('/api/player/room', {
       deviceId,
       roomCode,
+    }),
+  },
+  social: {
+    get: () => request('/api/social'),
+    action: (action, payload = {}) => request('/api/social', {
+      method:'POST',
+      body:{ action, ...payload },
     }),
   },
   display: {
@@ -115,5 +174,111 @@ export const tngApi = {
       roomCode,
       body:{ roomCode, action, ...payload },
     }),
+  },
+  hangman: {
+    getHostState: (deviceId) => request('/api/hangman/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/hangman/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/hangman/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/hangman/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+  },
+  wordSearch: {
+    getHostState: (deviceId) => request('/api/word-search/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/word-search/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/word-search/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/word-search/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+  },
+  bff: {
+    getHostState: (deviceId) => request('/host', {
+      deviceId,
+      apiBase: BFF_API_BASE,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/host', {
+      method:'POST',
+      deviceId,
+      apiBase:BFF_API_BASE,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/player', {
+      deviceId,
+      roomCode,
+      apiBase:BFF_API_BASE,
+    }),
+    getDisplayState: (roomCode) => request(`/display?room=${encodeURIComponent(roomCode)}`, {
+      authenticated:false,
+      apiBase:BFF_API_BASE,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      apiBase:BFF_API_BASE,
+      body:{ action, ...payload },
+    }),
+  },
+  squareBiz: {
+    getHostState: (deviceId) => request('/api/square-biz/host', {
+      deviceId,
+    }),
+    hostAction: (deviceId, action, payload = {}) => request('/api/square-biz/host', {
+      method:'POST',
+      deviceId,
+      body:{ action, ...payload },
+    }),
+    getPlayerState: (deviceId, roomCode) => request('/api/square-biz/player', {
+      deviceId,
+      roomCode,
+    }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/square-biz/player', {
+      method:'POST',
+      deviceId,
+      roomCode,
+      body:{ roomCode, action, ...payload },
+    }),
+    questions: {
+      list: (deviceId) => request('/api/square-biz/questions', { deviceId }),
+      create: (deviceId, payload) => request('/api/square-biz/questions', {
+        method:'POST',
+        deviceId,
+        body:{ action:'create', ...payload },
+      }),
+      bulkImport: (deviceId, questions) => request('/api/square-biz/questions', {
+        method:'POST',
+        deviceId,
+        body:{ action:'bulk_import', questions },
+      }),
+      update: (deviceId, payload) => request('/api/square-biz/questions', {
+        method:'PATCH',
+        deviceId,
+        body:payload,
+      }),
+    },
   },
 };
