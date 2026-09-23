@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { authClient } from "@/lib/neonAuth";
 import { useAuth } from "@/lib/AuthContext";
@@ -44,15 +44,15 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [routing, setRouting] = useState(false);
+  const routeAttemptedRef = useRef(false);
 
   useEffect(() => {
-    if (isLoadingAuth || !isAuthenticated || routing) return undefined;
+    if (isLoadingAuth || !isAuthenticated || routeAttemptedRef.current) return;
 
-    let cancelled = false;
+    routeAttemptedRef.current = true;
+    setRouting(true);
 
     async function routeSignedInDevice() {
-      setRouting(true);
-
       let destination = nextPath;
 
       try {
@@ -63,14 +63,14 @@ export default function Login() {
         if (!isExplicitPlayerJoin && savedRole !== 'player') {
           const route = await tngApi.host.getAccountRoute(currentDeviceId);
 
-          if (!cancelled && route?.route === 'display') {
+          if (route?.route === 'display') {
             // A second signed-in device for an already-active Host account
             // becomes the Game Display. Force a fresh pairing screen instead
             // of reusing an old/stale display token from this browser.
             localStorage.removeItem('tng_display_device_id');
             localStorage.removeItem('tng_display_token');
             destination = '/display';
-          } else if (!cancelled && route?.route === 'host' && nextPath === '/') {
+          } else if (route?.route === 'host' && nextPath === '/') {
             destination = '/host';
           }
         }
@@ -78,17 +78,11 @@ export default function Login() {
         console.warn('[TNG Login] account device routing check failed:', routeError);
       }
 
-      if (!cancelled) {
-        window.location.replace(destination);
-      }
+      window.location.replace(destination);
     }
 
     routeSignedInDevice();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAuthenticated, isLoadingAuth, nextPath, routing]);
+  }, [isAuthenticated, isLoadingAuth, nextPath]);
 
   if (!isLoadingAuth && isAuthenticated) {
     return (
