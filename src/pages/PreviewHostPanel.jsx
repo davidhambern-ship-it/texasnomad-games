@@ -93,7 +93,13 @@ export default function PreviewHostPanel() {
         sessionError instanceof TngApiError &&
         sessionError.code === 'HOST_ALREADY_CONTROLLED'
       ) {
-        return tngApi.host.startSession(deviceId, true, resumeTestRoom);
+        // Never steal an active Host session from another device.
+        // A second device on the same account belongs on the Game Display.
+        localStorage.setItem('tng_connection_role', 'display');
+        localStorage.removeItem('tng_display_device_id');
+        localStorage.removeItem('tng_display_token');
+        window.location.replace('/display');
+        throw sessionError;
       }
 
       if (
@@ -111,7 +117,10 @@ export default function PreviewHostPanel() {
             replacementError instanceof TngApiError &&
             replacementError.code === 'HOST_ALREADY_CONTROLLED'
           ) {
-            return tngApi.host.startSession(replacementId, true, resumeTestRoom);
+            localStorage.setItem('tng_connection_role', 'display');
+            localStorage.removeItem('tng_display_device_id');
+            localStorage.removeItem('tng_display_token');
+            window.location.replace('/display');
           }
           throw replacementError;
         }
