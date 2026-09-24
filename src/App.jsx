@@ -39,8 +39,12 @@ import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
 
 function HomeGate() {
-  const seen = localStorage.getItem('tn_welcome_seen');
-  if (!seen) { window.location.replace('/welcome'); return null; }
+  let welcomeComplete = false;
+  try {
+    welcomeComplete = sessionStorage.getItem('tng_welcome_complete') === '1';
+  } catch {}
+
+  if (!welcomeComplete) return <Navigate to="/welcome" replace />;
   return <Home />;
 }
 
@@ -119,6 +123,19 @@ const AuthenticatedApp = () => {
     '/forgot-password',
     '/reset-password',
   ]);
+
+  const publicUnauthenticatedPaths = new Set([
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/display',
+  ]);
+
+  if (!isAuthenticated && !publicUnauthenticatedPaths.has(location.pathname)) {
+    return <Navigate to="/login" replace />;
+  }
+
 
   if (
     profileGateEnabled &&
