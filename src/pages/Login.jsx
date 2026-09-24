@@ -68,9 +68,27 @@ export default function Login() {
       throw profileError;
     }
 
-    // Every successful TNG sign-in follows one clean path:
-    // Login -> Welcome -> Home. Device roles are chosen inside the app,
-    // never by hijacking the login handoff.
+    // Normal sign-ins follow Login -> Welcome -> Home.
+    // Narrow exception: if this account is already actively hosting on
+    // another device, this browser is the Display and should go straight
+    // to the pairing-code screen.
+    try {
+      const currentDeviceId = localStorage.getItem('tng_device_id');
+      const route = await tngApi.host.getAccountRoute(currentDeviceId);
+
+      if (route?.route === 'display' && route?.activeHost) {
+        localStorage.setItem('tng_connection_role', 'display');
+        localStorage.removeItem('tng_display_device_id');
+        localStorage.removeItem('tng_display_token');
+        window.location.replace('/display');
+        return;
+      }
+    } catch (routeError) {
+      // Account-route is an enhancement, never a reason to break ordinary
+      // sign-in. Fall through to the normal Welcome flow if it cannot load.
+      console.warn('[TNG Login] active host routing check failed:', routeError);
+    }
+
     try {
       sessionStorage.removeItem('tng_welcome_complete');
     } catch {}
