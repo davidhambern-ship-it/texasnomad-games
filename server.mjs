@@ -752,6 +752,139 @@ async function handleTngSessionLifecycle(req, res) {
   }
 }
 
+
+const WORD_SEARCH_DISPLAY_COLORS = {
+  1: '#BC13FE',
+  2: '#FF5F1F',
+  3: '#FFD700',
+  4: '#22D3EE',
+};
+
+function projectWordSearchDisplayState(rawState = {}, participants = []) {
+  const scores = rawState?.scores && typeof rawState.scores === 'object'
+    ? rawState.scores
+    : {};
+
+  return {
+    phase: rawState.phase || 'setup',
+    mode: rawState.mode || 'race',
+    difficulty: rawState.difficulty || 'simpleton',
+    category: rawState.category || 'random',
+    grid: Array.isArray(rawState.grid) ? rawState.grid : [],
+    words: Array.isArray(rawState.words)
+      ? rawState.words.map((word) => ({
+          word: word.word,
+          found: word.found === true,
+          foundBy: word.foundBy ?? null,
+          foundAt: word.foundAt ?? null,
+          cells: word.found === true && Array.isArray(word.cells) ? word.cells : [],
+          points: word.found === true ? (word.points ?? null) : null,
+          directionLabel: word.found === true ? (word.directionLabel ?? null) : null,
+          revealed: word.revealed === true,
+        }))
+      : [],
+    scores: { ...scores },
+    activeSeat: Number(rawState.active_seat || 0),
+    timeEnd: rawState.time_end || null,
+    paused: rawState.paused === true,
+    message: rawState.message || null,
+    winnerSeat: rawState.winner_seat || null,
+    lastAction: rawState.last_action || null,
+    roundNumber: Number(rawState.round_number || 0),
+    players: participants.map((player) => {
+      const seat = Number(player.seat_number || 0);
+      return {
+        playerId: player.account_id,
+        accountId: player.account_id,
+        seatNumber: seat,
+        role: player.role || 'player',
+        name: player.display_name || player.handle || (seat ? `Seat ${seat}` : 'Player'),
+        handle: player.handle || null,
+        color: WORD_SEARCH_DISPLAY_COLORS[seat] || '#FFFFFF',
+        score: Number(scores[String(seat)] || 0),
+      };
+    }),
+  };
+}
+
+async function handleTngDisplayState(req, res) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
+    });
+    return;
+  }
+
+  const displayId = String(req.headers['x-tng-display-id'] || '');
+  const displayToken = String(req.headers['x-tng-display-token'] || '');
+
+  const upstream = await fetch(`${TNG_API_ORIGIN}/display/state`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      ...(displayId ? { 'X-TNG-Display-Id': displayId } : {}),
+      ...(displayToken ? { 'X-TNG-Display-Token': displayToken } : {}),
+    },
+  });
+
+  const payload = await upstream.json().catch(() => ({}));
+
+  if (!upstream.ok) {
+    sendJson(res, upstream.status, payload);
+    return;
+  }
+
+  const room = payload?.room || null;
+  if (!room || room.gameId !== 'word-search' || !isUuid(room.id)) {
+    sendJson(res, 200, payload);
+    return;
+  }
+
+  const { rows: roomRows } = await bffPool.query(`
+    select id, display_state
+    from public.game_rooms
+    where id = $1::uuid
+      and game_id = 'word-search'
+      and status::text in ('lobby', 'live', 'paused')
+    limit 1
+  `, [room.id]);
+
+  const liveRoom = roomRows[0] || null;
+  if (!liveRoom) {
+    sendJson(res, 200, payload);
+    return;
+  }
+
+  const { rows: participants } = await bffPool.query(`
+    select
+      rp.account_id,
+      rp.role::text as role,
+      rp.seat_number,
+      pp.display_name,
+      pp.handle
+    from public.room_participants rp
+    left join public.player_profiles pp
+      on pp.account_id = rp.account_id
+    where rp.room_id = $1::uuid
+      and rp.left_at is null
+      and rp.seat_number in (1, 2, 3, 4)
+    order by rp.seat_number
+  `, [room.id]);
+
+  const rawState =
+    liveRoom.display_state?.gameState ||
+    liveRoom.display_state?.game_state ||
+    {};
+
+  sendJson(res, 200, {
+    ...payload,
+    room: {
+      ...room,
+      state: projectWordSearchDisplayState(rawState, participants),
+    },
+  });
+}
+
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, {
@@ -3358,6 +3491,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/tng-session')) {
       await handleTngSessionLifecycle(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/tng-display/state')) {
+      await handleTngDisplayState(req, res);
       return;
     }
 
