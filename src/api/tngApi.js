@@ -22,6 +22,12 @@ const STATS_API_BASE =
     ? '/tng-stats'
     : 'https://tng-live-production.up.railway.app/tng-stats');
 
+const ACCOUNT_ROUTE_API_BASE =
+  import.meta.env.VITE_TNG_ACCOUNT_ROUTE_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-api'
+    : 'https://tng-live-production.up.railway.app/tng-api');
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -115,6 +121,7 @@ export const tngApi = {
   host: {
     getAccountRoute: (deviceId) => request('/api/account-route', {
       deviceId: deviceId || undefined,
+      apiBase: ACCOUNT_ROUTE_API_BASE,
     }),
     startSession: (deviceId, reclaimController = false, resumeTestRoom = false) => request('/api/host/session', {
       method:'POST',
