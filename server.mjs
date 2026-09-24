@@ -80,7 +80,9 @@ function rewriteAuthCookie(cookie) {
   const cookieName = raw.split('=', 1)[0].trim();
   let next = raw
     .replace(/;\s*Domain=[^;]+/ig, '')
-    .replace(/;\s*Path=[^;]+/ig, '; Path=/');
+    .replace(/;\s*Path=[^;]+/ig, '; Path=/')
+    .replace(/;\s*Expires=[^;]+/ig, '')
+    .replace(/;\s*Max-Age=[^;]+/ig, '');
 
   if (!/;\s*Path=/i.test(next)) {
     next += '; Path=/';
@@ -546,6 +548,160 @@ async function handleTngStats(req, res) {
   });
 }
 
+async function handleTngSessionLifecycle(req, res) {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST required.' },
+    });
+    return;
+  }
+
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  const body = await readJsonBody(req).catch(() => ({}));
+  const action = String(body?.action || '').toLowerCase();
+  const deviceIds = Array.from(new Set(
+    (Array.isArray(body?.deviceIds) ? body.deviceIds : [])
+      .map((value) => String(value || '').trim())
+      .filter((value) => isUuid(value)),
+  ));
+
+  if (!['heartbeat', 'disconnect', 'logout'].includes(action)) {
+    sendJson(res, 400, {
+      error: { code: 'INVALID_SESSION_ACTION', message: 'Invalid TNG session action.' },
+    });
+    return;
+  }
+
+  if (deviceIds.length === 0) {
+    sendJson(res, 200, { ok: true, action, devices: 0 });
+    return;
+  }
+
+  const client = await bffPool.connect();
+
+  try {
+    await client.query('begin');
+
+    if (action === 'heartbeat') {
+      const result = await client.query(
+        `update public.device_sessions
+         set status = 'connected',
+             last_heartbeat_at = now(),
+             updated_at = now()
+         where account_id = $1::uuid
+           and id = any($2::uuid[])
+           and role::text <> 'game_display'
+         returning id`,
+        [resolved.account.id, deviceIds],
+      );
+
+      await client.query('commit');
+      sendJson(res, 200, {
+        ok: true,
+        action,
+        devices: result.rowCount || 0,
+      });
+      return;
+    }
+
+    const hostResult = await client.query(
+      `select id, display_device_id
+       from public.host_sessions
+       where host_account_id = $1::uuid
+         and controller_device_id = any($2::uuid[])
+         and ended_at is null
+         and status::text in ('pairing', 'ready', 'live')
+       for update`,
+      [resolved.account.id, deviceIds],
+    );
+
+    await client.query(
+      `update public.device_sessions
+       set status = 'disconnected',
+           last_heartbeat_at = now(),
+           updated_at = now()
+       where account_id = $1::uuid
+         and id = any($2::uuid[])`,
+      [resolved.account.id, deviceIds],
+    );
+
+    if (action === 'logout') {
+      await client.query(
+        `update public.room_participants
+         set left_at = coalesce(left_at, now()),
+             last_heartbeat_at = now()
+         where account_id = $1::uuid
+           and device_session_id = any($2::uuid[])
+           and left_at is null`,
+        [resolved.account.id, deviceIds],
+      );
+
+      const hostSessionIds = hostResult.rows
+        .map((row) => row.id)
+        .filter((value) => isUuid(value));
+      const displayDeviceIds = hostResult.rows
+        .map((row) => row.display_device_id)
+        .filter((value) => isUuid(value));
+
+      if (hostSessionIds.length) {
+        await client.query(
+          `update public.game_rooms
+           set status = 'abandoned',
+               updated_at = now()
+           where host_session_id = any($1::uuid[])
+             and status::text in ('lobby', 'live', 'paused')`,
+          [hostSessionIds],
+        );
+
+        await client.query(
+          `update public.display_pairings
+           set consumed_at = coalesce(consumed_at, now())
+           where host_session_id = any($1::uuid[])
+             and consumed_at is null`,
+          [hostSessionIds],
+        );
+
+        await client.query(
+          `update public.host_sessions
+           set status = 'ended',
+               ended_at = now(),
+               updated_at = now()
+           where id = any($1::uuid[])`,
+          [hostSessionIds],
+        );
+      }
+
+      if (displayDeviceIds.length) {
+        await client.query(
+          `update public.device_sessions
+           set status = 'disconnected',
+               updated_at = now()
+           where id = any($1::uuid[])`,
+          [displayDeviceIds],
+        );
+      }
+    }
+
+    await client.query('commit');
+    sendJson(res, 200, {
+      ok: true,
+      action,
+      devices: deviceIds.length,
+      hostsEnded: action === 'logout' ? hostResult.rows.length : 0,
+    });
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, {
@@ -654,6 +810,7 @@ async function handleTngAccountRoute(req, res) {
       and hs.ended_at is null
       and hs.status::text in ('pairing', 'ready', 'live')
       and ds.status::text in ('connected', 'active')
+      and ds.last_heartbeat_at > now() - interval '30 minutes'
       and (ds.expires_at is null or ds.expires_at > now())
     order by hs.updated_at desc
     limit 1
@@ -3146,6 +3303,11 @@ const server = http.createServer(async (req, res) => {
   try {
     if ((req.url || '').startsWith('/neon-auth')) {
       await proxyNeonAuth(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/tng-session')) {
+      await handleTngSessionLifecycle(req, res);
       return;
     }
 
