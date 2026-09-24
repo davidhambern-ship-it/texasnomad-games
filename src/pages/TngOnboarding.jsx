@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Gamepad2, Loader2, MonitorUp, UserRound } from 'lucide-react';
+import { Loader2, UserRound } from 'lucide-react';
 
 import AuthLayout from '@/components/AuthLayout';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
-import { waitForNeonSession } from '@/lib/neonAuth';
+import { startTngBrowserSession, waitForNeonSession } from '@/lib/neonAuth';
 import {
   createPreviewTngProfile,
   getPreviewTngProfile,
@@ -17,12 +17,6 @@ export default function TngOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isLoadingAuth, checkUserAuth } = useAuth();
-
-  const requestedNext = new URLSearchParams(location.search).get('next');
-  const nextPath =
-    requestedNext?.startsWith('/') && !requestedNext.startsWith('//')
-      ? requestedNext
-      : '/';
 
   const [stage, setStage] = useState('loading');
   const [displayName, setDisplayName] = useState('');
@@ -58,7 +52,9 @@ export default function TngOnboarding() {
         if (cancelled) return;
 
         if (profile) {
-          navigate(nextPath, { replace: true });
+          startTngBrowserSession();
+          try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
+          navigate('/welcome', { replace: true });
           return;
         }
 
@@ -74,7 +70,7 @@ export default function TngOnboarding() {
     return () => {
       cancelled = true;
     };
-  }, [checkUserAuth, isAuthenticated, isLoadingAuth, navigate, nextPath, user]);
+  }, [checkUserAuth, isAuthenticated, isLoadingAuth, navigate, user]);
 
   async function createProfile(event) {
     event.preventDefault();
@@ -84,23 +80,13 @@ export default function TngOnboarding() {
     try {
       await createPreviewTngProfile(user, { displayName, handle });
       await tngApi.stats.getProfile().catch(() => null);
-      setStage('welcome');
+      startTngBrowserSession();
+      try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
+      navigate('/welcome', { replace: true });
     } catch (profileError) {
       setError(profileError.message || 'Your TNG profile could not be created.');
     } finally {
       setSubmitting(false);
-    }
-  }
-
-  function chooseRole(role) {
-    localStorage.setItem('tng_connection_role', role);
-
-    if (role === 'host_controller') {
-      navigate('/host', { replace: true });
-    } else if (nextPath.startsWith('/join/')) {
-      navigate(nextPath, { replace: true });
-    } else {
-      navigate('/games', { replace: true });
     }
   }
 
@@ -237,58 +223,7 @@ export default function TngOnboarding() {
     );
   }
 
-  if (stage === 'welcome') {
-    return (
-      <AuthLayout icon={Gamepad2} title="Welcome to TNG" subtitle="Your profile is ready">
-        <button
-          onClick={() => setStage('role')}
-          className="w-full h-12 rounded-lg border-2 border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700]"
-          style={{ ...PS2, fontSize: 8 }}
-        >
-          CHOOSE HOW TO CONNECT →
-        </button>
-      </AuthLayout>
-    );
-  }
-
-  return (
-    <AuthLayout
-      icon={MonitorUp}
-      title="Choose Your Role"
-      subtitle="How are you using this device?"
-    >
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <RoleButton
-          title="Player"
-          description="Join and play TNG games from this device."
-          color="#FFD700"
-          onClick={() => chooseRole('player')}
-        />
-        <RoleButton
-          title="Host"
-          description="Use this device as the Host Controller."
-          color="#BC13FE"
-          onClick={() => chooseRole('host_controller')}
-        />
-      </div>
-    </AuthLayout>
-  );
-}
-
-function RoleButton({ title, description, color, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-xl border-2 p-5 text-left"
-      style={{ borderColor: color, background: `${color}12` }}
-    >
-      <span className="block uppercase mb-3" style={{ ...PS2, color, fontSize: 10 }}>
-        {title}
-      </span>
-      <span className="text-sm leading-relaxed text-white/55">{description}</span>
-    </button>
-  );
+  return <Status text="FINISHING YOUR TNG PROFILE" />;
 }
 
 function Status({ text, error = false }) {
