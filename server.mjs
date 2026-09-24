@@ -74,9 +74,35 @@ async function readRawBody(req) {
 }
 
 function rewriteAuthCookie(cookie) {
-  return String(cookie || '')
+  const raw = String(cookie || '');
+  if (!raw) return raw;
+
+  const cookieName = raw.split('=', 1)[0].trim();
+  let next = raw
     .replace(/;\s*Domain=[^;]+/ig, '')
     .replace(/;\s*Path=[^;]+/ig, '; Path=/');
+
+  if (!/;\s*Path=/i.test(next)) {
+    next += '; Path=/';
+  }
+
+  // Safari is strict about cross-origin cookie storage. Scope Neon Auth's
+  // session cookie to the shared TNG parent domain so requests from
+  // texasnomadgames.com to auth.texasnomadgames.com remain first-party.
+  // __Host- cookies are not allowed to carry Domain=, so preserve their
+  // host-only semantics if Neon ever emits one.
+  if (!cookieName.startsWith('__Host-')) {
+    next += '; Domain=texasnomadgames.com';
+  }
+
+  return next;
+}
+
+function authCookieNames(req) {
+  return String(req.headers.cookie || '')
+    .split(';')
+    .map((part) => part.trim().split('=', 1)[0])
+    .filter(Boolean);
 }
 
 async function proxyNeonAuth(req, res) {
@@ -137,7 +163,22 @@ async function proxyNeonAuth(req, res) {
       : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
 
   if (setCookies.length) {
-    res.setHeader('Set-Cookie', setCookies.map(rewriteAuthCookie));
+    const rewrittenCookies = setCookies.map(rewriteAuthCookie);
+    res.setHeader('Set-Cookie', rewrittenCookies);
+
+    console.info('[TNG auth proxy] upstream set-cookie', {
+      path: sourceUrl.pathname,
+      status: response.status,
+      cookieNames: rewrittenCookies
+        .map((value) => String(value || '').split('=', 1)[0].trim())
+        .filter(Boolean),
+    });
+  }
+
+  if (sourceUrl.pathname.endsWith('/get-session')) {
+    console.info('[TNG auth proxy] get-session cookie names', {
+      cookieNames: authCookieNames(req),
+    });
   }
 
   const payload = Buffer.from(await response.arrayBuffer());
