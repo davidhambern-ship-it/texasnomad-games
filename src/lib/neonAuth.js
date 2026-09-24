@@ -29,8 +29,39 @@ function unwrapSession(result) {
 }
 
 export async function getNeonSession() {
-  const result = await authClient.getSession();
-  return unwrapSession(result);
+  // Use a native credentialed fetch for session reads. The Neon auth endpoint
+  // is first-party to TNG and returns ordinary JSON; reading it directly avoids
+  // browser-specific adapter parsing issues (notably Safari) while preserving
+  // the Neon client for sign-in/sign-up/sign-out actions.
+  const response = await fetch(`${NEON_AUTH_URL}/get-session`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+
+  const text = await response.text();
+
+  if (!response.ok) {
+    let message = `TNG auth session check failed (${response.status}).`;
+    try {
+      const payload = text ? JSON.parse(text) : null;
+      message = payload?.message || payload?.error?.message || message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  if (!text) return null;
+
+  let payload;
+  try {
+    payload = JSON.parse(text);
+  } catch {
+    throw new Error('TNG received an invalid session response.');
+  }
+
+  return unwrapSession(payload);
 }
 
 export async function waitForNeonSession({
