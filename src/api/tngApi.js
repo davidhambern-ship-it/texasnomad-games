@@ -28,6 +28,12 @@ const ACCOUNT_ROUTE_API_BASE =
     ? '/tng-api'
     : 'https://tng-live-production.up.railway.app/tng-api');
 
+const DISPLAY_STATE_API_BASE =
+  import.meta.env.VITE_TNG_DISPLAY_STATE_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-display'
+    : 'https://tng-live-production.up.railway.app/tng-display');
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -173,10 +179,11 @@ export const tngApi = {
   },
   display: {
     pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
-    getState: (displayId, displayToken) => request('/api/display/state', {
+    getState: (displayId, displayToken) => request('/state', {
       displayId,
       displayToken,
       authenticated:false,
+      apiBase: DISPLAY_STATE_API_BASE,
     }),
   },
   spades: {
