@@ -182,6 +182,25 @@ async function proxyNeonAuth(req, res) {
   }
 
   const payload = Buffer.from(await response.arrayBuffer());
+
+  if (sourceUrl.pathname.endsWith('/get-session')) {
+    let payloadShape = 'non-json';
+    try {
+      const parsed = JSON.parse(payload.toString('utf8'));
+      if (parsed === null) payloadShape = 'null';
+      else if (Array.isArray(parsed)) payloadShape = 'array';
+      else if (parsed && typeof parsed === 'object') payloadShape = 'object';
+      else payloadShape = typeof parsed;
+    } catch {}
+
+    console.info('[TNG auth proxy] get-session response shape', {
+      status: response.status,
+      contentType: response.headers.get('content-type') || null,
+      payloadShape,
+      payloadBytes: payload.length,
+    });
+  }
+
   res.writeHead(response.status);
   res.end(payload);
 }
