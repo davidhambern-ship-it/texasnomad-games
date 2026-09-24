@@ -191,6 +191,17 @@ async function proxyNeonAuth(req, res) {
       else if (Array.isArray(parsed)) payloadShape = 'array';
       else if (parsed && typeof parsed === 'object') payloadShape = 'object';
       else payloadShape = typeof parsed;
+
+      console.info('[TNG auth proxy] get-session response keys', {
+        topLevelKeys: parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? Object.keys(parsed)
+          : [],
+        hasUser: Boolean(parsed?.user),
+        hasSession: Boolean(parsed?.session),
+        sessionKeys: parsed?.session && typeof parsed.session === 'object'
+          ? Object.keys(parsed.session)
+          : [],
+      });
     } catch {}
 
     console.info('[TNG auth proxy] get-session response shape', {
