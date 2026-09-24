@@ -102,18 +102,17 @@ export default function TngOnboarding() {
     return (
       <AuthLayout
         icon={UserRound}
-        title="Create Your FREE TNG Account"
-        subtitle="Unlock the community side of TexasNomad Games"
+        title="Create Your FREE TNG Profile"
+        subtitle="Your sign-in is ready. Now create your TNG identity."
       >
         <div className="space-y-5">
           <div className="rounded-2xl border border-[#FFD700]/30 bg-[#FFD700]/[.04] p-5">
             <div className="text-[7px] uppercase tracking-[.18em] text-[#FFD700]" style={PS2}>
-              FREE PLAYER ACCOUNT
+              TNG PROFILE
             </div>
 
             <p className="mt-3 text-sm leading-relaxed text-white/60">
-              Playing is one thing. A TNG account is what lets you become part of the community.
-              There is no charge and no subscription.
+              Your Google or email sign-in only verifies who you are. Your TNG Profile is the identity people see inside TexasNomad Games. There is no charge to create it.
             </p>
 
             <div className="mt-4 grid gap-2 text-sm text-white/65">
@@ -141,7 +140,7 @@ export default function TngOnboarding() {
             className="w-full h-12 rounded-lg border-2 border-[#FFD700] bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/15 transition-colors"
             style={{ ...PS2, fontSize: 8 }}
           >
-            CREATE MY FREE TNG ACCOUNT →
+            CREATE MY FREE TNG PROFILE →
           </button>
 
           <p className="text-center text-[10px] leading-relaxed text-white/25">
@@ -216,7 +215,7 @@ export default function TngOnboarding() {
             className="w-full h-12 rounded-lg border-2 border-[#BC13FE] bg-[#BC13FE]/20 text-[#BC13FE] disabled:opacity-50"
             style={{ ...PS2, fontSize: 8 }}
           >
-            {submitting ? 'CREATING…' : 'CREATE FREE TNG ACCOUNT'}
+            {submitting ? 'CREATING…' : 'CREATE FREE TNG PROFILE'}
           </button>
         </form>
       </AuthLayout>
