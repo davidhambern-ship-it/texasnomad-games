@@ -163,16 +163,41 @@ export default function Login() {
   const handleGoogle = async () => {
     setError("");
     setLoading(true);
+
     try {
       startTngBrowserSession();
+
+      // Neon/Better Auth returns the provider authorization URL. Launch it
+      // explicitly instead of depending on the SDK's automatic redirect;
+      // the first-party auth proxy can otherwise return successfully while
+      // leaving the browser sitting on the TNG login page.
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: `${window.location.origin}/login?next=${encodeURIComponent(nextPath)}`,
+        callbackURL: `${window.location.origin}/login?oauth=google`,
+        errorCallbackURL: `${window.location.origin}/login?oauth_error=google`,
+        newUserCallbackURL: `${window.location.origin}/login?oauth=google&new=1`,
+        disableRedirect: true,
         additionalParams: {
           prompt: "select_account",
         },
       });
-      if (result?.error) throw new Error(result.error.message || "Google sign-in failed");
+
+      if (result?.error) {
+        throw new Error(result.error.message || "Google sign-in failed");
+      }
+
+      const redirectUrl =
+        result?.data?.url ||
+        result?.url ||
+        result?.data?.redirectURL ||
+        result?.redirectURL ||
+        null;
+
+      if (!redirectUrl) {
+        throw new Error("TNG could not open Google sign-in. Please try again.");
+      }
+
+      window.location.assign(redirectUrl);
     } catch (err) {
       setError(err.message || "Google sign-in failed");
       setLoading(false);
@@ -182,12 +207,12 @@ export default function Login() {
   return (
     <AuthLayout
       icon={LogIn}
-      title="Enter TNG"
-      subtitle="Sign in or activate your TNG account"
+      title="Sign In to TNG"
+      subtitle="Sign in first. Your TNG Profile is a separate step."
       footer={
         <>
-          Don't have an account?{' '}
-          <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Create one free</Link>
+          Need TNG sign-in credentials?{' '}
+          <Link to="/register" style={{ color: '#BC13FE', fontWeight: 600 }}>Create a TNG login</Link>
         </>
       }
     >
@@ -204,7 +229,7 @@ export default function Login() {
         onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
       >
         <GoogleIcon style={{ width: 18, height: 18 }} />
-        Continue with Google
+        Sign in with Google
       </button>
 
       {/* Divider */}
@@ -220,8 +245,10 @@ export default function Login() {
         </div>
       )}
 
-      <div style={{ marginBottom: 16, padding: '10px 12px', borderRadius: 9, border: '1px solid rgba(34,211,238,0.24)', background: 'rgba(34,211,238,0.05)', color: 'rgba(255,255,255,0.55)', fontSize: 12, lineHeight: 1.55 }}>
-        First time on the new TNG system? Use the email and password you want for TNG. If your TNG login does not exist yet, it will be activated automatically and you’ll create your TNG ID next.
+      <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(34,211,238,0.24)', background: 'rgba(34,211,238,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
+        <strong style={{ color: '#67E8F9' }}>SIGN-IN ≠ TNG PROFILE.</strong>
+        <br />
+        Google or email/password only verifies who you are. After sign-in, TNG checks for your Profile. If you already have one, you go to Welcome. If you don't, you'll create your public @handle and TNG Profile next.
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
