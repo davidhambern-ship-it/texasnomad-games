@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 import AuthLayout from "@/components/AuthLayout";
-import GoogleIcon from "@/components/GoogleIcon";
 import { authClient, startTngBrowserSession, waitForNeonSession } from "@/lib/neonAuth";
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -85,53 +84,13 @@ export default function Register() {
     }
   };
 
-  const handleGoogle = async () => {
-    setError("");
-    setLoading(true);
-
-    try {
-      startTngBrowserSession();
-
-      const result = await authClient.signIn.social({
-        provider: "google",
-        callbackURL: `${window.location.origin}/login?oauth=google`,
-        errorCallbackURL: `${window.location.origin}/login?oauth_error=google`,
-        newUserCallbackURL: `${window.location.origin}/login?oauth=google&new=1`,
-        disableRedirect: true,
-        additionalParams: {
-          prompt: "select_account",
-        },
-      });
-
-      if (result?.error) {
-        throw new Error(result.error.message || "Google sign-in failed");
-      }
-
-      const redirectUrl =
-        result?.data?.url ||
-        result?.url ||
-        result?.data?.redirectURL ||
-        result?.redirectURL ||
-        null;
-
-      if (!redirectUrl) {
-        throw new Error("TNG could not open Google sign-in. Please try again.");
-      }
-
-      window.location.assign(redirectUrl);
-    } catch (err) {
-      setError(err.message || "Google sign-in failed");
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthLayout
       icon={UserPlus}
       title="Create TNG Sign-In"
       footer={
         <>
-          Already have an account?{' '}
+          Already have a TNG sign-in?{' '}
           <Link to="/login" style={{ color: '#BC13FE', fontWeight: 600 }}>Log in</Link>
         </>
       }
@@ -141,39 +100,8 @@ export default function Register() {
           ⚡ TNG ACCOUNT
         </div>
         <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.65)', lineHeight: 1.9, margin: 0 }}>
-          This creates your sign-in credentials only. Your TNG Profile and public @handle are created after you sign in.
+          This creates your TNG sign-in credentials only. Your TNG Profile and public @handle are created after you sign in.
         </p>
-      </div>
-
-      <button
-        onClick={handleGoogle}
-        disabled={loading}
-        style={{
-          width: '100%',
-          height: 46,
-          borderRadius: 10,
-          border: '1.5px solid rgba(255,255,255,0.15)',
-          background: 'rgba(255,255,255,0.05)',
-          color: 'white',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 10,
-          cursor: loading ? 'not-allowed' : 'pointer',
-          fontSize: 14,
-          fontFamily: "'Inter', sans-serif",
-          marginBottom: 18,
-          opacity: loading ? 0.6 : 1,
-        }}
-      >
-        <GoogleIcon style={{ width: 18, height: 18 }} />
-        Sign in with Google
-      </button>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
-        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
-        <span style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.2)' }}>or</span>
-        <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.08)' }} />
       </div>
 
       {error && (
@@ -218,7 +146,7 @@ export default function Register() {
           }}
         >
           {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
-          {loading ? 'CREATING ACCOUNT…' : 'CREATE TNG ACCOUNT →'}
+          {loading ? 'CREATING SIGN-IN…' : 'CREATE TNG SIGN-IN →'}
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </button>
       </form>
