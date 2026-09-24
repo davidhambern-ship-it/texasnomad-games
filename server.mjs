@@ -185,6 +185,56 @@ async function proxyNeonAuth(req, res) {
 
   const payload = Buffer.from(await response.arrayBuffer());
 
+  if (sourceUrl.pathname.endsWith('/sign-in/social')) {
+    let socialShape = 'non-json';
+    let socialKeys = [];
+    let redirectHost = null;
+    let redirectPath = null;
+    let oauthRedirectHost = null;
+
+    try {
+      const parsed = JSON.parse(payload.toString('utf8'));
+      socialShape = parsed === null
+        ? 'null'
+        : Array.isArray(parsed)
+          ? 'array'
+          : typeof parsed;
+      socialKeys = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+        ? Object.keys(parsed)
+        : [];
+
+      const candidateUrl =
+        parsed?.url ||
+        parsed?.data?.url ||
+        parsed?.redirectURL ||
+        parsed?.data?.redirectURL ||
+        null;
+
+      if (candidateUrl) {
+        const redirect = new URL(candidateUrl);
+        redirectHost = redirect.hostname;
+        redirectPath = redirect.pathname;
+
+        const redirectUri = redirect.searchParams.get('redirect_uri');
+        if (redirectUri) {
+          try {
+            oauthRedirectHost = new URL(redirectUri).hostname;
+          } catch {}
+        }
+      }
+    } catch {}
+
+    console.info('[TNG auth proxy] social sign-in response shape', {
+      status: response.status,
+      contentType: response.headers.get('content-type') || null,
+      socialShape,
+      socialKeys,
+      redirectHost,
+      redirectPath,
+      oauthRedirectHost,
+    });
+  }
+
   if (sourceUrl.pathname.endsWith('/get-session')) {
     let payloadShape = 'non-json';
     try {
