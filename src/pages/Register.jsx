@@ -88,16 +88,39 @@ export default function Register() {
   const handleGoogle = async () => {
     setError("");
     setLoading(true);
+
     try {
       startTngBrowserSession();
-      const callbackURL = `${window.location.origin}/onboarding`;
+
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL,
+        callbackURL: `${window.location.origin}/login?oauth=google`,
+        errorCallbackURL: `${window.location.origin}/login?oauth_error=google`,
+        newUserCallbackURL: `${window.location.origin}/login?oauth=google&new=1`,
+        disableRedirect: true,
+        additionalParams: {
+          prompt: "select_account",
+        },
       });
-      if (result?.error) throw new Error(result.error.message || "Google sign-up failed");
+
+      if (result?.error) {
+        throw new Error(result.error.message || "Google sign-in failed");
+      }
+
+      const redirectUrl =
+        result?.data?.url ||
+        result?.url ||
+        result?.data?.redirectURL ||
+        result?.redirectURL ||
+        null;
+
+      if (!redirectUrl) {
+        throw new Error("TNG could not open Google sign-in. Please try again.");
+      }
+
+      window.location.assign(redirectUrl);
     } catch (err) {
-      setError(err.message || "Google sign-up failed");
+      setError(err.message || "Google sign-in failed");
       setLoading(false);
     }
   };
@@ -105,7 +128,7 @@ export default function Register() {
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Create Your TNG Login"
+      title="Create TNG Sign-In"
       footer={
         <>
           Already have an account?{' '}
@@ -118,7 +141,7 @@ export default function Register() {
           ⚡ TNG ACCOUNT
         </div>
         <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.65)', lineHeight: 1.9, margin: 0 }}>
-          This login belongs to the new TNG system and will carry into your TNG profile.
+          This creates your sign-in credentials only. Your TNG Profile and public @handle are created after you sign in.
         </p>
       </div>
 
@@ -144,7 +167,7 @@ export default function Register() {
         }}
       >
         <GoogleIcon style={{ width: 18, height: 18 }} />
-        Continue with Google
+        Sign in with Google
       </button>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 18 }}>
