@@ -18,6 +18,7 @@ import { DisplayNotificationStack } from '@/components/social/TngNotificationToa
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
+import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -1360,6 +1361,228 @@ function BFFDisplay({ room, displayId }) {
   );
 }
 
+
+function formatWordSearchDisplayTime(ms) {
+  const seconds = Math.max(0, Math.ceil(Number(ms || 0) / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+function WordSearchDisplay({ room }) {
+  const state = room?.state || {};
+  const [clock, setClock] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setClock(Date.now()), 250);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  const phase = state.phase || 'setup';
+  const mode = state.mode || 'race';
+  const paused = state.paused === true;
+  const players = Array.isArray(state.players) ? state.players : [];
+  const words = Array.isArray(state.words) ? state.words : [];
+  const grid = Array.isArray(state.grid) ? state.grid : [];
+  const scores = state.scores || {};
+  const activeSeat = Number(state.activeSeat || 0);
+  const foundCount = words.filter((word) => word.found).length;
+  const timeRemaining = state.timeEnd
+    ? Math.max(0, Number(state.timeEnd) - clock)
+    : 0;
+  const activePlayer = players.find(
+    (player) => Number(player.seatNumber) === activeSeat,
+  );
+
+  const statusLabel =
+    phase === 'setup'
+      ? 'WAITING FOR HOST'
+      : phase === 'finished'
+        ? 'GAME OVER'
+        : paused
+          ? 'PAUSED'
+          : mode === 'race'
+            ? 'RACE LIVE'
+            : activePlayer
+              ? `${activePlayer.name || `SEAT ${activeSeat}`} TURN`
+              : `SEAT ${activeSeat} TURN`;
+
+  return (
+    <div className="relative flex h-full w-full flex-col overflow-hidden px-4 pb-4 pt-3 sm:px-6">
+      <div className="mb-3 grid shrink-0 grid-cols-4 gap-2">
+        <div className="rounded-xl border border-[#BC13FE]/30 bg-[#BC13FE]/[.06] px-3 py-3 text-center">
+          <div className="text-[5px] uppercase tracking-[.18em] text-white/25" style={PS2}>
+            STATUS
+          </div>
+          <div className="mt-2 text-[7px] uppercase tracking-[.12em] text-[#BC13FE]" style={PS2}>
+            {statusLabel}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#FFD700]/25 bg-[#FFD700]/[.05] px-3 py-3 text-center">
+          <div className="text-[5px] uppercase tracking-[.18em] text-white/25" style={PS2}>
+            TIME
+          </div>
+          <div className="mt-2 text-xl text-[#FFD700]" style={PS2}>
+            {phase === 'playing' && !paused
+              ? formatWordSearchDisplayTime(timeRemaining)
+              : paused
+                ? 'PAUSE'
+                : '--'}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-green-400/25 bg-green-400/[.05] px-3 py-3 text-center">
+          <div className="text-[5px] uppercase tracking-[.18em] text-white/25" style={PS2}>
+            FOUND
+          </div>
+          <div className="mt-2 text-xl text-green-400" style={PS2}>
+            {foundCount}/{words.length || 0}
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-[#22D3EE]/25 bg-[#22D3EE]/[.05] px-3 py-3 text-center">
+          <div className="text-[5px] uppercase tracking-[.18em] text-white/25" style={PS2}>
+            MODE
+          </div>
+          <div className="mt-2 text-[7px] uppercase tracking-[.12em] text-[#8DEEFF]" style={PS2}>
+            {mode === 'turn' ? 'TURN' : 'RACE'}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,1.45fr)_minmax(320px,.55fr)]">
+        <section className="flex min-h-0 items-center justify-center overflow-auto rounded-2xl border border-[#BC13FE]/20 bg-black/45 p-3">
+          {grid.length ? (
+            <NeonWordSearchBoard
+              grid={grid}
+              words={words}
+              players={players}
+              mySeat={null}
+              myColor="#BC13FE"
+              canInteract={false}
+              maxBoardPx={820}
+            />
+          ) : (
+            <div className="text-center">
+              <div className="text-6xl">🔍</div>
+              <div className="mt-5 text-2xl text-[#BC13FE]">
+                Word Search Ready
+              </div>
+              <div className="mt-2 text-sm text-white/35">
+                Waiting for the Host to start the board.
+              </div>
+            </div>
+          )}
+        </section>
+
+        <aside className="flex min-h-0 flex-col gap-3">
+          <section className="shrink-0 rounded-2xl border border-white/10 bg-black/50 p-3">
+            <div className="mb-2 text-[6px] uppercase tracking-[.18em] text-white/25" style={PS2}>
+              PLAYERS
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {players.length ? players.map((player) => {
+                const seat = Number(player.seatNumber || 0);
+                const active = mode === 'race'
+                  ? phase === 'playing'
+                  : activeSeat === seat;
+                const color = player.color || '#FFFFFF';
+
+                return (
+                  <div
+                    key={player.playerId || player.accountId || seat}
+                    className="rounded-lg border px-3 py-2"
+                    style={{
+                      borderColor: active ? color : 'rgba(255,255,255,.10)',
+                      background: active ? `${color}0d` : 'rgba(255,255,255,.015)',
+                      boxShadow: active ? `0 0 16px ${color}22` : 'none',
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="truncate text-sm text-white/75">
+                          {player.name || player.handle || `Seat ${seat}`}
+                        </div>
+                        <div className="mt-1 text-[5px] uppercase text-white/25" style={PS2}>
+                          SEAT {seat}
+                        </div>
+                      </div>
+                      <div className="text-xl" style={{ ...PS2, color }}>
+                        {Number(scores[String(seat)] || player.score || 0)}
+                      </div>
+                    </div>
+                  </div>
+                );
+              }) : (
+                <div className="col-span-2 py-4 text-center text-sm text-white/30">
+                  Waiting for players…
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="min-h-0 flex-1 rounded-2xl border border-[#BC13FE]/20 bg-black/50 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
+                WORDS
+              </div>
+              <div className="text-[6px] text-[#FFD700]" style={PS2}>
+                {foundCount}/{words.length}
+              </div>
+            </div>
+
+            <div className="grid max-h-full grid-cols-2 gap-2 overflow-y-auto pr-1">
+              {words.map((word) => {
+                const finder = players.find(
+                  (player) => String(player.seatNumber) === String(word.foundBy),
+                );
+                const color = word.revealed
+                  ? '#777777'
+                  : finder?.color || '#BC13FE';
+
+                return (
+                  <div
+                    key={word.word}
+                    className="rounded-lg border px-2 py-2 text-center"
+                    style={{
+                      borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)',
+                      background: word.found ? `${color}10` : 'rgba(255,255,255,.02)',
+                      color: word.found ? color : 'rgba(255,255,255,.48)',
+                      textDecoration: word.found ? 'line-through' : 'none',
+                    }}
+                  >
+                    <div className="text-[7px]" style={PS2}>
+                      {word.word}
+                    </div>
+                    {word.found && word.points != null && (
+                      <div className="mt-1 text-[5px] opacity-70" style={PS2}>
+                        {word.revealed ? 'REVEAL' : `+${word.points}`}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {phase === 'finished' && (
+            <section className="shrink-0 rounded-2xl border border-green-400/30 bg-green-400/[.06] p-4 text-center">
+              <div className="text-[7px] uppercase tracking-[.18em] text-green-400" style={PS2}>
+                GAME OVER
+              </div>
+              <div className="mt-2 text-sm text-white/55">
+                {state.winnerSeat
+                  ? `Seat ${state.winnerSeat} wins with ${Number(scores[String(state.winnerSeat)] || 0)} points.`
+                  : state.message || 'Word Search complete.'}
+              </div>
+            </section>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
 export default function GameDisplay() {
   const initial = useMemo(savedDisplay, []);
   const [code, setCode] = useState('');
@@ -1565,11 +1788,12 @@ export default function GameDisplay() {
         {room?.gameId === 'hangman' && <HangmanDisplay room={room} />}
         {room?.gameId === 'spades' && <SpadesDisplay room={room} />}
         {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
+        {room?.gameId === 'word-search' && <WordSearchDisplay room={room} />}
         {room?.gameId === 'bff' && (
           <BFFDisplay room={room} displayId={display?.deviceId} />
         )}
 
-        {room && !['hangman', 'spades', 'square-biz', 'bff'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>
