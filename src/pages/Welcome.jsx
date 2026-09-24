@@ -48,14 +48,12 @@ const GAMES = [
 export default function Welcome() {
   const navigate = useNavigate();
 
-  const goPlayer = () => {
-    localStorage.setItem('tn_welcome_seen', '1');
-    navigate('/register');
-  };
-
-  const goHost = () => {
-    localStorage.setItem('tn_welcome_seen', '1');
-    navigate('/host');
+  const enterTng = () => {
+    try {
+      sessionStorage.setItem('tng_welcome_complete', '1');
+      sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
+    } catch {}
+    navigate('/', { replace: true });
   };
 
   return (
@@ -163,44 +161,26 @@ export default function Welcome() {
         </div>
       </section>
 
-      {/* ── SECTION 4: Choose Your Role ──────────────────────────────────── */}
-      <section className="px-4 py-16 max-w-4xl mx-auto w-full">
-        <div className="text-center mb-8">
-          <div className="text-[8px] tracking-[0.4em] uppercase text-white/30 mb-2" style={PS2}>Get Started</div>
-          <h2 className="font-heading text-4xl sm:text-5xl tracking-widest uppercase text-white">WHO ARE YOU?</h2>
-        </div>
+      {/* ── SECTION 4: Enter TNG ─────────────────────────────────────────── */}
+      <section className="px-4 py-16 max-w-3xl mx-auto w-full">
+        <div className="text-center rounded-2xl border-2 border-[#FFD700]/50 bg-[#FFD700]/[.04] p-8 sm:p-10">
+          <div className="text-[8px] tracking-[0.4em] uppercase text-[#FFD700]/60 mb-3" style={PS2}>
+            Welcome, Nomad
+          </div>
+          <h2 className="font-heading text-4xl sm:text-5xl tracking-widest uppercase text-white">
+            YOU'RE IN
+          </h2>
+          <p className="mt-4 text-sm sm:text-base leading-relaxed text-white/55">
+            One TNG login covers the whole arena. Play, host, check your profile, and move between games without signing in again.
+          </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-          {/* HOST button */}
           <button
-            onClick={goHost}
-            className="group relative rounded-2xl border-2 p-8 flex flex-col items-center gap-4 text-center transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
-            style={{ borderColor: '#BC13FE', background: 'rgba(188,19,254,0.05)', boxShadow: '0 0 30px rgba(188,19,254,0.15)' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 60px rgba(188,19,254,0.4)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(188,19,254,0.15)'}
+            type="button"
+            onClick={enterTng}
+            className="mt-8 w-full sm:w-auto rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/10 px-8 py-4 text-[#FFD700] transition-all hover:bg-[#FFD700]/20 active:scale-95"
+            style={{ ...PS2, fontSize: 9 }}
           >
-            <div className="text-6xl">🎙️</div>
-            <div className="font-heading text-4xl tracking-[0.3em] uppercase" style={{ color: '#BC13FE', textShadow: '0 0 20px rgba(188,19,254,0.6)' }}>HOST</div>
-            <p className="text-white/50 font-body text-sm">Run games and manage players.</p>
-            <div className="mt-2 px-6 py-2 rounded-xl border border-[#BC13FE]/60 text-[#BC13FE] text-[8px] tracking-widest uppercase" style={PS2}>
-              Go to Host Panel →
-            </div>
-          </button>
-
-          {/* PLAYER button */}
-          <button
-            onClick={goPlayer}
-            className="group relative rounded-2xl border-2 p-8 flex flex-col items-center gap-4 text-center transition-all duration-300 hover:scale-105 active:scale-95 overflow-hidden"
-            style={{ borderColor: '#FFD700', background: 'rgba(255,215,0,0.05)', boxShadow: '0 0 30px rgba(255,215,0,0.15)' }}
-            onMouseEnter={e => e.currentTarget.style.boxShadow = '0 0 60px rgba(255,215,0,0.4)'}
-            onMouseLeave={e => e.currentTarget.style.boxShadow = '0 0 30px rgba(255,215,0,0.15)'}
-          >
-            <Smartphone className="w-16 h-16" style={{ color: '#FFD700', filter: 'drop-shadow(0 0 12px rgba(255,215,0,0.6))' }} />
-            <div className="font-heading text-4xl tracking-[0.3em] uppercase" style={{ color: '#FFD700', textShadow: '0 0 20px rgba(255,215,0,0.6)' }}>PLAYER</div>
-            <p className="text-white/50 font-body text-sm">Join games and compete.</p>
-            <div className="mt-2 px-6 py-2 rounded-xl border border-[#FFD700]/60 text-[#FFD700] text-[8px] tracking-widest uppercase" style={PS2}>
-              Enter the Arena →
-            </div>
+            ENTER TNG →
           </button>
         </div>
       </section>
