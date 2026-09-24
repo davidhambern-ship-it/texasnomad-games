@@ -88,15 +88,23 @@ async function proxyNeonAuth(req, res) {
   for (const [key, value] of Object.entries(req.headers)) {
     if (value == null) continue;
     const lower = key.toLowerCase();
-    if (['host', 'content-length', 'connection'].includes(lower)) continue;
+
+    // Neon Auth validates the hostname it is serving. Never forward Railway or
+    // TexasNomadGames proxy host metadata upstream; fetch() must present Neon's
+    // own hostname while the browser Origin remains texasnomadgames.com for
+    // Better Auth trusted-origin validation.
+    if ([
+      'host',
+      'content-length',
+      'connection',
+      'forwarded',
+      'x-forwarded-host',
+      'x-forwarded-proto',
+      'x-forwarded-port',
+    ].includes(lower)) continue;
+
     headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
   }
-
-  // Preserve the real TexasNomadGames browser origin so Neon Auth can enforce
-  // its trusted-origin checks, while telling upstream which first-party host
-  // the browser actually contacted.
-  headers.set('x-forwarded-host', String(req.headers.host || 'auth.texasnomadgames.com'));
-  headers.set('x-forwarded-proto', 'https');
 
   const body =
     ['GET', 'HEAD'].includes(String(req.method || 'GET').toUpperCase())
