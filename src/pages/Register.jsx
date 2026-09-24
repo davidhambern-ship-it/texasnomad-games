@@ -4,7 +4,7 @@ import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
 
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { authClient, waitForNeonSession } from "@/lib/neonAuth";
+import { authClient, startTngBrowserSession, waitForNeonSession } from "@/lib/neonAuth";
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -46,11 +46,6 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 }
 
 export default function Register() {
-  const requestedNext = new URLSearchParams(window.location.search).get('next');
-  const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
-    ? requestedNext
-    : '/games';
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -62,8 +57,7 @@ export default function Register() {
     if (!session?.user) {
       throw new Error('Your TNG login was created, but the session did not finish starting.');
     }
-    const next = encodeURIComponent(nextPath);
-    window.location.replace(`/onboarding?next=${next}`);
+    window.location.replace('/onboarding');
   };
 
   const handleSubmit = async (event) => {
@@ -83,6 +77,7 @@ export default function Register() {
         name: email.split('@')[0] || 'Nomad',
       });
       if (result?.error) throw new Error(result.error.message || "Registration failed");
+      startTngBrowserSession();
       await finishAuth();
     } catch (err) {
       setError(err.message || "Registration failed");
@@ -94,7 +89,8 @@ export default function Register() {
     setError("");
     setLoading(true);
     try {
-      const callbackURL = `${window.location.origin}/onboarding?next=${encodeURIComponent(nextPath)}`;
+      startTngBrowserSession();
+      const callbackURL = `${window.location.origin}/onboarding`;
       const result = await authClient.signIn.social({
         provider: "google",
         callbackURL,
