@@ -526,75 +526,113 @@ export default function PreviewHostPanel() {
           </div>
         )}
 
-        {phase === 'pairing' && (
+        {(phase === 'pairing' || phase === 'ready') && (
           <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-xl w-full">
-              <Monitor className="w-14 h-14 mx-auto mb-4 text-[#FFD700]" />
-              <h1 className="text-3xl mb-3">Connect Game Display</h1>
-              <p className="text-white/45 mb-6">
-                {repairingDisplay
-                  ? 'Open /display on the replacement TV/second screen and enter this fresh code. Your live room stays intact.'
-                  : 'Open the Game Display on a second screen and enter this code.'}
-              </p>
-              <div className="border-2 border-[#FFD700]/50 rounded-2xl p-8 font-mono text-6xl tracking-[0.25em] text-[#FFD700]">
-                {pairing?.code || '------'}
-              </div>
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <Link
-                  to="/display"
-                  target="_blank"
-                  className="inline-block px-5 py-3 bg-[#FFD700] text-black rounded-lg"
-                  style={PS2}
-                >
-                  OPEN DISPLAY
-                </Link>
+            <div className="w-full max-w-3xl text-center">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
+              <h1 className="text-3xl mb-4">Host System Ready</h1>
 
-                {!repairingDisplay && (
-                  <>
-                    <div className="text-[10px] text-white/30 uppercase tracking-widest">or</div>
+              {error && <p className="text-red-400 mb-4">{error}</p>}
+
+              <div className="mb-6 rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/[0.04] p-5 sm:p-6">
+                <div className="flex flex-col items-center justify-between gap-4 sm:flex-row sm:text-left">
+                  <div>
+                    <div className="text-[7px] uppercase tracking-[0.2em] text-[#FFD700]" style={PS2}>
+                      GAME DISPLAY
+                    </div>
+                    <div className="mt-2 text-sm text-white/45">
+                      {phase === 'pairing'
+                        ? repairingDisplay
+                          ? 'Enter this fresh code on the replacement Display. Your live Host session stays intact.'
+                          : 'Enter this code on the Game Display before choosing a game.'
+                        : 'Your Game Display is connected and ready.'}
+                    </div>
+                  </div>
+
+                  {phase === 'pairing' ? (
+                    <div className="shrink-0 rounded-xl border-2 border-[#FFD700]/55 bg-black/70 px-5 py-4 font-mono text-4xl tracking-[0.22em] text-[#FFD700] shadow-[0_0_24px_rgba(255,215,0,.12)]">
+                      {pairing?.code || '------'}
+                    </div>
+                  ) : (
+                    <div className="shrink-0 rounded-xl border border-green-400/35 bg-green-400/[0.07] px-4 py-3">
+                      <div className="flex items-center gap-2 text-green-400">
+                        <span className="h-2.5 w-2.5 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,.75)]" />
+                        <span className="text-[7px] uppercase tracking-[0.18em]" style={PS2}>
+                          DISPLAY CONNECTED
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <Link
+                    to="/display"
+                    target="_blank"
+                    className="rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/10 px-4 py-2 text-[#FFD700]"
+                    style={{ ...PS2, fontSize: 7 }}
+                  >
+                    OPEN DISPLAY
+                  </Link>
+
+                  {phase === 'ready' && (
+                    <button
+                      type="button"
+                      onClick={replaceDisplay}
+                      disabled={busy}
+                      className="rounded-lg border border-white/15 bg-white/[0.03] px-4 py-2 text-white/55 disabled:opacity-40"
+                      style={{ ...PS2, fontSize: 7 }}
+                    >
+                      RE-PAIR DISPLAY
+                    </button>
+                  )}
+
+                  {phase === 'pairing' && !repairingDisplay && (
                     <button
                       type="button"
                       onClick={continueWithoutDisplay}
                       disabled={busy}
-                      className="px-5 py-3 rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 text-[#BC13FE] hover:bg-[#BC13FE]/20 transition-all disabled:opacity-50"
-                      style={{ ...PS2, fontSize: 8 }}
+                      className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-4 py-2 text-[#BC13FE] disabled:opacity-40"
+                      style={{ ...PS2, fontSize: 7 }}
                     >
-                      {busy ? 'STARTING TEST MODE…' : 'CONTINUE WITHOUT DISPLAY'}
+                      {busy ? 'STARTING…' : 'TEST WITHOUT DISPLAY'}
                     </button>
-                    <p className="max-w-md text-xs leading-relaxed text-white/35">
-                      Live-test mode only. Use the Host Controller on this device without pairing a separate Game Display.
-                    </p>
-                  </>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-        )}
 
-        {phase === 'ready' && (
-          <div className="h-full flex items-center justify-center">
-            <div className="w-full max-w-2xl text-center">
-              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
-              <h1 className="text-3xl mb-6">Host System Ready</h1>
-
-              {error && <p className="text-red-400 mb-4">{error}</p>}
+              <div className="mb-3 text-left">
+                <div className="text-[7px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
+                  CHOOSE A GAME
+                </div>
+              </div>
 
               <div className="grid sm:grid-cols-3 gap-4">
-                {ALL_GAMES.map((game) => (
-                  <button
-                    key={game.id}
-                    disabled={busy}
-                    onClick={() => createRoom(game)}
-                    className="border-2 rounded-xl p-6 bg-black/50"
-                    style={{ borderColor: game.color + '55' }}
-                  >
-                    <div className="text-5xl mb-3">{game.emoji}</div>
-                    <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
-                      {game.title}
-                    </div>
-                  </button>
-                ))}
+                {ALL_GAMES.map((game) => {
+                  const displayReady = phase === 'ready';
+                  return (
+                    <button
+                      key={game.id}
+                      disabled={busy || !displayReady}
+                      onClick={() => createRoom(game)}
+                      className="border-2 rounded-xl p-6 bg-black/50 transition disabled:cursor-not-allowed disabled:opacity-30"
+                      style={{ borderColor: game.color + '55' }}
+                      title={displayReady ? `Start ${game.title}` : 'Connect the Game Display first'}
+                    >
+                      <div className="text-5xl mb-3">{game.emoji}</div>
+                      <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
+                        {game.title}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
+
+              {phase === 'pairing' && (
+                <p className="mt-4 text-xs text-white/30">
+                  Game selection unlocks as soon as the Display connects.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -611,8 +649,8 @@ export default function PreviewHostPanel() {
                       <span className="truncate text-sm font-black uppercase sm:text-base">
                         {roomGame?.title || activeRoom.gameId}
                       </span>
-                      <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
-                        {activeRoom.roomCode}
+                      <span className="shrink-0 rounded-md border border-[#FFD700]/20 bg-[#FFD700]/[0.04] px-2 py-1 font-mono text-xs tracking-[0.12em] text-[#FFD700] sm:text-sm">
+                        ROOM {activeRoom.roomCode}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
@@ -646,11 +684,11 @@ export default function PreviewHostPanel() {
                     onClick={replaceDisplay}
                     disabled={busy}
                     className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
-                    title={playerTestMode ? 'Restore display' : 'Re-pair display'}
+                    title={playerTestMode ? 'Restore display' : 'Emergency re-pair display'}
                   >
                     <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
                     <span className="hidden text-[9px] sm:inline">
-                      {playerTestMode ? 'DISPLAY' : 'PAIR'}
+                      {playerTestMode ? 'DISPLAY' : 'RE-PAIR'}
                     </span>
                   </button>
 
