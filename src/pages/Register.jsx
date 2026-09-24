@@ -90,7 +90,7 @@ export default function Register() {
       title="Create TNG Sign-In"
       footer={
         <>
-          Already have an account?{' '}
+          Already have a TNG sign-in?{' '}
           <Link to="/login" style={{ color: '#BC13FE', fontWeight: 600 }}>Log in</Link>
         </>
       }
@@ -146,7 +146,7 @@ export default function Register() {
           }}
         >
           {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
-          {loading ? 'CREATING ACCOUNT…' : 'CREATE TNG ACCOUNT →'}
+          {loading ? 'CREATING SIGN-IN…' : 'CREATE TNG SIGN-IN →'}
           <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </button>
       </form>
