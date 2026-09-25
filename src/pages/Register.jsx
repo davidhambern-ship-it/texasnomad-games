@@ -45,6 +45,11 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 }
 
 export default function Register() {
+  const requestedNext = new URLSearchParams(window.location.search).get('next');
+  const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/';
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -56,7 +61,8 @@ export default function Register() {
     if (!session?.user) {
       throw new Error('Your TNG login was created, but the session did not finish starting.');
     }
-    window.location.replace('/onboarding');
+    const next = encodeURIComponent(nextPath);
+    window.location.replace(`/onboarding?next=${next}`);
   };
 
   const handleSubmit = async (event) => {
@@ -91,7 +97,7 @@ export default function Register() {
       footer={
         <>
           Already have a TNG sign-in?{' '}
-          <Link to="/login" style={{ color: '#BC13FE', fontWeight: 600 }}>Log in</Link>
+          <Link to={`/login?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Log in</Link>
         </>
       }
     >
