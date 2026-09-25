@@ -10,18 +10,14 @@ import React, {
 import {
   authClient,
   clearTngBrowserSession,
-  getNeonSession,
-  hasTngBrowserSession,
   mapNeonUser,
-  TNG_LAST_ACTIVITY_KEY,
-  TNG_PAGEHIDE_KEY,
+  restoreTngBrowserSession,
   waitForNeonSession,
 } from '@/lib/neonAuth';
 
 const AuthContext = createContext();
 
-const INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
-const RETURN_GRACE_MS = 15 * 1000;
+const DEVICE_HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
 const SESSION_LIFECYCLE_URL =
   'https://tng-live-production.up.railway.app/tng-session';
 
@@ -80,44 +76,26 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      // A Neon cookie may outlive the browser tab. TNG does not. If this
-      // browser session was not explicitly started by Login/Register, treat
-      // the visitor as signed out even if Neon still has a server session.
-      if (!hasTngBrowserSession()) {
-        setSignedOutState();
-        return;
-      }
-
-      try {
-        const hiddenAt = Number(sessionStorage.getItem(TNG_PAGEHIDE_KEY) || 0);
-        if (hiddenAt) {
-          const awayFor = Date.now() - hiddenAt;
-          sessionStorage.removeItem(TNG_PAGEHIDE_KEY);
-
-          // A quick unload/reload is a refresh. A longer trip away from TNG is
-          // a new visit and must start at Login.
-          if (awayFor > RETURN_GRACE_MS) {
-            clearTngBrowserSession();
-            setSignedOutState();
-            return;
-          }
-        }
-      } catch {}
-
+      // Neon Auth is the source of truth for whether this browser is signed in.
+      // Do not invent a second short-lived TNG login on top of the valid Neon
+      // cookie: Host controllers may sit untouched or backgrounded for long
+      // stretches while a game is running.
       const isAuthHandoff =
         window.location.pathname.startsWith('/onboarding') ||
         window.location.pathname.startsWith('/login') ||
         window.location.pathname.startsWith('/register');
 
-      const session = isAuthHandoff
-        ? await waitForNeonSession({ attempts: 12, initialDelayMs: 150 })
-        : await getNeonSession();
+      const session = await waitForNeonSession({
+        attempts: isAuthHandoff ? 8 : 4,
+        initialDelayMs: isAuthHandoff ? 300 : 600,
+      });
 
       const neonUser = session?.user || null;
       const token = sessionToken(session);
 
       if (neonUser && token) {
         sessionTokenRef.current = token;
+        restoreTngBrowserSession();
         await syncBrowserDevices('heartbeat', token);
         setUser(mapNeonUser(neonUser));
         setIsAuthenticated(true);
@@ -127,11 +105,18 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('[TNG auth] session check failed:', error);
-      setSignedOutState();
-      setAuthError({
-        type: 'unknown',
-        message: error?.message || 'TNG could not verify your session.',
-      });
+
+      // A temporary auth-service/rate-limit failure must not destroy a session
+      // that this app has already confirmed.
+      if (sessionTokenRef.current) {
+        setAuthError(null);
+      } else {
+        setSignedOutState();
+        setAuthError({
+          type: 'unknown',
+          message: error?.message || 'TNG could not verify your session.',
+        });
+      }
     } finally {
       setIsLoadingAuth(false);
       setAuthChecked(true);
@@ -179,56 +164,41 @@ export const AuthProvider = ({ children }) => {
     }
   }, [setSignedOutState]);
 
-  // One TNG sign-in covers the entire site. Activity anywhere in the app keeps
-  // that browser session alive; 30 minutes with no user activity ends it.
+  // Keep authenticated device IDs alive while TNG is open. Host controllers are
+  // allowed to sit idle or move into the background without being signed out.
   useEffect(() => {
     if (!isAuthenticated) return undefined;
 
-    const markActivity = () => {
-      try {
-        sessionStorage.setItem(TNG_LAST_ACTIVITY_KEY, String(Date.now()));
-      } catch {}
+    const heartbeat = () => {
+      const token = sessionTokenRef.current;
+      if (token) syncBrowserDevices('heartbeat', token);
     };
 
-    try {
-      if (!sessionStorage.getItem(TNG_LAST_ACTIVITY_KEY)) markActivity();
-    } catch {}
+    const handlePageShow = () => heartbeat();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') heartbeat();
+    };
 
-    const events = ['pointerdown', 'keydown', 'touchstart', 'scroll'];
-    events.forEach((eventName) =>
-      window.addEventListener(eventName, markActivity, { passive: true })
-    );
-
-    const interval = window.setInterval(() => {
-      let lastActivity = Date.now();
-      try {
-        lastActivity = Number(
-          sessionStorage.getItem(TNG_LAST_ACTIVITY_KEY) || Date.now()
-        );
-      } catch {}
-
-      if (Date.now() - lastActivity >= INACTIVITY_LIMIT_MS) {
-        logout(true, 'inactive');
-      }
-    }, 15000);
+    heartbeat();
+    const interval = window.setInterval(heartbeat, DEVICE_HEARTBEAT_INTERVAL_MS);
+    window.addEventListener('pageshow', handlePageShow);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      events.forEach((eventName) =>
-        window.removeEventListener(eventName, markActivity)
-      );
       window.clearInterval(interval);
+      window.removeEventListener('pageshow', handlePageShow);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [isAuthenticated, logout]);
+  }, [isAuthenticated]);
 
-  // Leaving/closing TNG immediately disconnects this browser's TNG device IDs.
-  // On a normal refresh the same IDs are reconnected during checkUserAuth.
+  // Non-host pages may disconnect their device presence when the page really
+  // leaves. The Host controller stays attached until END/SIGN OUT or backend
+  // expiry so a tab switch, phone lock, or browser backgrounding cannot kill it.
   useEffect(() => {
     if (!isAuthenticated) return undefined;
 
     const handlePageHide = () => {
-      try {
-        sessionStorage.setItem(TNG_PAGEHIDE_KEY, String(Date.now()));
-      } catch {}
+      if (window.location.pathname.startsWith('/host')) return;
 
       const token = sessionTokenRef.current;
       if (token) {
