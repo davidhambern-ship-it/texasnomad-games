@@ -104,6 +104,45 @@ async function request(path, {
   return payload;
 }
 
+const BERNAVERSE_BRIDGE_URL =
+  import.meta.env.VITE_BERNAVERSE_BRIDGE_URL ||
+  'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
+
+async function bernaverseRequest(action, payload = {}) {
+  const token = await getNeonAuthToken();
+  if (!token) {
+    throw new TngApiError('Your TNG session is missing.', {
+      code: 'AUTH_REQUIRED',
+      status: 401,
+    });
+  }
+
+  const response = await fetch(BERNAVERSE_BRIDGE_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-TNG-Session': token,
+    },
+    body: JSON.stringify({
+      app: 'tng',
+      action,
+      ...payload,
+    }),
+  });
+
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new TngApiError(result?.error || 'BERNAverse is unavailable.', {
+      code: 'BERNAVERSE_ERROR',
+      status: response.status,
+      details: result,
+    });
+  }
+
+  return result?.data || {};
+}
+
 export const tngApi = {
   public: {
     liveRooms: () => request('/api/public/live-rooms', { authenticated:false }),
@@ -176,6 +215,10 @@ export const tngApi = {
       method:'POST',
       body:{ action, ...payload },
     }),
+  },
+  bernaverse: {
+    status: () => bernaverseRequest('status'),
+    link: (code) => bernaverseRequest('link', { code }),
   },
   display: {
     pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
