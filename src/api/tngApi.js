@@ -84,7 +84,7 @@ async function request(path, {
   // edge of a token refresh, fetch one fresh token and retry once before
   // treating the user as signed out.
   if (authenticated && response.status === 401) {
-    const freshToken = await getNeonAuthToken().catch(() => null);
+    const freshToken = await getNeonAuthToken({ forceRefresh: true }).catch(() => null);
     if (freshToken) {
       headers.Authorization = `Bearer ${freshToken}`;
       response = await fetch(url, {
