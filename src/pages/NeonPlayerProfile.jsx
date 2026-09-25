@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Gamepad2, Loader2, ShieldCheck, UserRound } from 'lucide-react';
+import { Gamepad2, Link2, Loader2, ShieldCheck, UserRound } from 'lucide-react';
 
 import Header from '@/components/home/Header';
 import { tngApi } from '@/api/tngApi';
@@ -38,6 +38,11 @@ export default function NeonPlayerProfile() {
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [bernaStatus, setBernaStatus] = useState(null);
+  const [bernaLoading, setBernaLoading] = useState(false);
+  const [bernaCode, setBernaCode] = useState('');
+  const [bernaNotice, setBernaNotice] = useState('');
+  const [bernaError, setBernaError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +81,34 @@ export default function NeonPlayerProfile() {
   }, []);
 
   const profile = payload?.profile || null;
+
+  useEffect(() => {
+    if (!profile) return;
+
+    let cancelled = false;
+
+    async function loadBernaVerse() {
+      setBernaLoading(true);
+      setBernaError('');
+
+      try {
+        const status = await tngApi.bernaverse.status();
+        if (!cancelled) setBernaStatus(status || { linked: false });
+      } catch (statusError) {
+        if (!cancelled) {
+          setBernaError(statusError?.message || 'BERNAverse status is unavailable.');
+        }
+      } finally {
+        if (!cancelled) setBernaLoading(false);
+      }
+    }
+
+    loadBernaVerse();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id, profile?.accountId, profile?.account_id, profile?.handle]);
+
   const gameStats = Array.isArray(profile?.playerStats) ? profile.playerStats : [];
   const hostStats = profile?.hostStats || {};
 
@@ -169,6 +202,41 @@ export default function NeonPlayerProfile() {
   const hostSessions = Number(hostStats?.sessionsHosted || hostStats?.sessions_hosted || 0);
   const hostedGames = Number(hostStats?.gamesCompleted || hostStats?.games_completed || 0);
 
+  async function connectBernaVerse(event) {
+    event.preventDefault();
+    const code = bernaCode.trim();
+
+    if (!code) {
+      setBernaError('Enter the link code from your TacTalk BERNAverse wallet.');
+      return;
+    }
+
+    setBernaLoading(true);
+    setBernaError('');
+    setBernaNotice('');
+
+    try {
+      const result = await tngApi.bernaverse.link(code);
+      setBernaStatus(result || { linked: true });
+      setBernaCode('');
+
+      const claimed = Number(result?.pending_rewards_claimed || 0);
+      const tacs = Number(result?.tacs_claimed || 0);
+
+      if (claimed > 0) {
+        setBernaNotice(
+          `Connected. We also found ${claimed} waiting reward${claimed === 1 ? '' : 's'}${tacs ? ` worth ${tacs} tacs` : ''}.`
+        );
+      } else {
+        setBernaNotice('Connected. TNG and TacTalk now recognize the same BERNAverse wallet.');
+      }
+    } catch (linkError) {
+      setBernaError(linkError?.message || 'That BERNAverse link code did not work.');
+    } finally {
+      setBernaLoading(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[#050308] text-white">
       <Header />
@@ -216,6 +284,75 @@ export default function NeonPlayerProfile() {
           {joined && (
             <div className="mt-6 border-t border-white/10 pt-4 text-xs text-white/30">
               TNG member since {new Date(joined).toLocaleDateString()}
+            </div>
+          )}
+        </section>
+
+        <section className="mt-5 rounded-2xl border border-[#00E5FF]/25 bg-[#00E5FF]/[.035] p-5 md:p-6">
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 text-[#00E5FF]">
+                <Link2 className="h-5 w-5" />
+                <span className="text-[7px] tracking-widest" style={PS2}>BERNAVERSE PASSPORT</span>
+              </div>
+
+              {bernaStatus?.linked ? (
+                <>
+                  <h2 className="mt-3 text-2xl font-black">CONNECTED</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-white/45">
+                    This TNG profile is connected to your BERNAverse wallet. Rewards earned here can follow you into TacTalk and future BERNAverse sites.
+                  </p>
+                  <div className="mt-4 inline-flex rounded-full border border-[#FFD700]/30 bg-[#FFD700]/5 px-4 py-2 text-sm font-bold text-[#FFD700]">
+                    {Number(bernaStatus?.balance || 0)} TACS
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="mt-3 text-2xl font-black">CONNECT YOUR WALLET</h2>
+                  <p className="mt-2 text-sm leading-relaxed text-white/45">
+                    Open TacTalk, click your Tac balance, choose <strong className="text-white/70">Connect TNG</strong>, then enter the one-time code here.
+                  </p>
+                </>
+              )}
+            </div>
+
+            {!bernaStatus?.linked && (
+              <form onSubmit={connectBernaVerse} className="w-full max-w-sm rounded-xl border border-white/10 bg-black/30 p-4">
+                <label className="text-[6px] tracking-widest text-white/30" style={PS2}>
+                  TACTALK LINK CODE
+                </label>
+                <input
+                  value={bernaCode}
+                  onChange={(event) => {
+                    setBernaCode(event.target.value.toUpperCase());
+                    setBernaError('');
+                    setBernaNotice('');
+                  }}
+                  placeholder="XXXX-XXXX-XXXX"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  className="mt-3 w-full rounded-lg border border-white/15 bg-black/50 px-3 py-3 font-mono uppercase tracking-[.12em] text-white outline-none focus:border-[#00E5FF]/70"
+                />
+                <button
+                  type="submit"
+                  disabled={bernaLoading}
+                  className="mt-3 w-full rounded-lg border border-[#00E5FF]/50 bg-[#00E5FF]/10 px-4 py-3 text-[#00E5FF] disabled:opacity-50"
+                  style={{ ...PS2, fontSize: 7 }}
+                >
+                  {bernaLoading ? 'CONNECTING...' : 'CONNECT BERNAverse'}
+                </button>
+              </form>
+            )}
+          </div>
+
+          {bernaNotice && (
+            <div className="mt-4 rounded-lg border border-green-400/25 bg-green-400/5 px-4 py-3 text-sm text-green-300">
+              {bernaNotice}
+            </div>
+          )}
+          {bernaError && (
+            <div className="mt-4 rounded-lg border border-red-500/25 bg-red-500/5 px-4 py-3 text-sm text-red-300">
+              {bernaError}
             </div>
           )}
         </section>
