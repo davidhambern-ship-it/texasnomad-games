@@ -10,6 +10,7 @@ import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPa
 import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
+import { getNeonSession } from '@/lib/neonAuth';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -49,7 +50,7 @@ export default function PreviewHostPanel() {
     [activeRoom, selectedGame],
   );
 
-  function recoverExpiredPreviewSession(authError) {
+  async function recoverExpiredPreviewSession(authError) {
     if (
       !(authError instanceof TngApiError) ||
       !['INVALID_IDENTITY', 'AUTH_REQUIRED'].includes(authError.code) ||
@@ -59,6 +60,25 @@ export default function PreviewHostPanel() {
     }
 
     authRecoveryStartedRef.current = true;
+
+    try {
+      // Do not bounce an active Host back to Login because one game poll caught
+      // a stale token or transient auth-rate-limit response. Confirm the actual
+      // Neon browser session first.
+      const session = await getNeonSession({
+        forceRefresh: true,
+        allowStaleOnError: true,
+      });
+
+      if (session?.user) {
+        authRecoveryStartedRef.current = false;
+        return false;
+      }
+    } catch (sessionError) {
+      console.warn('[PreviewHostPanel] auth recheck failed; keeping Host panel alive:', sessionError);
+      authRecoveryStartedRef.current = false;
+      return false;
+    }
 
     try {
       localStorage.setItem('tng_preview_expect_user_login', '1');
@@ -205,7 +225,7 @@ export default function PreviewHostPanel() {
         setPairing(pairingPayload.pairing);
         setPhase('pairing');
       } catch (initializeError) {
-        if (recoverExpiredPreviewSession(initializeError)) return;
+        if (await recoverExpiredPreviewSession(initializeError)) return;
 
         if (!cancelled) {
           setError(initializeError.message || 'The Host Controller could not start.');
@@ -249,7 +269,7 @@ export default function PreviewHostPanel() {
           setPhase('ready');
         }
       } catch (pollError) {
-        if (recoverExpiredPreviewSession(pollError)) return;
+        if (await recoverExpiredPreviewSession(pollError)) return;
         console.error('[PreviewHostPanel] display pairing poll failed:', pollError);
       }
     }, 2500);
@@ -275,7 +295,7 @@ export default function PreviewHostPanel() {
           setError('');
         }
       } catch (roomError) {
-        if (recoverExpiredPreviewSession(roomError)) return;
+        if (await recoverExpiredPreviewSession(roomError)) return;
 
         if (!cancelled) {
           setRoomPollError(roomError.message || 'The live room state could not be loaded.');
