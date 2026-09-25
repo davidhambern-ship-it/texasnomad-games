@@ -14,7 +14,34 @@ export const TNG_LAST_ACTIVITY_KEY = 'tng_last_activity_at';
 export const TNG_PAGEHIDE_KEY = 'tng_pagehide_at';
 export const TNG_WELCOME_COMPLETE_KEY = 'tng_welcome_complete';
 
+const SESSION_CACHE_TTL_MS = 60 * 1000;
+const STALE_SESSION_FALLBACK_MS = 10 * 60 * 1000;
+
+let cachedSession;
+let cachedSessionAt = 0;
+let sessionRequestPromise = null;
+
+function sessionToken(session) {
+  return session?.token || session?.session?.token || null;
+}
+
+function hasUsableSession(session) {
+  return Boolean(session?.user && sessionToken(session));
+}
+
+function isTransientAuthStatus(status) {
+  return status === 429 || status === 502 || status === 503 || status === 504;
+}
+
+export function clearNeonSessionCache() {
+  cachedSession = undefined;
+  cachedSessionAt = 0;
+  sessionRequestPromise = null;
+}
+
+
 export function startTngBrowserSession() {
+  clearNeonSessionCache();
   try {
     sessionStorage.setItem(TNG_BROWSER_SESSION_KEY, '1');
     sessionStorage.setItem(TNG_LAST_ACTIVITY_KEY, String(Date.now()));
@@ -24,6 +51,7 @@ export function startTngBrowserSession() {
 }
 
 export function clearTngBrowserSession() {
+  clearNeonSessionCache();
   try {
     sessionStorage.removeItem(TNG_BROWSER_SESSION_KEY);
     sessionStorage.removeItem(TNG_LAST_ACTIVITY_KEY);
@@ -38,6 +66,17 @@ export function hasTngBrowserSession() {
   } catch {
     return false;
   }
+}
+
+
+export function restoreTngBrowserSession() {
+  try {
+    sessionStorage.setItem(TNG_BROWSER_SESSION_KEY, '1');
+    if (!sessionStorage.getItem(TNG_LAST_ACTIVITY_KEY)) {
+      sessionStorage.setItem(TNG_LAST_ACTIVITY_KEY, String(Date.now()));
+    }
+    sessionStorage.removeItem(TNG_PAGEHIDE_KEY);
+  } catch {}
 }
 
 
@@ -60,72 +99,123 @@ function unwrapSession(result) {
   return result;
 }
 
-export async function getNeonSession() {
-  // Use a native credentialed fetch for session reads. The Neon auth endpoint
-  // is first-party to TNG and returns ordinary JSON; reading it directly avoids
-  // browser-specific adapter parsing issues (notably Safari) while preserving
-  // the Neon client for sign-in/sign-up/sign-out actions.
-  const response = await fetch(`${NEON_AUTH_URL}/get-session`, {
-    method: 'GET',
-    credentials: 'include',
-    headers: {
-      Accept: 'application/json',
-    },
-  });
+export async function getNeonSession({
+  forceRefresh = false,
+  allowStaleOnError = true,
+} = {}) {
+  const now = Date.now();
 
-  const text = await response.text();
+  if (
+    !forceRefresh &&
+    cachedSessionAt > 0 &&
+    now - cachedSessionAt < SESSION_CACHE_TTL_MS
+  ) {
+    return cachedSession ?? null;
+  }
 
-  if (!response.ok) {
-    let message = `TNG auth session check failed (${response.status}).`;
+  // Host/game screens can make several authenticated API calls at once.
+  // Share one session lookup instead of hammering Neon Auth for every poll.
+  if (sessionRequestPromise) return sessionRequestPromise;
+
+  sessionRequestPromise = (async () => {
+    const response = await fetch(`${NEON_AUTH_URL}/get-session`, {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
+
+    const text = await response.text();
+
+    if (!response.ok) {
+      let message = `TNG auth session check failed (${response.status}).`;
+      try {
+        const payload = text ? JSON.parse(text) : null;
+        message = payload?.message || payload?.error?.message || message;
+      } catch {}
+
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+
+    if (!text) {
+      cachedSession = null;
+      cachedSessionAt = Date.now();
+      return null;
+    }
+
+    let payload;
     try {
-      const payload = text ? JSON.parse(text) : null;
-      message = payload?.message || payload?.error?.message || message;
-    } catch {}
-    throw new Error(message);
-  }
+      payload = JSON.parse(text);
+    } catch {
+      throw new Error('TNG received an invalid session response.');
+    }
 
-  if (!text) return null;
+    const session = unwrapSession(payload);
+    cachedSession = session ?? null;
+    cachedSessionAt = Date.now();
+    return cachedSession;
+  })();
 
-  let payload;
   try {
-    payload = JSON.parse(text);
-  } catch {
-    throw new Error('TNG received an invalid session response.');
+    return await sessionRequestPromise;
+  } catch (error) {
+    const cacheAge = Date.now() - cachedSessionAt;
+    if (
+      allowStaleOnError &&
+      hasUsableSession(cachedSession) &&
+      cacheAge < STALE_SESSION_FALLBACK_MS &&
+      isTransientAuthStatus(error?.status)
+    ) {
+      console.warn('[TNG auth] using cached session after transient auth failure:', error?.status);
+      return cachedSession;
+    }
+    throw error;
+  } finally {
+    sessionRequestPromise = null;
   }
-
-  return unwrapSession(payload);
 }
 
 export async function waitForNeonSession({
-  attempts = 12,
-  initialDelayMs = 150,
+  attempts = 8,
+  initialDelayMs = 300,
 } = {}) {
   let lastSession = null;
+  let lastError = null;
+  let receivedAuthResponse = false;
 
   for (let attempt = 0; attempt < attempts; attempt += 1) {
-    lastSession = await getNeonSession().catch(() => null);
-    if (lastSession?.user) return lastSession;
+    try {
+      lastSession = await getNeonSession({
+        forceRefresh: attempt > 0,
+        allowStaleOnError: true,
+      });
+      receivedAuthResponse = true;
+      lastError = null;
+      if (lastSession?.user) return lastSession;
+    } catch (error) {
+      lastError = error;
+    }
 
     if (attempt < attempts - 1) {
-      const delay = initialDelayMs + Math.min(attempt * 175, 850);
+      const delay = initialDelayMs + Math.min(attempt * 300, 1500);
       await new Promise((resolve) => window.setTimeout(resolve, delay));
     }
   }
 
+  if (!receivedAuthResponse && lastError) throw lastError;
   return lastSession;
 }
 
-export async function getNeonAuthToken() {
-  // TNG backend deployment 29 verifies Neon Auth's active opaque session
-  // token directly. Do not call the optional JWT/token plugin routes:
-  // this Neon Auth deployment does not expose them and they return HTTP 404.
-  const session = await getNeonSession();
+export async function getNeonAuthToken({ forceRefresh = false } = {}) {
+  // The TNG backend verifies Neon Auth's active opaque session token directly.
+  // Cache ordinary reads so high-frequency game polling does not rate-limit
+  // the auth service; callers can force one fresh lookup after an HTTP 401.
+  const session = await getNeonSession({ forceRefresh });
 
-  return (
-    session?.token ||
-    session?.session?.token ||
-    null
-  );
+  return sessionToken(session);
 }
 
 export function mapNeonUser(user) {
