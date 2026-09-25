@@ -17,6 +17,10 @@ export default function TngOnboarding() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, isAuthenticated, isLoadingAuth, checkUserAuth } = useAuth();
+  const requestedNext = new URLSearchParams(location.search).get('next');
+  const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
+    ? requestedNext
+    : '/';
 
   const [stage, setStage] = useState('loading');
   const [displayName, setDisplayName] = useState('');
@@ -41,7 +45,7 @@ export default function TngOnboarding() {
           return;
         }
 
-        navigate('/login', { replace: true });
+        navigate(`/login?next=${encodeURIComponent(nextPath)}`, { replace: true });
         return;
       }
 
@@ -53,8 +57,12 @@ export default function TngOnboarding() {
 
         if (profile) {
           startTngBrowserSession();
-          try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
-          navigate('/welcome', { replace: true });
+          if (nextPath !== '/') {
+            navigate(nextPath, { replace: true });
+          } else {
+            try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
+            navigate('/welcome', { replace: true });
+          }
           return;
         }
 
@@ -81,8 +89,12 @@ export default function TngOnboarding() {
       await createPreviewTngProfile(user, { displayName, handle });
       await tngApi.stats.getProfile().catch(() => null);
       startTngBrowserSession();
-      try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
-      navigate('/welcome', { replace: true });
+      if (nextPath !== '/') {
+        navigate(nextPath, { replace: true });
+      } else {
+        try { sessionStorage.removeItem('tng_welcome_complete'); } catch {}
+        navigate('/welcome', { replace: true });
+      }
     } catch (profileError) {
       setError(profileError.message || 'Your TNG profile could not be created.');
     } finally {
