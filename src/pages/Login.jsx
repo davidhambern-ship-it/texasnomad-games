@@ -62,7 +62,8 @@ export default function Login() {
         profileError?.code === 'ACCOUNT_REQUIRED' ||
         profileError?.status === 404
       ) {
-        window.location.replace('/onboarding');
+        const next = encodeURIComponent(nextPath);
+        window.location.replace(`/onboarding?next=${next}`);
         return;
       }
       throw profileError;
@@ -87,6 +88,11 @@ export default function Login() {
       // Account-route is an enhancement, never a reason to break ordinary
       // sign-in. Fall through to the normal Welcome flow if it cannot load.
       console.warn('[TNG Login] active host routing check failed:', routeError);
+    }
+
+    if (nextPath !== '/') {
+      window.location.replace(nextPath);
+      return;
     }
 
     try {
@@ -185,7 +191,7 @@ export default function Login() {
       footer={
         <>
           Need TNG sign-in credentials?{' '}
-          <Link to="/register" style={{ color: '#BC13FE', fontWeight: 600 }}>Create a TNG login</Link>
+          <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Create a TNG login</Link>
         </>
       }
     >
