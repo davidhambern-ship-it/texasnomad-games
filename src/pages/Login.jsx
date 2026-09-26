@@ -207,6 +207,16 @@ export default function Login() {
         Your email/password verifies who you are. After sign-in, TNG checks for your Profile. If you already have one, you go to Welcome. If you don't, you'll create your public @handle and TNG Profile next.
       </div>
 
+      <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(255,215,0,0.28)', background: 'rgba(255,215,0,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
+        <strong style={{ color: '#FFD700' }}>HAD A TNG PROFILE BEFORE THE NEW SIGN-IN?</strong>
+        <br />
+        If you never created TNG email/password credentials, there is no old password to reset yet. Use{' '}
+        <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#FFD700', fontWeight: 700 }}>
+          Create a TNG login
+        </Link>{' '}
+        with the same email you used before. TNG will reconnect you to your existing Profile after sign-in.
+      </div>
+
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div>
           <label htmlFor="email" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>EMAIL</label>
