@@ -356,6 +356,225 @@ const bffVoiceWss = new WebSocketServer({ noServer: true });
 const bffVoiceRooms = new Map();
 const bffVoiceActivePlayerByRoom = new Map();
 
+const hostLiveWss = new WebSocketServer({ noServer: true });
+
+const HOST_LIVE_GAME_PATHS = {
+  spades: '/spades/host',
+  hangman: '/hangman/host',
+  'word-search': '/word-search/host',
+  'square-biz': '/square-biz/host',
+};
+
+async function fetchHostLiveJson(url, token, controllerId) {
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      'X-TNG-Device-Id': controllerId,
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  return { response, payload };
+}
+
+async function loadHostLiveRoom(token, controllerId) {
+  return fetchHostLiveJson(
+    `${TNG_API_ORIGIN}/host/room-state`,
+    token,
+    controllerId,
+  );
+}
+
+async function loadHostLiveGame(token, controllerId, gameId) {
+  if (!gameId) return null;
+
+  if (gameId === 'bff') {
+    return fetchHostLiveJson(
+      `http://127.0.0.1:${port}/bff-api/host`,
+      token,
+      controllerId,
+    );
+  }
+
+  const path = HOST_LIVE_GAME_PATHS[gameId];
+  if (!path) return null;
+
+  return fetchHostLiveJson(
+    `${TNG_API_ORIGIN}${path}`,
+    token,
+    controllerId,
+  );
+}
+
+function hostLiveSend(ws, payload) {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify(payload));
+}
+
+hostLiveWss.on('connection', (ws) => {
+  let token = null;
+  let controllerId = null;
+  let activeGameId = null;
+  let pollTimer = null;
+  let pollBusy = false;
+  let roomTick = 0;
+  let authenticated = false;
+
+  const stopPolling = () => {
+    if (pollTimer) {
+      clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  };
+
+  const poll = async ({ forceRoom = false } = {}) => {
+    if (!authenticated || !token || !controllerId || pollBusy) return;
+    pollBusy = true;
+
+    try {
+      roomTick += 1;
+      const shouldLoadRoom = forceRoom || roomTick % 2 === 1 || !activeGameId;
+
+      if (shouldLoadRoom) {
+        const { response, payload } = await loadHostLiveRoom(token, controllerId);
+
+        if ([401, 403].includes(response.status)) {
+          authenticated = false;
+          stopPolling();
+          hostLiveSend(ws, { type: 'reauth-required' });
+          return;
+        }
+
+        if (!response.ok) {
+          hostLiveSend(ws, {
+            type: 'host-live-warning',
+            scope: 'room',
+            status: response.status,
+          });
+        } else {
+          const room = payload?.room || null;
+          activeGameId = room?.gameId || room?.game_id || null;
+          hostLiveSend(ws, { type: 'room-state', room });
+        }
+      }
+
+      if (activeGameId) {
+        const gameResult = await loadHostLiveGame(token, controllerId, activeGameId);
+
+        if (gameResult) {
+          const { response, payload } = gameResult;
+
+          if ([401, 403].includes(response.status)) {
+            authenticated = false;
+            stopPolling();
+            hostLiveSend(ws, { type: 'reauth-required' });
+            return;
+          }
+
+          if (!response.ok) {
+            hostLiveSend(ws, {
+              type: 'host-live-warning',
+              scope: 'game',
+              gameId: activeGameId,
+              status: response.status,
+            });
+          } else {
+            hostLiveSend(ws, {
+              type: 'game-state',
+              gameId: activeGameId,
+              payload,
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.warn('[TNG Host Live] poll failed:', error?.message || error);
+      hostLiveSend(ws, { type: 'host-live-warning', scope: 'transport' });
+    } finally {
+      pollBusy = false;
+    }
+  };
+
+  const authenticate = async (message) => {
+    const nextToken = String(message?.token || '');
+    const nextControllerId = String(message?.controllerId || '');
+
+    if (!nextToken || !isUuid(nextControllerId)) {
+      hostLiveSend(ws, { type: 'auth-failed' });
+      return;
+    }
+
+    try {
+      const { response, payload } = await loadHostLiveRoom(nextToken, nextControllerId);
+
+      if (!response.ok) {
+        hostLiveSend(ws, {
+          type: response.status === 401 || response.status === 403
+            ? 'reauth-required'
+            : 'auth-failed',
+          status: response.status,
+        });
+        return;
+      }
+
+      token = nextToken;
+      controllerId = nextControllerId;
+      authenticated = true;
+      const room = payload?.room || null;
+      activeGameId = room?.gameId || room?.game_id || null;
+
+      hostLiveSend(ws, {
+        type: 'host-live-ready',
+        room,
+      });
+
+      stopPolling();
+      await poll({ forceRoom: true });
+      pollTimer = setInterval(() => {
+        poll().catch(() => {});
+      }, 800);
+    } catch (error) {
+      console.warn('[TNG Host Live] auth failed:', error?.message || error);
+      hostLiveSend(ws, { type: 'auth-failed' });
+    }
+  };
+
+  const authTimeout = setTimeout(() => {
+    if (!authenticated && ws.readyState === WebSocket.OPEN) {
+      ws.close(4001, 'Host live auth timeout');
+    }
+  }, 8000);
+
+  ws.on('message', (data, isBinary) => {
+    if (isBinary) return;
+
+    let message;
+    try {
+      message = JSON.parse(String(data));
+    } catch {
+      return;
+    }
+
+    if (message?.type === 'auth') {
+      authenticate(message).catch(() => {});
+      return;
+    }
+
+    if (message?.type === 'refresh') {
+      poll({ forceRoom: true }).catch(() => {});
+    }
+  });
+
+  ws.on('close', () => {
+    clearTimeout(authTimeout);
+    stopPolling();
+  });
+
+  ws.on('error', () => {});
+});
+
 function voiceRoomSet(roomCode) {
   const key = String(roomCode || '').toUpperCase();
   if (!bffVoiceRooms.has(key)) bffVoiceRooms.set(key, new Set());
@@ -3666,6 +3885,22 @@ bffVoiceWss.on('connection', (ws, request, meta) => {
 server.on('upgrade', async (request, socket, head) => {
   try {
     const url = new URL(request.url || '/', 'http://localhost');
+
+    if (url.pathname === '/host-live') {
+      const origin = String(request.headers.origin || '');
+
+      if (origin && !isAllowedBrowserOrigin(origin)) {
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+
+      hostLiveWss.handleUpgrade(request, socket, head, (ws) => {
+        hostLiveWss.emit('connection', ws, request);
+      });
+      return;
+    }
+
     if (url.pathname !== '/bff-voice') {
       socket.destroy();
       return;
@@ -3682,7 +3917,7 @@ server.on('upgrade', async (request, socket, head) => {
       bffVoiceWss.emit('connection', ws, request, meta);
     });
   } catch (error) {
-    console.error('[BFF Voice Relay] upgrade failed', error);
+    console.error('[TNG WebSocket] upgrade failed', error);
     socket.destroy();
   }
 });
