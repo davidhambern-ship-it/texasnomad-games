@@ -108,6 +108,304 @@ const BERNAVERSE_BRIDGE_URL =
   import.meta.env.VITE_BERNAVERSE_BRIDGE_URL ||
   'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
 
+
+const HOST_LIVE_WS_URL =
+  import.meta.env.VITE_TNG_HOST_LIVE_WS_URL ||
+  (typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app')
+    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/host-live`
+    : 'wss://tng-live-production.up.railway.app/host-live');
+
+const hostLive = {
+  socket: null,
+  controllerId: null,
+  connecting: null,
+  reconnectTimer: null,
+  intentionallyClosed: false,
+  roomReceived: false,
+  room: null,
+  games: new Map(),
+  waiters: new Map(),
+};
+
+function hostLiveKey(kind, gameId = '') {
+  return gameId ? `${kind}:${gameId}` : kind;
+}
+
+function resolveHostLiveWaiters(key, value) {
+  const waiters = hostLive.waiters.get(key);
+  if (!waiters?.length) return;
+
+  hostLive.waiters.delete(key);
+  for (const waiter of waiters) {
+    window.clearTimeout(waiter.timer);
+    waiter.resolve(value);
+  }
+}
+
+function rejectAllHostLiveWaiters(error) {
+  for (const waiters of hostLive.waiters.values()) {
+    for (const waiter of waiters) {
+      window.clearTimeout(waiter.timer);
+      waiter.reject(error);
+    }
+  }
+  hostLive.waiters.clear();
+}
+
+function waitForHostLiveValue(key, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const list = hostLive.waiters.get(key) || [];
+    const waiter = {
+      resolve,
+      reject,
+      timer: window.setTimeout(() => {
+        const current = hostLive.waiters.get(key) || [];
+        hostLive.waiters.set(
+          key,
+          current.filter((entry) => entry !== waiter),
+        );
+        reject(new TngApiError('The Host live connection did not return state in time.', {
+          code: 'HOST_LIVE_TIMEOUT',
+          status: 504,
+        }));
+      }, timeoutMs),
+    };
+
+    list.push(waiter);
+    hostLive.waiters.set(key, list);
+  });
+}
+
+function requestHostLiveRefresh() {
+  if (hostLive.socket?.readyState === WebSocket.OPEN) {
+    hostLive.socket.send(JSON.stringify({ type: 'refresh' }));
+  }
+}
+
+function closeHostLiveConnection() {
+  hostLive.intentionallyClosed = true;
+
+  if (hostLive.reconnectTimer) {
+    window.clearTimeout(hostLive.reconnectTimer);
+    hostLive.reconnectTimer = null;
+  }
+
+  if (hostLive.socket) {
+    try { hostLive.socket.close(1000, 'Host session ended'); } catch {}
+  }
+
+  hostLive.socket = null;
+  hostLive.controllerId = null;
+  hostLive.connecting = null;
+  hostLive.roomReceived = false;
+  hostLive.room = null;
+  hostLive.games.clear();
+  rejectAllHostLiveWaiters(new TngApiError('The Host live connection was closed.', {
+    code: 'HOST_LIVE_CLOSED',
+    status: 499,
+  }));
+}
+
+async function ensureHostLiveConnection(deviceId) {
+  if (!deviceId) {
+    throw new TngApiError('The Host Controller device is missing.', {
+      code: 'CONTROLLER_REQUIRED',
+      status: 400,
+    });
+  }
+
+  if (
+    hostLive.controllerId === deviceId &&
+    hostLive.socket?.readyState === WebSocket.OPEN &&
+    !hostLive.connecting
+  ) {
+    return;
+  }
+
+  if (hostLive.controllerId === deviceId && hostLive.connecting) {
+    return hostLive.connecting;
+  }
+
+  if (hostLive.controllerId && hostLive.controllerId !== deviceId) {
+    closeHostLiveConnection();
+  }
+
+  hostLive.controllerId = deviceId;
+  hostLive.intentionallyClosed = false;
+
+  hostLive.connecting = (async () => {
+    const token = await getNeonAuthToken();
+    if (!token) {
+      throw new TngApiError('Your TNG session is missing.', {
+        code: 'AUTH_REQUIRED',
+        status: 401,
+      });
+    }
+
+    await new Promise((resolve, reject) => {
+      const socket = new WebSocket(HOST_LIVE_WS_URL);
+      hostLive.socket = socket;
+
+      let settled = false;
+
+      const fail = (error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
+      socket.addEventListener('open', () => {
+        socket.send(JSON.stringify({
+          type: 'auth',
+          token,
+          controllerId: deviceId,
+        }));
+      });
+
+      socket.addEventListener('message', async (event) => {
+        let message;
+        try {
+          message = JSON.parse(event.data);
+        } catch {
+          return;
+        }
+
+        if (message?.type === 'host-live-ready') {
+          hostLive.roomReceived = true;
+          hostLive.room = message.room ?? null;
+          resolveHostLiveWaiters(hostLiveKey('room'), { room: hostLive.room });
+
+          if (!settled) {
+            settled = true;
+            resolve();
+          }
+          return;
+        }
+
+        if (message?.type === 'room-state') {
+          hostLive.roomReceived = true;
+          hostLive.room = message.room ?? null;
+          resolveHostLiveWaiters(hostLiveKey('room'), { room: hostLive.room });
+          return;
+        }
+
+        if (message?.type === 'game-state' && message.gameId) {
+          hostLive.games.set(message.gameId, message.payload);
+          resolveHostLiveWaiters(
+            hostLiveKey('game', message.gameId),
+            message.payload,
+          );
+          return;
+        }
+
+        if (message?.type === 'reauth-required') {
+          try {
+            const freshToken = await getNeonAuthToken({ forceRefresh: true });
+            if (freshToken && socket.readyState === WebSocket.OPEN) {
+              socket.send(JSON.stringify({
+                type: 'auth',
+                token: freshToken,
+                controllerId: deviceId,
+              }));
+            }
+          } catch (error) {
+            console.warn('[TNG Host Live] silent re-auth failed:', error);
+          }
+          return;
+        }
+
+        if (message?.type === 'auth-failed') {
+          fail(new TngApiError('The Host live connection could not authenticate.', {
+            code: 'AUTH_REQUIRED',
+            status: message.status || 401,
+          }));
+        }
+      });
+
+      socket.addEventListener('error', () => {
+        fail(new TngApiError('The Host live connection could not start.', {
+          code: 'HOST_LIVE_UNAVAILABLE',
+          status: 503,
+        }));
+      });
+
+      socket.addEventListener('close', () => {
+        if (hostLive.socket === socket) {
+          hostLive.socket = null;
+        }
+
+        if (!settled) {
+          fail(new TngApiError('The Host live connection closed while starting.', {
+            code: 'HOST_LIVE_UNAVAILABLE',
+            status: 503,
+          }));
+        }
+
+        if (
+          !hostLive.intentionallyClosed &&
+          hostLive.controllerId === deviceId &&
+          !hostLive.reconnectTimer
+        ) {
+          hostLive.reconnectTimer = window.setTimeout(() => {
+            hostLive.reconnectTimer = null;
+            hostLive.connecting = null;
+            ensureHostLiveConnection(deviceId).catch((error) => {
+              console.warn('[TNG Host Live] reconnect failed:', error);
+            });
+          }, 1000);
+        }
+      });
+    });
+  })();
+
+  try {
+    await hostLive.connecting;
+  } finally {
+    hostLive.connecting = null;
+  }
+}
+
+async function getHostLiveRoomState(deviceId) {
+  if (hostLive.controllerId === deviceId && hostLive.roomReceived) {
+    ensureHostLiveConnection(deviceId).catch(() => {});
+    return { room: hostLive.room };
+  }
+
+  await ensureHostLiveConnection(deviceId);
+
+  if (hostLive.roomReceived) {
+    return { room: hostLive.room };
+  }
+
+  return waitForHostLiveValue(hostLiveKey('room'));
+}
+
+async function getHostLiveGameState(deviceId, gameId) {
+  if (hostLive.controllerId === deviceId && hostLive.games.has(gameId)) {
+    ensureHostLiveConnection(deviceId).catch(() => {});
+    return hostLive.games.get(gameId);
+  }
+
+  await ensureHostLiveConnection(deviceId);
+
+  if (hostLive.games.has(gameId)) {
+    return hostLive.games.get(gameId);
+  }
+
+  return waitForHostLiveValue(hostLiveKey('game', gameId));
+}
+
+async function hostActionAndRefresh(path, deviceId, action, payload = {}, options = {}) {
+  const result = await request(path, {
+    method: 'POST',
+    deviceId,
+    body: { action, ...payload },
+    ...options,
+  });
+  requestHostLiveRefresh();
+  return result;
+}
+
 async function bernaverseRequest(action, payload = {}) {
   const token = await getNeonAuthToken();
   if (!token) {
@@ -173,29 +471,50 @@ export const tngApi = {
       deviceId,
       body:{ reclaimController, resumeTestRoom },
     }),
-    endSession: (deviceId) => request('/api/host/session', { method:'DELETE', deviceId }),
+    endSession: async (deviceId) => {
+      const result = await request('/api/host/session', { method:'DELETE', deviceId });
+      closeHostLiveConnection();
+      return result;
+    },
     createPairing: (deviceId, replaceDisplay = false) => request('/api/host/pairing', {
       method:'POST',
       deviceId,
       body:{ replaceDisplay },
     }),
-    createRoom: (deviceId, gameId) => request('/api/host/room', {
-      method:'POST',
-      deviceId,
-      body:{ gameId },
-    }),
-    endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
-    getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
-    updateRoomState: (deviceId, statePatch) => request('/api/host/room-state', {
-      method:'PATCH',
-      deviceId,
-      body:{ statePatch },
-    }),
-    sendRoomCommand: (deviceId, command) => request('/api/host/room-state', {
-      method:'PATCH',
-      deviceId,
-      body:{ command },
-    }),
+    createRoom: async (deviceId, gameId) => {
+      const result = await request('/api/host/room', {
+        method:'POST',
+        deviceId,
+        body:{ gameId },
+      });
+      requestHostLiveRefresh();
+      return result;
+    },
+    endRoom: async (deviceId) => {
+      const result = await request('/api/host/room', { method:'DELETE', deviceId });
+      hostLive.games.clear();
+      requestHostLiveRefresh();
+      return result;
+    },
+    getRoomState: (deviceId) => getHostLiveRoomState(deviceId),
+    updateRoomState: async (deviceId, statePatch) => {
+      const result = await request('/api/host/room-state', {
+        method:'PATCH',
+        deviceId,
+        body:{ statePatch },
+      });
+      requestHostLiveRefresh();
+      return result;
+    },
+    sendRoomCommand: async (deviceId, command) => {
+      const result = await request('/api/host/room-state', {
+        method:'PATCH',
+        deviceId,
+        body:{ command },
+      });
+      requestHostLiveRefresh();
+      return result;
+    },
   },
   player: {
     joinRoom: (deviceId, roomCode) => request('/api/player/room', {
@@ -230,12 +549,9 @@ export const tngApi = {
     }),
   },
   spades: {
-    getHostState: (deviceId) => request('/api/spades/host', { deviceId }),
-    hostAction: (deviceId, action, payload = {}) => request('/api/spades/host', {
-      method:'POST',
-      deviceId,
-      body:{ action, ...payload },
-    }),
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'spades'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/api/spades/host', deviceId, action, payload),
     getPlayerState: (deviceId, roomCode) => request('/api/spades/player', {
       deviceId,
       roomCode,
@@ -248,14 +564,9 @@ export const tngApi = {
     }),
   },
   hangman: {
-    getHostState: (deviceId) => request('/api/hangman/host', {
-      deviceId,
-    }),
-    hostAction: (deviceId, action, payload = {}) => request('/api/hangman/host', {
-      method:'POST',
-      deviceId,
-      body:{ action, ...payload },
-    }),
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'hangman'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/api/hangman/host', deviceId, action, payload),
     getPlayerState: (deviceId, roomCode) => request('/api/hangman/player', {
       deviceId,
       roomCode,
@@ -268,14 +579,9 @@ export const tngApi = {
     }),
   },
   wordSearch: {
-    getHostState: (deviceId) => request('/api/word-search/host', {
-      deviceId,
-    }),
-    hostAction: (deviceId, action, payload = {}) => request('/api/word-search/host', {
-      method:'POST',
-      deviceId,
-      body:{ action, ...payload },
-    }),
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'word-search'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/api/word-search/host', deviceId, action, payload),
     getPlayerState: (deviceId, roomCode) => request('/api/word-search/player', {
       deviceId,
       roomCode,
@@ -288,16 +594,9 @@ export const tngApi = {
     }),
   },
   bff: {
-    getHostState: (deviceId) => request('/host', {
-      deviceId,
-      apiBase: BFF_API_BASE,
-    }),
-    hostAction: (deviceId, action, payload = {}) => request('/host', {
-      method:'POST',
-      deviceId,
-      apiBase:BFF_API_BASE,
-      body:{ action, ...payload },
-    }),
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'bff'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/host', deviceId, action, payload, { apiBase:BFF_API_BASE }),
     getPlayerState: (deviceId, roomCode) => request('/player', {
       deviceId,
       roomCode,
@@ -316,14 +615,9 @@ export const tngApi = {
     }),
   },
   squareBiz: {
-    getHostState: (deviceId) => request('/api/square-biz/host', {
-      deviceId,
-    }),
-    hostAction: (deviceId, action, payload = {}) => request('/api/square-biz/host', {
-      method:'POST',
-      deviceId,
-      body:{ action, ...payload },
-    }),
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'square-biz'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/api/square-biz/host', deviceId, action, payload),
     getPlayerState: (deviceId, roomCode) => request('/api/square-biz/player', {
       deviceId,
       roomCode,
