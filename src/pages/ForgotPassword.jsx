@@ -40,10 +40,24 @@ export default function ForgotPassword() {
       }
     >
       {sent ? (
-        <p className="text-sm text-foreground text-center">
-          If an account exists with that email, you'll receive a password reset link shortly.
-        </p>
+        <div className="space-y-4 text-center">
+          <p className="text-sm text-foreground">
+            If a TNG sign-in exists with that email, you'll receive a password reset link shortly.
+          </p>
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-left text-xs leading-5 text-muted-foreground">
+            <strong className="text-yellow-400">No reset email?</strong>{' '}
+            If your TNG Profile was created before the new sign-in system and you never made TNG email/password credentials, there is no password to reset yet. Create a TNG login with the same email and TNG will reconnect you to your existing Profile.
+          </div>
+          <Link to="/register" className="inline-block text-sm font-medium text-primary hover:underline">
+            Create a TNG login
+          </Link>
+        </div>
       ) : (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-3 text-xs leading-5 text-muted-foreground">
+            <strong className="text-yellow-400">Old TNG Profile?</strong>{' '}
+            Only use password reset if you already created TNG email/password credentials. If you never did, create a TNG login using the same email instead.
+          </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="email">Email address</Label>
@@ -73,6 +87,7 @@ export default function ForgotPassword() {
             )}
           </Button>
         </form>
+        </div>
       )}
     </AuthLayout>
   );
