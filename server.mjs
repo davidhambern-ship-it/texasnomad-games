@@ -107,10 +107,65 @@ function authCookieNames(req) {
     .filter(Boolean);
 }
 
+const AUTH_SESSION_PROXY_CACHE_TTL_MS = 30 * 1000;
+const authSessionProxyCache = new Map();
+
+function authSessionProxyKey(req) {
+  const cookie = String(req.headers.cookie || '');
+  const origin = String(req.headers.origin || req.headers.referer || '');
+  return `${origin}\n${cookie}`;
+}
+
+function clearAuthSessionProxyCache() {
+  authSessionProxyCache.clear();
+}
+
+function pruneAuthSessionProxyCache(now = Date.now()) {
+  for (const [key, entry] of authSessionProxyCache.entries()) {
+    if (now - entry.cachedAt >= AUTH_SESSION_PROXY_CACHE_TTL_MS) {
+      authSessionProxyCache.delete(key);
+    }
+  }
+}
+
+function sendCachedAuthSession(res, entry) {
+  for (const [name, value] of Object.entries(entry.headers || {})) {
+    if (value) res.setHeader(name, value);
+  }
+  if (entry.setCookies?.length) {
+    res.setHeader('Set-Cookie', entry.setCookies);
+  }
+  res.writeHead(entry.status);
+  res.end(entry.payload);
+}
+
 async function proxyNeonAuth(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const suffix = sourceUrl.pathname.replace(/^\/neon-auth/, '') || '/';
   const targetUrl = `${NEON_AUTH_ORIGIN}${suffix}${sourceUrl.search}`;
+
+  const method = String(req.method || 'GET').toUpperCase();
+  const isSessionRead =
+    method === 'GET' && sourceUrl.pathname.endsWith('/get-session');
+
+  // Old/open Host tabs can still contain a high-frequency auth loop. Absorb
+  // those repeated session reads at the first-party proxy so they cannot
+  // rate-limit Neon Auth. This works immediately without refreshing the Host.
+  if (isSessionRead) {
+    const now = Date.now();
+    pruneAuthSessionProxyCache(now);
+
+    const cacheKey = authSessionProxyKey(req);
+    const cached = authSessionProxyCache.get(cacheKey);
+
+    if (cached && now - cached.cachedAt < AUTH_SESSION_PROXY_CACHE_TTL_MS) {
+      sendCachedAuthSession(res, cached);
+      return;
+    }
+  } else if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+    // Sign-in/sign-out/account mutations can change the cookie-backed session.
+    clearAuthSessionProxyCache();
+  }
 
   const headers = new Headers();
   for (const [key, value] of Object.entries(req.headers)) {
@@ -184,6 +239,28 @@ async function proxyNeonAuth(req, res) {
   }
 
   const payload = Buffer.from(await response.arrayBuffer());
+
+  if (isSessionRead && response.status === 200) {
+    const cacheKey = authSessionProxyKey(req);
+    const cachedHeaders = {};
+
+    for (const name of passthroughHeaders) {
+      const value = response.headers.get(name);
+      if (value) cachedHeaders[name] = value;
+    }
+
+    const rewrittenSetCookies = setCookies.length
+      ? setCookies.map(rewriteAuthCookie)
+      : [];
+
+    authSessionProxyCache.set(cacheKey, {
+      cachedAt: Date.now(),
+      status: response.status,
+      headers: cachedHeaders,
+      setCookies: rewrittenSetCookies,
+      payload,
+    });
+  }
 
   if (sourceUrl.pathname.endsWith('/sign-in/social')) {
     let socialShape = 'non-json';
