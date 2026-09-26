@@ -14,7 +14,7 @@ export const TNG_LAST_ACTIVITY_KEY = 'tng_last_activity_at';
 export const TNG_PAGEHIDE_KEY = 'tng_pagehide_at';
 export const TNG_WELCOME_COMPLETE_KEY = 'tng_welcome_complete';
 
-const SESSION_CACHE_TTL_MS = 60 * 1000;
+const SESSION_CACHE_TTL_MS = Number.POSITIVE_INFINITY;
 const STALE_SESSION_FALLBACK_MS = 10 * 60 * 1000;
 
 let cachedSession;
@@ -110,6 +110,9 @@ export async function getNeonSession({
     cachedSessionAt > 0 &&
     now - cachedSessionAt < SESSION_CACHE_TTL_MS
   ) {
+    // Once this tab has a confirmed Neon session, keep using it for the life
+    // of the tab. A backend 401 is the only thing that should force another
+    // auth lookup during normal TNG use.
     return cachedSession ?? null;
   }
 
