@@ -1,161 +1,30 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
-
+import React, { useEffect } from "react";
+import { UserPlus, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
-import { authClient, startTngBrowserSession, waitForNeonSession } from "@/lib/neonAuth";
 
-const PS2 = { fontFamily: "'Press Start 2P', monospace" };
-
-function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoComplete }) {
-  return (
-    <div style={{ position: 'relative' }}>
-      {type === 'email'
-        ? <Mail style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(188,19,254,0.5)' }} />
-        : <Lock style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', width: 15, height: 15, color: 'rgba(188,19,254,0.5)' }} />
-      }
-      <input
-        id={id}
-        type={type}
-        placeholder={placeholder}
-        value={value}
-        onChange={onChange}
-        autoFocus={autoFocus}
-        autoComplete={autoComplete}
-        required
-        style={{
-          width: '100%',
-          paddingLeft: 38,
-          paddingRight: 14,
-          height: 46,
-          background: 'rgba(0,0,0,0.6)',
-          border: '1.5px solid rgba(188,19,254,0.35)',
-          borderRadius: 10,
-          color: 'white',
-          fontSize: 14,
-          fontFamily: "'Inter', sans-serif",
-          outline: 'none',
-          boxSizing: 'border-box',
-        }}
-        onFocus={(e) => { e.target.style.borderColor = '#BC13FE'; }}
-        onBlur={(e) => { e.target.style.borderColor = 'rgba(188,19,254,0.35)'; }}
-      />
-    </div>
-  );
-}
+const BERNA_SIGNUP_URL = "https://bernaverse.hireberna.app/?auth=signup&app=tng";
 
 export default function Register() {
-  const requestedNext = new URLSearchParams(window.location.search).get('next');
-  const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
-    ? requestedNext
-    : '/';
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  const finishAuth = async () => {
-    const session = await waitForNeonSession();
-    if (!session?.user) {
-      throw new Error('Your TNG login was created, but the session did not finish starting.');
-    }
-    const next = encodeURIComponent(nextPath);
-    window.location.replace(`/onboarding?next=${next}`);
-  };
-
-  const handleSubmit = async (event) => {
-    event.preventDefault();
-    setError("");
-
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await authClient.signUp.email({
-        email,
-        password,
-        name: email.split('@')[0] || 'Nomad',
-      });
-      if (result?.error) throw new Error(result.error.message || "Registration failed");
-      startTngBrowserSession();
-      await finishAuth();
-    } catch (err) {
-      setError(err.message || "Registration failed");
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    window.location.replace(BERNA_SIGNUP_URL);
+  }, []);
 
   return (
     <AuthLayout
       icon={UserPlus}
-      title="Create TNG Sign-In"
-      footer={
-        <>
-          Already have a TNG sign-in?{' '}
-          <Link to={`/login?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Log in</Link>
-        </>
-      }
+      title="BERNAverse Sign-Up"
+      subtitle="TNG accounts now begin in the BERNAverse."
     >
-      <div style={{ marginBottom: 20, padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(255,215,0,0.4)', background: 'rgba(255,215,0,0.06)', textAlign: 'center' }}>
-        <div style={{ ...PS2, fontSize: 8, background: 'linear-gradient(90deg, #BC13FE, #FFD700)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', marginBottom: 6 }}>
-          ⚡ TNG ACCOUNT
+      <div style={{ textAlign: "center", color: "rgba(255,255,255,0.68)", lineHeight: 1.7 }}>
+        <Loader2 style={{ width: 22, height: 22, margin: "0 auto 14px", color: "#BC13FE", animation: "spin 0.8s linear infinite" }} />
+        Sending you to the global BERNAverse sign-up…
+        <div style={{ marginTop: 16 }}>
+          <a href={BERNA_SIGNUP_URL} style={{ color: "#FFD700", fontWeight: 700 }}>
+            Continue to BERNAverse
+          </a>
         </div>
-        <p style={{ ...PS2, fontSize: 6, color: 'rgba(255,215,0,0.65)', lineHeight: 1.9, margin: 0 }}>
-          This creates your TNG sign-in credentials only. Your TNG Profile and public @handle are created after you sign in.
-        </p>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
-
-      {error && (
-        <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13 }}>
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <div>
-          <label htmlFor="email" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>EMAIL</label>
-          <TNGInput id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} autoFocus autoComplete="email" />
-        </div>
-        <div>
-          <label htmlFor="password" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>PASSWORD</label>
-          <TNGInput id="password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" />
-        </div>
-        <div>
-          <label htmlFor="confirm" style={{ ...PS2, fontSize: 6, color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: 6 }}>CONFIRM PASSWORD</label>
-          <TNGInput id="confirm" type="password" placeholder="••••••••" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} autoComplete="new-password" />
-        </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            width: '100%',
-            height: 46,
-            borderRadius: 10,
-            border: '2px solid #BC13FE',
-            background: 'rgba(188,19,254,0.2)',
-            color: '#BC13FE',
-            fontFamily: "'Teko', sans-serif",
-            fontSize: 18,
-            letterSpacing: '0.15em',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          {loading && <Loader2 style={{ width: 16, height: 16, animation: 'spin 0.8s linear infinite' }} />}
-          {loading ? 'CREATING SIGN-IN…' : 'CREATE TNG SIGN-IN →'}
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </button>
-      </form>
     </AuthLayout>
   );
 }
