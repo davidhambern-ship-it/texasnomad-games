@@ -190,8 +190,8 @@ export default function Login() {
       subtitle="Sign in with your TNG email and password."
       footer={
         <>
-          Need TNG sign-in credentials?{' '}
-          <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#BC13FE', fontWeight: 600 }}>Create a TNG login</Link>
+          New to TNG?{' '}
+          <a href="https://bernaverse.hireberna.app/?auth=signup&app=tng" style={{ color: '#BC13FE', fontWeight: 600 }}>Create your BERNAverse account</a>
         </>
       }
     >
@@ -210,11 +210,7 @@ export default function Login() {
       <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(255,215,0,0.28)', background: 'rgba(255,215,0,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
         <strong style={{ color: '#FFD700' }}>HAD A TNG PROFILE BEFORE THE NEW SIGN-IN?</strong>
         <br />
-        If you never created TNG email/password credentials, there is no old password to reset yet. Use{' '}
-        <Link to={`/register?next=${encodeURIComponent(nextPath)}`} style={{ color: '#FFD700', fontWeight: 700 }}>
-          Create a TNG login
-        </Link>{' '}
-        with the same email you used before. TNG will reconnect you to your existing Profile after sign-in.
+        New sign-ups now begin in the BERNAverse. If you already had a TNG Profile before this change, keep using your existing TNG sign-in for now; profile linking will preserve your stats as the global identity rollout continues.
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
