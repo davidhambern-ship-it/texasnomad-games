@@ -44,7 +44,7 @@ const NEON_AUTH_ORIGIN =
 
 const LIVE_BROWSER_ORIGINS = new Set(
   (process.env.TNG_LIVE_ALLOWED_ORIGINS ||
-    'https://texasnomadgames.com,https://www.texasnomadgames.com')
+    'https://texasnomadgames.com,https://www.texasnomadgames.com,https://bernaverse.hireberna.app')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean),
@@ -193,6 +193,18 @@ async function proxyNeonAuth(req, res) {
     ['GET', 'HEAD'].includes(String(req.method || 'GET').toUpperCase())
       ? undefined
       : await readRawBody(req);
+
+  // BERNAverse is the global signup front door. For the one supported
+  // cross-site provisioning call, present TNG's own origin upstream so Neon
+  // Auth accepts the request while our proxy still enforces the browser origin.
+  const browserOrigin = String(req.headers.origin || '');
+  if (
+    browserOrigin === 'https://bernaverse.hireberna.app'
+    && sourceUrl.pathname.endsWith('/sign-up/email')
+  ) {
+    headers.set('origin', 'https://texasnomadgames.com');
+    headers.set('referer', 'https://texasnomadgames.com/');
+  }
 
   const response = await fetch(targetUrl, {
     method: req.method || 'GET',
