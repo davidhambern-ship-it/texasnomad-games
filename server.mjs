@@ -605,25 +605,29 @@ async function handleSpadesNilScoring(req, res) {
     const players = Array.isArray(gameState.players) ? gameState.players : [];
     const nilResults = [];
 
-    for (const player of players) {
-      const seatNumber = Number(player?.seatNumber || player?.seat_number || 0);
-      const bid = Number(player?.bid);
-      if (![1, 2, 3, 4].includes(seatNumber) || bid !== 0) continue;
+    // TNG's first hand bids itself, so a zero generated there is not an
+    // explicit NIL contract. NIL starts with the normal player-bidding hands.
+    if (handNumber > 1) {
+      for (const player of players) {
+        const seatNumber = Number(player?.seatNumber || player?.seat_number || 0);
+        const bid = Number(player?.bid);
+        if (![1, 2, 3, 4].includes(seatNumber) || bid !== 0) continue;
 
-      const tricksWon = Number(player?.tricksWon || player?.tricks_won || 0);
-      const success = tricksWon === 0;
-      const points = success ? 100 : -100;
-      const team = seatNumber === 1 || seatNumber === 3 ? 1 : 2;
+        const tricksWon = Number(player?.tricksWon || player?.tricks_won || 0);
+        const success = tricksWon === 0;
+        const points = success ? 100 : -100;
+        const team = seatNumber === 1 || seatNumber === 3 ? 1 : 2;
 
-      nilResults.push({
-        seatNumber,
-        team,
-        playerId: player?.playerId || player?.accountId || null,
-        name: player?.name || player?.handle || `Seat ${seatNumber}`,
-        tricksWon,
-        success,
-        points,
-      });
+        nilResults.push({
+          seatNumber,
+          team,
+          playerId: player?.playerId || player?.accountId || null,
+          name: player?.name || player?.handle || `Seat ${seatNumber}`,
+          tricksWon,
+          success,
+          points,
+        });
+      }
     }
 
     const delta1 = nilResults
