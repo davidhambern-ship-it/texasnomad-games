@@ -465,19 +465,34 @@ export default function NeonSpadesPlayer({ roomCode }) {
                   </div>
 
                   {isMyBidTurn && (
-                    <div className="mt-3 grid grid-cols-7 gap-1.5">
-                      {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
+                    <>
+                      <div className="mt-2 text-xs text-white/35">
+                        NIL means you are betting that you will take zero books.
+                      </div>
+                      <div className="mt-3 grid grid-cols-7 gap-1.5">
                         <button
-                          key={bid}
                           type="button"
                           disabled={busy}
-                          onClick={() => placeBid(bid)}
-                          className="h-9 rounded-lg border border-[#FF5F1F]/55 bg-[#FF5F1F]/10 text-sm text-white transition hover:bg-[#FF5F1F]/25 disabled:opacity-40"
+                          onClick={() => placeBid(0)}
+                          className="col-span-2 h-9 rounded-lg border border-[#22D3EE]/70 bg-[#22D3EE]/10 text-[9px] text-[#8DEEFF] transition hover:bg-[#22D3EE]/20 disabled:opacity-40"
+                          style={PS2}
                         >
-                          {bid}
+                          NIL
                         </button>
-                      ))}
-                    </div>
+
+                        {[1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
+                          <button
+                            key={bid}
+                            type="button"
+                            disabled={busy}
+                            onClick={() => placeBid(bid)}
+                            className="h-9 rounded-lg border border-[#FF5F1F]/55 bg-[#FF5F1F]/10 text-sm text-white transition hover:bg-[#FF5F1F]/25 disabled:opacity-40"
+                          >
+                            {bid}
+                          </button>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
