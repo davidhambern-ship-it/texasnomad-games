@@ -575,6 +575,7 @@ export const tngApi = {
   },
   bernaverse: {
     status: () => bernaverseRequest('status'),
+    ensureFree: () => bernaverseRequest('ensure_free'),
     link: (code) => bernaverseRequest('link', { code }),
   },
   display: {
