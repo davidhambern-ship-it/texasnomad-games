@@ -16,6 +16,10 @@ const BFF_API_BASE =
     ? '/bff-api'
     : 'https://br-polished-glade-avfsrygs-bffapi.compute.c-11.us-east-1.aws.neon.tech');
 
+const SPECTATOR_API_BASE =
+  import.meta.env.VITE_TNG_SPECTATOR_API_BASE ||
+  '/tng-spectator';
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -179,6 +183,12 @@ export const tngApi = {
     getRoom: (deviceId, roomCode) => request('/api/player/room', {
       deviceId,
       roomCode,
+    }),
+  },
+  spectator: {
+    getState: (roomCode) => request(`/state?room=${encodeURIComponent(roomCode)}`, {
+      roomCode,
+      apiBase:SPECTATOR_API_BASE,
     }),
   },
   social: {
