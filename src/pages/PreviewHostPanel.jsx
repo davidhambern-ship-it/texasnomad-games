@@ -57,6 +57,8 @@ export default function PreviewHostPanel() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [error, setError] = useState('');
   const [roomPollError, setRoomPollError] = useState('');
+  const [roomPeople, setRoomPeople] = useState([]);
+  const [rosterError, setRosterError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recoveryRoute, setRecoveryRoute] = useState(null);
   const [displayMode, setDisplayMode] = useState(
@@ -415,6 +417,39 @@ export default function PreviewHostPanel() {
 
   useEffect(() => {
     if (phase !== 'room' || !controllerId) {
+      setRoomPeople([]);
+      setRosterError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function refreshRoster() {
+      try {
+        const payload = await tngApi.host.getRoster(controllerId);
+        if (cancelled) return;
+        setRoomPeople(Array.isArray(payload?.people) ? payload.people : []);
+        setRosterError('');
+      } catch (rosterLoadError) {
+        if (cancelled) return;
+        setRosterError(
+          rosterLoadError?.message ||
+            'TNG could not load the people currently in this room.',
+        );
+      }
+    }
+
+    refreshRoster();
+    const interval = window.setInterval(refreshRoster, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [phase, controllerId]);
+
+  useEffect(() => {
+    if (phase !== 'room' || !controllerId) {
       setRoomState(null);
       return undefined;
     }
@@ -614,6 +649,8 @@ export default function PreviewHostPanel() {
       await tngApi.host.endRoom(controllerId);
       setActiveRoom(null);
       setRoomState(null);
+      setRoomPeople([]);
+      setRosterError('');
       setSelectedGame(null);
 
       if (playerTestMode) {
@@ -961,6 +998,13 @@ export default function PreviewHostPanel() {
                         />
                         {displayMode === 'embedded' ? 'HOST-ONLY' : 'DISPLAY'}
                       </span>
+                      <span
+                        className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
+                        style={PS2}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                        {roomPeople.length} IN ROOM
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -1016,7 +1060,75 @@ export default function PreviewHostPanel() {
 
             <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
 
-            {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
+            <section className="mb-3 rounded-xl border border-white/10 bg-black/55 px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-[7px] uppercase tracking-[0.16em] text-green-400" style={PS2}>
+                    PEOPLE IN ROOM
+                  </div>
+                  <div className="rounded-full border border-green-400/25 bg-green-400/[0.06] px-2 py-1 text-[10px] text-green-400">
+                    {roomPeople.length}
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-white/25">
+                  Players and active spectators update automatically.
+                </div>
+              </div>
+
+              {rosterError ? (
+                <div className="mt-3 text-xs text-red-400">{rosterError}</div>
+              ) : roomPeople.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {roomPeople.map((person, index) => {
+                    const label =
+                      person.role === 'host'
+                        ? 'HOST'
+                        : person.role === 'spectator'
+                          ? 'SPECTATOR'
+                          : person.seatNumber
+                            ? `SEAT ${person.seatNumber}`
+                            : 'PLAYER';
+
+                    return (
+                      <div
+                        key={person.accountId || person.handle || `${person.role}-${index}`}
+                        className={`rounded-lg border px-3 py-2 ${
+                          person.role === 'spectator'
+                            ? 'border-[#22D3EE]/30 bg-[#22D3EE]/[0.05]'
+                            : person.role === 'host'
+                              ? 'border-[#FFD700]/30 bg-[#FFD700]/[0.05]'
+                              : 'border-[#BC13FE]/30 bg-[#BC13FE]/[0.05]'
+                        }`}
+                      >
+                        <div className="max-w-[180px] truncate text-sm text-white/80">
+                          {person.displayName || person.handle || 'Player'}
+                        </div>
+                        <div
+                          className={`mt-1 text-[6px] uppercase tracking-widest ${
+                            person.role === 'spectator'
+                              ? 'text-[#8DEEFF]'
+                              : person.role === 'host'
+                                ? 'text-[#FFD700]'
+                                : 'text-[#BC13FE]'
+                          }`}
+                          style={PS2}
+                        >
+                          {label}
+                          {person.handle ? ` · @${person.handle}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-sm text-white/30">
+                  No connected players or spectators are being reported yet.
+                </div>
+              )}
+            </section>
+
+            {error && <p className="text-red-400 mb-4 text-center">{error}</p>
             {!roomState && roomPollError && (
               <p className="text-red-400 mb-4 text-center">{roomPollError}</p>
             )}
