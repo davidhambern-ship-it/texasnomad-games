@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
+import { Expand, Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
 
 import { ALL_GAMES } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
@@ -8,10 +8,40 @@ import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
 import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
 import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
+import GameDisplay from '@/pages/GameDisplay';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+function readEmbeddedDisplay() {
+  if (typeof window === 'undefined') return null;
+
+  const deviceId = localStorage.getItem('tng_host_embedded_display_id');
+  const token = localStorage.getItem('tng_host_embedded_display_token');
+  return deviceId && token ? { deviceId, token } : null;
+}
+
+function detectHostViewport() {
+  if (typeof window === 'undefined') {
+    return { kind: 'desktop', orientation: 'landscape', width: 1280, height: 800 };
+  }
+
+  const width = window.innerWidth || 1280;
+  const height = window.innerHeight || 800;
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches === true;
+  const shortSide = Math.min(width, height);
+  const orientation = width >= height ? 'landscape' : 'portrait';
+
+  let kind = 'desktop';
+  if (width <= 680 || (coarsePointer && shortSide <= 560)) {
+    kind = 'phone';
+  } else if (width <= 1180 || (coarsePointer && shortSide <= 900)) {
+    kind = 'tablet';
+  }
+
+  return { kind, orientation, width, height, coarsePointer };
+}
 
 export default function PreviewHostPanel() {
   const { user, logout } = useAuth();
@@ -29,7 +59,14 @@ export default function PreviewHostPanel() {
   const [roomPollError, setRoomPollError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recoveryRoute, setRecoveryRoute] = useState(null);
+  const [displayMode, setDisplayMode] = useState(
+    () => localStorage.getItem('tng_host_display_mode') ||
+      (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external'),
+  );
+  const [embeddedDisplay, setEmbeddedDisplay] = useState(readEmbeddedDisplay);
+  const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
+  const hostBoardRef = useRef(null);
 
   function isStaleRoom(room) {
     if (!room) return false;
@@ -49,6 +86,109 @@ export default function PreviewHostPanel() {
     () => ALL_GAMES.find((game) => game.id === activeRoom?.gameId) || selectedGame,
     [activeRoom, selectedGame],
   );
+
+  const hostOnlyActive =
+    displayMode === 'embedded' &&
+    Boolean(embeddedDisplay?.deviceId && embeddedDisplay?.token);
+
+  const hostBoardSideBySide =
+    hostOnlyActive &&
+    (
+      hostViewport.kind === 'desktop' ||
+      (hostViewport.kind === 'tablet' && hostViewport.orientation === 'landscape')
+    );
+
+  const hostBoardHeight =
+    hostViewport.kind === 'phone'
+      ? hostViewport.orientation === 'landscape'
+        ? 'clamp(300px, 72dvh, 520px)'
+        : 'clamp(320px, 52dvh, 480px)'
+      : hostViewport.kind === 'tablet'
+        ? hostViewport.orientation === 'landscape'
+          ? 'calc(100dvh - 150px)'
+          : 'clamp(420px, 54dvh, 650px)'
+        : 'calc(100dvh - 150px)';
+
+  useEffect(() => {
+    const updateViewport = () => setHostViewport(detectHostViewport());
+    updateViewport();
+
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
+  }, []);
+
+  function saveEmbeddedDisplay(display) {
+    if (!display?.deviceId || !display?.token) return;
+    localStorage.setItem('tng_host_embedded_display_id', display.deviceId);
+    localStorage.setItem('tng_host_embedded_display_token', display.token);
+    setEmbeddedDisplay(display);
+  }
+
+  function clearEmbeddedDisplay() {
+    localStorage.removeItem('tng_host_embedded_display_id');
+    localStorage.removeItem('tng_host_embedded_display_token');
+    setEmbeddedDisplay(null);
+  }
+
+  function setHostDisplayMode(mode) {
+    localStorage.setItem('tng_host_display_mode', mode);
+    setDisplayMode(mode);
+
+    // The backend currently requires a paired display identity before rooms
+    // can start. Embedded mode uses a private virtual display on the Host
+    // device while the user experiences a true one-screen Host setup.
+    if (mode === 'embedded') {
+      localStorage.setItem('tng_player_test_mode', '1');
+      setPlayerTestMode(true);
+    } else {
+      localStorage.removeItem('tng_player_test_mode');
+      setPlayerTestMode(false);
+    }
+  }
+
+  async function ensureEmbeddedDisplay(deviceId, replaceDisplay = false) {
+    const existing = readEmbeddedDisplay();
+
+    if (existing && !replaceDisplay) {
+      try {
+        await tngApi.display.getState(existing.deviceId, existing.token);
+        setEmbeddedDisplay(existing);
+        return existing;
+      } catch {
+        clearEmbeddedDisplay();
+      }
+    }
+
+    const pairingPayload = await tngApi.host.createPairing(deviceId, true);
+    const pairedPayload = await tngApi.display.pair(pairingPayload.pairing.code);
+    const display = {
+      deviceId: pairedPayload.display.deviceId,
+      token: pairedPayload.display.token,
+    };
+
+    saveEmbeddedDisplay(display);
+    return display;
+  }
+
+  async function toggleHostBoardFullscreen() {
+    const board = hostBoardRef.current;
+    if (!board) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await board.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch {
+      setError('Fullscreen was blocked by this browser.');
+    }
+  }
 
   function recoverExpiredPreviewSession(authError) {
     if (
@@ -164,11 +304,18 @@ export default function PreviewHostPanel() {
             return;
           }
 
-          // Preview is currently being used for controller + player testing.
-          // Once a current live room exists, resume it headlessly instead of
-          // forcing the Game Display requirement back on after auth refresh.
-          localStorage.setItem('tng_player_test_mode', '1');
-          setPlayerTestMode(true);
+          const savedMode =
+            localStorage.getItem('tng_host_display_mode') ||
+            (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external');
+
+          if (savedMode === 'embedded') {
+            setHostDisplayMode('embedded');
+            await ensureEmbeddedDisplay(deviceId);
+            if (cancelled) return;
+          } else {
+            setHostDisplayMode('external');
+          }
+
           setPhase('room');
           return;
         }
@@ -177,23 +324,27 @@ export default function PreviewHostPanel() {
           localStorage.getItem('tng_player_test_mode') === '1';
 
         if (session.hostSession?.displayDeviceId) {
-          setPlayerTestMode(testModeActive);
+          if (displayMode === 'embedded' || testModeActive) {
+            setHostDisplayMode('embedded');
+            await ensureEmbeddedDisplay(deviceId);
+            if (cancelled) return;
+          } else {
+            setHostDisplayMode('external');
+          }
+
           setError('');
           setPhase('ready');
           return;
         }
 
-        if (testModeActive) {
-          const pairingPayload = await tngApi.host.createPairing(deviceId);
-          if (cancelled) return;
-
-          await tngApi.display.pair(pairingPayload.pairing.code);
+        if (testModeActive || displayMode === 'embedded') {
+          setHostDisplayMode('embedded');
+          await ensureEmbeddedDisplay(deviceId);
           if (cancelled) return;
 
           const refreshedSession = await tngApi.host.startSession(deviceId);
           if (cancelled) return;
 
-          setPlayerTestMode(true);
           setPairing(null);
           setRepairingDisplay(false);
           setActiveRoom(refreshedSession.activeRoom || null);
@@ -233,8 +384,8 @@ export default function PreviewHostPanel() {
           if (session.hostSession?.displayDeviceId) {
             setPairing(null);
             setRepairingDisplay(false);
-            localStorage.removeItem('tng_player_test_mode');
-            setPlayerTestMode(false);
+            setHostDisplayMode('external');
+            clearEmbeddedDisplay();
             setActiveRoom(session.activeRoom || null);
             setPhase(session.activeRoom ? 'room' : 'ready');
           }
@@ -248,6 +399,8 @@ export default function PreviewHostPanel() {
         }
 
         if (session.hostSession?.displayDeviceId) {
+          setHostDisplayMode('external');
+          clearEmbeddedDisplay();
           setPairing(null);
           setPhase('ready');
         }
@@ -303,6 +456,8 @@ export default function PreviewHostPanel() {
 
     try {
       const payload = await tngApi.host.createPairing(controllerId, true);
+      setHostDisplayMode('external');
+      clearEmbeddedDisplay();
       setPairing(payload.pairing);
       setRepairingDisplay(true);
       setPhase('pairing');
@@ -313,25 +468,23 @@ export default function PreviewHostPanel() {
     }
   }
 
-  async function releaseDisplayForPlayerTesting() {
-    if (!controllerId || !activeRoom || busy) return;
+  async function switchToHostOnly() {
+    if (!controllerId || busy) return;
 
     setBusy(true);
     setError('');
 
     try {
-      // The existing replace-display backend path disconnects the current
-      // Game Display while preserving the active Host session and room.
-      // We intentionally discard the temporary pairing code here so this
-      // second device can be reused as a signed-in Player screen.
-      await tngApi.host.createPairing(controllerId, true);
-      localStorage.setItem('tng_player_test_mode', '1');
-      setPlayerTestMode(true);
+      setHostDisplayMode('embedded');
+      await ensureEmbeddedDisplay(controllerId, true);
       setPairing(null);
       setRepairingDisplay(false);
-      setPhase('room');
-    } catch (releaseError) {
-      setError(releaseError.message || 'The Game Display could not be released for player testing.');
+      setPhase(activeRoom ? 'room' : 'ready');
+    } catch (switchError) {
+      setError(
+        switchError?.message ||
+          'TNG could not switch this Host to one-screen mode.',
+      );
     } finally {
       setBusy(false);
     }
@@ -344,12 +497,14 @@ export default function PreviewHostPanel() {
     setError('');
 
     try {
-      // Pair a virtual test display in the background. This satisfies the
-      // backend's real display requirement without opening a second screen.
-      await tngApi.display.pair(pairing.code);
+      const pairedPayload = await tngApi.display.pair(pairing.code);
+      const display = {
+        deviceId: pairedPayload.display.deviceId,
+        token: pairedPayload.display.token,
+      };
 
-      localStorage.setItem('tng_player_test_mode', '1');
-      setPlayerTestMode(true);
+      saveEmbeddedDisplay(display);
+      setHostDisplayMode('embedded');
       setPairing(null);
       setRepairingDisplay(false);
 
@@ -359,7 +514,7 @@ export default function PreviewHostPanel() {
     } catch (bypassError) {
       setError(
         bypassError?.message ||
-          'TNG could not start the no-display live-test session.',
+          'TNG could not start Host Panel Only mode.',
       );
     } finally {
       setBusy(false);
@@ -487,6 +642,8 @@ export default function PreviewHostPanel() {
     localStorage.removeItem('tng_device_id');
     localStorage.removeItem('tng_connection_role');
     localStorage.removeItem('tng_player_test_mode');
+    localStorage.removeItem('tng_host_display_mode');
+    clearEmbeddedDisplay();
     logout(true);
   }
 
