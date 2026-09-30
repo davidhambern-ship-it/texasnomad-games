@@ -44,6 +44,65 @@ const bffPool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+async function logStagingSchemaDiagnostics() {
+  try {
+    const columnResult = await bffPool.query(`
+      select column_name, data_type, udt_name, is_nullable
+      from information_schema.columns
+      where table_schema = 'public'
+        and table_name = 'room_participants'
+      order by ordinal_position
+    `);
+
+    const enumResult = await bffPool.query(`
+      select t.typname, e.enumlabel
+      from pg_attribute a
+      join pg_class c on c.oid = a.attrelid
+      join pg_namespace n on n.oid = c.relnamespace
+      join pg_type t on t.oid = a.atttypid
+      left join pg_enum e on e.enumtypid = t.oid
+      where n.nspname = 'public'
+        and c.relname = 'room_participants'
+        and a.attname = 'role'
+      order by e.enumsortorder nulls last
+    `);
+
+    const keyResult = await bffPool.query(`
+      with active_rooms as (
+        select game_id, display_state
+        from public.game_rooms
+        where status::text in ('lobby','live','paused')
+      )
+      select game_id,
+             array_agg(distinct top_key order by top_key) filter (where top_key is not null) as top_keys,
+             array_agg(distinct game_key order by game_key) filter (where game_key is not null) as game_state_keys
+      from (
+        select game_id,
+               jsonb_object_keys(coalesce(display_state, '{}'::jsonb)) as top_key,
+               null::text as game_key
+        from active_rooms
+        union all
+        select game_id,
+               null::text as top_key,
+               jsonb_object_keys(coalesce(display_state->'gameState', display_state->'game_state', '{}'::jsonb)) as game_key
+        from active_rooms
+      ) keys
+      group by game_id
+      order by game_id
+    `);
+
+    console.log('[TNG STAGING DIAGNOSTIC] room_participants columns', columnResult.rows);
+    console.log('[TNG STAGING DIAGNOSTIC] room_participants role enum', enumResult.rows);
+    console.log('[TNG STAGING DIAGNOSTIC] active room state keys', keyResult.rows);
+  } catch (error) {
+    console.warn('[TNG STAGING DIAGNOSTIC] failed', error?.message || error);
+  }
+}
+
+setTimeout(() => {
+  logStagingSchemaDiagnostics().catch(() => {});
+}, 1500);
+
 const bffVoiceWss = new WebSocketServer({ noServer: true });
 const bffVoiceRooms = new Map();
 const bffVoiceActivePlayerByRoom = new Map();
