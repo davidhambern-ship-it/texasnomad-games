@@ -27,6 +27,7 @@ export default function NeonSpadesHostPanel({ controllerId }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const actionLockRef = useRef(false);
+  const nilFinalizedHandRef = useRef(0);
 
   const gameState = state?.gameState || {};
   const players = gameState.players || [];
@@ -156,28 +157,58 @@ export default function NeonSpadesHostPanel({ controllerId }) {
   }, [act, gameState.trickWinnerSeat, phase]);
 
   useEffect(() => {
-    if (phase !== 'round_over' || handNumber < 1) return undefined;
+    if (
+      phase !== 'round_over' ||
+      handNumber < 1 ||
+      nilFinalizedHandRef.current === handNumber
+    ) {
+      return undefined;
+    }
 
-    const targetScore = Number(gameState.targetScore || 500);
-    const matchComplete =
-      Number(gameState.score1 || 0) >= targetScore ||
-      Number(gameState.score2 || 0) >= targetScore;
+    let cancelled = false;
+    let dealTimer = null;
 
-    if (matchComplete) return undefined;
+    async function finalizeHand() {
+      try {
+        // Standard NIL is resolved after the hand: +100 for taking zero books,
+        // -100 for taking one or more. The normal team-contract score has
+        // already been calculated by the Spades service, so this staging step
+        // applies only the NIL bonus/penalty.
+        const result = await tngApi.spades.applyNilScoring(controllerId);
+        if (cancelled) return;
 
-    const timer = window.setTimeout(() => {
-      act('deal');
-    }, 3000);
+        const finalizedState = result?.room?.gameState || gameState;
+        if (result?.room) setState(result.room);
+        nilFinalizedHandRef.current = handNumber;
 
-    return () => window.clearTimeout(timer);
-  }, [
-    act,
-    gameState.score1,
-    gameState.score2,
-    gameState.targetScore,
-    handNumber,
-    phase,
-  ]);
+        const targetScore = Number(finalizedState.targetScore || 500);
+        const matchComplete =
+          Number(finalizedState.score1 || 0) >= targetScore ||
+          Number(finalizedState.score2 || 0) >= targetScore;
+
+        if (matchComplete) return;
+
+        dealTimer = window.setTimeout(() => {
+          if (!cancelled) act('deal');
+        }, 2500);
+      } catch (nilError) {
+        if (!cancelled) {
+          setError(
+            nilError?.message ||
+              'NIL scoring could not be finalized. The next hand was paused.',
+          );
+        }
+      }
+    }
+
+    const timer = window.setTimeout(finalizeHand, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+      if (dealTimer) window.clearTimeout(dealTimer);
+    };
+  }, [act, controllerId, handNumber, phase]);
 
   useEffect(() => {
     if (phase !== 'bidding' || !currentBidderSeat) return undefined;
@@ -296,8 +327,28 @@ export default function NeonSpadesHostPanel({ controllerId }) {
 
           {lastResult && phase === 'round_over' && (
             <div className="mt-4 border-t border-white/[0.07] pt-4 text-sm text-white/50">
-              Hand {lastResult.handNumber}: Team 1 won {lastResult.books1} books and Team 2 won {lastResult.books2}.
-              {' '}Score: {lastResult.score1}–{lastResult.score2}.
+              <div>
+                Hand {lastResult.handNumber}: Team 1 won {lastResult.books1} books and Team 2 won {lastResult.books2}.
+                {' '}Score: {lastResult.score1}–{lastResult.score2}.
+              </div>
+
+              {Array.isArray(lastResult.nilResults) && lastResult.nilResults.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {lastResult.nilResults.map((result) => (
+                    <span
+                      key={result.seatNumber}
+                      className={`rounded-full border px-3 py-1 text-xs ${
+                        result.success
+                          ? 'border-green-400/35 bg-green-400/[0.06] text-green-400'
+                          : 'border-red-400/35 bg-red-400/[0.06] text-red-400'
+                      }`}
+                    >
+                      Seat {result.seatNumber} NIL {result.success ? 'MADE' : 'BUST'}
+                      {' '}({result.points > 0 ? '+' : ''}{result.points})
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -336,6 +387,17 @@ export default function NeonSpadesHostPanel({ controllerId }) {
                 <span className="text-[#FFD700]">{player?.cardCount || 0} cards</span>
                 <span className="text-white/35">{player?.tricksWon || 0} books</span>
               </div>
+              {player?.bid != null && (
+                <div
+                  className={`mt-2 rounded-md border px-2 py-1 text-center text-xs ${
+                    Number(player.bid) === 0
+                      ? 'border-[#22D3EE]/45 bg-[#22D3EE]/[0.07] text-[#8DEEFF]'
+                      : 'border-white/10 text-white/35'
+                  }`}
+                >
+                  BID {Number(player.bid) === 0 ? 'NIL' : player.bid}
+                </div>
+              )}
             </div>
           );
         })}
@@ -357,10 +419,20 @@ export default function NeonSpadesHostPanel({ controllerId }) {
             {isHostBidTurn && (
               <>
                 <div className="mt-2 text-xs text-white/35">
-                  Tap a number to place your bid.
+                  Choose NIL to commit to taking zero books, or choose a regular bid.
                 </div>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
-                  {[0,1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => act('place_bid', { bid: 0 })}
+                    className="h-10 min-w-[72px] rounded-lg border border-[#22D3EE]/70 bg-[#22D3EE]/10 px-3 text-[#8DEEFF] transition hover:bg-[#22D3EE]/20 disabled:opacity-40"
+                    style={PS2}
+                  >
+                    NIL
+                  </button>
+
+                  {[1,2,3,4,5,6,7,8,9,10,11,12,13].map((bid) => (
                     <button
                       key={bid}
                       type="button"
