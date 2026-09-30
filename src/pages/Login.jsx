@@ -57,6 +57,7 @@ export default function Login() {
 
       try {
         const isExplicitPlayerJoin = nextPath.startsWith('/join/');
+        const isExplicitHostReturn = nextPath === '/host' || nextPath.startsWith('/host?');
         const currentDeviceId = localStorage.getItem('tng_device_id');
 
         if (!isExplicitPlayerJoin) {
@@ -66,10 +67,18 @@ export default function Login() {
           const route = await tngApi.host.getAccountRoute(currentDeviceId);
 
           if (route?.route === 'display') {
-            localStorage.setItem('tng_connection_role', 'display');
-            localStorage.removeItem('tng_display_device_id');
-            localStorage.removeItem('tng_display_token');
-            destination = '/display';
+            if (isExplicitHostReturn && route?.activeHost) {
+              // A Host Controller that was kicked/reloaded must be allowed back
+              // to /host so the explicit REJOIN AS HOST recovery screen can
+              // reclaim the existing live session. Do not auto-route it away.
+              localStorage.setItem('tng_connection_role', 'host_controller');
+              destination = '/host';
+            } else {
+              localStorage.setItem('tng_connection_role', 'display');
+              localStorage.removeItem('tng_display_device_id');
+              localStorage.removeItem('tng_display_token');
+              destination = '/display';
+            }
           } else if (route?.route === 'host') {
             localStorage.setItem('tng_connection_role', 'host_controller');
             if (nextPath === '/') destination = '/host';
