@@ -55,6 +55,12 @@ export default function Login() {
 
     try {
       await tngApi.profile.get();
+
+      // Every verified TNG account belongs to the BERNAverse FREE tier.
+      // Do not block TNG login if the membership bridge is temporarily down.
+      await tngApi.bernaverse.ensureFree().catch((membershipError) => {
+        console.warn('[TNG Login] BERNAverse FREE enrollment deferred:', membershipError);
+      });
     } catch (profileError) {
       if (
         profileError?.code === 'PROFILE_NOT_FOUND' ||
@@ -146,32 +152,12 @@ export default function Login() {
         return;
       }
 
-      // First visit from the legacy LIVE site: activate the same email in the
-      // new Neon/TNG auth system instead of making the user understand that
-      // LIVE and LIVE TEST previously had separate identity stores.
-      const signUpResult = await authClient.signUp.email({
-        email: cleanEmail,
-        password,
-        name: cleanEmail.split('@')[0] || 'Nomad',
-      });
-
-      if (!signUpResult?.error) {
-        startTngBrowserSession();
-        const session = await waitForNeonSession();
-        if (!session?.user) {
-          throw new Error('Your TNG login was created, but the session did not finish starting. Please try Continue once more.');
-        }
-        const next = encodeURIComponent(nextPath);
-        window.location.replace(`/onboarding?next=${next}`);
-        return;
-      }
-
-      // If sign-up also fails, this is normally an existing Neon account with
-      // the wrong password (or another credential problem). Do not create a
-      // duplicate identity; send the user toward recovery.
+      // TNG no longer creates accounts from the login form. All new accounts
+      // begin in the BERNAverse so TNG, TacTalk, and CREAPD can share one
+      // global identity and membership record.
       throw new Error(
         signInResult?.error?.message
-        || 'We could not sign you in. Check your password or use Forgot.'
+        || 'We could not sign you in. If you are new to TNG, create your FREE BERNAverse account below.'
       );
     } catch (err) {
       setError(
