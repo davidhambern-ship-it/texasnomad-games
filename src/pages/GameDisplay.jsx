@@ -804,7 +804,7 @@ function SpadesDisplay({ room }) {
 
   return (
     <div className="relative z-10 flex h-full w-full flex-col px-2 pb-2 pt-2 sm:px-8 sm:pb-5 sm:pt-4">
-      <div className="flex shrink-0 items-center justify-between gap-6 px-2 pb-3">
+      <div className="flex shrink-0 flex-col gap-2 px-1 pb-2 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-2 sm:pb-3">
         <div>
           <div
             className="text-[9px] uppercase tracking-[0.2em] text-[#BC13FE]"
@@ -817,8 +817,8 @@ function SpadesDisplay({ room }) {
           </div>
         </div>
 
-        <div className="flex items-stretch gap-2">
-          <div className="min-w-[190px] rounded-lg border border-[#BC13FE]/20 bg-[#BC13FE]/[0.035] px-4 py-2.5">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-stretch">
+          <div className="min-w-0 rounded-lg border border-[#BC13FE]/20 bg-[#BC13FE]/[0.035] px-2 py-2 sm:min-w-[190px] sm:px-4 sm:py-2.5">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div
@@ -837,7 +837,7 @@ function SpadesDisplay({ room }) {
             </div>
           </div>
 
-          <div className="min-w-[190px] rounded-lg border border-[#FF5F1F]/20 bg-[#FF5F1F]/[0.035] px-4 py-2.5">
+          <div className="min-w-0 rounded-lg border border-[#FF5F1F]/20 bg-[#FF5F1F]/[0.035] px-2 py-2 sm:min-w-[190px] sm:px-4 sm:py-2.5">
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div
