@@ -162,6 +162,10 @@ export const tngApi = {
     }),
     endRoom: (deviceId) => request('/api/host/room', { method:'DELETE', deviceId }),
     getRoomState: (deviceId) => request('/api/host/room-state', { deviceId }),
+    getRoster: (deviceId) => request('/roster', {
+      deviceId,
+      apiBase:'/tng-host-stage',
+    }),
     updateRoomState: (deviceId, statePatch) => request('/api/host/room-state', {
       method:'PATCH',
       deviceId,
