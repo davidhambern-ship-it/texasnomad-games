@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { createHmac } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -367,7 +368,276 @@ const bffPool = new Pool({
 const BERNAVERSE_BRIDGE_URL =
   process.env.BERNAVERSE_BRIDGE_URL ||
   'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
+const BERNAVERSE_SSO_URL =
+  process.env.BERNAVERSE_SSO_URL ||
+  'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-sso';
 const BERNAVERSE_APP_KEY = String(process.env.BERNAVERSE_APP_KEY || '').trim();
+const BERNAVERSE_SSO_LOCAL_SECRET =
+  String(process.env.BERNAVERSE_SSO_LOCAL_SECRET || '').trim();
+
+function safeTngSsoReturn(rawReturn) {
+  const fallback = 'https://texasnomadgames.com/login?sso=1';
+
+  try {
+    const candidate = new URL(String(rawReturn || fallback));
+    const host = candidate.hostname.toLowerCase();
+
+    if (
+      candidate.protocol === 'https:' &&
+      (host === 'texasnomadgames.com' || host === 'www.texasnomadgames.com')
+    ) {
+      return candidate.toString();
+    }
+  } catch {}
+
+  return fallback;
+}
+
+function redirectTngSso(res, location, cookies = []) {
+  res.statusCode = 302;
+  res.setHeader('Location', location);
+  res.setHeader('Cache-Control', 'no-store');
+  if (cookies.length) res.setHeader('Set-Cookie', cookies);
+  res.end();
+}
+
+function tngSsoFailureUrl(code) {
+  const target = new URL('https://texasnomadgames.com/login');
+  target.searchParams.set('sso', String(code || 'error'));
+  return target.toString();
+}
+
+function deriveTngSsoPassword(memberId) {
+  if (!BERNAVERSE_SSO_LOCAL_SECRET) {
+    throw new Error('BERNAverse SSO local secret is not configured.');
+  }
+
+  const digest = createHmac('sha256', BERNAVERSE_SSO_LOCAL_SECRET)
+    .update(`tng:${memberId}`)
+    .digest('base64url');
+
+  // Better Auth receives an app-private password that the user never sees.
+  // BERNAverse remains the user's authentication authority.
+  return `Bv!${digest}9a`;
+}
+
+async function consumeBernaverseSsoTicket(ticket) {
+  if (!BERNAVERSE_APP_KEY) {
+    throw new Error('BERNAverse app credential is not configured.');
+  }
+
+  const response = await fetch(BERNAVERSE_SSO_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
+    },
+    body: JSON.stringify({
+      action: 'consume',
+      ticket,
+    }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok || !payload?.data?.email || !payload?.data?.member_id) {
+    const error = new Error(
+      payload?.error || 'BERNAverse SSO ticket could not be verified.',
+    );
+    error.status = response.status;
+    throw error;
+  }
+
+  return payload.data;
+}
+
+async function callNeonEmailAuth(path, body) {
+  const response = await fetch(`${NEON_AUTH_ORIGIN}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Origin: 'https://texasnomadgames.com',
+      Referer: 'https://texasnomadgames.com/',
+    },
+    body: JSON.stringify(body),
+    redirect: 'manual',
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  const setCookies =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : (response.headers.get('set-cookie')
+          ? [response.headers.get('set-cookie')]
+          : []);
+
+  return {
+    response,
+    payload,
+    setCookies: setCookies.filter(Boolean).map(rewriteAuthCookie),
+  };
+}
+
+async function findTngAccountByEmail(email) {
+  const { rows } = await bffPool.query(
+    `
+      select
+        a.id::text as external_user_id,
+        pp.handle as external_handle
+      from public.accounts a
+      left join public.player_profiles pp
+        on pp.account_id = a.id
+      where lower(trim(a.email)) = lower(trim($1))
+      order by a.created_at asc nulls first
+      limit 1
+    `,
+    [email],
+  );
+
+  return rows[0] || null;
+}
+
+async function ensureTngSsoIdentity(email) {
+  if (!BERNAVERSE_APP_KEY) return;
+
+  let account = null;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    account = await findTngAccountByEmail(email);
+    if (account?.external_user_id) break;
+    if (attempt < 4) {
+      await new Promise((resolve) => setTimeout(resolve, 200 + attempt * 150));
+    }
+  }
+
+  if (!account?.external_user_id) return;
+
+  const response = await fetch(BERNAVERSE_BRIDGE_URL, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
+    },
+    body: JSON.stringify({
+      action: 'ensure_free',
+      payload: {
+        external_user_id: account.external_user_id,
+        external_handle: account.external_handle || null,
+        email,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(
+      payload?.error || `BERNAverse TNG identity sync failed (${response.status}).`,
+    );
+  }
+}
+
+async function handleBernaverseSso(req, res) {
+  if (req.method !== 'GET') {
+    res.writeHead(405, { Allow: 'GET', 'Cache-Control': 'no-store' });
+    res.end();
+    return;
+  }
+
+  const url = new URL(req.url || '/bernaverse-sso', 'https://auth.texasnomadgames.com');
+  const ticket = String(url.searchParams.get('ticket') || '').trim();
+  const returnUrl = safeTngSsoReturn(url.searchParams.get('return'));
+
+  if (!ticket) {
+    redirectTngSso(res, tngSsoFailureUrl('invalid'));
+    return;
+  }
+
+  let identity;
+  try {
+    identity = await consumeBernaverseSsoTicket(ticket);
+  } catch (error) {
+    console.warn('[TNG BERNAverse SSO] ticket rejected:', error?.message || error);
+    redirectTngSso(res, tngSsoFailureUrl('invalid'));
+    return;
+  }
+
+  const email = String(identity.email || '').trim().toLowerCase();
+  const memberId = String(identity.member_id || '').trim();
+  const name = String(identity.display_name || email.split('@')[0] || 'Nomad').slice(0, 120);
+
+  let password;
+  try {
+    password = deriveTngSsoPassword(memberId);
+  } catch (error) {
+    console.error('[TNG BERNAverse SSO] configuration error:', error?.message || error);
+    redirectTngSso(res, tngSsoFailureUrl('unavailable'));
+    return;
+  }
+
+  // First try the app-private credential. This succeeds for accounts created
+  // by BERNAverse SSO on prior visits.
+  let signIn = await callNeonEmailAuth('/sign-in/email', { email, password });
+
+  if (!signIn.response.ok) {
+    // Preserve every pre-SSO TNG account. If the email already exists, never
+    // overwrite its password or profile; the member can keep using legacy TNG
+    // sign-in while new accounts use BERNAverse SSO.
+    const existingAccount = await findTngAccountByEmail(email).catch(() => null);
+    if (existingAccount?.external_user_id) {
+      redirectTngSso(res, tngSsoFailureUrl('legacy'));
+      return;
+    }
+
+    const signUp = await callNeonEmailAuth('/sign-up/email', {
+      email,
+      password,
+      name,
+    });
+
+    if (!signUp.response.ok) {
+      const message = String(
+        signUp.payload?.message ||
+        signUp.payload?.error?.message ||
+        '',
+      );
+
+      console.warn('[TNG BERNAverse SSO] account creation failed:', {
+        status: signUp.response.status,
+        message: message.slice(0, 180),
+      });
+
+      redirectTngSso(
+        res,
+        tngSsoFailureUrl(/already|exist|registered|email/i.test(message) ? 'legacy' : 'setup'),
+      );
+      return;
+    }
+
+    // Sign in after provisioning so the browser receives a normal TNG session
+    // cookie scoped to texasnomadgames.com.
+    signIn = await callNeonEmailAuth('/sign-in/email', { email, password });
+  }
+
+  if (!signIn.response.ok) {
+    console.warn('[TNG BERNAverse SSO] internal sign-in failed:', {
+      status: signIn.response.status,
+    });
+    redirectTngSso(res, tngSsoFailureUrl('setup'));
+    return;
+  }
+
+  clearAuthSessionProxyCache();
+
+  try {
+    await ensureTngSsoIdentity(email);
+  } catch (error) {
+    // Identity linking is idempotent and can retry at normal TNG login.
+    console.warn('[TNG BERNAverse SSO] identity sync deferred:', error?.message || error);
+  }
+
+  redirectTngSso(res, returnUrl, signIn.setCookies);
+}
 
 async function syncTngAccountsToBernaverseFree() {
   if (!BERNAVERSE_APP_KEY) {
@@ -3860,6 +4130,11 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if ((req.url || '').startsWith('/bernaverse-sso')) {
+      await handleBernaverseSso(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/neon-auth')) {
       await proxyNeonAuth(req, res);
       return;
