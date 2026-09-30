@@ -212,6 +212,11 @@ export const tngApi = {
   },
   spades: {
     getHostState: (deviceId) => request('/api/spades/host', { deviceId }),
+    applyNilScoring: (deviceId) => request('/nil-score', {
+      method:'POST',
+      deviceId,
+      apiBase:'/tng-spades-stage',
+    }),
     hostAction: (deviceId, action, payload = {}) => request('/api/spades/host', {
       method:'POST',
       deviceId,
