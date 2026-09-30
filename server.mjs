@@ -364,6 +364,74 @@ const bffPool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+const BERNAVERSE_BRIDGE_URL =
+  process.env.BERNAVERSE_BRIDGE_URL ||
+  'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
+const BERNAVERSE_APP_KEY = String(process.env.BERNAVERSE_APP_KEY || '').trim();
+
+async function syncTngAccountsToBernaverseFree() {
+  if (!BERNAVERSE_APP_KEY) {
+    console.info('[BERNAverse sync] skipped: app credential is not configured');
+    return;
+  }
+
+  const { rows } = await bffPool.query(`
+    select
+      a.id::text as external_user_id,
+      lower(trim(a.email)) as email,
+      pp.handle as external_handle
+    from public.accounts a
+    left join public.player_profiles pp
+      on pp.account_id = a.id
+    where nullif(trim(a.email), '') is not null
+    order by a.created_at asc nulls first, a.id
+  `);
+
+  let synced = 0;
+  let failed = 0;
+
+  for (let index = 0; index < rows.length; index += 5) {
+    const batch = rows.slice(index, index + 5);
+
+    const results = await Promise.allSettled(
+      batch.map(async (account) => {
+        const response = await fetch(BERNAVERSE_BRIDGE_URL, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
+          },
+          body: JSON.stringify({
+            action: 'ensure_free',
+            payload: {
+              external_user_id: account.external_user_id,
+              external_handle: account.external_handle || null,
+              email: account.email,
+            },
+          }),
+        });
+
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          throw new Error(payload?.error || `BERNAverse sync failed (${response.status}).`);
+        }
+      }),
+    );
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') synced += 1;
+      else failed += 1;
+    }
+  }
+
+  console.info('[BERNAverse sync] TNG FREE membership pass complete', {
+    accounts: rows.length,
+    synced,
+    failed,
+  });
+}
+
 const bffVoiceWss = new WebSocketServer({ noServer: true });
 const bffVoiceRooms = new Map();
 const bffVoiceActivePlayerByRoom = new Map();
@@ -3936,4 +4004,18 @@ server.on('upgrade', async (request, socket, head) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`TNG staging frontend listening on port ${port}`);
+
+  // Idempotent production backfill: every existing TNG account gets a
+  // BERNAverse FREE membership. Future sign-ins also call ensure_free.
+  windowlessTimeout(syncTngAccountsToBernaverseFree, 1500);
 });
+
+function windowlessTimeout(task, delayMs) {
+  setTimeout(() => {
+    Promise.resolve()
+      .then(task)
+      .catch((error) => {
+        console.error('[BERNAverse sync] TNG FREE membership pass failed', error);
+      });
+  }, delayMs);
+}
