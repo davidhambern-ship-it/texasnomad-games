@@ -33,10 +33,15 @@ function TNGInput({ id, type, placeholder, value, onChange, autoFocus, autoCompl
 
 export default function Login() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
-  const requestedNext = new URLSearchParams(window.location.search).get('next');
+  const loginParams = new URLSearchParams(window.location.search);
+  const requestedNext = loginParams.get('next');
+  const ssoStatus = loginParams.get('sso');
   const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext
     : '/';
+
+  const bernaverseSsoUrl =
+    'https://bernaverse.hireberna.app/sso.html?app=tng';
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -173,7 +178,7 @@ export default function Login() {
     <AuthLayout
       icon={LogIn}
       title="Sign In to TNG"
-      subtitle="Sign in with your TNG email and password."
+      subtitle="Use your BERNAverse Passport. Existing pre-SSO accounts can still use their original TNG password."
       footer={
         <>
           New to TNG?{' '}
@@ -187,6 +192,37 @@ export default function Login() {
         </div>
       )}
 
+      {ssoStatus === 'legacy' && (
+        <div style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 8, background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.32)', color: '#FFE88A', fontSize: 12, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
+          <strong>YOUR TNG LOGIN WAS PRESERVED.</strong><br />
+          This account existed before BERNAverse SSO, so we did not change its password. Use your existing TNG email and password below.
+        </div>
+      )}
+
+      {['invalid', 'setup', 'unavailable'].includes(ssoStatus) && (
+        <div style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.28)', color: '#FCA5A5', fontSize: 12, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
+          BERNAverse could not finish the TNG handoff. Your account was not changed. You can retry BERNAverse or use an existing TNG password below.
+        </div>
+      )}
+
+      <a
+        href={bernaverseSsoUrl}
+        style={{
+          width: '100%', height: 48, borderRadius: 10, border: '2px solid #FFD700',
+          background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(188,19,254,0.18))',
+          color: '#FFD700', fontFamily: "'Teko', sans-serif", fontSize: 18,
+          letterSpacing: '0.12em', textDecoration: 'none', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
+          boxShadow: '0 0 18px rgba(255,215,0,0.18)', marginBottom: 12,
+        }}
+      >
+        CONTINUE WITH BERNAVERSE →
+      </a>
+
+      <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 14, fontFamily: "'Inter', sans-serif" }}>
+        EXISTING TNG PASSWORD LOGIN
+      </div>
+
       <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(34,211,238,0.24)', background: 'rgba(34,211,238,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
         <strong style={{ color: '#67E8F9' }}>SIGN-IN ≠ TNG PROFILE.</strong>
         <br />
@@ -194,9 +230,9 @@ export default function Login() {
       </div>
 
       <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(255,215,0,0.28)', background: 'rgba(255,215,0,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
-        <strong style={{ color: '#FFD700' }}>HAD A TNG PROFILE BEFORE THE NEW SIGN-IN?</strong>
+        <strong style={{ color: '#FFD700' }}>PRE-BERNAVERSE TNG ACCOUNT?</strong>
         <br />
-        New sign-ups now begin in the BERNAverse. If you already had a TNG Profile before this change, keep using your existing TNG sign-in for now; profile linking will preserve your stats as the global identity rollout continues.
+        Keep using your original TNG password below. We will not reset or overwrite existing credentials while the SSO migration rolls out.
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
