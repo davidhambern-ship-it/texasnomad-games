@@ -8,7 +8,7 @@ const API_BASE =
   import.meta.env.VITE_TNG_API_BASE ||
   (IS_RAILWAY_TEMP_HOST
     ? '/tng-api'
-    : 'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech');
+    : 'https://tng-live-production.up.railway.app/tng-api');
 
 const BFF_API_BASE =
   import.meta.env.VITE_BFF_API_BASE ||
