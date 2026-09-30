@@ -44,6 +44,86 @@ const bffPool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
+// Spectators intentionally do not take a room_participants seat. Track their
+// authenticated read-only presence separately so the Host can still see who
+// is actually watching the room. tng-staging runs one replica, so a short
+// in-memory heartbeat is enough for live presence without changing the DB.
+const tngSpectatorPresence = new Map();
+const TNG_SPECTATOR_TTL_MS = 8000;
+
+function spectatorPresenceKey(roomCode) {
+  return String(roomCode || '').trim().toUpperCase();
+}
+
+function recordSpectatorPresence(roomCode, profilePayload = {}) {
+  const roomKey = spectatorPresenceKey(roomCode);
+  if (!roomKey) return;
+
+  const profile = profilePayload?.profile || {};
+  const handle = String(
+    profile.handle ||
+    profile.normalizedHandle ||
+    profile.normalized_handle ||
+    ''
+  ).replace(/^@/, '').trim();
+
+  const accountKey = String(
+    profile.accountId ||
+    profile.account_id ||
+    profile.id ||
+    handle ||
+    ''
+  ).trim();
+
+  if (!accountKey) return;
+
+  if (!tngSpectatorPresence.has(roomKey)) {
+    tngSpectatorPresence.set(roomKey, new Map());
+  }
+
+  tngSpectatorPresence.get(roomKey).set(accountKey, {
+    accountId:
+      profile.accountId ||
+      profile.account_id ||
+      profile.id ||
+      null,
+    displayName:
+      profile.displayName ||
+      profile.display_name ||
+      profile.fullName ||
+      profile.full_name ||
+      handle ||
+      'Spectator',
+    handle: handle || null,
+    role: 'spectator',
+    seatNumber: null,
+    lastSeenAt: Date.now(),
+  });
+}
+
+function getLiveSpectators(roomCode) {
+  const roomKey = spectatorPresenceKey(roomCode);
+  const roomPresence = tngSpectatorPresence.get(roomKey);
+  if (!roomPresence) return [];
+
+  const cutoff = Date.now() - TNG_SPECTATOR_TTL_MS;
+  const live = [];
+
+  for (const [key, spectator] of roomPresence.entries()) {
+    if (Number(spectator.lastSeenAt || 0) < cutoff) {
+      roomPresence.delete(key);
+      continue;
+    }
+    live.push(spectator);
+  }
+
+  if (roomPresence.size === 0) {
+    tngSpectatorPresence.delete(roomKey);
+  }
+
+  return live;
+}
+
 
 const bffVoiceWss = new WebSocketServer({ noServer: true });
 const bffVoiceRooms = new Map();
@@ -377,6 +457,8 @@ async function handleTngSpectator(req, res) {
     return;
   }
 
+  const profilePayload = await profileResponse.json().catch(() => ({}));
+
   const roomCode = String(
     sourceUrl.searchParams.get('room') ||
     req.headers['x-tng-room-code'] ||
@@ -407,6 +489,8 @@ async function handleTngSpectator(req, res) {
     });
     return;
   }
+
+  recordSpectatorPresence(room.room_code, profilePayload);
 
   let state = {};
 
@@ -454,6 +538,148 @@ async function handleTngSpectator(req, res) {
       createdAt: room.created_at,
       updatedAt: room.updated_at,
       spectator: true,
+    },
+  });
+}
+
+
+async function handleTngHostRoster(req, res) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
+    });
+    return;
+  }
+
+  const controllerId = String(req.headers['x-tng-device-id'] || '');
+  if (!isUuid(controllerId)) {
+    sendJson(res, 400, {
+      error: { code: 'CONTROLLER_REQUIRED', message: 'Host Controller is required.' },
+    });
+    return;
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    sendJson(res, 401, {
+      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+    });
+    return;
+  }
+
+  // Let the authoritative TNG API verify this signed-in Host/controller pair.
+  const verified = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+      'X-TNG-Device-Id': controllerId,
+    },
+  });
+
+  if (!verified.ok) {
+    const payload = await verified.json().catch(() => ({}));
+    sendJson(res, verified.status, payload?.error
+      ? payload
+      : {
+          error: {
+            code: 'HOST_SESSION_INVALID',
+            message: 'TNG could not verify this Host session.',
+          },
+        });
+    return;
+  }
+
+  const { rows: roomRows } = await bffPool.query(`
+    select gr.id, gr.room_code, gr.game_id, gr.status::text as status
+    from public.host_sessions hs
+    join public.game_rooms gr on gr.host_session_id = hs.id
+    where hs.controller_device_id = $1::uuid
+      and hs.ended_at is null
+      and gr.status::text in ('lobby', 'live', 'paused')
+    order by gr.updated_at desc
+    limit 1
+  `, [controllerId]);
+
+  const room = roomRows[0] || null;
+  if (!room) {
+    sendJson(res, 200, {
+      room: null,
+      people: [],
+      players: [],
+      spectators: [],
+      counts: { people: 0, players: 0, spectators: 0 },
+    });
+    return;
+  }
+
+  const { rows: participantRows } = await bffPool.query(`
+    select
+      rp.account_id,
+      rp.role::text as role,
+      rp.seat_number,
+      rp.joined_at,
+      pp.display_name,
+      pp.handle
+    from public.room_participants rp
+    left join public.player_profiles pp
+      on pp.account_id = rp.account_id
+    where rp.room_id = $1::uuid
+      and rp.left_at is null
+    order by
+      case when rp.role::text = 'host_player' then 0 else 1 end,
+      rp.seat_number nulls last,
+      rp.joined_at
+  `, [room.id]);
+
+  const players = participantRows.map((row) => ({
+    accountId: row.account_id,
+    displayName:
+      row.display_name ||
+      row.handle ||
+      (row.role === 'host_player' ? 'Host' : 'Player'),
+    handle: row.handle || null,
+    role: row.role === 'host_player' ? 'host' : 'player',
+    seatNumber: row.seat_number == null ? null : Number(row.seat_number),
+    joinedAt: row.joined_at,
+  }));
+
+  const playerAccountIds = new Set(
+    players
+      .map((player) => String(player.accountId || ''))
+      .filter(Boolean),
+  );
+  const playerHandles = new Set(
+    players
+      .map((player) => String(player.handle || '').toLowerCase())
+      .filter(Boolean),
+  );
+
+  const spectators = getLiveSpectators(room.room_code).filter((spectator) => {
+    const accountId = String(spectator.accountId || '');
+    const handle = String(spectator.handle || '').toLowerCase();
+    return !(
+      (accountId && playerAccountIds.has(accountId)) ||
+      (handle && playerHandles.has(handle))
+    );
+  });
+
+  const people = [...players, ...spectators];
+
+  sendJson(res, 200, {
+    room: {
+      id: room.id,
+      roomCode: room.room_code,
+      gameId: room.game_id,
+      status: room.status,
+    },
+    people,
+    players,
+    spectators,
+    counts: {
+      people: people.length,
+      players: players.filter((player) => player.role === 'player').length,
+      spectators: spectators.length,
     },
   });
 }
@@ -3140,6 +3366,11 @@ async function handleBffApi(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if ((req.url || '').startsWith('/tng-host-stage/roster')) {
+      await handleTngHostRoster(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-spades-stage/nil-score')) {
       await handleSpadesNilScoring(req, res);
       return;
