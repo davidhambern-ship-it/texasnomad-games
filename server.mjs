@@ -44,64 +44,6 @@ const bffPool = new Pool({
   idleTimeoutMillis: 30000,
 });
 
-async function logStagingSchemaDiagnostics() {
-  try {
-    const columnResult = await bffPool.query(`
-      select column_name, data_type, udt_name, is_nullable
-      from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'room_participants'
-      order by ordinal_position
-    `);
-
-    const enumResult = await bffPool.query(`
-      select t.typname, e.enumlabel
-      from pg_attribute a
-      join pg_class c on c.oid = a.attrelid
-      join pg_namespace n on n.oid = c.relnamespace
-      join pg_type t on t.oid = a.atttypid
-      left join pg_enum e on e.enumtypid = t.oid
-      where n.nspname = 'public'
-        and c.relname = 'room_participants'
-        and a.attname = 'role'
-      order by e.enumsortorder nulls last
-    `);
-
-    const keyResult = await bffPool.query(`
-      with active_rooms as (
-        select game_id, display_state
-        from public.game_rooms
-        where status::text in ('lobby','live','paused')
-      )
-      select game_id,
-             array_agg(distinct top_key order by top_key) filter (where top_key is not null) as top_keys,
-             array_agg(distinct game_key order by game_key) filter (where game_key is not null) as game_state_keys
-      from (
-        select game_id,
-               jsonb_object_keys(coalesce(display_state, '{}'::jsonb)) as top_key,
-               null::text as game_key
-        from active_rooms
-        union all
-        select game_id,
-               null::text as top_key,
-               jsonb_object_keys(coalesce(display_state->'gameState', display_state->'game_state', '{}'::jsonb)) as game_key
-        from active_rooms
-      ) keys
-      group by game_id
-      order by game_id
-    `);
-
-    console.log('[TNG STAGING DIAGNOSTIC] room_participants columns', columnResult.rows);
-    console.log('[TNG STAGING DIAGNOSTIC] room_participants role enum', enumResult.rows);
-    console.log('[TNG STAGING DIAGNOSTIC] active room state keys', keyResult.rows);
-  } catch (error) {
-    console.warn('[TNG STAGING DIAGNOSTIC] failed', error?.message || error);
-  }
-}
-
-setTimeout(() => {
-  logStagingSchemaDiagnostics().catch(() => {});
-}, 1500);
 
 const bffVoiceWss = new WebSocketServer({ noServer: true });
 const bffVoiceRooms = new Map();
@@ -217,10 +159,22 @@ async function handleTngAccountRoute(req, res) {
       hs.status::text as status,
       hs.controller_device_id,
       hs.display_device_id,
-      hs.updated_at
+      hs.updated_at,
+      gr.room_code as active_room_code,
+      gr.game_id as active_room_game_id,
+      gr.status::text as active_room_status,
+      gr.updated_at as active_room_updated_at
     from public.host_sessions hs
     join public.device_sessions ds
       on ds.id = hs.controller_device_id
+    left join lateral (
+      select room_code, game_id, status, updated_at
+      from public.game_rooms
+      where host_session_id = hs.id
+        and status::text in ('lobby', 'live', 'paused')
+      order by updated_at desc
+      limit 1
+    ) gr on true
     where hs.host_account_id = $1::uuid
       and hs.ended_at is null
       and hs.status::text in ('pairing', 'ready', 'live')
@@ -248,6 +202,259 @@ async function handleTngAccountRoute(req, res) {
     activeHost: true,
     sameController,
     displayPaired: Boolean(session.display_device_id),
+    activeRoom: session.active_room_code
+      ? {
+          roomCode: session.active_room_code,
+          gameId: session.active_room_game_id,
+          status: session.active_room_status,
+          updatedAt: session.active_room_updated_at,
+        }
+      : null,
+  });
+}
+
+const WORD_SEARCH_SPECTATOR_COLORS = {
+  1: '#BC13FE',
+  2: '#FF5F1F',
+  3: '#FFD700',
+  4: '#22D3EE',
+};
+
+function projectWordSearchSpectatorState(rawState = {}, participants = []) {
+  const scores = rawState?.scores && typeof rawState.scores === 'object'
+    ? rawState.scores
+    : {};
+
+  return {
+    phase: rawState.phase || 'setup',
+    mode: rawState.mode || 'race',
+    difficulty: rawState.difficulty || 'simpleton',
+    category: rawState.category || 'random',
+    grid: Array.isArray(rawState.grid) ? rawState.grid : [],
+    words: Array.isArray(rawState.words)
+      ? rawState.words.map((word) => ({
+          word: word.word,
+          found: word.found === true,
+          foundBy: word.foundBy ?? null,
+          foundAt: word.foundAt ?? null,
+          cells: word.found === true && Array.isArray(word.cells) ? word.cells : [],
+          points: word.found === true ? (word.points ?? null) : null,
+          directionLabel: word.found === true ? (word.directionLabel ?? null) : null,
+          revealed: word.revealed === true,
+        }))
+      : [],
+    scores: { ...scores },
+    activeSeat: Number(rawState.active_seat || rawState.activeSeat || 0),
+    timeEnd: rawState.time_end || rawState.timeEnd || null,
+    paused: rawState.paused === true,
+    message: rawState.message || null,
+    winnerSeat: rawState.winner_seat || rawState.winnerSeat || null,
+    lastAction: rawState.last_action || rawState.lastAction || null,
+    roundNumber: Number(rawState.round_number || rawState.roundNumber || 0),
+    players: participants.map((player) => {
+      const seat = Number(player.seat_number || 0);
+      return {
+        playerId: player.account_id,
+        accountId: player.account_id,
+        seatNumber: seat,
+        role: player.role || 'player',
+        name: player.display_name || player.handle || (seat ? `Seat ${seat}` : 'Player'),
+        handle: player.handle || null,
+        color: WORD_SEARCH_SPECTATOR_COLORS[seat] || '#FFFFFF',
+        score: Number(scores[String(seat)] || 0),
+      };
+    }),
+  };
+}
+
+function sanitizeGenericSpectatorState(gameId, displayState = {}) {
+  const source =
+    displayState?.state ||
+    displayState?.gameState ||
+    displayState?.game_state ||
+    displayState ||
+    {};
+
+  let state;
+  try {
+    state = JSON.parse(JSON.stringify(source));
+  } catch {
+    state = { ...source };
+  }
+
+  if (gameId === 'hangman') {
+    delete state.word;
+    delete state.secretWord;
+    delete state.secret_word;
+    delete state.answer;
+    delete state.normalizedWord;
+    delete state.normalized_word;
+  }
+
+  if (gameId === 'spades') {
+    delete state.deck;
+    delete state.hands;
+    delete state.privateHands;
+    delete state.private_hands;
+
+    if (Array.isArray(state.players)) {
+      state.players = state.players.map((player) => {
+        const next = { ...player };
+        const hiddenCards =
+          (Array.isArray(next.hand) && next.hand) ||
+          (Array.isArray(next.cards) && next.cards) ||
+          (Array.isArray(next.privateHand) && next.privateHand) ||
+          [];
+        if (next.cardCount == null && hiddenCards.length) {
+          next.cardCount = hiddenCards.length;
+        }
+        delete next.hand;
+        delete next.cards;
+        delete next.privateHand;
+        delete next.private_hand;
+        return next;
+      });
+    }
+  }
+
+  if (gameId === 'square-biz') {
+    const revealAnswer = ['result', 'finished'].includes(String(state.phase || ''));
+    if (!revealAnswer) {
+      delete state.correctAnswer;
+      delete state.correct_answer;
+    }
+
+    if (state.currentQuestion && typeof state.currentQuestion === 'object') {
+      state.currentQuestion = { ...state.currentQuestion };
+      if (!revealAnswer) {
+        delete state.currentQuestion.answer;
+        delete state.currentQuestion.correctAnswer;
+        delete state.currentQuestion.correct_answer;
+      }
+    }
+  }
+
+  return state;
+}
+
+async function handleTngSpectator(req, res) {
+  const sourceUrl = new URL(req.url || '/', 'http://localhost');
+  const path = sourceUrl.pathname.replace(/^\/tng-spectator/, '') || '/';
+
+  if (req.method !== 'GET' || path !== '/state') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET /state required.' },
+    });
+    return;
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    sendJson(res, 401, {
+      error: { code: 'AUTH_REQUIRED', message: 'Sign in to spectate.' },
+    });
+    return;
+  }
+
+  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+    },
+  });
+
+  if (!profileResponse.ok) {
+    const payload = await profileResponse.json().catch(() => ({}));
+    sendJson(res, profileResponse.status, payload?.error
+      ? payload
+      : {
+          error: {
+            code: 'AUTH_REQUIRED',
+            message: 'Your TNG session could not be verified.',
+          },
+        });
+    return;
+  }
+
+  const roomCode = String(
+    sourceUrl.searchParams.get('room') ||
+    req.headers['x-tng-room-code'] ||
+    ''
+  ).trim().toUpperCase();
+
+  if (!roomCode) {
+    sendJson(res, 400, {
+      error: { code: 'ROOM_REQUIRED', message: 'Enter a live room code to spectate.' },
+    });
+    return;
+  }
+
+  const { rows } = await bffPool.query(`
+    select id, room_code, game_id, status::text as status, revision, display_state,
+           created_at, updated_at
+    from public.game_rooms
+    where upper(room_code) = upper($1)
+      and status::text in ('lobby', 'live', 'paused')
+    order by updated_at desc
+    limit 1
+  `, [roomCode]);
+
+  let room = rows[0] || null;
+  if (!room) {
+    sendJson(res, 404, {
+      error: { code: 'ROOM_NOT_FOUND', message: `Room "${roomCode}" is not live.` },
+    });
+    return;
+  }
+
+  let state = {};
+
+  if (room.game_id === 'bff') {
+    room = await reconcileBffTimers(room);
+    const internalState = extractBffGameState(room.display_state || {});
+    const players = await loadBffParticipants(room.id, internalState);
+    state = sanitizeBffPlayerState(internalState, players, null);
+  } else if (room.game_id === 'word-search') {
+    const { rows: participants } = await bffPool.query(`
+      select
+        rp.account_id,
+        rp.role::text as role,
+        rp.seat_number,
+        pp.display_name,
+        pp.handle
+      from public.room_participants rp
+      left join public.player_profiles pp
+        on pp.account_id = rp.account_id
+      where rp.room_id = $1::uuid
+        and rp.left_at is null
+        and rp.seat_number in (1, 2, 3, 4)
+      order by rp.seat_number
+    `, [room.id]);
+
+    const rawState =
+      room.display_state?.gameState ||
+      room.display_state?.game_state ||
+      {};
+
+    state = projectWordSearchSpectatorState(rawState, participants);
+  } else {
+    state = sanitizeGenericSpectatorState(room.game_id, room.display_state || {});
+  }
+
+  sendJson(res, 200, {
+    status: 'spectating',
+    room: {
+      id: room.id,
+      roomCode: room.room_code,
+      gameId: room.game_id,
+      status: room.status,
+      revision: room.revision,
+      state,
+      createdAt: room.created_at,
+      updatedAt: room.updated_at,
+      spectator: true,
+    },
   });
 }
 
@@ -2692,6 +2899,11 @@ async function handleBffApi(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if ((req.url || '').startsWith('/tng-spectator')) {
+      await handleTngSpectator(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-api/account-route')) {
       await handleTngAccountRoute(req, res);
       return;
