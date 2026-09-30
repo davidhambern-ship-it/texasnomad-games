@@ -28,6 +28,7 @@ export default function PreviewHostPanel() {
   const [error, setError] = useState('');
   const [roomPollError, setRoomPollError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [recoveryRoute, setRecoveryRoute] = useState(null);
   const authRecoveryStartedRef = useRef(false);
 
   function isStaleRoom(room) {
@@ -91,40 +92,17 @@ export default function PreviewHostPanel() {
     } catch (sessionError) {
       if (
         sessionError instanceof TngApiError &&
-        sessionError.code === 'HOST_ALREADY_CONTROLLED'
-      ) {
-        // Never steal an active Host session from another device.
-        // A second device on the same account belongs on the Game Display.
-        localStorage.setItem('tng_connection_role', 'display');
-        localStorage.removeItem('tng_display_device_id');
-        localStorage.removeItem('tng_display_token');
-        window.location.replace('/display');
-        throw sessionError;
-      }
-
-      if (
-        sessionError instanceof TngApiError &&
         ['INVALID_CONTROLLER', 'CONTROLLER_REQUIRED'].includes(sessionError.code)
       ) {
         localStorage.removeItem('tng_device_id');
         const replacementId = await createController();
         setControllerId(replacementId);
-
-        try {
-          return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
-        } catch (replacementError) {
-          if (
-            replacementError instanceof TngApiError &&
-            replacementError.code === 'HOST_ALREADY_CONTROLLED'
-          ) {
-            localStorage.setItem('tng_connection_role', 'display');
-            localStorage.removeItem('tng_display_device_id');
-            localStorage.removeItem('tng_display_token');
-            window.location.replace('/display');
-          }
-          throw replacementError;
-        }
+        return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
       }
+
+      // HOST_ALREADY_CONTROLLED is intentionally allowed to bubble up.
+      // The Host Panel will show an explicit recovery choice instead of
+      // assuming this browser must be the Game Display.
       throw sessionError;
     }
   }
@@ -146,9 +124,34 @@ export default function PreviewHostPanel() {
         if (cancelled) return;
         setControllerId(deviceId);
 
-        const session = await startOrReplaceController(deviceId);
+        let session;
+
+        try {
+          session = await startOrReplaceController(deviceId);
+        } catch (sessionError) {
+          if (
+            sessionError instanceof TngApiError &&
+            sessionError.code === 'HOST_ALREADY_CONTROLLED'
+          ) {
+            const route = await tngApi.host.getAccountRoute(
+              localStorage.getItem('tng_device_id') || deviceId,
+            ).catch(() => null);
+
+            if (cancelled) return;
+
+            setRecoveryRoute(route || { activeHost: true, activeRoom: null });
+            setActiveRoom(route?.activeRoom || null);
+            setError('');
+            setPhase('host-recovery');
+            return;
+          }
+
+          throw sessionError;
+        }
+
         if (cancelled) return;
 
+        setRecoveryRoute(null);
         setActiveRoom(session.activeRoom || null);
 
         if (session.activeRoom) {
@@ -363,6 +366,56 @@ export default function PreviewHostPanel() {
     }
   }
 
+  async function reclaimHostController() {
+    if (!controllerId || busy) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const session = await tngApi.host.startSession(controllerId, true, true);
+
+      localStorage.setItem('tng_connection_role', 'host_controller');
+      setRecoveryRoute(null);
+      setActiveRoom(session.activeRoom || null);
+
+      if (session.activeRoom) {
+        if (isStaleRoom(session.activeRoom)) {
+          setPhase('stale-room');
+        } else {
+          setPhase('room');
+        }
+        return;
+      }
+
+      if (session.hostSession?.displayDeviceId) {
+        setPairing(null);
+        setRepairingDisplay(false);
+        setPhase('ready');
+        return;
+      }
+
+      const pairingPayload = await tngApi.host.createPairing(controllerId);
+      setPairing(pairingPayload.pairing);
+      setRepairingDisplay(false);
+      setPhase('pairing');
+    } catch (reclaimError) {
+      setError(
+        reclaimError?.message ||
+          'TNG could not reclaim this Host Controller. The live room was not changed.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function continueAsDisplay() {
+    localStorage.setItem('tng_connection_role', 'display');
+    localStorage.removeItem('tng_display_device_id');
+    localStorage.removeItem('tng_display_token');
+    window.location.replace('/display');
+  }
+
   async function createRoom(game) {
     setBusy(true);
     setError('');
@@ -469,6 +522,64 @@ export default function PreviewHostPanel() {
             <div>
               <div style={PS2}>HOST CONTROLLER ERROR</div>
               <p className="mt-4">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {phase === 'host-recovery' && (
+          <div className="h-full flex items-center justify-center px-4">
+            <div className="max-w-xl w-full text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
+              <div className="text-[#FFD700]" style={PS2}>LIVE HOST SESSION FOUND</div>
+
+              <h2 className="mt-4 text-2xl">
+                Rejoin as the Host?
+              </h2>
+
+              {recoveryRoute?.activeRoom ? (
+                <div className="mt-4 rounded-xl border border-[#BC13FE]/25 bg-black/35 p-4">
+                  <div className="text-xs uppercase tracking-widest text-white/30">
+                    ACTIVE LIVE GAME
+                  </div>
+                  <div className="mt-2 text-xl font-bold uppercase text-white">
+                    {String(recoveryRoute.activeRoom.gameId || 'game').replaceAll('-', ' ')}
+                  </div>
+                  <div className="mt-2 font-mono text-lg tracking-[0.18em] text-[#FFD700]">
+                    ROOM {recoveryRoute.activeRoom.roomCode}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm leading-relaxed text-white/50">
+                  TNG still sees an active Host Controller for this account.
+                </p>
+              )}
+
+              <p className="mt-4 text-sm leading-relaxed text-white/55">
+                Rejoining transfers Host control to this device. The existing room, players,
+                scores, board state, and paired Display stay attached to the same live session.
+              </p>
+
+              {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={reclaimHostController}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE] disabled:opacity-40"
+                >
+                  {busy ? 'REJOINING…' : 'REJOIN AS HOST'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={continueAsDisplay}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/5 text-[#FFD700] disabled:opacity-40"
+                >
+                  USE THIS DEVICE AS DISPLAY
+                </button>
+              </div>
             </div>
           </div>
         )}
