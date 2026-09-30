@@ -56,6 +56,9 @@ export default function TngOnboarding() {
         if (cancelled) return;
 
         if (profile) {
+          await tngApi.bernaverse.ensureFree().catch((membershipError) => {
+            console.warn('[TNG Onboarding] BERNAverse FREE enrollment deferred:', membershipError);
+          });
           startTngBrowserSession();
           if (nextPath !== '/') {
             navigate(nextPath, { replace: true });
@@ -88,6 +91,9 @@ export default function TngOnboarding() {
     try {
       await createPreviewTngProfile(user, { displayName, handle });
       await tngApi.stats.getProfile().catch(() => null);
+      await tngApi.bernaverse.ensureFree().catch((membershipError) => {
+        console.warn('[TNG Onboarding] BERNAverse FREE enrollment deferred:', membershipError);
+      });
       startTngBrowserSession();
       if (nextPath !== '/') {
         navigate(nextPath, { replace: true });
