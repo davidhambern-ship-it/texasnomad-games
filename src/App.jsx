@@ -160,6 +160,7 @@ const AuthenticatedApp = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<TngOnboarding />} />
       <Route path="/display" element={<GameDisplay />} />
+      <Route path="/spectate/:roomCode" element={<GameDisplay spectator />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route path="/" element={<HomeGate />} />
