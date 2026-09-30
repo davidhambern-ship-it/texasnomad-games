@@ -1601,11 +1601,27 @@ function WordSearchDisplay({ room }) {
   );
 }
 
-export default function GameDisplay({ spectator = false }) {
+export default function GameDisplay({
+  spectator = false,
+  embedded = false,
+  displayCredentials = null,
+}) {
   const spectatorRoomCode = spectator
     ? decodeURIComponent(window.location.pathname.split('/spectate/')[1] || '').trim().toUpperCase()
     : '';
-  const initial = useMemo(() => spectator ? null : savedDisplay(), [spectator]);
+  const initial = useMemo(
+    () => spectator
+      ? null
+      : embedded
+        ? displayCredentials
+        : savedDisplay(),
+    [
+      spectator,
+      embedded,
+      displayCredentials?.deviceId,
+      displayCredentials?.token,
+    ],
+  );
   const [code, setCode] = useState('');
   const [display, setDisplay] = useState(initial);
   const [room, setRoom] = useState(null);
@@ -1613,6 +1629,18 @@ export default function GameDisplay({ spectator = false }) {
   const [status, setStatus] = useState(spectator ? 'connecting' : (initial ? 'connecting' : 'unpaired'));
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
+
+  useEffect(() => {
+    if (!embedded) return;
+    setDisplay(displayCredentials || null);
+    if (displayCredentials?.deviceId && displayCredentials?.token) {
+      setStatus('connecting');
+    }
+  }, [
+    embedded,
+    displayCredentials?.deviceId,
+    displayCredentials?.token,
+  ]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -1758,7 +1786,7 @@ export default function GameDisplay({ spectator = false }) {
     }
   }
 
-  if (!spectator && !display) {
+  if (!spectator && !embedded && !display) {
     return (
       <div className="relative min-h-[100dvh] overflow-hidden bg-[#030207] text-white">
         <AmbientBackdrop />
@@ -1804,9 +1832,13 @@ export default function GameDisplay({ spectator = false }) {
   const squareBizMode = room?.gameId === 'square-biz';
 
   return (
-    <div className="relative h-[100dvh] overflow-hidden bg-[#030207] text-white">
+    <div
+      className={`relative overflow-hidden bg-[#030207] text-white ${
+        embedded ? 'h-full min-h-0' : 'h-[100dvh]'
+      }`}
+    >
       {!squareBizMode && <AmbientBackdrop />}
-      {!squareBizMode && (
+      {!squareBizMode && !embedded && (
         <DisplayHud
           room={room}
           isFullscreen={isFullscreen}
@@ -1821,9 +1853,17 @@ export default function GameDisplay({ spectator = false }) {
         </div>
       )}
 
-      <DisplayNotificationStack notifications={notifications} />
+      {!embedded && <DisplayNotificationStack notifications={notifications} />}
 
-      <div className={`relative z-10 overflow-hidden ${squareBizMode ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)]'}`}>
+      <div
+        className={`relative z-10 overflow-hidden ${
+          embedded
+            ? 'h-full'
+            : squareBizMode
+              ? 'h-[100dvh]'
+              : 'h-[calc(100dvh-4rem)]'
+        }`}
+      >
         {!room && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
@@ -1860,7 +1900,10 @@ export default function GameDisplay({ spectator = false }) {
         {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
         {room?.gameId === 'word-search' && <WordSearchDisplay room={room} />}
         {room?.gameId === 'bff' && (
-          <BFFDisplay room={room} displayId={spectator ? null : display?.deviceId} />
+          <BFFDisplay
+            room={room}
+            displayId={spectator || embedded ? null : display?.deviceId}
+          />
         )}
 
         {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff'].includes(room.gameId) && (
