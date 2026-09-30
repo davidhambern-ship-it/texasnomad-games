@@ -458,6 +458,243 @@ async function handleTngSpectator(req, res) {
   });
 }
 
+
+function extractSpadesGameState(displayState = {}) {
+  if (displayState?.gameState && typeof displayState.gameState === 'object') {
+    return { ...displayState.gameState };
+  }
+  if (displayState?.game_state && typeof displayState.game_state === 'object') {
+    return { ...displayState.game_state };
+  }
+  return displayState && typeof displayState === 'object'
+    ? { ...displayState }
+    : {};
+}
+
+function wrapSpadesGameState(displayState = {}, gameState = {}) {
+  const base = displayState && typeof displayState === 'object'
+    ? { ...displayState }
+    : {};
+
+  if (base.gameState && typeof base.gameState === 'object') {
+    return { ...base, gameState };
+  }
+  if (base.game_state && typeof base.game_state === 'object') {
+    return { ...base, game_state: gameState };
+  }
+
+  return gameState;
+}
+
+async function verifySpadesHostWithTngApi(req, controllerId) {
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    return {
+      ok: false,
+      status: 401,
+      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
+    };
+  }
+
+  const response = await fetch(`${TNG_API_ORIGIN}/spades/host`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+      'X-TNG-Device-Id': controllerId,
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  return { ok: response.ok, status: response.status, payload };
+}
+
+async function handleSpadesNilScoring(req, res) {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST required.' },
+    });
+    return;
+  }
+
+  const controllerId = String(req.headers['x-tng-device-id'] || '');
+  if (!isUuid(controllerId)) {
+    sendJson(res, 400, {
+      error: { code: 'CONTROLLER_REQUIRED', message: 'Host Controller is required.' },
+    });
+    return;
+  }
+
+  const verified = await verifySpadesHostWithTngApi(req, controllerId);
+  if (!verified.ok) {
+    sendJson(res, verified.status || 401, verified.payload || {
+      error: { code: 'HOST_SESSION_INVALID', message: 'Rejoin the Host Controller.' },
+    });
+    return;
+  }
+
+  const client = await bffPool.connect();
+
+  try {
+    await client.query('begin');
+
+    const { rows } = await client.query(`
+      select gr.id, gr.room_code, gr.game_id, gr.status::text as status,
+             gr.revision, gr.display_state, gr.created_at, gr.updated_at
+      from public.host_sessions hs
+      join public.game_rooms gr on gr.host_session_id = hs.id
+      where hs.controller_device_id = $1::uuid
+        and hs.ended_at is null
+        and hs.status::text in ('ready', 'live')
+        and gr.game_id = 'spades'
+        and gr.status::text in ('lobby', 'live', 'paused')
+      order by gr.updated_at desc
+      limit 1
+      for update of gr
+    `, [controllerId]);
+
+    const room = rows[0] || null;
+    if (!room) {
+      await client.query('rollback');
+      sendJson(res, 404, {
+        error: { code: 'ROOM_NOT_FOUND', message: 'No active Spades room was found.' },
+      });
+      return;
+    }
+
+    const gameState = extractSpadesGameState(room.display_state || {});
+    const handNumber = Number(gameState.handNumber || gameState.hand_number || 0);
+    const phase = String(gameState.phase || '');
+
+    if (phase !== 'round_over' || handNumber < 1) {
+      await client.query('rollback');
+      sendJson(res, 409, {
+        error: {
+          code: 'NIL_SCORING_NOT_READY',
+          message: 'NIL scoring is applied after the hand is complete.',
+        },
+      });
+      return;
+    }
+
+    const previousNilHand = Number(
+      gameState.nilScoringAppliedHand ||
+      gameState.nil_scoring_applied_hand ||
+      0
+    );
+
+    if (previousNilHand === handNumber) {
+      await client.query('rollback');
+      sendJson(res, 200, {
+        ok: true,
+        alreadyApplied: true,
+        room: {
+          id: room.id,
+          roomCode: room.room_code,
+          gameId: room.game_id,
+          status: room.status,
+          revision: room.revision,
+          gameState,
+          createdAt: room.created_at,
+          updatedAt: room.updated_at,
+        },
+      });
+      return;
+    }
+
+    const players = Array.isArray(gameState.players) ? gameState.players : [];
+    const nilResults = [];
+
+    for (const player of players) {
+      const seatNumber = Number(player?.seatNumber || player?.seat_number || 0);
+      const bid = Number(player?.bid);
+      if (![1, 2, 3, 4].includes(seatNumber) || bid !== 0) continue;
+
+      const tricksWon = Number(player?.tricksWon || player?.tricks_won || 0);
+      const success = tricksWon === 0;
+      const points = success ? 100 : -100;
+      const team = seatNumber === 1 || seatNumber === 3 ? 1 : 2;
+
+      nilResults.push({
+        seatNumber,
+        team,
+        playerId: player?.playerId || player?.accountId || null,
+        name: player?.name || player?.handle || `Seat ${seatNumber}`,
+        tricksWon,
+        success,
+        points,
+      });
+    }
+
+    const delta1 = nilResults
+      .filter((result) => result.team === 1)
+      .reduce((sum, result) => sum + result.points, 0);
+    const delta2 = nilResults
+      .filter((result) => result.team === 2)
+      .reduce((sum, result) => sum + result.points, 0);
+
+    const nextGameState = {
+      ...gameState,
+      score1: Number(gameState.score1 || 0) + delta1,
+      score2: Number(gameState.score2 || 0) + delta2,
+      nilScoringAppliedHand: handNumber,
+      nilResults,
+    };
+
+    if (nextGameState.lastHandResult && typeof nextGameState.lastHandResult === 'object') {
+      nextGameState.lastHandResult = {
+        ...nextGameState.lastHandResult,
+        score1: nextGameState.score1,
+        score2: nextGameState.score2,
+        nilResults,
+        nilDelta1: delta1,
+        nilDelta2: delta2,
+      };
+    }
+
+    const nextDisplayState = wrapSpadesGameState(
+      room.display_state || {},
+      nextGameState,
+    );
+
+    const updated = await client.query(`
+      update public.game_rooms
+      set display_state = $2::jsonb,
+          revision = revision + 1,
+          updated_at = now()
+      where id = $1::uuid
+      returning id, room_code, game_id, status::text as status,
+                revision, display_state, created_at, updated_at
+    `, [room.id, JSON.stringify(nextDisplayState)]);
+
+    await client.query('commit');
+
+    const savedRoom = updated.rows[0] || room;
+    const savedState = extractSpadesGameState(savedRoom.display_state || {});
+
+    sendJson(res, 200, {
+      ok: true,
+      alreadyApplied: false,
+      nilResults,
+      room: {
+        id: savedRoom.id,
+        roomCode: savedRoom.room_code,
+        gameId: savedRoom.game_id,
+        status: savedRoom.status,
+        revision: savedRoom.revision,
+        gameState: savedState,
+        createdAt: savedRoom.created_at,
+        updatedAt: savedRoom.updated_at,
+      },
+    });
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function proxyTngApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
@@ -2899,6 +3136,11 @@ async function handleBffApi(req, res) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if ((req.url || '').startsWith('/tng-spades-stage/nil-score')) {
+      await handleSpadesNilScoring(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-spectator')) {
       await handleTngSpectator(req, res);
       return;
