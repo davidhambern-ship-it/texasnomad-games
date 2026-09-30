@@ -1128,7 +1128,7 @@ export default function PreviewHostPanel() {
               )}
             </section>
 
-            {error && <p className="text-red-400 mb-4 text-center">{error}</p>
+            {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
               <p className="text-red-400 mb-4 text-center">{roomPollError}</p>
             )}
