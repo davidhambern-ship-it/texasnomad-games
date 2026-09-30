@@ -4,11 +4,17 @@ const IS_RAILWAY_TEMP_HOST =
   typeof window !== 'undefined' &&
   window.location.hostname.endsWith('.up.railway.app');
 
+const DIRECT_TNG_API_BASE =
+  'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech';
+
+const RAILWAY_TNG_API_FALLBACK =
+  'https://tng-live-production.up.railway.app/tng-api';
+
 const API_BASE =
   import.meta.env.VITE_TNG_API_BASE ||
   (IS_RAILWAY_TEMP_HOST
     ? '/tng-api'
-    : 'https://tng-live-production.up.railway.app/tng-api');
+    : DIRECT_TNG_API_BASE);
 
 const BFF_API_BASE =
   import.meta.env.VITE_BFF_API_BASE ||
@@ -74,11 +80,33 @@ async function request(path, {
   const url = `${apiBase}${path.replace(/^\/api/, '')}`;
   const requestBody = body === undefined ? undefined : JSON.stringify(body);
 
-  let response = await fetch(url, {
+  const fetchOptions = {
     method,
     headers,
     body: requestBody,
-  });
+  };
+
+  let response;
+
+  try {
+    // Fast path: talk directly to the Neon game API just like TNG did before.
+    // This keeps live-game actions off the extra Railway network hop.
+    response = await fetch(url, fetchOptions);
+  } catch (networkError) {
+    const canUseRailwayFallback =
+      !IS_RAILWAY_TEMP_HOST &&
+      apiBase === API_BASE &&
+      API_BASE === DIRECT_TNG_API_BASE;
+
+    if (!canUseRailwayFallback) throw networkError;
+
+    // Resilience path: if a browser/network cannot reach Neon directly
+    // ("Failed to fetch"), retry the exact request through TNG's Railway proxy.
+    const fallbackUrl =
+      `${RAILWAY_TNG_API_FALLBACK}${path.replace(/^\/api/, '')}`;
+
+    response = await fetch(fallbackUrl, fetchOptions);
+  }
 
   // Neon Auth JWTs are intentionally short-lived. If a request happens on the
   // edge of a token refresh, fetch one fresh token and retry once before
@@ -87,11 +115,21 @@ async function request(path, {
     const freshToken = await getNeonAuthToken({ forceRefresh: true }).catch(() => null);
     if (freshToken) {
       headers.Authorization = `Bearer ${freshToken}`;
-      response = await fetch(url, {
-        method,
-        headers,
-        body: requestBody,
-      });
+
+      try {
+        response = await fetch(url, fetchOptions);
+      } catch (networkError) {
+        const canUseRailwayFallback =
+          !IS_RAILWAY_TEMP_HOST &&
+          apiBase === API_BASE &&
+          API_BASE === DIRECT_TNG_API_BASE;
+
+        if (!canUseRailwayFallback) throw networkError;
+
+        const fallbackUrl =
+          `${RAILWAY_TNG_API_FALLBACK}${path.replace(/^\/api/, '')}`;
+        response = await fetch(fallbackUrl, fetchOptions);
+      }
     }
   }
 
