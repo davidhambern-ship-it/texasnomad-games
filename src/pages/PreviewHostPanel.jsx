@@ -757,8 +757,6 @@ export default function PreviewHostPanel() {
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.setItem('tng_player_test_mode', '1');
-                    setPlayerTestMode(true);
                     setPhase('room');
                   }}
                   className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE]"
@@ -795,46 +793,76 @@ export default function PreviewHostPanel() {
         )}
 
         {phase === 'pairing' && (
-          <div className="h-full flex items-center justify-center">
-            <div className="text-center max-w-xl w-full">
+          <div className="h-full flex items-center justify-center px-2">
+            <div className="w-full max-w-4xl text-center">
               <Monitor className="w-14 h-14 mx-auto mb-4 text-[#FFD700]" />
-              <h1 className="text-3xl mb-3">Connect Game Display</h1>
-              <p className="text-white/45 mb-6">
-                {repairingDisplay
-                  ? 'Open /display on the replacement TV/second screen and enter this fresh code. Your live room stays intact.'
-                  : 'Open the Game Display on a second screen and enter this code.'}
+              <h1 className="text-3xl mb-3">Choose Your Host Setup</h1>
+              <p className="mx-auto mb-7 max-w-2xl text-white/45">
+                Use a TV or second screen for the game board, or run everything from this Host device.
+                TNG will remember your choice for the next room.
               </p>
-              <div className="border-2 border-[#FFD700]/50 rounded-2xl p-8 font-mono text-6xl tracking-[0.25em] text-[#FFD700]">
-                {pairing?.code || '------'}
-              </div>
-              <div className="mt-6 flex flex-col items-center gap-3">
-                <Link
-                  to="/display"
-                  target="_blank"
-                  className="inline-block px-5 py-3 bg-[#FFD700] text-black rounded-lg"
-                  style={PS2}
-                >
-                  OPEN DISPLAY
-                </Link>
 
-                {!repairingDisplay && (
-                  <>
-                    <div className="text-[10px] text-white/30 uppercase tracking-widest">or</div>
-                    <button
-                      type="button"
-                      onClick={continueWithoutDisplay}
-                      disabled={busy}
-                      className="px-5 py-3 rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 text-[#BC13FE] hover:bg-[#BC13FE]/20 transition-all disabled:opacity-50"
-                      style={{ ...PS2, fontSize: 8 }}
-                    >
-                      {busy ? 'STARTING TEST MODE…' : 'CONTINUE WITHOUT DISPLAY'}
-                    </button>
-                    <p className="max-w-md text-xs leading-relaxed text-white/35">
-                      Live-test mode only. Use the Host Controller on this device without pairing a separate Game Display.
-                    </p>
-                  </>
-                )}
+              {error && <p className="mb-5 text-sm text-red-400">{error}</p>}
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <section className="rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/[0.04] p-5">
+                  <div className="text-[#FFD700]" style={{ ...PS2, fontSize: 8 }}>
+                    USE A GAME DISPLAY
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-white/45">
+                    Best for TVs, projectors, or a second tablet. Players look at the shared board while you keep the controls here.
+                  </p>
+
+                  <div className="mt-5 rounded-xl border-2 border-[#FFD700]/50 p-5 font-mono text-4xl tracking-[0.2em] text-[#FFD700] sm:text-5xl">
+                    {pairing?.code || '------'}
+                  </div>
+
+                  <Link
+                    to="/display"
+                    target="_blank"
+                    className="mt-5 inline-block rounded-lg bg-[#FFD700] px-5 py-3 text-black"
+                    style={{ ...PS2, fontSize: 8 }}
+                  >
+                    OPEN DISPLAY
+                  </Link>
+
+                  <p className="mt-3 text-xs text-white/30">
+                    Enter the code above on the display screen.
+                  </p>
+                </section>
+
+                <section className="rounded-2xl border border-[#BC13FE]/40 bg-[#BC13FE]/[0.05] p-5">
+                  <div className="text-[#BC13FE]" style={{ ...PS2, fontSize: 8 }}>
+                    HOST PANEL ONLY
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-white/45">
+                    No second screen required. The live game board will appear inside your Host Panel beside the controls,
+                    and TNG will resize it for desktop, tablet, or phone.
+                  </p>
+
+                  <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-left text-sm text-white/45">
+                    <div>• Desktop / landscape tablet: board + controls side by side</div>
+                    <div className="mt-2">• Portrait tablet / phone: board fits above the controls</div>
+                    <div className="mt-2">• Fullscreen board button included</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={continueWithoutDisplay}
+                    disabled={busy || !pairing?.code}
+                    className="mt-5 w-full rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 px-5 py-3 text-[#BC13FE] transition hover:bg-[#BC13FE]/20 disabled:opacity-50"
+                    style={{ ...PS2, fontSize: 8 }}
+                  >
+                    {busy ? 'STARTING HOST-ONLY MODE…' : 'USE HOST PANEL ONLY'}
+                  </button>
+                </section>
               </div>
+
+              {repairingDisplay && (
+                <p className="mt-4 text-xs text-white/35">
+                  Your current live room stays intact while you change the screen setup.
+                </p>
+              )}
             </div>
           </div>
         )}
@@ -843,7 +871,40 @@ export default function PreviewHostPanel() {
           <div className="h-full flex items-center justify-center">
             <div className="w-full max-w-2xl text-center">
               <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
-              <h1 className="text-3xl mb-6">Host System Ready</h1>
+              <h1 className="text-3xl mb-3">Host System Ready</h1>
+
+              <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+                <span
+                  className={`rounded-full border px-3 py-2 text-[7px] uppercase tracking-widest ${
+                    displayMode === 'embedded'
+                      ? 'border-[#BC13FE]/40 bg-[#BC13FE]/10 text-[#BC13FE]'
+                      : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]'
+                  }`}
+                  style={PS2}
+                >
+                  {displayMode === 'embedded' ? 'HOST PANEL ONLY' : 'GAME DISPLAY CONNECTED'}
+                </span>
+
+                {displayMode === 'embedded' ? (
+                  <button
+                    type="button"
+                    onClick={replaceDisplay}
+                    disabled={busy}
+                    className="rounded-lg border border-[#FFD700]/45 px-3 py-2 text-xs text-[#FFD700] disabled:opacity-40"
+                  >
+                    USE DISPLAY
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={switchToHostOnly}
+                    disabled={busy}
+                    className="rounded-lg border border-[#BC13FE]/45 px-3 py-2 text-xs text-[#BC13FE] disabled:opacity-40"
+                  >
+                    HOST PANEL ONLY
+                  </button>
+                )}
+              </div>
 
               {error && <p className="text-red-400 mb-4">{error}</p>}
 
@@ -887,40 +948,57 @@ export default function PreviewHostPanel() {
                       <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
                         LIVE HOST
                       </span>
-                      {playerTestMode && (
-                        <span className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-[#FFD700]" style={PS2}>
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#FFD700] animate-pulse" />
-                          TEST MODE
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center gap-1 text-[6px] uppercase tracking-widest ${
+                          displayMode === 'embedded' ? 'text-[#BC13FE]' : 'text-[#FFD700]'
+                        }`}
+                        style={PS2}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full animate-pulse ${
+                            displayMode === 'embedded' ? 'bg-[#BC13FE]' : 'bg-[#FFD700]'
+                          }`}
+                        />
+                        {displayMode === 'embedded' ? 'HOST-ONLY' : 'DISPLAY'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {!playerTestMode && (
+                  {displayMode === 'external' ? (
+                    <>
+                      <button
+                        onClick={switchToHostOnly}
+                        disabled={busy}
+                        className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE] disabled:opacity-40"
+                        title="Use Host Panel only"
+                      >
+                        <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                        <span className="hidden text-[9px] sm:inline">HOST ONLY</span>
+                      </button>
+
+                      <button
+                        onClick={replaceDisplay}
+                        disabled={busy}
+                        className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
+                        title="Re-pair display"
+                      >
+                        <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                        <span className="hidden text-[9px] sm:inline">PAIR</span>
+                      </button>
+                    </>
+                  ) : (
                     <button
-                      onClick={releaseDisplayForPlayerTesting}
+                      onClick={replaceDisplay}
                       disabled={busy}
-                      className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/10 px-2.5 py-2 text-[#4ade80] disabled:opacity-40"
-                      title="Player test mode"
+                      className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
+                      title="Move board to a separate Game Display"
                     >
-                      <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                      <span className="hidden text-[9px] sm:inline">TEST</span>
+                      <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                      <span className="hidden text-[9px] sm:inline">USE DISPLAY</span>
                     </button>
                   )}
-
-                  <button
-                    onClick={replaceDisplay}
-                    disabled={busy}
-                    className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
-                    title={playerTestMode ? 'Restore display' : 'Re-pair display'}
-                  >
-                    <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                    <span className="hidden text-[9px] sm:inline">
-                      {playerTestMode ? 'DISPLAY' : 'PAIR'}
-                    </span>
-                  </button>
 
                   <button
                     onClick={endRoom}
@@ -950,33 +1028,83 @@ export default function PreviewHostPanel() {
               </div>
             )}
 
-            {roomState?.gameId === 'hangman' && (
-              <HangmanHostPanel controllerId={controllerId} />
-            )}
+            {roomState && (
+              <div
+                className={
+                  hostBoardSideBySide
+                    ? 'grid min-w-0 grid-cols-[minmax(0,1.08fr)_minmax(360px,.92fr)] items-start gap-3'
+                    : 'min-w-0 space-y-3'
+                }
+              >
+                {hostOnlyActive && (
+                  <section
+                    ref={hostBoardRef}
+                    className={`min-w-0 overflow-hidden rounded-2xl border border-[#BC13FE]/30 bg-[#030207] shadow-[0_0_35px_rgba(188,19,254,.08)] ${
+                      hostBoardSideBySide ? 'sticky top-[122px]' : ''
+                    }`}
+                    style={{ height: hostBoardHeight }}
+                    data-host-device={hostViewport.kind}
+                    data-host-orientation={hostViewport.orientation}
+                  >
+                    <div className="flex h-9 items-center justify-between border-b border-white/10 bg-black/75 px-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
+                        <span className="text-[6px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
+                          LIVE BOARD · {hostViewport.kind.toUpperCase()} {hostViewport.orientation.toUpperCase()}
+                        </span>
+                      </div>
 
-            {roomState?.gameId === 'spades' && (
-              <NeonSpadesHostPanel controllerId={controllerId} />
-            )}
+                      <button
+                        type="button"
+                        onClick={toggleHostBoardFullscreen}
+                        className="flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[7px] text-white/55"
+                        title="Fullscreen game board"
+                      >
+                        <Expand className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">BOARD</span>
+                      </button>
+                    </div>
 
-            {roomState?.gameId === 'word-search' && (
-              <NeonWordSearchHostPanel controllerId={controllerId} />
-            )}
+                    <div className="h-[calc(100%-2.25rem)] min-h-0">
+                      <GameDisplay
+                        embedded
+                        displayCredentials={embeddedDisplay}
+                      />
+                    </div>
+                  </section>
+                )}
 
-            {roomState?.gameId === 'square-biz' && (
-              <NeonSquareBizHostPanel controllerId={controllerId} />
-            )}
+                <section className="min-w-0">
+                  {roomState?.gameId === 'hangman' && (
+                    <HangmanHostPanel controllerId={controllerId} />
+                  )}
 
-            {roomState?.gameId === 'bff' && (
-              <NeonBFFHostPanel controllerId={controllerId} />
-            )}
+                  {roomState?.gameId === 'spades' && (
+                    <NeonSpadesHostPanel controllerId={controllerId} />
+                  )}
 
-            {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
-              <div className="py-16 text-center text-white/40">
-                <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
-                <p>
-                  {roomGame?.title || roomState.gameId} is connected to the new Neon room.
-                  Its game controls are next in the migration queue.
-                </p>
+                  {roomState?.gameId === 'word-search' && (
+                    <NeonWordSearchHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState?.gameId === 'square-biz' && (
+                    <NeonSquareBizHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState?.gameId === 'bff' && (
+                    <NeonBFFHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
+                    <div className="py-16 text-center text-white/40">
+                      <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
+                      <p>
+                        {roomGame?.title || roomState.gameId} is connected to the new Neon room.
+                        Its game controls are next in the migration queue.
+                      </p>
+                    </div>
+                  )}
+                </section>
               </div>
             )}
           </div>
