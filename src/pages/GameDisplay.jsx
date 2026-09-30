@@ -462,36 +462,48 @@ function HangmanDisplay({ room }) {
 }
 
 
-function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount = null }) {
+function SpadesSeat({
+  seat,
+  player,
+  state,
+  position,
+  scale = 1,
+  visualCardCount = null,
+  compactDisplay = false,
+}) {
   const team = seat === 1 || seat === 3 ? 1 : 2;
   const teamColor = team === 1 ? '#BC13FE' : '#FF5F1F';
   const isTurn = state.currentTurnSeat === seat;
   const isDealer = state.dealerSeat === seat;
   const cardCount = visualCardCount ?? Number(player?.cardCount || 0);
   const compactGameplay = state.phase === 'playing' || state.phase === 'resolving';
-  const effectiveScale = scale * (compactGameplay ? 0.82 : 1);
+  const effectiveScale = scale * (
+    compactDisplay
+      ? (compactGameplay ? 0.76 : 0.86)
+      : (compactGameplay ? 0.82 : 1)
+  );
 
   const positionStyle = {
     top: {
       left: '50%',
-      top: 6,
+      top: compactDisplay ? 2 : 6,
       transform: `translateX(-50%) scale(${effectiveScale})`,
       transformOrigin: 'top center',
     },
     bottom: {
       left: '50%',
-      bottom: 6,
+      bottom: compactDisplay ? 2 : 6,
       transform: `translateX(-50%) scale(${effectiveScale})`,
       transformOrigin: 'bottom center',
     },
     left: {
-      left: 22,
+      left: compactDisplay ? 6 : 22,
       top: '50%',
       transform: `translateY(-50%) scale(${effectiveScale})`,
       transformOrigin: 'left center',
     },
     right: {
-      right: 22,
+      right: compactDisplay ? 6 : 22,
       top: '50%',
       transform: `translateY(-50%) scale(${effectiveScale})`,
       transformOrigin: 'right center',
@@ -505,13 +517,17 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
       className="absolute z-20"
       style={{
         ...positionStyle,
-        width: compactGameplay
-          ? (position === 'left' || position === 'right' ? 160 : 172)
-          : (position === 'left' || position === 'right' ? 176 : 190),
+        width: compactDisplay
+          ? (position === 'left' || position === 'right' ? 142 : 150)
+          : compactGameplay
+            ? (position === 'left' || position === 'right' ? 160 : 172)
+            : (position === 'left' || position === 'right' ? 176 : 190),
       }}
     >
       <div
-        className="rounded-xl border bg-black/88 px-4 py-3 backdrop-blur-md"
+        className={`rounded-xl border bg-black/88 backdrop-blur-md ${
+          compactDisplay ? 'px-2.5 py-2' : 'px-4 py-3'
+        }`}
         style={{
           borderColor: isTurn ? '#FFD700' : teamColor + '66',
           boxShadow: isTurn
@@ -550,7 +566,7 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
 
         <div className="mt-1.5 flex items-end justify-between gap-3">
           <div className="min-w-0">
-            <div className="truncate text-lg leading-none text-white">
+            <div className={`truncate leading-none text-white ${compactDisplay ? 'text-sm' : 'text-lg'}`}>
               {player?.name || 'Waiting…'}
             </div>
             <div
@@ -562,7 +578,7 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
           </div>
 
           <div className="shrink-0 text-right">
-            <div className="font-mono text-2xl leading-none text-[#FFD700]">
+            <div className={`font-mono leading-none text-[#FFD700] ${compactDisplay ? 'text-lg' : 'text-2xl'}`}>
               {cardCount}
             </div>
             <div
@@ -594,8 +610,13 @@ function SpadesSeat({ seat, player, state, position, scale = 1, visualCardCount 
         )}
 
         {(player?.bid != null || player?.tricksWon > 0) && (
-          <div className="mt-2 border-t border-white/[0.06] pt-2 text-center text-xs text-white/40">
-            Bid {player?.bid ?? '-'} · Books {player?.tricksWon || 0}
+          <div
+            className={`mt-2 border-t border-white/[0.06] pt-2 text-center text-white/40 ${
+              compactDisplay ? 'text-[9px]' : 'text-xs'
+            }`}
+          >
+            Bid {player?.bid == null ? '-' : Number(player.bid) === 0 ? 'NIL' : player.bid}
+            {' '}· Books {player?.tricksWon || 0}
           </div>
         )}
       </div>
@@ -609,6 +630,7 @@ function SpadesDisplay({ room }) {
   const trick = state.currentTrick || [];
   const playAreaRef = useRef(null);
   const [tableSize, setTableSize] = useState(null);
+  const [compactDisplay, setCompactDisplay] = useState(false);
   const handNumber = Number(state.handNumber || 0);
   const lastAnimatedHandRef = useRef(handNumber);
   const [dealVisualPhase, setDealVisualPhase] = useState('idle');
@@ -631,29 +653,47 @@ function SpadesDisplay({ room }) {
       const availableHeight = playArea.clientHeight;
       if (!availableWidth || !availableHeight) return;
 
-      // Keep the game-display table taller and less stretched while still
-      // scaling cleanly across televisions, desktops, tablets, and phones.
-      const widthFraction =
-        availableWidth < 760 ? 0.98 :
-        availableWidth < 1100 ? 0.90 :
-        availableWidth < 1450 ? 0.82 :
-        0.76;
+      // Phone displays need a protected center lane for played cards. On a
+      // small or short viewport we shrink the seat cards and use a slightly
+      // taller table so the four trick cards do not sit behind player panels.
+      const compact =
+        availableWidth < 700 ||
+        availableHeight < 420;
+
+      setCompactDisplay(compact);
+
+      const compactPortrait =
+        compact &&
+        availableHeight >= availableWidth * 0.62;
+
+      const targetAspect = compactPortrait ? 1.18 : TARGET_ASPECT;
+      const widthFraction = compact
+        ? 0.96
+        : availableWidth < 1100
+          ? 0.90
+          : availableWidth < 1450
+            ? 0.82
+            : 0.76;
 
       const maxWidth = availableWidth * widthFraction;
-      const maxHeight = availableHeight * 0.96;
+      const maxHeight = availableHeight * (compact ? 0.94 : 0.96);
 
       let width = maxWidth;
-      let height = width / TARGET_ASPECT;
+      let height = width / targetAspect;
 
       if (height > maxHeight) {
         height = maxHeight;
-        width = height * TARGET_ASPECT;
+        width = height * targetAspect;
       }
+
+      const scale = compact
+        ? Math.max(0.50, Math.min(0.64, width / 560))
+        : Math.max(0.68, Math.min(1, width / 1120));
 
       setTableSize({
         width: Math.round(width),
         height: Math.round(height),
-        scale: Math.max(0.68, Math.min(1, width / 1120)),
+        scale,
       });
     };
 
@@ -711,14 +751,24 @@ function SpadesDisplay({ room }) {
   const playerAt = (seat) => players.find((player) => player.seatNumber === seat);
 
   const trickScale = tableSize?.scale || 1;
-  const trickZoneWidth = Math.min(
-    420,
-    Math.max(300, Math.round((tableSize?.width || 900) * 0.38)),
-  );
-  const trickZoneHeight = Math.min(
-    300,
-    Math.max(220, Math.round((tableSize?.height || 420) * 0.72)),
-  );
+  const trickZoneWidth = compactDisplay
+    ? Math.min(
+        175,
+        Math.max(138, Math.round((tableSize?.width || 360) * 0.42)),
+      )
+    : Math.min(
+        420,
+        Math.max(300, Math.round((tableSize?.width || 900) * 0.38)),
+      );
+  const trickZoneHeight = compactDisplay
+    ? Math.min(
+        165,
+        Math.max(138, Math.round((tableSize?.height || 300) * 0.50)),
+      )
+    : Math.min(
+        300,
+        Math.max(220, Math.round((tableSize?.height || 420) * 0.72)),
+      );
   const trickCardWidth = Math.round(64 * trickScale);
   const trickCardHeight = Math.round(96 * trickScale);
 
@@ -753,7 +803,7 @@ function SpadesDisplay({ room }) {
   };
 
   return (
-    <div className="relative z-10 flex h-full w-full flex-col px-8 pb-5 pt-4">
+    <div className="relative z-10 flex h-full w-full flex-col px-2 pb-2 pt-2 sm:px-8 sm:pb-5 sm:pt-4">
       <div className="flex shrink-0 items-center justify-between gap-6 px-2 pb-3">
         <div>
           <div
@@ -850,10 +900,10 @@ function SpadesDisplay({ room }) {
               />
             </div>
 
-            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[3] ?? null} />
-            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[2] ?? null} />
-            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[4] ?? null} />
-            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[1] ?? null} />
+            <SpadesSeat seat={3} player={playerAt(3)} state={state} position="top" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[3] ?? null} compactDisplay={compactDisplay} />
+            <SpadesSeat seat={2} player={playerAt(2)} state={state} position="left" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[2] ?? null} compactDisplay={compactDisplay} />
+            <SpadesSeat seat={4} player={playerAt(4)} state={state} position="right" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[4] ?? null} compactDisplay={compactDisplay} />
+            <SpadesSeat seat={1} player={playerAt(1)} state={state} position="bottom" scale={tableSize?.scale || 1} visualCardCount={visualCardCounts?.[1] ?? null} compactDisplay={compactDisplay} />
 
             <div
               className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2"
