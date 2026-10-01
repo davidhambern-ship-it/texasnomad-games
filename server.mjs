@@ -374,6 +374,14 @@ const BERNAVERSE_SSO_URL =
 const BERNAVERSE_APP_KEY = String(process.env.BERNAVERSE_APP_KEY || '').trim();
 const BERNAVERSE_SSO_LOCAL_SECRET =
   String(process.env.BERNAVERSE_SSO_LOCAL_SECRET || '').trim();
+const BERNAVERSE_SSO_ADMIN_EMAIL =
+  String(process.env.BERNAVERSE_SSO_ADMIN_EMAIL || '').trim().toLowerCase();
+const BERNAVERSE_SSO_ADMIN_PASSWORD =
+  String(process.env.BERNAVERSE_SSO_ADMIN_PASSWORD || '').trim();
+
+let bernaverseSsoAdminCookie = '';
+let bernaverseSsoAdminCookieAt = 0;
+const BERNAVERSE_SSO_ADMIN_COOKIE_TTL_MS = 45 * 60 * 1000;
 
 function safeTngSsoReturn(rawReturn) {
   const fallback = 'https://texasnomadgames.com/login?sso=1';
@@ -472,11 +480,183 @@ async function callNeonEmailAuth(path, body) {
           ? [response.headers.get('set-cookie')]
           : []);
 
+  const rawSetCookies = setCookies.filter(Boolean);
+
+  return {
+    response,
+    payload,
+    rawSetCookies,
+    cookieHeader: rawSetCookies
+      .map((value) => String(value || '').split(';', 1)[0])
+      .filter(Boolean)
+      .join('; '),
+    setCookies: rawSetCookies.map(rewriteAuthCookie),
+  };
+}
+
+async function promoteBernaverseSsoAdmin() {
+  if (!BERNAVERSE_SSO_ADMIN_EMAIL) {
+    throw new Error('BERNAverse SSO admin email is not configured.');
+  }
+
+  const { rows: columns } = await bffPool.query(
+    `
+      select column_name
+      from information_schema.columns
+      where table_schema = 'neon_auth'
+        and table_name = 'user'
+    `,
+  );
+
+  const names = new Set(columns.map((row) => String(row.column_name || '')));
+  if (!names.has('role')) {
+    throw new Error('Neon Auth admin role column is unavailable.');
+  }
+
+  const assignments = ["role = 'admin'"];
+  if (names.has('emailVerified')) assignments.push('"emailVerified" = true');
+
+  const result = await bffPool.query(
+    `
+      update neon_auth."user"
+      set ${assignments.join(', ')}
+      where lower(trim(email)) = lower(trim($1))
+    `,
+    [BERNAVERSE_SSO_ADMIN_EMAIL],
+  );
+
+  if (!result.rowCount) {
+    throw new Error('BERNAverse SSO admin account could not be found.');
+  }
+}
+
+async function getBernaverseSsoAdminCookie({ force = false } = {}) {
+  if (!BERNAVERSE_SSO_ADMIN_EMAIL || !BERNAVERSE_SSO_ADMIN_PASSWORD) {
+    throw new Error('BERNAverse SSO admin credentials are not configured.');
+  }
+
+  if (
+    !force &&
+    bernaverseSsoAdminCookie &&
+    Date.now() - bernaverseSsoAdminCookieAt < BERNAVERSE_SSO_ADMIN_COOKIE_TTL_MS
+  ) {
+    return bernaverseSsoAdminCookie;
+  }
+
+  let signIn = await callNeonEmailAuth('/sign-in/email', {
+    email: BERNAVERSE_SSO_ADMIN_EMAIL,
+    password: BERNAVERSE_SSO_ADMIN_PASSWORD,
+  });
+
+  if (!signIn.response.ok) {
+    const signUp = await callNeonEmailAuth('/sign-up/email', {
+      email: BERNAVERSE_SSO_ADMIN_EMAIL,
+      password: BERNAVERSE_SSO_ADMIN_PASSWORD,
+      name: 'BERNAverse SSO',
+    });
+
+    if (!signUp.response.ok) {
+      const message = String(
+        signUp.payload?.message ||
+        signUp.payload?.error?.message ||
+        '',
+      );
+
+      if (!/already|exist|registered|email/i.test(message)) {
+        throw new Error(
+          message || `BERNAverse SSO admin provisioning failed (${signUp.response.status}).`,
+        );
+      }
+    }
+  }
+
+  await promoteBernaverseSsoAdmin();
+
+  // Re-authenticate after promotion so the admin plugin sees the current role.
+  signIn = await callNeonEmailAuth('/sign-in/email', {
+    email: BERNAVERSE_SSO_ADMIN_EMAIL,
+    password: BERNAVERSE_SSO_ADMIN_PASSWORD,
+  });
+
+  if (!signIn.response.ok || !signIn.cookieHeader) {
+    const message = String(
+      signIn.payload?.message ||
+      signIn.payload?.error?.message ||
+      '',
+    );
+    throw new Error(
+      message || `BERNAverse SSO admin sign-in failed (${signIn.response.status}).`,
+    );
+  }
+
+  bernaverseSsoAdminCookie = signIn.cookieHeader;
+  bernaverseSsoAdminCookieAt = Date.now();
+  return bernaverseSsoAdminCookie;
+}
+
+async function callNeonAdmin(path, body, cookieHeader) {
+  const response = await fetch(`${NEON_AUTH_ORIGIN}${path}`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Cookie: cookieHeader,
+      Origin: 'https://texasnomadgames.com',
+      Referer: 'https://texasnomadgames.com/',
+    },
+    body: JSON.stringify(body),
+    redirect: 'manual',
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  const setCookies =
+    typeof response.headers.getSetCookie === 'function'
+      ? response.headers.getSetCookie()
+      : (response.headers.get('set-cookie')
+          ? [response.headers.get('set-cookie')]
+          : []);
+
   return {
     response,
     payload,
     setCookies: setCookies.filter(Boolean).map(rewriteAuthCookie),
   };
+}
+
+async function impersonateTngAccount(userId) {
+  let adminCookie = await getBernaverseSsoAdminCookie();
+  let result = await callNeonAdmin(
+    '/admin/impersonate-user',
+    { userId },
+    adminCookie,
+  );
+
+  if ([401, 403].includes(result.response.status)) {
+    bernaverseSsoAdminCookie = '';
+    bernaverseSsoAdminCookieAt = 0;
+    adminCookie = await getBernaverseSsoAdminCookie({ force: true });
+    result = await callNeonAdmin(
+      '/admin/impersonate-user',
+      { userId },
+      adminCookie,
+    );
+  }
+
+  if (!result.response.ok || !result.setCookies.length) {
+    const message = String(
+      result.payload?.message ||
+      result.payload?.error?.message ||
+      result.payload?.error ||
+      '',
+    );
+    const error = new Error(
+      message || `TNG SSO session creation failed (${result.response.status}).`,
+    );
+    error.status = result.response.status;
+    throw error;
+  }
+
+  return result;
 }
 
 async function findTngAccountByEmail(email) {
@@ -580,13 +760,37 @@ async function handleBernaverseSso(req, res) {
   let signIn = await callNeonEmailAuth('/sign-in/email', { email, password });
 
   if (!signIn.response.ok) {
-    // Preserve every pre-SSO TNG account. If the email already exists, never
-    // overwrite its password or profile; the member can keep using legacy TNG
-    // sign-in while new accounts use BERNAverse SSO.
+    // Existing pre-SSO accounts keep their original password untouched.
+    // BERNAverse creates a short-lived TNG session through Neon Auth's Admin
+    // impersonation API, so legacy credentials remain valid while SSO works.
     const existingAccount = await findTngAccountByEmail(email).catch(() => null);
     if (existingAccount?.external_user_id) {
-      redirectTngSso(res, tngSsoFailureUrl('legacy'));
-      return;
+      try {
+        const impersonation = await impersonateTngAccount(
+          existingAccount.external_user_id,
+        );
+
+        clearAuthSessionProxyCache();
+
+        try {
+          await ensureTngSsoIdentity(email);
+        } catch (identityError) {
+          console.warn(
+            '[TNG BERNAverse SSO] existing identity sync deferred:',
+            identityError?.message || identityError,
+          );
+        }
+
+        redirectTngSso(res, returnUrl, impersonation.setCookies);
+        return;
+      } catch (impersonationError) {
+        console.error(
+          '[TNG BERNAverse SSO] existing-account handoff failed:',
+          impersonationError?.message || impersonationError,
+        );
+        redirectTngSso(res, tngSsoFailureUrl('legacy'));
+        return;
+      }
     }
 
     const signUp = await callNeonEmailAuth('/sign-up/email', {
@@ -645,17 +849,24 @@ async function syncTngAccountsToBernaverseFree() {
     return;
   }
 
-  const { rows } = await bffPool.query(`
-    select
-      a.id::text as external_user_id,
-      lower(trim(a.email)) as email,
-      pp.handle as external_handle
-    from public.accounts a
-    left join public.player_profiles pp
-      on pp.account_id = a.id
-    where nullif(trim(a.email), '') is not null
-    order by a.created_at asc nulls first, a.id
-  `);
+  const { rows } = await bffPool.query(
+    `
+      select
+        a.id::text as external_user_id,
+        lower(trim(a.email)) as email,
+        pp.handle as external_handle
+      from public.accounts a
+      left join public.player_profiles pp
+        on pp.account_id = a.id
+      where nullif(trim(a.email), '') is not null
+        and (
+          $1 = ''
+          or lower(trim(a.email)) <> lower(trim($1))
+        )
+      order by a.created_at asc nulls first, a.id
+    `,
+    [BERNAVERSE_SSO_ADMIN_EMAIL],
+  );
 
   let synced = 0;
   let failed = 0;
