@@ -30,7 +30,9 @@ async function sendFile(res, filePath) {
   const body = await readFile(filePath);
   res.writeHead(200, {
     'Content-Type': mime[extname(filePath).toLowerCase()] || 'application/octet-stream',
-    'Cache-Control': extname(filePath) === '.html'\n      ? 'no-store, no-cache, must-revalidate, max-age=0'\n      : 'public, max-age=31536000, immutable',
+    'Cache-Control': extname(filePath) === '.html'
+      ? 'no-store, no-cache, must-revalidate, max-age=0'
+      : 'public, max-age=31536000, immutable',
   });
   res.end(body);
 }
