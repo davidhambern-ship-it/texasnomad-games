@@ -46,8 +46,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
   const [family2Input, setFamily2Input] = useState(gs.family2 || '');
   const [answerInput, setAnswerInput] = useState('');
   const [checkResult, setCheckResult] = useState(null);
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef(null);
   const autoRoundTimerRef = useRef(null);
   const prevStealResultRef = useRef(gs.steal_result);
 
@@ -156,19 +154,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
     }
     setAnswerInput('');
     setTimeout(() => setCheckResult(null), 5000);
-  };
-
-  const toggleVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) { setCheckResult({ type: 'warn', message: 'Voice needs Chrome/Edge' }); return; }
-    if (isListening) { recognitionRef.current?.stop(); return; }
-    const r = new SR();
-    r.lang = 'en-US'; r.interimResults = false;
-    r.onstart = () => setIsListening(true);
-    r.onend = () => setIsListening(false);
-    r.onerror = () => setIsListening(false);
-    r.onresult = (e) => { const t = e.results[0][0].transcript.trim(); setAnswerInput(t); checkAnswer(t); };
-    recognitionRef.current = r; r.start();
   };
 
   // Auto-select faceoff using rotation
@@ -509,9 +494,6 @@ export default function BFFHostPanel({ gs, updateState, sendCommand, roomCode })
               <input className="flex-1 px-4 py-3 rounded-lg bg-black/80 border-2 border-[#22d3ee]/30 text-white font-body text-base focus:border-[#22d3ee] focus:outline-none"
                 value={answerInput} onChange={(e) => setAnswerInput(e.target.value)}
                 placeholder="Type player's answer..." onKeyDown={(e) => e.key === 'Enter' && checkAnswer(answerInput)} autoComplete="off" />
-              <button onClick={toggleVoice} className={`px-4 py-3 rounded-lg border-2 font-heading text-lg transition-all ${isListening ? 'border-red-500 text-red-400 bg-red-500/20' : 'border-[#22d3ee]/40 text-[#22d3ee]/70'}`}>
-                {isListening ? '🔴' : '🎙'}
-              </button>
               <button onClick={() => checkAnswer(answerInput)} className="px-4 py-3 rounded-lg border-2 border-[#22d3ee] text-[#22d3ee] font-heading text-sm tracking-widest uppercase hover:bg-[#22d3ee]/20 transition-all">CHECK</button>
             </div>
             {checkResult && (
