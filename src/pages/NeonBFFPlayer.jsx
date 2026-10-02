@@ -1,12 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Radio, Users, Zap, Mic, MicOff } from 'lucide-react';
+import { Loader2, Radio, Users, Zap } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
-import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 import { quitTngGame } from '@/lib/quitTngGame';
 import { getPublicTngName } from '@/lib/publicTngName';
 
@@ -233,7 +232,7 @@ function DysfunctionPlayerPanel({
             </div>
             <div className="mt-2 font-heading text-4xl text-[#FFD700]">{defenseSeconds ?? 0}s</div>
             <div className="mt-2 text-[10px] text-white/40">
-              Their mic is live to the whole room. Explain yourself.
+              They have the floor. Explain yourself.
             </div>
           </div>
         )}
@@ -300,18 +299,6 @@ export default function NeonBFFPlayer({ roomCode }) {
     && ['faceoff_answer', 'play_pass', 'family_play', 'steal_answer', 'dysfunction_defense'].includes(roundStage)
   );
 
-  const voiceRelay = useBffVoiceRelay({
-    roomCode,
-    role: 'player',
-    identity: deviceId,
-    shouldSend: isActiveTurn,
-    autoStart: Boolean(deviceId && participant),
-  });
-
-  const micOn = voiceRelay.micReady;
-  const micBusy = voiceRelay.status === 'connecting';
-  const voiceConnectionState = voiceRelay.status;
-  const isActiveSpeaker = Boolean(micOn && isActiveTurn);
   const showPlayPass = Boolean(
     roundStage === 'play_pass'
     && String(gameState.faceoff_winner_id || '') === String(myAccountId || '')
@@ -369,15 +356,6 @@ export default function NeonBFFPlayer({ roomCode }) {
     return () => window.clearTimeout(timeout);
   }, [gameState.sound_cue]);
 
-  const enableMic = useCallback(async () => {
-    setError('');
-    const ok = await voiceRelay.start();
-    if (!ok && voiceRelay.error) setError(voiceRelay.error);
-  }, [voiceRelay]);
-
-  const disableMic = useCallback(() => {
-    voiceRelay.stop();
-  }, [voiceRelay]);
 
   const buzz = useCallback(async () => {
     if (!deviceId || !roomCode || !canBuzz || busy) return;
@@ -495,20 +473,6 @@ export default function NeonBFFPlayer({ roomCode }) {
               >
                 {status}
               </div>
-              <button
-                type="button"
-                disabled={micBusy || (micOn && ['playing', 'dysfunction'].includes(gameState.phase))}
-                onClick={micOn ? disableMic : enableMic}
-                className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-2 text-[6px] uppercase tracking-widest disabled:opacity-40 ${
-                  micOn
-                    ? 'border-[#22D3EE]/50 bg-[#22D3EE]/10 text-[#22D3EE]'
-                    : 'border-white/15 text-white/45'
-                }`}
-                style={PS2}
-              >
-                {micOn ? <Mic className="h-3.5 w-3.5" /> : <MicOff className="h-3.5 w-3.5" />}
-                {micBusy ? 'MIC…' : micOn ? 'MIC ON' : 'MIC OFF'}
-              </button>
 
               <button
                 type="button"
@@ -536,31 +500,6 @@ export default function NeonBFFPlayer({ roomCode }) {
             {flashCue}
           </div>
         )}
-
-        <div
-          className={`rounded-lg border px-3 py-2 text-center text-[6px] uppercase tracking-[.14em] ${
-            voiceConnectionState === 'live'
-              ? 'border-[#22D3EE]/30 bg-[#22D3EE]/5 text-[#22D3EE]'
-              : voiceConnectionState === 'failed'
-                ? 'border-[#FF174D]/30 bg-[#FF174D]/5 text-[#FF174D]'
-                : micOn
-                  ? 'border-[#FFD700]/30 bg-[#FFD700]/5 text-[#FFD700]'
-                  : 'border-white/10 bg-white/[.02] text-white/30'
-          }`}
-          style={PS2}
-        >
-          {!micOn
-            ? 'MIC REQUIRED · TURN IT ON TO PLAY'
-            : voiceConnectionState === 'failed'
-              ? 'VOICE RELAY ERROR · RETRY MIC'
-              : voiceConnectionState === 'recovering'
-                ? 'VOICE RECONNECTING · HOLD ON'
-                : voiceConnectionState !== 'live'
-                  ? 'VOICE CONNECTING · KEEP THIS PAGE OPEN'
-                : isActiveSpeaker
-                  ? 'MIC LIVE · EVERYONE CAN HEAR YOU'
-                  : 'MIC READY · OPENS AUTOMATICALLY ON YOUR TURN'}
-        </div>
 
         {showPlayPass && (
           <section className="grid grid-cols-2 gap-2 rounded-xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-3">
