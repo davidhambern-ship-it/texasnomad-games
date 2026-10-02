@@ -380,7 +380,7 @@ export default function PreviewHostPanel() {
         setPairing(pairingPayload.pairing);
         setPhase('pairing');
       } catch (initializeError) {
-        if (recoverExpiredPreviewSession(initializeError)) return;
+        if (await recoverExpiredPreviewSession(initializeError)) return;
 
         if (!cancelled) {
           setError(initializeError.message || 'The Host Controller could not start.');
@@ -426,7 +426,7 @@ export default function PreviewHostPanel() {
           setPhase('ready');
         }
       } catch (pollError) {
-        if (recoverExpiredPreviewSession(pollError)) return;
+        if (await recoverExpiredPreviewSession(pollError)) return;
         console.error('[PreviewHostPanel] display pairing poll failed:', pollError);
       }
     }, 2500);
@@ -485,7 +485,7 @@ export default function PreviewHostPanel() {
           setError('');
         }
       } catch (roomError) {
-        if (recoverExpiredPreviewSession(roomError)) return;
+        if (await recoverExpiredPreviewSession(roomError)) return;
 
         if (!cancelled) {
           setRoomPollError(roomError.message || 'The live room state could not be loaded.');
