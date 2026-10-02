@@ -11,25 +11,6 @@ import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-function waitForIceComplete(pc) {
-  if (pc.iceGatheringState === 'complete') return Promise.resolve();
-
-  return new Promise((resolve) => {
-    const onState = () => {
-      if (pc.iceGatheringState === 'complete') {
-        pc.removeEventListener('icegatheringstatechange', onState);
-        resolve();
-      }
-    };
-
-    pc.addEventListener('icegatheringstatechange', onState);
-    window.setTimeout(() => {
-      pc.removeEventListener('icegatheringstatechange', onState);
-      resolve();
-    }, 3500);
-  });
-}
-
 function statusFor(gameState, myTeam, buzzWinner) {
   const phase = gameState.phase || 'waiting';
 
