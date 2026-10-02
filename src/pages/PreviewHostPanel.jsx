@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
+import { Expand, Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
 
 import { ALL_GAMES } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
@@ -8,11 +8,40 @@ import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
 import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
 import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
+import GameDisplay from '@/pages/GameDisplay';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
-import { getNeonSession } from '@/lib/neonAuth';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
+
+function readEmbeddedDisplay() {
+  if (typeof window === 'undefined') return null;
+
+  const deviceId = localStorage.getItem('tng_host_embedded_display_id');
+  const token = localStorage.getItem('tng_host_embedded_display_token');
+  return deviceId && token ? { deviceId, token } : null;
+}
+
+function detectHostViewport() {
+  if (typeof window === 'undefined') {
+    return { kind: 'desktop', orientation: 'landscape', width: 1280, height: 800 };
+  }
+
+  const width = window.innerWidth || 1280;
+  const height = window.innerHeight || 800;
+  const coarsePointer = window.matchMedia?.('(pointer: coarse)')?.matches === true;
+  const shortSide = Math.min(width, height);
+  const orientation = width >= height ? 'landscape' : 'portrait';
+
+  let kind = 'desktop';
+  if (width <= 680 || (coarsePointer && shortSide <= 560)) {
+    kind = 'phone';
+  } else if (width <= 1180 || (coarsePointer && shortSide <= 900)) {
+    kind = 'tablet';
+  }
+
+  return { kind, orientation, width, height, coarsePointer };
+}
 
 export default function PreviewHostPanel() {
   const { user, logout } = useAuth();
@@ -28,8 +57,18 @@ export default function PreviewHostPanel() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [error, setError] = useState('');
   const [roomPollError, setRoomPollError] = useState('');
+  const [roomPeople, setRoomPeople] = useState([]);
+  const [rosterError, setRosterError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [recoveryRoute, setRecoveryRoute] = useState(null);
+  const [displayMode, setDisplayMode] = useState(
+    () => localStorage.getItem('tng_host_display_mode') ||
+      (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external'),
+  );
+  const [embeddedDisplay, setEmbeddedDisplay] = useState(readEmbeddedDisplay);
+  const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
+  const hostBoardRef = useRef(null);
 
   function isStaleRoom(room) {
     if (!room) return false;
@@ -49,6 +88,109 @@ export default function PreviewHostPanel() {
     () => ALL_GAMES.find((game) => game.id === activeRoom?.gameId) || selectedGame,
     [activeRoom, selectedGame],
   );
+
+  const hostOnlyActive =
+    displayMode === 'embedded' &&
+    Boolean(embeddedDisplay?.deviceId && embeddedDisplay?.token);
+
+  const hostBoardSideBySide =
+    hostOnlyActive &&
+    (
+      hostViewport.kind === 'desktop' ||
+      (hostViewport.kind === 'tablet' && hostViewport.orientation === 'landscape')
+    );
+
+  const hostBoardHeight =
+    hostViewport.kind === 'phone'
+      ? hostViewport.orientation === 'landscape'
+        ? 'clamp(300px, 72dvh, 520px)'
+        : 'clamp(320px, 52dvh, 480px)'
+      : hostViewport.kind === 'tablet'
+        ? hostViewport.orientation === 'landscape'
+          ? 'calc(100dvh - 150px)'
+          : 'clamp(420px, 54dvh, 650px)'
+        : 'calc(100dvh - 150px)';
+
+  useEffect(() => {
+    const updateViewport = () => setHostViewport(detectHostViewport());
+    updateViewport();
+
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
+  }, []);
+
+  function saveEmbeddedDisplay(display) {
+    if (!display?.deviceId || !display?.token) return;
+    localStorage.setItem('tng_host_embedded_display_id', display.deviceId);
+    localStorage.setItem('tng_host_embedded_display_token', display.token);
+    setEmbeddedDisplay(display);
+  }
+
+  function clearEmbeddedDisplay() {
+    localStorage.removeItem('tng_host_embedded_display_id');
+    localStorage.removeItem('tng_host_embedded_display_token');
+    setEmbeddedDisplay(null);
+  }
+
+  function setHostDisplayMode(mode) {
+    localStorage.setItem('tng_host_display_mode', mode);
+    setDisplayMode(mode);
+
+    // The backend currently requires a paired display identity before rooms
+    // can start. Embedded mode uses a private virtual display on the Host
+    // device while the user experiences a true one-screen Host setup.
+    if (mode === 'embedded') {
+      localStorage.setItem('tng_player_test_mode', '1');
+      setPlayerTestMode(true);
+    } else {
+      localStorage.removeItem('tng_player_test_mode');
+      setPlayerTestMode(false);
+    }
+  }
+
+  async function ensureEmbeddedDisplay(deviceId, replaceDisplay = false) {
+    const existing = readEmbeddedDisplay();
+
+    if (existing && !replaceDisplay) {
+      try {
+        await tngApi.display.getState(existing.deviceId, existing.token);
+        setEmbeddedDisplay(existing);
+        return existing;
+      } catch {
+        clearEmbeddedDisplay();
+      }
+    }
+
+    const pairingPayload = await tngApi.host.createPairing(deviceId, true);
+    const pairedPayload = await tngApi.display.pair(pairingPayload.pairing.code);
+    const display = {
+      deviceId: pairedPayload.display.deviceId,
+      token: pairedPayload.display.token,
+    };
+
+    saveEmbeddedDisplay(display);
+    return display;
+  }
+
+  async function toggleHostBoardFullscreen() {
+    const board = hostBoardRef.current;
+    if (!board) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await board.requestFullscreen?.();
+      } else {
+        await document.exitFullscreen?.();
+      }
+    } catch {
+      setError('Fullscreen was blocked by this browser.');
+    }
+  }
 
   async function recoverExpiredPreviewSession(authError) {
     if (
@@ -111,40 +253,17 @@ export default function PreviewHostPanel() {
     } catch (sessionError) {
       if (
         sessionError instanceof TngApiError &&
-        sessionError.code === 'HOST_ALREADY_CONTROLLED'
-      ) {
-        // Never steal an active Host session from another device.
-        // A second device on the same account belongs on the Game Display.
-        localStorage.setItem('tng_connection_role', 'display');
-        localStorage.removeItem('tng_display_device_id');
-        localStorage.removeItem('tng_display_token');
-        window.location.replace('/display');
-        throw sessionError;
-      }
-
-      if (
-        sessionError instanceof TngApiError &&
         ['INVALID_CONTROLLER', 'CONTROLLER_REQUIRED'].includes(sessionError.code)
       ) {
         localStorage.removeItem('tng_device_id');
         const replacementId = await createController();
         setControllerId(replacementId);
-
-        try {
-          return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
-        } catch (replacementError) {
-          if (
-            replacementError instanceof TngApiError &&
-            replacementError.code === 'HOST_ALREADY_CONTROLLED'
-          ) {
-            localStorage.setItem('tng_connection_role', 'display');
-            localStorage.removeItem('tng_display_device_id');
-            localStorage.removeItem('tng_display_token');
-            window.location.replace('/display');
-          }
-          throw replacementError;
-        }
+        return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
       }
+
+      // HOST_ALREADY_CONTROLLED is intentionally allowed to bubble up.
+      // The Host Panel will show an explicit recovery choice instead of
+      // assuming this browser must be the Game Display.
       throw sessionError;
     }
   }
@@ -166,9 +285,34 @@ export default function PreviewHostPanel() {
         if (cancelled) return;
         setControllerId(deviceId);
 
-        const session = await startOrReplaceController(deviceId);
+        let session;
+
+        try {
+          session = await startOrReplaceController(deviceId);
+        } catch (sessionError) {
+          if (
+            sessionError instanceof TngApiError &&
+            sessionError.code === 'HOST_ALREADY_CONTROLLED'
+          ) {
+            const route = await tngApi.host.getAccountRoute(
+              localStorage.getItem('tng_device_id') || deviceId,
+            ).catch(() => null);
+
+            if (cancelled) return;
+
+            setRecoveryRoute(route || { activeHost: true, activeRoom: null });
+            setActiveRoom(route?.activeRoom || null);
+            setError('');
+            setPhase('host-recovery');
+            return;
+          }
+
+          throw sessionError;
+        }
+
         if (cancelled) return;
 
+        setRecoveryRoute(null);
         setActiveRoom(session.activeRoom || null);
 
         if (session.activeRoom) {
@@ -181,11 +325,18 @@ export default function PreviewHostPanel() {
             return;
           }
 
-          // Preview is currently being used for controller + player testing.
-          // Once a current live room exists, resume it headlessly instead of
-          // forcing the Game Display requirement back on after auth refresh.
-          localStorage.setItem('tng_player_test_mode', '1');
-          setPlayerTestMode(true);
+          const savedMode =
+            localStorage.getItem('tng_host_display_mode') ||
+            (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external');
+
+          if (savedMode === 'embedded') {
+            setHostDisplayMode('embedded');
+            await ensureEmbeddedDisplay(deviceId);
+            if (cancelled) return;
+          } else {
+            setHostDisplayMode('external');
+          }
+
           setPhase('room');
           return;
         }
@@ -194,23 +345,27 @@ export default function PreviewHostPanel() {
           localStorage.getItem('tng_player_test_mode') === '1';
 
         if (session.hostSession?.displayDeviceId) {
-          setPlayerTestMode(testModeActive);
+          if (displayMode === 'embedded' || testModeActive) {
+            setHostDisplayMode('embedded');
+            await ensureEmbeddedDisplay(deviceId);
+            if (cancelled) return;
+          } else {
+            setHostDisplayMode('external');
+          }
+
           setError('');
           setPhase('ready');
           return;
         }
 
-        if (testModeActive) {
-          const pairingPayload = await tngApi.host.createPairing(deviceId);
-          if (cancelled) return;
-
-          await tngApi.display.pair(pairingPayload.pairing.code);
+        if (testModeActive || displayMode === 'embedded') {
+          setHostDisplayMode('embedded');
+          await ensureEmbeddedDisplay(deviceId);
           if (cancelled) return;
 
           const refreshedSession = await tngApi.host.startSession(deviceId);
           if (cancelled) return;
 
-          setPlayerTestMode(true);
           setPairing(null);
           setRepairingDisplay(false);
           setActiveRoom(refreshedSession.activeRoom || null);
@@ -225,7 +380,7 @@ export default function PreviewHostPanel() {
         setPairing(pairingPayload.pairing);
         setPhase('pairing');
       } catch (initializeError) {
-        if (await recoverExpiredPreviewSession(initializeError)) return;
+        if (recoverExpiredPreviewSession(initializeError)) return;
 
         if (!cancelled) {
           setError(initializeError.message || 'The Host Controller could not start.');
@@ -250,8 +405,8 @@ export default function PreviewHostPanel() {
           if (session.hostSession?.displayDeviceId) {
             setPairing(null);
             setRepairingDisplay(false);
-            localStorage.removeItem('tng_player_test_mode');
-            setPlayerTestMode(false);
+            setHostDisplayMode('external');
+            clearEmbeddedDisplay();
             setActiveRoom(session.activeRoom || null);
             setPhase(session.activeRoom ? 'room' : 'ready');
           }
@@ -265,17 +420,52 @@ export default function PreviewHostPanel() {
         }
 
         if (session.hostSession?.displayDeviceId) {
+          setHostDisplayMode('external');
+          clearEmbeddedDisplay();
           setPairing(null);
           setPhase('ready');
         }
       } catch (pollError) {
-        if (await recoverExpiredPreviewSession(pollError)) return;
+        if (recoverExpiredPreviewSession(pollError)) return;
         console.error('[PreviewHostPanel] display pairing poll failed:', pollError);
       }
     }, 2500);
 
     return () => window.clearInterval(interval);
   }, [phase, controllerId, repairingDisplay]);
+
+  useEffect(() => {
+    if (phase !== 'room' || !controllerId) {
+      setRoomPeople([]);
+      setRosterError('');
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function refreshRoster() {
+      try {
+        const payload = await tngApi.host.getRoster(controllerId);
+        if (cancelled) return;
+        setRoomPeople(Array.isArray(payload?.people) ? payload.people : []);
+        setRosterError('');
+      } catch (rosterLoadError) {
+        if (cancelled) return;
+        setRosterError(
+          rosterLoadError?.message ||
+            'TNG could not load the people currently in this room.',
+        );
+      }
+    }
+
+    refreshRoster();
+    const interval = window.setInterval(refreshRoster, 1200);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [phase, controllerId]);
 
   useEffect(() => {
     if (phase !== 'room' || !controllerId) {
@@ -295,7 +485,7 @@ export default function PreviewHostPanel() {
           setError('');
         }
       } catch (roomError) {
-        if (await recoverExpiredPreviewSession(roomError)) return;
+        if (recoverExpiredPreviewSession(roomError)) return;
 
         if (!cancelled) {
           setRoomPollError(roomError.message || 'The live room state could not be loaded.');
@@ -320,6 +510,8 @@ export default function PreviewHostPanel() {
 
     try {
       const payload = await tngApi.host.createPairing(controllerId, true);
+      setHostDisplayMode('external');
+      clearEmbeddedDisplay();
       setPairing(payload.pairing);
       setRepairingDisplay(true);
       setPhase('pairing');
@@ -330,25 +522,23 @@ export default function PreviewHostPanel() {
     }
   }
 
-  async function releaseDisplayForPlayerTesting() {
-    if (!controllerId || !activeRoom || busy) return;
+  async function switchToHostOnly() {
+    if (!controllerId || busy) return;
 
     setBusy(true);
     setError('');
 
     try {
-      // The existing replace-display backend path disconnects the current
-      // Game Display while preserving the active Host session and room.
-      // We intentionally discard the temporary pairing code here so this
-      // second device can be reused as a signed-in Player screen.
-      await tngApi.host.createPairing(controllerId, true);
-      localStorage.setItem('tng_player_test_mode', '1');
-      setPlayerTestMode(true);
+      setHostDisplayMode('embedded');
+      await ensureEmbeddedDisplay(controllerId, true);
       setPairing(null);
       setRepairingDisplay(false);
-      setPhase('room');
-    } catch (releaseError) {
-      setError(releaseError.message || 'The Game Display could not be released for player testing.');
+      setPhase(activeRoom ? 'room' : 'ready');
+    } catch (switchError) {
+      setError(
+        switchError?.message ||
+          'TNG could not switch this Host to one-screen mode.',
+      );
     } finally {
       setBusy(false);
     }
@@ -361,12 +551,14 @@ export default function PreviewHostPanel() {
     setError('');
 
     try {
-      // Pair a virtual test display in the background. This satisfies the
-      // backend's real display requirement without opening a second screen.
-      await tngApi.display.pair(pairing.code);
+      const pairedPayload = await tngApi.display.pair(pairing.code);
+      const display = {
+        deviceId: pairedPayload.display.deviceId,
+        token: pairedPayload.display.token,
+      };
 
-      localStorage.setItem('tng_player_test_mode', '1');
-      setPlayerTestMode(true);
+      saveEmbeddedDisplay(display);
+      setHostDisplayMode('embedded');
       setPairing(null);
       setRepairingDisplay(false);
 
@@ -376,11 +568,61 @@ export default function PreviewHostPanel() {
     } catch (bypassError) {
       setError(
         bypassError?.message ||
-          'TNG could not start the no-display live-test session.',
+          'TNG could not start Host Panel Only mode.',
       );
     } finally {
       setBusy(false);
     }
+  }
+
+  async function reclaimHostController() {
+    if (!controllerId || busy) return;
+
+    setBusy(true);
+    setError('');
+
+    try {
+      const session = await tngApi.host.startSession(controllerId, true, true);
+
+      localStorage.setItem('tng_connection_role', 'host_controller');
+      setRecoveryRoute(null);
+      setActiveRoom(session.activeRoom || null);
+
+      if (session.activeRoom) {
+        if (isStaleRoom(session.activeRoom)) {
+          setPhase('stale-room');
+        } else {
+          setPhase('room');
+        }
+        return;
+      }
+
+      if (session.hostSession?.displayDeviceId) {
+        setPairing(null);
+        setRepairingDisplay(false);
+        setPhase('ready');
+        return;
+      }
+
+      const pairingPayload = await tngApi.host.createPairing(controllerId);
+      setPairing(pairingPayload.pairing);
+      setRepairingDisplay(false);
+      setPhase('pairing');
+    } catch (reclaimError) {
+      setError(
+        reclaimError?.message ||
+          'TNG could not reclaim this Host Controller. The live room was not changed.',
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function continueAsDisplay() {
+    localStorage.setItem('tng_connection_role', 'display');
+    localStorage.removeItem('tng_display_device_id');
+    localStorage.removeItem('tng_display_token');
+    window.location.replace('/display');
   }
 
   async function createRoom(game) {
@@ -426,6 +668,8 @@ export default function PreviewHostPanel() {
       await tngApi.host.endRoom(controllerId);
       setActiveRoom(null);
       setRoomState(null);
+      setRoomPeople([]);
+      setRosterError('');
       setSelectedGame(null);
 
       if (playerTestMode) {
@@ -454,6 +698,8 @@ export default function PreviewHostPanel() {
     localStorage.removeItem('tng_device_id');
     localStorage.removeItem('tng_connection_role');
     localStorage.removeItem('tng_player_test_mode');
+    localStorage.removeItem('tng_host_display_mode');
+    clearEmbeddedDisplay();
     logout(true);
   }
 
@@ -493,6 +739,64 @@ export default function PreviewHostPanel() {
           </div>
         )}
 
+        {phase === 'host-recovery' && (
+          <div className="h-full flex items-center justify-center px-4">
+            <div className="max-w-xl w-full text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
+              <div className="text-[#FFD700]" style={PS2}>LIVE HOST SESSION FOUND</div>
+
+              <h2 className="mt-4 text-2xl">
+                Rejoin as the Host?
+              </h2>
+
+              {recoveryRoute?.activeRoom ? (
+                <div className="mt-4 rounded-xl border border-[#BC13FE]/25 bg-black/35 p-4">
+                  <div className="text-xs uppercase tracking-widest text-white/30">
+                    ACTIVE LIVE GAME
+                  </div>
+                  <div className="mt-2 text-xl font-bold uppercase text-white">
+                    {String(recoveryRoute.activeRoom.gameId || 'game').replaceAll('-', ' ')}
+                  </div>
+                  <div className="mt-2 font-mono text-lg tracking-[0.18em] text-[#FFD700]">
+                    ROOM {recoveryRoute.activeRoom.roomCode}
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm leading-relaxed text-white/50">
+                  TNG still sees an active Host Controller for this account.
+                </p>
+              )}
+
+              <p className="mt-4 text-sm leading-relaxed text-white/55">
+                Rejoining transfers Host control to this device. The existing room, players,
+                scores, board state, and paired Display stay attached to the same live session.
+              </p>
+
+              {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={reclaimHostController}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE] disabled:opacity-40"
+                >
+                  {busy ? 'REJOINING…' : 'REJOIN AS HOST'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={continueAsDisplay}
+                  disabled={busy}
+                  className="px-5 py-3 rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/5 text-[#FFD700] disabled:opacity-40"
+                >
+                  USE THIS DEVICE AS DISPLAY
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {phase === 'stale-room' && activeRoom && (
           <div className="h-full flex items-center justify-center px-4">
             <div className="max-w-xl w-full text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
@@ -509,8 +813,6 @@ export default function PreviewHostPanel() {
                 <button
                   type="button"
                   onClick={() => {
-                    localStorage.setItem('tng_player_test_mode', '1');
-                    setPlayerTestMode(true);
                     setPhase('room');
                   }}
                   className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE]"
@@ -546,113 +848,138 @@ export default function PreviewHostPanel() {
           </div>
         )}
 
-        {(phase === 'pairing' || phase === 'ready') && (
-          <div className="h-full flex items-center justify-center">
-            <div className="w-full max-w-3xl text-center">
-              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
-              <h1 className="text-3xl mb-4">Host System Ready</h1>
+        {phase === 'pairing' && (
+          <div className="h-full flex items-center justify-center px-2">
+            <div className="w-full max-w-4xl text-center">
+              <Monitor className="w-14 h-14 mx-auto mb-4 text-[#FFD700]" />
+              <h1 className="text-3xl mb-3">Choose Your Host Setup</h1>
+              <p className="mx-auto mb-7 max-w-2xl text-white/45">
+                Use a TV or second screen for the game board, or run everything from this Host device.
+                TNG will remember your choice for the next room.
+              </p>
 
-              {error && <p className="text-red-400 mb-4">{error}</p>}
+              {error && <p className="mb-5 text-sm text-red-400">{error}</p>}
 
-              <div className="mb-6 rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/[0.04] p-5 sm:p-6">
-                <div className="flex flex-col items-center justify-between gap-4 sm:flex-row sm:text-left">
-                  <div>
-                    <div className="text-[7px] uppercase tracking-[0.2em] text-[#FFD700]" style={PS2}>
-                      GAME DISPLAY
-                    </div>
-                    <div className="mt-2 text-sm text-white/45">
-                      {phase === 'pairing'
-                        ? repairingDisplay
-                          ? 'Enter this fresh code on the replacement Display. Your live Host session stays intact.'
-                          : 'Enter this code on the Game Display before choosing a game.'
-                        : 'Your Game Display is connected and ready.'}
-                    </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <section className="rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/[0.04] p-5">
+                  <div className="text-[#FFD700]" style={{ ...PS2, fontSize: 8 }}>
+                    USE A GAME DISPLAY
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-white/45">
+                    Best for TVs, projectors, or a second tablet. Players look at the shared board while you keep the controls here.
+                  </p>
+
+                  <div className="mt-5 rounded-xl border-2 border-[#FFD700]/50 p-5 font-mono text-4xl tracking-[0.2em] text-[#FFD700] sm:text-5xl">
+                    {pairing?.code || '------'}
                   </div>
 
-                  {phase === 'pairing' ? (
-                    <div className="shrink-0 rounded-xl border-2 border-[#FFD700]/55 bg-black/70 px-5 py-4 font-mono text-4xl tracking-[0.22em] text-[#FFD700] shadow-[0_0_24px_rgba(255,215,0,.12)]">
-                      {pairing?.code || '------'}
-                    </div>
-                  ) : (
-                    <div className="shrink-0 rounded-xl border border-green-400/35 bg-green-400/[0.07] px-4 py-3">
-                      <div className="flex items-center gap-2 text-green-400">
-                        <span className="h-2.5 w-2.5 rounded-full bg-green-400 shadow-[0_0_10px_rgba(74,222,128,.75)]" />
-                        <span className="text-[7px] uppercase tracking-[0.18em]" style={PS2}>
-                          DISPLAY CONNECTED
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                   <Link
                     to="/display"
                     target="_blank"
-                    className="rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/10 px-4 py-2 text-[#FFD700]"
-                    style={{ ...PS2, fontSize: 7 }}
+                    className="mt-5 inline-block rounded-lg bg-[#FFD700] px-5 py-3 text-black"
+                    style={{ ...PS2, fontSize: 8 }}
                   >
                     OPEN DISPLAY
                   </Link>
 
-                  {phase === 'ready' && (
-                    <button
-                      type="button"
-                      onClick={replaceDisplay}
-                      disabled={busy}
-                      className="rounded-lg border border-white/15 bg-white/[0.03] px-4 py-2 text-white/55 disabled:opacity-40"
-                      style={{ ...PS2, fontSize: 7 }}
-                    >
-                      RE-PAIR DISPLAY
-                    </button>
-                  )}
+                  <p className="mt-3 text-xs text-white/30">
+                    Enter the code above on the display screen.
+                  </p>
+                </section>
 
-                  {phase === 'pairing' && !repairingDisplay && (
-                    <button
-                      type="button"
-                      onClick={continueWithoutDisplay}
-                      disabled={busy}
-                      className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-4 py-2 text-[#BC13FE] disabled:opacity-40"
-                      style={{ ...PS2, fontSize: 7 }}
-                    >
-                      {busy ? 'STARTING…' : 'TEST WITHOUT DISPLAY'}
-                    </button>
-                  )}
-                </div>
+                <section className="rounded-2xl border border-[#BC13FE]/40 bg-[#BC13FE]/[0.05] p-5">
+                  <div className="text-[#BC13FE]" style={{ ...PS2, fontSize: 8 }}>
+                    HOST PANEL ONLY
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-white/45">
+                    No second screen required. The live game board will appear inside your Host Panel beside the controls,
+                    and TNG will resize it for desktop, tablet, or phone.
+                  </p>
+
+                  <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-left text-sm text-white/45">
+                    <div>• Desktop / landscape tablet: board + controls side by side</div>
+                    <div className="mt-2">• Portrait tablet / phone: board fits above the controls</div>
+                    <div className="mt-2">• Fullscreen board button included</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={continueWithoutDisplay}
+                    disabled={busy || !pairing?.code}
+                    className="mt-5 w-full rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 px-5 py-3 text-[#BC13FE] transition hover:bg-[#BC13FE]/20 disabled:opacity-50"
+                    style={{ ...PS2, fontSize: 8 }}
+                  >
+                    {busy ? 'STARTING HOST-ONLY MODE…' : 'USE HOST PANEL ONLY'}
+                  </button>
+                </section>
               </div>
 
-              <div className="mb-3 text-left">
-                <div className="text-[7px] uppercase tracking-[0.18em] text-white/25" style={PS2}>
-                  CHOOSE A GAME
-                </div>
-              </div>
-
-              <div className="grid sm:grid-cols-3 gap-4">
-                {ALL_GAMES.map((game) => {
-                  const displayReady = phase === 'ready';
-                  return (
-                    <button
-                      key={game.id}
-                      disabled={busy || !displayReady}
-                      onClick={() => createRoom(game)}
-                      className="border-2 rounded-xl p-6 bg-black/50 transition disabled:cursor-not-allowed disabled:opacity-30"
-                      style={{ borderColor: game.color + '55' }}
-                      title={displayReady ? `Start ${game.title}` : 'Connect the Game Display first'}
-                    >
-                      <div className="text-5xl mb-3">{game.emoji}</div>
-                      <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
-                        {game.title}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {phase === 'pairing' && (
-                <p className="mt-4 text-xs text-white/30">
-                  Game selection unlocks as soon as the Display connects.
+              {repairingDisplay && (
+                <p className="mt-4 text-xs text-white/35">
+                  Your current live room stays intact while you change the screen setup.
                 </p>
               )}
+            </div>
+          </div>
+        )}
+
+        {phase === 'ready' && (
+          <div className="h-full flex items-center justify-center">
+            <div className="w-full max-w-2xl text-center">
+              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
+              <h1 className="text-3xl mb-3">Host System Ready</h1>
+
+              <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
+                <span
+                  className={`rounded-full border px-3 py-2 text-[7px] uppercase tracking-widest ${
+                    displayMode === 'embedded'
+                      ? 'border-[#BC13FE]/40 bg-[#BC13FE]/10 text-[#BC13FE]'
+                      : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]'
+                  }`}
+                  style={PS2}
+                >
+                  {displayMode === 'embedded' ? 'HOST PANEL ONLY' : 'GAME DISPLAY CONNECTED'}
+                </span>
+
+                {displayMode === 'embedded' ? (
+                  <button
+                    type="button"
+                    onClick={replaceDisplay}
+                    disabled={busy}
+                    className="rounded-lg border border-[#FFD700]/45 px-3 py-2 text-xs text-[#FFD700] disabled:opacity-40"
+                  >
+                    USE DISPLAY
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={switchToHostOnly}
+                    disabled={busy}
+                    className="rounded-lg border border-[#BC13FE]/45 px-3 py-2 text-xs text-[#BC13FE] disabled:opacity-40"
+                  >
+                    HOST PANEL ONLY
+                  </button>
+                )}
+              </div>
+
+              {error && <p className="text-red-400 mb-4">{error}</p>}
+
+              <div className="grid sm:grid-cols-3 gap-4">
+                {ALL_GAMES.map((game) => (
+                  <button
+                    key={game.id}
+                    disabled={busy}
+                    onClick={() => createRoom(game)}
+                    className="border-2 rounded-xl p-6 bg-black/50"
+                    style={{ borderColor: game.color + '55' }}
+                  >
+                    <div className="text-5xl mb-3">{game.emoji}</div>
+                    <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
+                      {game.title}
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -669,48 +996,72 @@ export default function PreviewHostPanel() {
                       <span className="truncate text-sm font-black uppercase sm:text-base">
                         {roomGame?.title || activeRoom.gameId}
                       </span>
-                      <span className="shrink-0 rounded-md border border-[#FFD700]/20 bg-[#FFD700]/[0.04] px-2 py-1 font-mono text-xs tracking-[0.12em] text-[#FFD700] sm:text-sm">
-                        ROOM {activeRoom.roomCode}
+                      <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
+                        {activeRoom.roomCode}
                       </span>
                     </div>
                     <div className="mt-0.5 flex items-center gap-2">
                       <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
                         LIVE HOST
                       </span>
-                      {playerTestMode && (
-                        <span className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-[#FFD700]" style={PS2}>
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#FFD700] animate-pulse" />
-                          TEST MODE
-                        </span>
-                      )}
+                      <span
+                        className={`inline-flex items-center gap-1 text-[6px] uppercase tracking-widest ${
+                          displayMode === 'embedded' ? 'text-[#BC13FE]' : 'text-[#FFD700]'
+                        }`}
+                        style={PS2}
+                      >
+                        <span
+                          className={`h-1.5 w-1.5 rounded-full animate-pulse ${
+                            displayMode === 'embedded' ? 'bg-[#BC13FE]' : 'bg-[#FFD700]'
+                          }`}
+                        />
+                        {displayMode === 'embedded' ? 'HOST-ONLY' : 'DISPLAY'}
+                      </span>
+                      <span
+                        className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
+                        style={PS2}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                        {roomPeople.length} IN ROOM
+                      </span>
                     </div>
                   </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {!playerTestMode && (
+                  {displayMode === 'external' ? (
+                    <>
+                      <button
+                        onClick={switchToHostOnly}
+                        disabled={busy}
+                        className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE] disabled:opacity-40"
+                        title="Use Host Panel only"
+                      >
+                        <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                        <span className="hidden text-[9px] sm:inline">HOST ONLY</span>
+                      </button>
+
+                      <button
+                        onClick={replaceDisplay}
+                        disabled={busy}
+                        className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
+                        title="Re-pair display"
+                      >
+                        <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                        <span className="hidden text-[9px] sm:inline">PAIR</span>
+                      </button>
+                    </>
+                  ) : (
                     <button
-                      onClick={releaseDisplayForPlayerTesting}
+                      onClick={replaceDisplay}
                       disabled={busy}
-                      className="rounded-lg border border-[#4ade80]/50 bg-[#4ade80]/10 px-2.5 py-2 text-[#4ade80] disabled:opacity-40"
-                      title="Player test mode"
+                      className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
+                      title="Move board to a separate Game Display"
                     >
-                      <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                      <span className="hidden text-[9px] sm:inline">TEST</span>
+                      <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                      <span className="hidden text-[9px] sm:inline">USE DISPLAY</span>
                     </button>
                   )}
-
-                  <button
-                    onClick={replaceDisplay}
-                    disabled={busy}
-                    className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
-                    title={playerTestMode ? 'Restore display' : 'Emergency re-pair display'}
-                  >
-                    <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                    <span className="hidden text-[9px] sm:inline">
-                      {playerTestMode ? 'DISPLAY' : 'RE-PAIR'}
-                    </span>
-                  </button>
 
                   <button
                     onClick={endRoom}
@@ -728,6 +1079,74 @@ export default function PreviewHostPanel() {
 
             <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
 
+            <section className="mb-3 rounded-xl border border-white/10 bg-black/55 px-3 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-[7px] uppercase tracking-[0.16em] text-green-400" style={PS2}>
+                    PEOPLE IN ROOM
+                  </div>
+                  <div className="rounded-full border border-green-400/25 bg-green-400/[0.06] px-2 py-1 text-[10px] text-green-400">
+                    {roomPeople.length}
+                  </div>
+                </div>
+
+                <div className="text-[10px] text-white/25">
+                  Players and active spectators update automatically.
+                </div>
+              </div>
+
+              {rosterError ? (
+                <div className="mt-3 text-xs text-red-400">{rosterError}</div>
+              ) : roomPeople.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {roomPeople.map((person, index) => {
+                    const label =
+                      person.role === 'host'
+                        ? 'HOST'
+                        : person.role === 'spectator'
+                          ? 'SPECTATOR'
+                          : person.seatNumber
+                            ? `SEAT ${person.seatNumber}`
+                            : 'PLAYER';
+
+                    return (
+                      <div
+                        key={person.accountId || person.handle || `${person.role}-${index}`}
+                        className={`rounded-lg border px-3 py-2 ${
+                          person.role === 'spectator'
+                            ? 'border-[#22D3EE]/30 bg-[#22D3EE]/[0.05]'
+                            : person.role === 'host'
+                              ? 'border-[#FFD700]/30 bg-[#FFD700]/[0.05]'
+                              : 'border-[#BC13FE]/30 bg-[#BC13FE]/[0.05]'
+                        }`}
+                      >
+                        <div className="max-w-[180px] truncate text-sm text-white/80">
+                          {person.displayName || person.handle || 'Player'}
+                        </div>
+                        <div
+                          className={`mt-1 text-[6px] uppercase tracking-widest ${
+                            person.role === 'spectator'
+                              ? 'text-[#8DEEFF]'
+                              : person.role === 'host'
+                                ? 'text-[#FFD700]'
+                                : 'text-[#BC13FE]'
+                          }`}
+                          style={PS2}
+                        >
+                          {label}
+                          {person.handle ? ` · @${person.handle}` : ''}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-sm text-white/30">
+                  No connected players or spectators are being reported yet.
+                </div>
+              )}
+            </section>
+
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
               <p className="text-red-400 mb-4 text-center">{roomPollError}</p>
@@ -740,33 +1159,83 @@ export default function PreviewHostPanel() {
               </div>
             )}
 
-            {roomState?.gameId === 'hangman' && (
-              <HangmanHostPanel controllerId={controllerId} />
-            )}
+            {roomState && (
+              <div
+                className={
+                  hostBoardSideBySide
+                    ? 'grid min-w-0 grid-cols-[minmax(0,1.08fr)_minmax(360px,.92fr)] items-start gap-3'
+                    : 'min-w-0 space-y-3'
+                }
+              >
+                {hostOnlyActive && (
+                  <section
+                    ref={hostBoardRef}
+                    className={`min-w-0 overflow-hidden rounded-2xl border border-[#BC13FE]/30 bg-[#030207] shadow-[0_0_35px_rgba(188,19,254,.08)] ${
+                      hostBoardSideBySide ? 'sticky top-[122px]' : ''
+                    }`}
+                    style={{ height: hostBoardHeight }}
+                    data-host-device={hostViewport.kind}
+                    data-host-orientation={hostViewport.orientation}
+                  >
+                    <div className="flex h-9 items-center justify-between border-b border-white/10 bg-black/75 px-3">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
+                        <span className="text-[6px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
+                          LIVE BOARD · {hostViewport.kind.toUpperCase()} {hostViewport.orientation.toUpperCase()}
+                        </span>
+                      </div>
 
-            {roomState?.gameId === 'spades' && (
-              <NeonSpadesHostPanel controllerId={controllerId} />
-            )}
+                      <button
+                        type="button"
+                        onClick={toggleHostBoardFullscreen}
+                        className="flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[7px] text-white/55"
+                        title="Fullscreen game board"
+                      >
+                        <Expand className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">BOARD</span>
+                      </button>
+                    </div>
 
-            {roomState?.gameId === 'word-search' && (
-              <NeonWordSearchHostPanel controllerId={controllerId} />
-            )}
+                    <div className="h-[calc(100%-2.25rem)] min-h-0">
+                      <GameDisplay
+                        embedded
+                        displayCredentials={embeddedDisplay}
+                      />
+                    </div>
+                  </section>
+                )}
 
-            {roomState?.gameId === 'square-biz' && (
-              <NeonSquareBizHostPanel controllerId={controllerId} />
-            )}
+                <section className="min-w-0">
+                  {roomState?.gameId === 'hangman' && (
+                    <HangmanHostPanel controllerId={controllerId} />
+                  )}
 
-            {roomState?.gameId === 'bff' && (
-              <NeonBFFHostPanel controllerId={controllerId} />
-            )}
+                  {roomState?.gameId === 'spades' && (
+                    <NeonSpadesHostPanel controllerId={controllerId} />
+                  )}
 
-            {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
-              <div className="py-16 text-center text-white/40">
-                <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
-                <p>
-                  {roomGame?.title || roomState.gameId} is connected to the new Neon room.
-                  Its game controls are next in the migration queue.
-                </p>
+                  {roomState?.gameId === 'word-search' && (
+                    <NeonWordSearchHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState?.gameId === 'square-biz' && (
+                    <NeonSquareBizHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState?.gameId === 'bff' && (
+                    <NeonBFFHostPanel controllerId={controllerId} />
+                  )}
+
+                  {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
+                    <div className="py-16 text-center text-white/40">
+                      <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
+                      <p>
+                        {roomGame?.title || roomState.gameId} is connected to the new Neon room.
+                        Its game controls are next in the migration queue.
+                      </p>
+                    </div>
+                  )}
+                </section>
               </div>
             )}
           </div>
