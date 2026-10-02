@@ -15,14 +15,12 @@ import {
   Sparkles,
   Zap,
   Undo2,
-  Pencil,
-  Mic,
-  MicOff,
+  Pencil
+
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
-import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -319,7 +317,7 @@ function ControlButton({ label, icon: Icon, accent = '#BC13FE', active = false, 
   );
 }
 
-function PlayerRow({ player, team, onAssign, busy, voiceLive }) {
+function PlayerRow({ player, team, onAssign, busy }) {
   const accent = team === 1 ? '#BC13FE' : team === 2 ? '#FF5F1F' : '#FFD700';
 
   return (
@@ -337,7 +335,6 @@ function PlayerRow({ player, team, onAssign, busy, voiceLive }) {
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          {voiceLive && <Mic className="h-3 w-3 text-[#22D3EE]" />}
           <span className="h-2 w-2 shrink-0 rounded-full bg-[#4ade80]" />
         </div>
       </div>
@@ -377,33 +374,6 @@ function PlayerRow({ player, team, onAssign, busy, voiceLive }) {
   );
 }
 
-function waitForIceComplete(pc) {
-  if (pc.iceGatheringState === 'complete') return Promise.resolve();
-
-  return new Promise((resolve) => {
-    const onState = () => {
-      if (pc.iceGatheringState === 'complete') {
-        pc.removeEventListener('icegatheringstatechange', onState);
-        resolve();
-      }
-    };
-
-    pc.addEventListener('icegatheringstatechange', onState);
-    window.setTimeout(() => {
-      pc.removeEventListener('icegatheringstatechange', onState);
-      resolve();
-    }, 3500);
-  });
-}
-
-function createSilentAudioTrack() {
-  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  const context = new AudioContextClass();
-  const destination = context.createMediaStreamDestination();
-  const track = destination.stream.getAudioTracks()[0];
-  return { context, track };
-}
-
 export default function NeonBFFHostPanel({ controllerId }) {
   const [room, setRoom] = useState(null);
   const [actionError, setActionError] = useState('');
@@ -412,35 +382,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [selectedAnswer, setSelectedAnswer] = useState(0);
   const [manualPoints, setManualPoints] = useState(10);
   const lastSoundCueRef = useRef(null);
-  const voicePeersRef = useRef(new Map());
-  const handledVoiceOffersRef = useRef(new Map());
-  const voiceAudioRef = useRef(null);
-  const playerVoiceTracksRef = useRef(new Map());
-  const silentAudioRef = useRef(null);
-  const hostMicStreamRef = useRef(null);
-  const hostMicTrackRef = useRef(null);
-  const activePlayerIdRef = useRef(null);
-  const [hostMuted, setHostMuted] = useState(false);
-  const [clockNow, setClockNow] = useState(() => Date.now());
-  const handledDeadlineRef = useRef(null);
-  const hostMicAutoAttemptedRef = useRef(false);
-  const hostVoiceMountedRef = useRef(true);
-  const publishedVoiceAnswersRef = useRef(new Set());
-  const reportedVoiceLiveRef = useRef(new Set());
-  const voiceSignalQueueRef = useRef(Promise.resolve());
 
   const gameState = room?.gameState || {};
-  const hostVoiceRelay = useBffVoiceRelay({
-    roomCode: room?.roomCode || null,
-    role: 'host',
-    identity: controllerId,
-    shouldSend: !hostMuted,
-    autoStart: Boolean(room?.roomCode && controllerId),
-  });
-  const hostMicReady = Boolean(
-    hostVoiceRelay.micReady && hostVoiceRelay.status === 'live'
-  );
-  const hostMicBusy = hostVoiceRelay.status === 'connecting';
   const players = Array.isArray(gameState.players)
     ? gameState.players
     : Array.isArray(room?.players)
@@ -472,30 +415,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
     ? Math.max(0, Math.ceil((Number(gameState.answer_deadline_at) - clockNow) / 1000))
     : null;
   const selectingFaceoff = ['faceoff_setup', 'faceoff_ready', 'faceoff_unresolved'].includes(roundStage);
-  const micsReady = Boolean(gameState.mics_ready);
-  const voiceSessionLocked = Boolean(gameState.voice_session_locked);
-  const assignedPlayers = [...team1, ...team2];
-  const backendVoiceVerified = gameState.voice_verified || {};
-  const relayConnected = gameState.voice_relay_connected || {};
-  const liveMicsReady = Boolean(
-    assignedPlayers.length >= 2
-    && team1.length > 0
-    && team2.length > 0
-    && assignedPlayers.every((player) => Boolean(relayConnected[player.playerId]))
-  );
-  const micStatusRows = assignedPlayers.map((player) => {
-    const playerId = String(player.playerId);
-    const live = Boolean(relayConnected[playerId]);
-    const verified = Boolean(backendVoiceVerified[playerId]);
-    return {
-      playerId,
-      name: getPublicTngName(player),
-      status: live ? 'live' : verified ? 'reconnecting' : 'off',
-    };
-  });
-  const missingMicNames = micStatusRows
-    .filter((row) => row.status !== 'live')
-    .map((row) => row.name);
   const canActivateBuzz = Boolean(
     !gameState.buzzer_open
     && (
@@ -518,21 +437,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
     && (Number(gameState.winning_team) === 1 ? team1.length : team2.length) >= 4
   );
 
-  const enableHostMic = useCallback(async () => {
-    setActionError('');
-    const ok = await hostVoiceRelay.start();
-    if (!ok && hostVoiceRelay.error) {
-      setActionError(hostVoiceRelay.error);
-    }
-  }, [hostVoiceRelay]);
-
-  const toggleHostMute = useCallback(() => {
-    if (!hostVoiceRelay.micReady) {
-      enableHostMic();
-      return;
-    }
-    setHostMuted((current) => !current);
-  }, [enableHostMic, hostVoiceRelay.micReady]);
 
   const refresh = useCallback(async () => {
     if (!controllerId) return;
@@ -560,11 +464,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
     preloadBffSounds();
     armBffSoundUnlock();
   }, []);
-  useEffect(() => {
-    if (hostMicAutoAttemptedRef.current || hostMicReady || hostMicBusy) return;
-    hostMicAutoAttemptedRef.current = true;
-    enableHostMic();
-  }, [enableHostMic, hostMicBusy, hostMicReady]);
 
 
   useEffect(() => {
@@ -637,7 +536,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
       )}
 
       <section className={`rounded-xl border px-3 py-2 ${
-        gameState.family_names_set && hostMicReady && (voiceSessionLocked || liveMicsReady)
+        gameState.family_names_set
           ? 'border-[#4ADE80]/35 bg-[#4ADE80]/[.05]'
           : 'border-[#FF5F1F]/35 bg-[#FF5F1F]/[.05]'
       }`}>
@@ -647,74 +546,12 @@ export default function NeonBFFHostPanel({ controllerId }) {
               ROUND SETUP STATUS
             </div>
             <div className="mt-1 text-[10px] text-white/55">
-              {!gameState.family_names_set
-                ? 'Enter both family names.'
-                : !hostMicReady
-                  ? 'Enable the Host microphone.'
-                  : voiceSessionLocked
-                    ? missingMicNames.length
-                      ? `VOICE LOCKED · Reconnecting in background: ${missingMicNames.join(', ')}`
-                      : 'VOICE LOCKED · All players live.'
-                    : missingMicNames.length
-                      ? `Waiting on mic connection: ${missingMicNames.join(', ')}`
-                      : 'READY · Start Round is unlocked.'}
+              {gameState.family_names_set
+                ? 'READY · Start Round is unlocked.'
+                : 'Enter both family names.'}
             </div>
           </div>
-
-          <div className="flex flex-wrap gap-1.5">
-            {micStatusRows.map((row) => (
-              <span
-                key={row.playerId}
-                className={`rounded-md border px-2 py-1 text-[6px] uppercase ${
-                  row.status === 'live'
-                    ? 'border-[#4ADE80]/35 text-[#4ADE80]'
-                    : row.status === 'reconnecting'
-                      ? 'border-[#FFD700]/35 text-[#FFD700]'
-                      : 'border-[#FF5F1F]/35 text-[#FF5F1F]'
-                }`}
-                style={PS2}
-              >
-                {row.name} · {row.status === 'live' ? 'MIC LIVE' : row.status === 'reconnecting' ? 'RECONNECTING' : 'MIC OFF'}
-              </span>
-            ))}
-          </div>
         </div>
-      </section>
-
-      <section className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#22D3EE]/25 bg-[#22D3EE]/[.035] px-3 py-2">
-        <div>
-          <div className="text-[6px] uppercase tracking-[.16em] text-[#22D3EE]" style={PS2}>
-            ROOM AUDIO
-          </div>
-          <div className="mt-1 text-[10px] text-white/40">
-            Host is heard by every player. Only the active player's mic is routed back to the room.
-          </div>
-        </div>
-
-        <button
-          type="button"
-          disabled={hostMicBusy}
-          onClick={hostMicReady ? toggleHostMute : enableHostMic}
-          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-[6px] uppercase tracking-widest disabled:opacity-40 ${
-            hostMicReady && !hostMuted
-              ? 'border-[#4ADE80]/50 bg-[#4ADE80]/10 text-[#4ADE80]'
-              : hostMicReady
-                ? 'border-[#FF5F1F]/50 bg-[#FF5F1F]/10 text-[#FF5F1F]'
-                : 'border-[#22D3EE]/40 bg-[#22D3EE]/5 text-[#22D3EE]'
-          }`}
-          style={PS2}
-        >
-          {hostMicReady && !hostMuted
-            ? <Mic className="h-4 w-4" />
-            : <MicOff className="h-4 w-4" />}
-          {hostMicBusy
-            ? 'MIC…'
-            : !hostMicReady
-              ? 'ENABLE HOST MIC'
-              : hostMuted
-                ? 'HOST MUTED'
-                : 'HOST LIVE'}
-        </button>
       </section>
 
       <div className="grid grid-cols-1 gap-2 min-[600px]:grid-cols-[minmax(0,1fr)_minmax(130px,.62fr)_minmax(0,1fr)]">
@@ -849,7 +686,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 disabled={busy || !canStartDysfunction}
                 className="rounded-lg border border-[#F472B6]/50 bg-[#F472B6]/10 px-3 py-2 text-[6px] text-[#F472B6] disabled:opacity-30"
                 style={PS2}
-                title={canStartDysfunction ? 'Start Family Dysfunction' : 'Winning family needs at least 4 connected mic-ready players'}
+                title={canStartDysfunction ? 'Start Family Dysfunction' : 'Winning family needs at least 4 players'}
               >
                 START FAMILY DYSFUNCTION
               </button>
@@ -918,7 +755,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
               {roundStage === 'dysfunction_defense' && (
                 <div className="mt-2 text-[10px] text-[#FFD700]">
-                  Defense mic is live for {getPublicTngName(activePlayer, 'the selected family member')}.
+                  Defense turn: {getPublicTngName(activePlayer, 'the selected family member')}.
                 </div>
               )}
 
@@ -969,27 +806,8 @@ export default function NeonBFFHostPanel({ controllerId }) {
         </section>
 
         <aside className="rounded-xl border border-[#FF5F1F]/25 bg-black/60 p-2.5">
-          <div className="mb-2 grid grid-cols-2 gap-1.5">
-            <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
-              voiceSessionLocked || (micsReady && liveMicsReady)
-                ? 'border-[#4ADE80]/30 text-[#4ADE80]'
-                : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
-            }`} style={PS2}>
-              PLAYERS {
-                voiceSessionLocked
-                  ? missingMicNames.length
-                    ? 'VOICE LOCKED'
-                    : 'MIC READY'
-                  : micsReady && liveMicsReady
-                    ? 'MIC READY'
-                    : 'NEED MICS'
-              }
-            </div>
-            <div className={`rounded-lg border px-2 py-1.5 text-center text-[5px] uppercase ${
-              hostMicReady && !hostMuted ? 'border-[#4ADE80]/30 text-[#4ADE80]' : 'border-[#FF5F1F]/30 text-[#FF5F1F]'
-            }`} style={PS2}>
-              HOST {hostMicReady && !hostMuted ? 'LIVE' : hostMicReady ? 'MUTED' : 'MIC OFF'}
-            </div>
+          <div className="mb-2 rounded-lg border border-[#4ADE80]/30 px-2 py-1.5 text-center text-[5px] uppercase text-[#4ADE80]" style={PS2}>
+            PLAYERS READY
           </div>
 
           <div className="mb-2 flex items-center justify-between">
@@ -1033,15 +851,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
 
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             <ControlButton
-              label={
-                !gameState.family_names_set
-                  ? 'Need Names'
-                  : !hostMicReady
-                    ? 'Host Mic'
-                    : !voiceSessionLocked && !liveMicsReady
-                      ? 'Need Mics'
-                      : 'Start Round'
-              }
+              label={gameState.family_names_set ? 'Start Round' : 'Need Names'}
               icon={Play}
               accent="#4ADE80"
               onClick={() => act('start_round')}
@@ -1050,8 +860,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
                 || gameState.phase === 'playing'
                 || Boolean(gameState.current_question)
                 || !gameState.family_names_set
-                || !hostMicReady
-                || (!voiceSessionLocked && (!micsReady || !liveMicsReady))
               }
             />
             <ControlButton
@@ -1075,7 +883,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
               accent="#FF174D"
               onClick={() => {
                 const confirmed = window.confirm(
-                  'Reset the entire BFF game? Scores, rounds, survey history, strikes, faceoff and finale progress will reset. Connected players, family setup and voice stay intact.',
+                  'Reset the entire BFF game? Scores, rounds, survey history, strikes, faceoff and finale progress will reset. Connected players and family setup stay intact.',
                 );
                 if (confirmed) act('reset_game');
               }}
@@ -1204,7 +1012,6 @@ export default function NeonBFFHostPanel({ controllerId }) {
                   team={Number(teamMap[player.playerId] ?? player.familyTeam) || null}
                   onAssign={assignPlayer}
                   busy={busy}
-                  voiceLive={Boolean(relayConnected[player.playerId])}
                 />
               )) : (
                 <div className="rounded-lg border border-dashed border-white/10 px-3 py-4 text-center text-[9px] text-white/20">
