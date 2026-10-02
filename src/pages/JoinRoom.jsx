@@ -183,7 +183,7 @@ export default function JoinRoom() {
           let deviceId = await ensurePlayerDevice(user?.id);
 
           try {
-            const payload = validatePlayerJoin(
+            let payload = validatePlayerJoin(
               await tngApi.player.joinRoom(deviceId, roomCode),
               roomCode,
             );
@@ -209,7 +209,7 @@ export default function JoinRoom() {
               localStorage.removeItem('tng_player_device_id');
               deviceId = await ensurePlayerDevice(user?.id);
 
-              const payload = validatePlayerJoin(
+              let payload = validatePlayerJoin(
                 await tngApi.player.joinRoom(deviceId, roomCode),
                 roomCode,
               );
