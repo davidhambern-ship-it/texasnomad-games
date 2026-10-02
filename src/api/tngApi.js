@@ -40,6 +40,18 @@ const DISPLAY_STATE_API_BASE =
     ? '/tng-display'
     : 'https://tng-live-production.up.railway.app/tng-display');
 
+const SPECTATOR_API_BASE =
+  import.meta.env.VITE_TNG_SPECTATOR_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-spectator'
+    : 'https://tng-live-production.up.railway.app/tng-spectator');
+
+const HOST_ROSTER_API_BASE =
+  import.meta.env.VITE_TNG_HOST_ROSTER_API_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-host-stage'
+    : 'https://tng-live-production.up.railway.app/tng-host-stage');
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -564,6 +576,12 @@ export const tngApi = {
     getRoom: (deviceId, roomCode) => request('/api/player/room', {
       deviceId,
       roomCode,
+    }),
+  },
+  spectator: {
+    getState: (roomCode) => request(`/state?room=${encodeURIComponent(roomCode)}`, {
+      roomCode,
+      apiBase: SPECTATOR_API_BASE,
     }),
   },
   social: {

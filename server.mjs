@@ -913,9 +913,85 @@ async function syncTngAccountsToBernaverseFree() {
   });
 }
 
-const bffVoiceWss = new WebSocketServer({ noServer: true });
-const bffVoiceRooms = new Map();
-const bffVoiceActivePlayerByRoom = new Map();
+// Spectators intentionally do not take a room_participants seat. Track their
+// authenticated read-only presence separately so the Host can still see who
+// is actually watching the room. tng-staging runs one replica, so a short
+// in-memory heartbeat is enough for live presence without changing the DB.
+const tngSpectatorPresence = new Map();
+const TNG_SPECTATOR_TTL_MS = 8000;
+
+function spectatorPresenceKey(roomCode) {
+  return String(roomCode || '').trim().toUpperCase();
+}
+
+function recordSpectatorPresence(roomCode, profilePayload = {}) {
+  const roomKey = spectatorPresenceKey(roomCode);
+  if (!roomKey) return;
+
+  const profile = profilePayload?.profile || {};
+  const handle = String(
+    profile.handle ||
+    profile.normalizedHandle ||
+    profile.normalized_handle ||
+    ''
+  ).replace(/^@/, '').trim();
+
+  const accountKey = String(
+    profile.accountId ||
+    profile.account_id ||
+    profile.id ||
+    handle ||
+    ''
+  ).trim();
+
+  if (!accountKey) return;
+
+  if (!tngSpectatorPresence.has(roomKey)) {
+    tngSpectatorPresence.set(roomKey, new Map());
+  }
+
+  tngSpectatorPresence.get(roomKey).set(accountKey, {
+    accountId:
+      profile.accountId ||
+      profile.account_id ||
+      profile.id ||
+      null,
+    displayName:
+      profile.displayName ||
+      profile.display_name ||
+      profile.fullName ||
+      profile.full_name ||
+      handle ||
+      'Spectator',
+    handle: handle || null,
+    role: 'spectator',
+    seatNumber: null,
+    lastSeenAt: Date.now(),
+  });
+}
+
+function getLiveSpectators(roomCode) {
+  const roomKey = spectatorPresenceKey(roomCode);
+  const roomPresence = tngSpectatorPresence.get(roomKey);
+  if (!roomPresence) return [];
+
+  const cutoff = Date.now() - TNG_SPECTATOR_TTL_MS;
+  const live = [];
+
+  for (const [key, spectator] of roomPresence.entries()) {
+    if (Number(spectator.lastSeenAt || 0) < cutoff) {
+      roomPresence.delete(key);
+      continue;
+    }
+    live.push(spectator);
+  }
+
+  if (roomPresence.size === 0) {
+    tngSpectatorPresence.delete(roomKey);
+  }
+
+  return live;
+}
 
 const hostLiveWss = new WebSocketServer({ noServer: true });
 
@@ -1135,12 +1211,6 @@ hostLiveWss.on('connection', (ws) => {
 
   ws.on('error', () => {});
 });
-
-function voiceRoomSet(roomCode) {
-  const key = String(roomCode || '').toUpperCase();
-  if (!bffVoiceRooms.has(key)) bffVoiceRooms.set(key, new Set());
-  return bffVoiceRooms.get(key);
-}
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
@@ -2081,6 +2151,397 @@ async function ensureBffTeamAssignments(room, gameState = {}, players = []) {
 }
 
 
+const WORD_SEARCH_SPECTATOR_COLORS = {
+  1: '#BC13FE',
+  2: '#FF5F1F',
+  3: '#FFD700',
+  4: '#22D3EE',
+};
+
+function projectWordSearchSpectatorState(rawState = {}, participants = []) {
+  const scores = rawState?.scores && typeof rawState.scores === 'object'
+    ? rawState.scores
+    : {};
+
+  return {
+    phase: rawState.phase || 'setup',
+    mode: rawState.mode || 'race',
+    difficulty: rawState.difficulty || 'simpleton',
+    category: rawState.category || 'random',
+    grid: Array.isArray(rawState.grid) ? rawState.grid : [],
+    words: Array.isArray(rawState.words)
+      ? rawState.words.map((word) => ({
+          word: word.word,
+          found: word.found === true,
+          foundBy: word.foundBy ?? null,
+          foundAt: word.foundAt ?? null,
+          cells: word.found === true && Array.isArray(word.cells) ? word.cells : [],
+          points: word.found === true ? (word.points ?? null) : null,
+          directionLabel: word.found === true ? (word.directionLabel ?? null) : null,
+          revealed: word.revealed === true,
+        }))
+      : [],
+    scores: { ...scores },
+    activeSeat: Number(rawState.active_seat || rawState.activeSeat || 0),
+    timeEnd: rawState.time_end || rawState.timeEnd || null,
+    paused: rawState.paused === true,
+    message: rawState.message || null,
+    winnerSeat: rawState.winner_seat || rawState.winnerSeat || null,
+    lastAction: rawState.last_action || rawState.lastAction || null,
+    roundNumber: Number(rawState.round_number || rawState.roundNumber || 0),
+    players: participants.map((player) => {
+      const seat = Number(player.seat_number || 0);
+      return {
+        playerId: player.account_id,
+        accountId: player.account_id,
+        seatNumber: seat,
+        role: player.role || 'player',
+        name: player.display_name || player.handle || (seat ? `Seat ${seat}` : 'Player'),
+        handle: player.handle || null,
+        color: WORD_SEARCH_SPECTATOR_COLORS[seat] || '#FFFFFF',
+        score: Number(scores[String(seat)] || 0),
+      };
+    }),
+  };
+}
+
+function sanitizeGenericSpectatorState(gameId, displayState = {}) {
+  const source =
+    displayState?.state ||
+    displayState?.gameState ||
+    displayState?.game_state ||
+    displayState ||
+    {};
+
+  let state;
+  try {
+    state = JSON.parse(JSON.stringify(source));
+  } catch {
+    state = { ...source };
+  }
+
+  if (gameId === 'hangman') {
+    delete state.word;
+    delete state.secretWord;
+    delete state.secret_word;
+    delete state.answer;
+    delete state.normalizedWord;
+    delete state.normalized_word;
+  }
+
+  if (gameId === 'spades') {
+    delete state.deck;
+    delete state.hands;
+    delete state.privateHands;
+    delete state.private_hands;
+
+    if (Array.isArray(state.players)) {
+      state.players = state.players.map((player) => {
+        const next = { ...player };
+        const hiddenCards =
+          (Array.isArray(next.hand) && next.hand) ||
+          (Array.isArray(next.cards) && next.cards) ||
+          (Array.isArray(next.privateHand) && next.privateHand) ||
+          [];
+        if (next.cardCount == null && hiddenCards.length) {
+          next.cardCount = hiddenCards.length;
+        }
+        delete next.hand;
+        delete next.cards;
+        delete next.privateHand;
+        delete next.private_hand;
+        return next;
+      });
+    }
+  }
+
+  if (gameId === 'square-biz') {
+    const revealAnswer = ['result', 'finished'].includes(String(state.phase || ''));
+    if (!revealAnswer) {
+      delete state.correctAnswer;
+      delete state.correct_answer;
+    }
+
+    if (state.currentQuestion && typeof state.currentQuestion === 'object') {
+      state.currentQuestion = { ...state.currentQuestion };
+      if (!revealAnswer) {
+        delete state.currentQuestion.answer;
+        delete state.currentQuestion.correctAnswer;
+        delete state.currentQuestion.correct_answer;
+      }
+    }
+  }
+
+  return state;
+}
+
+async function handleTngSpectator(req, res) {
+  const sourceUrl = new URL(req.url || '/', 'http://localhost');
+  const path = sourceUrl.pathname.replace(/^\/tng-spectator/, '') || '/';
+
+  if (req.method !== 'GET' || path !== '/state') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET /state required.' },
+    });
+    return;
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    sendJson(res, 401, {
+      error: { code: 'AUTH_REQUIRED', message: 'Sign in to spectate.' },
+    });
+    return;
+  }
+
+  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+    },
+  });
+
+  if (!profileResponse.ok) {
+    const payload = await profileResponse.json().catch(() => ({}));
+    sendJson(res, profileResponse.status, payload?.error
+      ? payload
+      : {
+          error: {
+            code: 'AUTH_REQUIRED',
+            message: 'Your TNG session could not be verified.',
+          },
+        });
+    return;
+  }
+
+  const profilePayload = await profileResponse.json().catch(() => ({}));
+
+  const roomCode = String(
+    sourceUrl.searchParams.get('room') ||
+    req.headers['x-tng-room-code'] ||
+    ''
+  ).trim().toUpperCase();
+
+  if (!roomCode) {
+    sendJson(res, 400, {
+      error: { code: 'ROOM_REQUIRED', message: 'Enter a live room code to spectate.' },
+    });
+    return;
+  }
+
+  const { rows } = await bffPool.query(`
+    select id, room_code, game_id, status::text as status, revision, display_state,
+           created_at, updated_at
+    from public.game_rooms
+    where upper(room_code) = upper($1)
+      and status::text in ('lobby', 'live', 'paused')
+    order by updated_at desc
+    limit 1
+  `, [roomCode]);
+
+  let room = rows[0] || null;
+  if (!room) {
+    sendJson(res, 404, {
+      error: { code: 'ROOM_NOT_FOUND', message: `Room "${roomCode}" is not live.` },
+    });
+    return;
+  }
+
+  recordSpectatorPresence(room.room_code, profilePayload);
+
+  let state = {};
+
+  if (room.game_id === 'bff') {
+    room = await reconcileBffTimers(room);
+    const internalState = extractBffGameState(room.display_state || {});
+    const players = await loadBffParticipants(room.id, internalState);
+    state = sanitizeBffPlayerState(internalState, players, null);
+  } else if (room.game_id === 'word-search') {
+    const { rows: participants } = await bffPool.query(`
+      select
+        rp.account_id,
+        rp.role::text as role,
+        rp.seat_number,
+        pp.display_name,
+        pp.handle
+      from public.room_participants rp
+      left join public.player_profiles pp
+        on pp.account_id = rp.account_id
+      where rp.room_id = $1::uuid
+        and rp.left_at is null
+        and rp.seat_number in (1, 2, 3, 4)
+      order by rp.seat_number
+    `, [room.id]);
+
+    const rawState =
+      room.display_state?.gameState ||
+      room.display_state?.game_state ||
+      {};
+
+    state = projectWordSearchSpectatorState(rawState, participants);
+  } else {
+    state = sanitizeGenericSpectatorState(room.game_id, room.display_state || {});
+  }
+
+  sendJson(res, 200, {
+    status: 'spectating',
+    room: {
+      id: room.id,
+      roomCode: room.room_code,
+      gameId: room.game_id,
+      status: room.status,
+      revision: room.revision,
+      state,
+      createdAt: room.created_at,
+      updatedAt: room.updated_at,
+      spectator: true,
+    },
+  });
+}
+
+
+async function handleTngHostRoster(req, res) {
+  if (req.method !== 'GET') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
+    });
+    return;
+  }
+
+  const controllerId = String(req.headers['x-tng-device-id'] || '');
+  if (!isUuid(controllerId)) {
+    sendJson(res, 400, {
+      error: { code: 'CONTROLLER_REQUIRED', message: 'Host Controller is required.' },
+    });
+    return;
+  }
+
+  const auth = String(req.headers.authorization || '');
+  if (!auth) {
+    sendJson(res, 401, {
+      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+    });
+    return;
+  }
+
+  // Let the authoritative TNG API verify this signed-in Host/controller pair.
+  const verified = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: auth,
+      'X-TNG-Device-Id': controllerId,
+    },
+  });
+
+  if (!verified.ok) {
+    const payload = await verified.json().catch(() => ({}));
+    sendJson(res, verified.status, payload?.error
+      ? payload
+      : {
+          error: {
+            code: 'HOST_SESSION_INVALID',
+            message: 'TNG could not verify this Host session.',
+          },
+        });
+    return;
+  }
+
+  const { rows: roomRows } = await bffPool.query(`
+    select gr.id, gr.room_code, gr.game_id, gr.status::text as status
+    from public.host_sessions hs
+    join public.game_rooms gr on gr.host_session_id = hs.id
+    where hs.controller_device_id = $1::uuid
+      and hs.ended_at is null
+      and gr.status::text in ('lobby', 'live', 'paused')
+    order by gr.updated_at desc
+    limit 1
+  `, [controllerId]);
+
+  const room = roomRows[0] || null;
+  if (!room) {
+    sendJson(res, 200, {
+      room: null,
+      people: [],
+      players: [],
+      spectators: [],
+      counts: { people: 0, players: 0, spectators: 0 },
+    });
+    return;
+  }
+
+  const { rows: participantRows } = await bffPool.query(`
+    select
+      rp.account_id,
+      rp.role::text as role,
+      rp.seat_number,
+      rp.joined_at,
+      pp.display_name,
+      pp.handle
+    from public.room_participants rp
+    left join public.player_profiles pp
+      on pp.account_id = rp.account_id
+    where rp.room_id = $1::uuid
+      and rp.left_at is null
+    order by
+      case when rp.role::text = 'host_player' then 0 else 1 end,
+      rp.seat_number nulls last,
+      rp.joined_at
+  `, [room.id]);
+
+  const players = participantRows.map((row) => ({
+    accountId: row.account_id,
+    displayName:
+      row.display_name ||
+      row.handle ||
+      (row.role === 'host_player' ? 'Host' : 'Player'),
+    handle: row.handle || null,
+    role: row.role === 'host_player' ? 'host' : 'player',
+    seatNumber: row.seat_number == null ? null : Number(row.seat_number),
+    joinedAt: row.joined_at,
+  }));
+
+  const playerAccountIds = new Set(
+    players
+      .map((player) => String(player.accountId || ''))
+      .filter(Boolean),
+  );
+  const playerHandles = new Set(
+    players
+      .map((player) => String(player.handle || '').toLowerCase())
+      .filter(Boolean),
+  );
+
+  const spectators = getLiveSpectators(room.room_code).filter((spectator) => {
+    const accountId = String(spectator.accountId || '');
+    const handle = String(spectator.handle || '').toLowerCase();
+    return !(
+      (accountId && playerAccountIds.has(accountId)) ||
+      (handle && playerHandles.has(handle))
+    );
+  });
+
+  const people = [...players, ...spectators];
+
+  sendJson(res, 200, {
+    room: {
+      id: room.id,
+      roomCode: room.room_code,
+      gameId: room.game_id,
+      status: room.status,
+    },
+    people,
+    players,
+    spectators,
+    counts: {
+      people: people.length,
+      players: players.filter((player) => player.role === 'player').length,
+      spectators: spectators.length,
+    },
+  });
+}
+
 function extractBffGameState(displayState = {}) {
   if (
     displayState &&
@@ -2176,7 +2637,6 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     buzzer_open: Boolean(gameState.buzzer_open || gameState.buzzer_phase === 'buzzer_active'),
     buzz_winner: gameState.buzz_winner || null,
     family_names_set: bffFamilyNamesReady(gameState),
-    mics_ready: bffMicsReady(players, gameState),
     round_stage: gameState.round_stage || 'setup',
     faceoff_players: gameState.faceoff_players || {},
     faceoff_results: gameState.faceoff_results || {},
@@ -2197,18 +2657,6 @@ function sanitizeBffHostState(gameState = {}, players = []) {
     dysfunction: gameState.dysfunction || null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
-    voice_offers: gameState.voice_offers || {},
-    voice_ready: gameState.voice_ready || {},
-    voice_verified: gameState.voice_verified || {},
-    voice_status: gameState.voice_status || {},
-    voice_session_locked: Boolean(gameState.voice_session_locked),
-    voice_session_locked_at: Number(gameState.voice_session_locked_at) || null,
-    voice_session_players: Array.isArray(gameState.voice_session_players)
-      ? gameState.voice_session_players
-      : [],
-    voice_relay_connected: gameState.voice_relay_connected || {},
-    voice_relay_host_connected: Boolean(gameState.voice_relay_host_connected),
-    voice_transport: gameState.voice_transport || null,
     answers: safeAnswers,
     players,
   };
@@ -2227,201 +2675,7 @@ async function saveBffGameState(roomId, originalDisplayState, nextGameState) {
   `, [roomId, JSON.stringify(nextDisplayState)]);
 
   const saved = rows[0] || null;
-  if (saved?.room_code) {
-    bffVoiceActivePlayerByRoom.set(
-      String(saved.room_code).toUpperCase(),
-      nextGameState.active_player_id ? String(nextGameState.active_player_id) : null,
-    );
-  }
-
   return saved;
-}
-
-async function setBffVoiceRelayPresence(roomId, roomCode, role, playerId, connected) {
-  const client = await bffPool.connect();
-
-  try {
-    await client.query('begin');
-    const locked = await client.query(`
-      select id, room_code, display_state
-      from public.game_rooms
-      where id = $1::uuid
-      for update
-    `, [roomId]);
-
-    const row = locked.rows[0];
-    if (!row) {
-      await client.query('rollback');
-      return;
-    }
-
-    const gameState = extractBffGameState(row.display_state || {});
-    gameState.voice_transport = 'railway-websocket';
-
-    if (role === 'host') {
-      gameState.voice_relay_host_connected = Boolean(connected);
-    } else if (role === 'display') {
-      gameState.voice_relay_display_connected = Boolean(connected);
-    } else if (playerId) {
-      gameState.voice_relay_connected = {
-        ...(gameState.voice_relay_connected || {}),
-        [String(playerId)]: Boolean(connected),
-      };
-
-      if (connected) {
-        gameState.voice_verified = {
-          ...(gameState.voice_verified || {}),
-          [String(playerId)]: true,
-        };
-        gameState.voice_ready = {
-          ...(gameState.voice_ready || {}),
-          [String(playerId)]: true,
-        };
-      }
-    }
-
-    const nextDisplayState = wrapBffGameState(row.display_state || {}, gameState);
-    await client.query(`
-      update public.game_rooms
-      set display_state = $2::jsonb,
-          revision = revision + 1,
-          updated_at = now()
-      where id = $1::uuid
-    `, [roomId, JSON.stringify(nextDisplayState)]);
-
-    bffVoiceActivePlayerByRoom.set(
-      String(roomCode || row.room_code || '').toUpperCase(),
-      gameState.active_player_id ? String(gameState.active_player_id) : null,
-    );
-
-    await client.query('commit');
-  } catch (error) {
-    await client.query('rollback').catch(() => {});
-    console.error('[BFF Voice Relay] presence update failed', error);
-  } finally {
-    client.release();
-  }
-}
-
-async function resolveBffVoiceSocket(url) {
-  const roomCode = String(url.searchParams.get('room') || '').toUpperCase();
-  const role = String(url.searchParams.get('role') || '');
-  const identity = String(url.searchParams.get('id') || '');
-
-  if (!roomCode || !['host', 'player', 'display'].includes(role) || !isUuid(identity)) {
-    return null;
-  }
-
-  if (role === 'host') {
-    const { rows } = await bffPool.query(`
-      select gr.id, gr.room_code, gr.display_state
-      from public.host_sessions hs
-      join public.game_rooms gr on gr.host_session_id = hs.id
-      where hs.controller_device_id = $1::uuid
-        and hs.status in ('pairing','ready','live')
-        and gr.room_code = $2
-        and gr.game_id = 'bff'
-        and gr.status in ('lobby','live','paused')
-      order by gr.updated_at desc
-      limit 1
-    `, [identity, roomCode]);
-
-    const room = rows[0];
-    if (!room) return null;
-
-    const gameState = extractBffGameState(room.display_state || {});
-    bffVoiceActivePlayerByRoom.set(
-      roomCode,
-      gameState.active_player_id ? String(gameState.active_player_id) : null,
-    );
-
-    return {
-      roomId: room.id,
-      roomCode,
-      role: 'host',
-      identity,
-      playerId: null,
-    };
-  }
-
-  if (role === 'display') {
-    const { rows } = await bffPool.query(`
-      select gr.id, gr.room_code, gr.display_state
-      from public.host_sessions hs
-      join public.game_rooms gr on gr.host_session_id = hs.id
-      where hs.display_device_id = $1::uuid
-        and gr.room_code = $2
-        and gr.game_id = 'bff'
-        and gr.status in ('lobby','live','paused')
-      order by gr.updated_at desc
-      limit 1
-    `, [identity, roomCode]);
-
-    const room = rows[0];
-    if (!room) return null;
-
-    return {
-      roomId: room.id,
-      roomCode,
-      role: 'display',
-      identity,
-      playerId: null,
-    };
-  }
-
-  const { rows } = await bffPool.query(`
-    select gr.id, gr.room_code, gr.display_state, rp.account_id
-    from public.game_rooms gr
-    join public.room_participants rp on rp.room_id = gr.id
-    where gr.room_code = $1
-      and gr.game_id = 'bff'
-      and gr.status in ('lobby','live','paused')
-      and rp.device_session_id = $2::uuid
-      and rp.left_at is null
-    order by gr.updated_at desc
-    limit 1
-  `, [roomCode, identity]);
-
-  const room = rows[0];
-  if (!room) return null;
-
-  const gameState = extractBffGameState(room.display_state || {});
-  bffVoiceActivePlayerByRoom.set(
-    roomCode,
-    gameState.active_player_id ? String(gameState.active_player_id) : null,
-  );
-
-  return {
-    roomId: room.id,
-    roomCode,
-    role: 'player',
-    identity,
-    playerId: String(room.account_id),
-  };
-}
-
-function relayBffVoiceFrame(sender, data) {
-  const room = voiceRoomSet(sender.roomCode);
-  if (sender.role === 'display') return;
-  if (!Buffer.isBuffer(data) && !(data instanceof ArrayBuffer) && !ArrayBuffer.isView(data)) {
-    return;
-  }
-
-  const sourceKind = sender.role === 'host' ? 1 : 2;
-  const source = Buffer.isBuffer(data)
-    ? data
-    : Buffer.from(data.buffer || data, data.byteOffset || 0, data.byteLength || undefined);
-  const packet = Buffer.allocUnsafe(1 + source.length);
-  packet.writeUInt8(sourceKind, 0);
-  source.copy(packet, 1);
-
-  for (const client of room) {
-    if (client.ws === sender.ws) continue;
-    if (client.ws.readyState !== WebSocket.OPEN) continue;
-    try {
-      client.ws.send(packet, { binary: true });
-    } catch {}
-  }
 }
 
 function ensureBffAnswerSlot(answers, index) {
@@ -2554,39 +2808,6 @@ function bffNextPlayerId(players = [], gameState = {}, team, currentPlayerId) {
 
 function bffAssignedPlayers(players = [], gameState = {}) {
   return players.filter((player) => [1, 2].includes(bffTeamForPlayer(gameState, player.playerId)));
-}
-
-function bffMicsReady(players = [], gameState = {}) {
-  const assigned = bffAssignedPlayers(players, gameState);
-  if (!assigned.length) return false;
-
-  const hasTeam1 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 1);
-  const hasTeam2 = assigned.some((player) => bffTeamForPlayer(gameState, player.playerId) === 2);
-  if (!hasTeam1 || !hasTeam2) return false;
-
-  // Once the match voice roster has been verified and locked, gameplay no longer
-  // blocks on transient WebRTC state changes. Peers reconnect in the background.
-  if (gameState.voice_session_locked) {
-    const lockedIds = new Set(
-      Array.isArray(gameState.voice_session_players)
-        ? gameState.voice_session_players.map(String)
-        : [],
-    );
-    return assigned.every((player) => lockedIds.has(String(player.playerId)));
-  }
-
-  const verified = gameState.voice_verified || {};
-  const relayConnected = gameState.voice_relay_connected || {};
-
-  if (gameState.voice_transport === 'railway-websocket') {
-    return assigned.every((player) =>
-      relayConnected[String(player.playerId)] === true
-    );
-  }
-
-  return assigned.every((player) =>
-    verified[String(player.playerId)] === true
-  );
 }
 
 function bffFaceoffAttempted(gameState = {}, team) {
@@ -3065,9 +3286,6 @@ async function applyBffHostAction(room, body = {}, players = []) {
     if (!bffFamilyNamesReady(next)) {
       throw new Error('Enter both family names before starting the round.');
     }
-    if (!bffMicsReady(players, next)) {
-      throw new Error('Every assigned family player must turn their microphone on before Start Round.');
-    }
 
     const survey = await pickBffSurvey(next);
     if (!survey) throw new Error('No active BFF surveys are available.');
@@ -3080,12 +3298,6 @@ async function applyBffHostAction(room, body = {}, players = []) {
     next.is_tiebreak = false;
     next.family_names_set = true;
 
-    if (!next.voice_session_locked) {
-      next.voice_session_locked = true;
-      next.voice_session_locked_at = Date.now();
-      next.voice_session_players = bffAssignedPlayers(players, next)
-        .map((player) => String(player.playerId));
-    }
     next.round_stage = 'faceoff_setup';
     next.round_number = Math.max(1, Number(next.round_number || next.roundNumber || 1));
     next.round_bank = 0;
@@ -3116,7 +3328,7 @@ async function applyBffHostAction(room, body = {}, players = []) {
   }
 
   if (action === 'reset_game') {
-    // Preserve room membership, family setup, assignments, and voice relay/session.
+    // Preserve room membership, family setup, and assignments.
     // Reset the actual match so this room can immediately run a fresh game.
     next.phase = 'waiting';
     next.round_stage = 'setup';
@@ -3435,16 +3647,6 @@ async function applyBffHostAction(room, body = {}, players = []) {
       throw new Error('Family Dysfunction needs at least four connected members from the winning family for a 2v2 finale.');
     }
 
-    const relayConnected = next.voice_relay_connected || {};
-    const verified = next.voice_verified || {};
-    if (!roster.every((player) =>
-      Boolean(
-        relayConnected[String(player.playerId)]
-        || verified[String(player.playerId)]
-      )
-    )) {
-      throw new Error('Every Family Dysfunction player must be connected to room audio before the finale starts.');
-    }
 
     const sideAssignments = {};
     roster.forEach((player, index) => {
@@ -3476,59 +3678,6 @@ async function applyBffHostAction(room, body = {}, players = []) {
     return next;
   }
 
-  if (action === 'voice_peer_status') {
-    const playerId = String(body.playerId || '');
-    if (!playerId) return next;
-
-    const previouslyVerified = Boolean((next.voice_verified || {})[playerId]);
-
-    next.voice_ready = {
-      ...(next.voice_ready || {}),
-      [playerId]: previouslyVerified || Boolean(body.ready),
-    };
-
-    if (body.ready || previouslyVerified) {
-      next.voice_verified = {
-        ...(next.voice_verified || {}),
-        [playerId]: true,
-      };
-    }
-
-    next.voice_status = {
-      ...(next.voice_status || {}),
-      [playerId]: {
-        ready: previouslyVerified || Boolean(body.ready),
-        connectionState: String(body.connectionState || ''),
-        iceConnectionState: String(body.iceConnectionState || ''),
-        iceGatheringState: String(body.iceGatheringState || ''),
-        signalingState: String(body.signalingState || ''),
-        at: Date.now(),
-      },
-    };
-    return next;
-  }
-
-  if (action === 'voice_answer') {
-    const playerId = String(body.playerId || '');
-    const sdp = String(body.sdp || '');
-    const offerAt = Number(body.offerAt || 0);
-    if (!playerId || !sdp || !offerAt) return next;
-
-    const currentOfferAt = Number((next.voice_offers || {})[playerId]?.at || 0);
-    if (!currentOfferAt || currentOfferAt !== offerAt) {
-      return next;
-    }
-
-    next.voice_answers = {
-      ...(next.voice_answers || {}),
-      [playerId]: {
-        sdp,
-        offerAt,
-        at: Date.now(),
-      },
-    };
-    return next;
-  }
 
   if (action === 'sound') {
     next.sound_cue = {
@@ -3650,12 +3799,6 @@ function sanitizeBffPlayerState(gameState = {}, players = [], participant = null
       : null,
     playerTeams: gameState.playerTeams || {},
     sound_cue: gameState.sound_cue || null,
-    voice_offer_at: participant
-      ? Number((gameState.voice_offers || {})[participant.accountId || participant.playerId]?.at) || null
-      : null,
-    voice_answer: participant
-      ? (gameState.voice_answers || {})[participant.accountId || participant.playerId] || null
-      : null,
     answers: safeAnswers,
     players,
   };
@@ -3888,55 +4031,6 @@ async function applyBffPlayerAction(room, participant, body = {}, players = []) 
     return next;
   }
 
-  if (action === 'voice_offer') {
-    const sdp = String(body.sdp || '');
-    if (!sdp || !playerId) return current;
-
-    const offerAt = Date.now();
-    const answers = { ...(current.voice_answers || {}) };
-    const statuses = { ...(current.voice_status || {}) };
-    delete answers[playerId];
-    delete statuses[playerId];
-
-    return {
-      ...current,
-      voice_offers: {
-        ...(current.voice_offers || {}),
-        [playerId]: {
-          sdp,
-          playerId,
-          playerName: participant.playerName || participant.name || 'Player',
-          at: offerAt,
-        },
-      },
-      voice_answers: answers,
-      voice_ready: {
-        ...(current.voice_ready || {}),
-        [playerId]: Boolean((current.voice_verified || {})[playerId]),
-      },
-      voice_status: statuses,
-    };
-  }
-
-  if (action === 'voice_stop') {
-    if (['playing', 'dysfunction'].includes(current.phase)) {
-      return current;
-    }
-
-    const offers = { ...(current.voice_offers || {}) };
-    const answers = { ...(current.voice_answers || {}) };
-    const ready = { ...(current.voice_ready || {}) };
-    delete offers[playerId];
-    delete answers[playerId];
-    delete ready[playerId];
-
-    return {
-      ...current,
-      voice_offers: offers,
-      voice_answers: answers,
-      voice_ready: ready,
-    };
-  }
 
   return current;
 }
@@ -4361,6 +4455,16 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/tng-spectator')) {
+      await handleTngSpectator(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/tng-host-stage/roster')) {
+      await handleTngHostRoster(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/tng-api/account-route')) {
       await handleTngAccountRoute(req, res);
       return;
@@ -4397,55 +4501,8 @@ const server = http.createServer(async (req, res) => {
   } catch (error) {
     console.error('[TNG temp host] request failed', error);
     res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('TNG staging host error');
+    res.end('TNG host error');
   }
-});
-
-bffVoiceWss.on('connection', (ws, request, meta) => {
-  const client = { ws, ...meta };
-  const room = voiceRoomSet(meta.roomCode);
-  room.add(client);
-
-  ws.send(JSON.stringify({
-    type: 'voice-ready',
-    transport: 'railway-websocket',
-    role: meta.role,
-  }));
-
-  setBffVoiceRelayPresence(
-    meta.roomId,
-    meta.roomCode,
-    meta.role,
-    meta.playerId,
-    true,
-  ).catch(() => {});
-
-  ws.on('message', (data, isBinary) => {
-    if (!isBinary) return;
-    relayBffVoiceFrame(client, data);
-  });
-
-  ws.on('close', () => {
-    room.delete(client);
-
-    if (!room.size) bffVoiceRooms.delete(meta.roomCode);
-
-    const sameIdentityStillConnected = [...room].some((entry) =>
-      entry.role === meta.role
-      && String(entry.playerId || entry.identity) === String(meta.playerId || meta.identity)
-      && entry.ws.readyState === WebSocket.OPEN
-    );
-
-    if (!sameIdentityStillConnected) {
-      setBffVoiceRelayPresence(
-        meta.roomId,
-        meta.roomCode,
-        meta.role,
-        meta.playerId,
-        false,
-      ).catch(() => {});
-    }
-  });
 });
 
 server.on('upgrade', async (request, socket, head) => {
@@ -4467,21 +4524,8 @@ server.on('upgrade', async (request, socket, head) => {
       return;
     }
 
-    if (url.pathname !== '/bff-voice') {
-      socket.destroy();
-      return;
-    }
-
-    const meta = await resolveBffVoiceSocket(url);
-    if (!meta) {
-      socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-      socket.destroy();
-      return;
-    }
-
-    bffVoiceWss.handleUpgrade(request, socket, head, (ws) => {
-      bffVoiceWss.emit('connection', ws, request, meta);
-    });
+    socket.destroy();
+    return;
   } catch (error) {
     console.error('[TNG WebSocket] upgrade failed', error);
     socket.destroy();
@@ -4489,7 +4533,7 @@ server.on('upgrade', async (request, socket, head) => {
 });
 
 server.listen(port, '0.0.0.0', () => {
-  console.log(`TNG staging frontend listening on port ${port}`);
+  console.log(`TNG frontend listening on port ${port}`);
 
   // Idempotent production backfill: every existing TNG account gets a
   // BERNAverse FREE membership. Future sign-ins also call ensure_free.

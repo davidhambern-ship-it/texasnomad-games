@@ -57,11 +57,9 @@ function BFFViewer({ roomCode, isVsAI }) {
   const [answerInput, setAnswerInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState(null);
-  const [isListening, setIsListening] = useState(false);
 
   const containerRef = useRef(null);
   const notifTimerRef = useRef(null);
-  const recognitionRef = useRef(null);
   const inputRef = useRef(null);
   const spInitRef = useRef(false);
 
@@ -396,19 +394,6 @@ function BFFViewer({ roomCode, isVsAI }) {
     if (canAnswer) await updateState({ current_typing: val });
   };
 
-  const toggleVoice = () => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
-    if (isListening) { recognitionRef.current?.stop(); return; }
-    const r = new SR();
-    r.lang = 'en-US'; r.interimResults = false;
-    r.onstart = () => setIsListening(true);
-    r.onend = () => setIsListening(false);
-    r.onerror = () => setIsListening(false);
-    r.onresult = (e) => { const t = e.results[0][0].transcript.trim(); setAnswerInput(t); submitAnswer(t); };
-    recognitionRef.current = r; r.start();
-  };
-
   // Non-vsAI: legacy multiplayer role/family logic
   const [myRole, setMyRole] = useState(() => localStorage.getItem(`bff_role_${roomCode}`) || null);
   const [roleLoading, setRoleLoading] = useState(false);
@@ -592,10 +577,6 @@ function BFFViewer({ roomCode, isVsAI }) {
                   autoComplete="off"
                   autoFocus
                 />
-                <button onClick={toggleVoice}
-                  className={`px-4 py-3 rounded-lg border-2 font-heading text-lg transition-all ${isListening ? 'border-red-500 text-red-400 bg-red-500/20' : 'border-[#4ade80]/40 text-[#4ade80]/70'}`}>
-                  {isListening ? '🔴' : '🎙'}
-                </button>
                 <button
                   onClick={() => submitAnswer(answerInput)}
                   disabled={!answerInput.trim() || isSubmitting}
