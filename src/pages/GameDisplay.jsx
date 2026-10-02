@@ -101,7 +101,7 @@ function HangmanBoard({ wrongCount, maxWrong }) {
   );
 }
 
-function DisplayHud({ room, isFullscreen, onToggleFullscreen }) {
+function DisplayHud({ room, isFullscreen, onToggleFullscreen, spectator = false }) {
   return (
     <div className="relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.07] bg-black/35 px-5 sm:px-8 backdrop-blur-md">
       <div className="flex items-center gap-4">
@@ -113,7 +113,7 @@ function DisplayHud({ room, isFullscreen, onToggleFullscreen }) {
             TEXASNOMAD GAMES
           </div>
           <div className="mt-1 text-[7px] uppercase tracking-[0.22em] text-white/30" style={PS2}>
-            GAME DISPLAY
+            {spectator ? 'SPECTATOR VIEW' : 'GAME DISPLAY'}
           </div>
         </div>
 
@@ -1583,15 +1583,46 @@ function WordSearchDisplay({ room }) {
   );
 }
 
-export default function GameDisplay() {
-  const initial = useMemo(savedDisplay, []);
+export default function GameDisplay({
+  spectator = false,
+  embedded = false,
+  displayCredentials = null,
+}) {
+  const spectatorRoomCode = spectator
+    ? decodeURIComponent(window.location.pathname.split('/spectate/')[1] || '').trim().toUpperCase()
+    : '';
+  const initial = useMemo(
+    () => spectator
+      ? null
+      : embedded
+        ? displayCredentials
+        : savedDisplay(),
+    [
+      spectator,
+      embedded,
+      displayCredentials?.deviceId,
+      displayCredentials?.token,
+    ],
+  );
   const [code, setCode] = useState('');
   const [display, setDisplay] = useState(initial);
   const [room, setRoom] = useState(null);
   const [notifications, setNotifications] = useState([]);
-  const [status, setStatus] = useState(initial ? 'connecting' : 'unpaired');
+  const [status, setStatus] = useState(spectator ? 'connecting' : (initial ? 'connecting' : 'unpaired'));
   const [error, setError] = useState('');
   const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
+
+  useEffect(() => {
+    if (!embedded) return;
+    setDisplay(displayCredentials || null);
+    if (displayCredentials?.deviceId && displayCredentials?.token) {
+      setStatus('connecting');
+    }
+  }, [
+    embedded,
+    displayCredentials?.deviceId,
+    displayCredentials?.token,
+  ]);
 
   useEffect(() => {
     const onFullscreenChange = () => {
@@ -1603,7 +1634,7 @@ export default function GameDisplay() {
   }, []);
 
   useEffect(() => {
-    if (!display?.deviceId || !display?.token) return undefined;
+    if (spectator || !display?.deviceId || !display?.token) return undefined;
 
     let cancelled = false;
 
@@ -1654,8 +1685,46 @@ export default function GameDisplay() {
   }, [display?.deviceId, display?.token]);
 
   useEffect(() => {
+    if (!spectator) return undefined;
+
+    if (!spectatorRoomCode) {
+      setError('No room code was provided for spectator mode.');
+      setStatus('ended');
+      return undefined;
+    }
+
+    let cancelled = false;
+
+    async function refreshSpectator() {
+      try {
+        const payload = await tngApi.spectator.getState(spectatorRoomCode);
+        if (cancelled) return;
+
+        setRoom(payload.room || null);
+        setStatus(payload.status || 'spectating');
+        setError('');
+      } catch (spectatorError) {
+        if (cancelled) return;
+
+        setError(spectatorError?.message || 'The spectator connection was lost.');
+        if (spectatorError?.status === 404) {
+          setStatus('ended');
+        }
+      }
+    }
+
+    refreshSpectator();
+    const interval = window.setInterval(refreshSpectator, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [spectator, spectatorRoomCode]);
+
+  useEffect(() => {
     function onKeyDown(event) {
-      if (event.key.toLowerCase() === 'f' && display) {
+      if (event.key.toLowerCase() === 'f' && (display || spectator)) {
         event.preventDefault();
         toggleFullscreen();
       }
@@ -1663,7 +1732,7 @@ export default function GameDisplay() {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [display, isFullscreen]);
+  }, [display, spectator, isFullscreen]);
 
   async function toggleFullscreen() {
     try {
@@ -1699,7 +1768,7 @@ export default function GameDisplay() {
     }
   }
 
-  if (!display) {
+  if (!spectator && !embedded && !display) {
     return (
       <div className="relative min-h-[100dvh] overflow-hidden bg-[#030207] text-white">
         <AmbientBackdrop />
@@ -1745,9 +1814,20 @@ export default function GameDisplay() {
   const squareBizMode = room?.gameId === 'square-biz';
 
   return (
-    <div className="relative h-[100dvh] overflow-hidden bg-[#030207] text-white">
+    <div
+      className={`relative overflow-hidden bg-[#030207] text-white ${
+        embedded ? 'h-full min-h-0' : 'h-[100dvh]'
+      }`}
+    >
       {!squareBizMode && <AmbientBackdrop />}
-      {!squareBizMode && <DisplayHud room={room} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} />}
+      {!squareBizMode && !embedded && (
+        <DisplayHud
+          room={room}
+          isFullscreen={isFullscreen}
+          onToggleFullscreen={toggleFullscreen}
+          spectator={spectator}
+        />
+      )}
 
       {error && (
         <div className="fixed left-1/2 top-20 z-50 -translate-x-1/2 rounded-lg border border-red-500/40 bg-black/90 px-4 py-2 text-sm text-red-400 shadow-xl">
@@ -1755,9 +1835,17 @@ export default function GameDisplay() {
         </div>
       )}
 
-      <DisplayNotificationStack notifications={notifications} />
+      {!embedded && <DisplayNotificationStack notifications={notifications} />}
 
-      <div className={`relative z-10 overflow-hidden ${squareBizMode ? 'h-[100dvh]' : 'h-[calc(100dvh-4rem)]'}`}>
+      <div
+        className={`relative z-10 overflow-hidden ${
+          embedded
+            ? 'h-full'
+            : squareBizMode
+              ? 'h-[100dvh]'
+              : 'h-[calc(100dvh-4rem)]'
+        }`}
+      >
         {!room && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
@@ -1772,9 +1860,13 @@ export default function GameDisplay() {
               <div className="mt-5 flex items-center justify-center gap-2 text-white/40">
                 <Wifi className="h-4 w-4 text-green-400" />
                 <span>
-                  {status === 'waiting_for_room'
-                    ? 'Waiting for the Host to choose a game…'
-                    : 'Connected to the Host Controller.'}
+                  {spectator
+                    ? status === 'ended'
+                      ? 'This live room has ended.'
+                      : `Watching room ${spectatorRoomCode} without taking a player seat.`
+                    : status === 'waiting_for_room'
+                      ? 'Waiting for the Host to choose a game…'
+                      : 'Connected to the Host Controller.'}
                 </span>
               </div>
 
@@ -1790,7 +1882,10 @@ export default function GameDisplay() {
         {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
         {room?.gameId === 'word-search' && <WordSearchDisplay room={room} />}
         {room?.gameId === 'bff' && (
-          <BFFDisplay room={room} displayId={display?.deviceId} />
+          <BFFDisplay
+            room={room}
+            displayId={spectator || embedded ? null : display?.deviceId}
+          />
         )}
 
         {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff'].includes(room.gameId) && (
