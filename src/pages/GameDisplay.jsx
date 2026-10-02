@@ -16,7 +16,6 @@ import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
 import { SquareBizBoard, SquareBizCueCard, SquareBizIntro, SquareBizShowStyles } from '@/components/square-biz/SquareBizShow';
 import { DisplayNotificationStack } from '@/components/social/TngNotificationToaster';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
-import { useBffVoiceRelay } from '@/lib/useBffVoiceRelay';
 import { armBffSoundUnlock, playBffSound, preloadBffSounds } from '@/lib/bffSound';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 
@@ -1216,19 +1215,12 @@ function BFFDysfunctionDisplay({ gameState }) {
   );
 }
 
-function BFFDisplay({ room, displayId }) {
+function BFFDisplay({ room }) {
   const [liveRoom, setLiveRoom] = useState(null);
   const [error, setError] = useState('');
   const lastSoundCueRef = useRef(null);
   const roomCode = room?.roomCode || '';
 
-  useBffVoiceRelay({
-    roomCode,
-    role: 'display',
-    identity: displayId,
-    shouldSend: false,
-    autoStart: Boolean(roomCode && displayId),
-  });
 
   useEffect(() => {
     preloadBffSounds();
@@ -1882,10 +1874,7 @@ export default function GameDisplay({
         {room?.gameId === 'square-biz' && <SquareBizDisplay room={room} />}
         {room?.gameId === 'word-search' && <WordSearchDisplay room={room} />}
         {room?.gameId === 'bff' && (
-          <BFFDisplay
-            room={room}
-            displayId={spectator || embedded ? null : display?.deviceId}
-          />
+          <BFFDisplay room={room} />
         )}
 
         {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff'].includes(room.gameId) && (
