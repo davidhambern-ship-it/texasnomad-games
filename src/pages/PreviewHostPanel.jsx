@@ -11,6 +11,7 @@ import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
 import GameDisplay from '@/pages/GameDisplay';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
+import { getNeonSession } from '@/lib/neonAuth';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
