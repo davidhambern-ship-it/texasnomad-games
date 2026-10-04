@@ -2,7 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { base44 } from '@/api/base44Client';
+import { dominoStore } from '@/api/dominoStore';
 import { TngApiError, tngApi } from '@/api/tngApi';
+import { resolveViralRoom } from '@/api/viralRoomStore';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
@@ -65,6 +67,36 @@ function gameTitle(gameId) {
     .split('-')
     .map((part) => part ? part[0].toUpperCase() + part.slice(1) : '')
     .join(' ');
+}
+
+async function redirectSpecialGameRoom(roomCode) {
+  const code = String(roomCode || '').trim().toUpperCase();
+
+  // VIRAL uses a four-letter room code backed by its live WebSocket relay.
+  if (/^[A-Z]{4}$/.test(code)) {
+    try {
+      const viral = await resolveViralRoom(code);
+      if (viral?.live) {
+        window.location.replace(`/viral/index.html?join=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed VIRAL lookup should not block other room types.
+    }
+  }
+
+  // Dominoes owns its own persisted table state instead of a Neon GameRoom.
+  try {
+    const dominoes = await dominoStore.entities.DominoGame.filter({ room_code: code });
+    if (Array.isArray(dominoes) && dominoes.length > 0) {
+      window.location.replace(`/games/dominoes?room=${encodeURIComponent(code)}`);
+      return true;
+    }
+  } catch {
+    // Fall through to the normal room-not-found message.
+  }
+
+  return false;
 }
 
 async function claimSpadesSeat(deviceId, roomCode, joinedPayload) {
@@ -163,6 +195,7 @@ export default function JoinRoom() {
           if (cancelled) return;
 
           if (!payload?.room?.gameId) {
+            if (await redirectSpecialGameRoom(roomCode)) return;
             setError(`Room "${roomCode}" could not be loaded.`);
             setLoadingRoom(false);
             return;
@@ -235,6 +268,7 @@ export default function JoinRoom() {
 
         const rooms = await base44.entities.GameRoom.filter({ room_code: roomCode });
         if (!rooms || rooms.length === 0) {
+          if (await redirectSpecialGameRoom(roomCode)) return;
           setError(`Room "${roomCode}" not found. Check the code and try again.`);
           setLoadingRoom(false);
           return;
@@ -251,6 +285,7 @@ export default function JoinRoom() {
         window.location.replace(`${gamePath}?room=${roomCode}`);
       } catch (roomError) {
         if (cancelled) return;
+        if (await redirectSpecialGameRoom(roomCode)) return;
         setError(
           roomError?.message ||
           `Room "${roomCode}" could not be loaded. Check the code and try again.`,
