@@ -1,0 +1,28 @@
+name: Validate VIRAL promotion
+
+on:
+  push:
+    branches:
+      - fix/promote-viral-into-tng
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check Railway server syntax
+        run: node --check server.mjs
+      - name: Install dependencies
+        run: npm ci
+      - name: Build production frontend and restore VIRAL
+        run: npm run build
+      - name: Confirm VIRAL build exists
+        run: test -s dist/viral/index.html
