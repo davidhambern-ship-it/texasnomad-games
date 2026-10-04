@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { dominoStore as base44 } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
+import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateRoomCode, getTeam, newRound, applyPlay, applyPass, chooseAIMove } from '@/lib/dominoEngine';
@@ -126,6 +127,7 @@ export default function DominoHost() {
     return (
       <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)' }}>
         <Header />
+        <TestFeedbackButton gameId="dominoes" roomCode={game.room_code} testerName={hostName} />
         <div className="tnd-root"><div className="tnd-lobby">
           <div className="tnd-panel" style={{ textAlign: 'center' }}>
             <h1>DOMINOES</h1>
@@ -198,6 +200,7 @@ export default function DominoHost() {
   return (
     <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)' }}>
       <Header />
+      <TestFeedbackButton gameId="dominoes" roomCode={game.room_code} testerName={hostName} />
       <DominoTable game={game} mySeat={0} isHost roomCode={game.room_code}
         onPlay={hostPlay} onPass={hostPass} onNextRound={nextRound} onPlayAgain={playAgain}
         onLeave={() => { window.location.href = '/games'; }}
