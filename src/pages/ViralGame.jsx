@@ -4,9 +4,15 @@ export default function ViralGame() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const joinCode = String(params.get('join') || '').trim().toUpperCase();
-    const suffix = /^[A-Z]{4}$/.test(joinCode)
-      ? `?join=${encodeURIComponent(joinCode)}`
-      : '';
+    const launch = new URLSearchParams();
+
+    if (/^[A-Z]{4}$/.test(joinCode)) {
+      launch.set('join', joinCode);
+    } else if (params.get('host') === '1') {
+      launch.set('host', '1');
+    }
+
+    const suffix = launch.toString() ? `?${launch.toString()}` : '';
     window.location.replace(`/viral/index.html${suffix}`);
   }, []);
 
