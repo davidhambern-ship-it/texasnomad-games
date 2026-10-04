@@ -4,6 +4,8 @@
   const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   const requestedHost = params.get('host') === '1';
   let hostModeActive = requestedHost;
+  let viralPeerCount = 0;
+  let viralDisplayAttached = false;
 
   const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
     ? window.location.origin
@@ -99,6 +101,7 @@
 
           if (message.t === 'welcome') {
             peers = Array.isArray(message.peers) ? message.peers : [];
+            viralPeerCount = peers.length;
             if (!settled) {
               settled = true;
               window.clearTimeout(failTimer);
@@ -118,6 +121,7 @@
 
           if (message.t === 'peers') {
             peers = Array.isArray(message.peers) ? message.peers : [];
+            viralPeerCount = peers.length;
             notifyPeers({
               joined: Array.isArray(message.joined) ? message.joined : [],
               left: Array.isArray(message.left) ? message.left : [],
@@ -150,6 +154,7 @@
             });
           }
           peers = [];
+          viralPeerCount = 0;
         });
       });
     }
@@ -360,6 +365,11 @@
       const fresh = await getHostAuthToken(true).catch(() => '');
       if (fresh) response = await send(fresh).catch(() => null);
     }
+
+    if (response?.ok) {
+      const payload = await response.clone().json().catch(() => null);
+      viralDisplayAttached = payload?.displayAttached === true;
+    }
   }
 
   function startHostDisplaySync() {
@@ -377,6 +387,176 @@
     displaySyncTimer = window.setInterval(() => {
       syncHostDisplay();
     }, 4000);
+  }
+
+  function mountSessionBar() {
+    if (requestedDisplay || document.getElementById('tng-viral-session-root')) return;
+
+    const playerMode = /^[A-Z]{4}$/.test(requestedJoin);
+    const hostMode = !playerMode && detectHostMode();
+    if (!playerMode && !hostMode) return;
+
+    const style = document.createElement('style');
+    style.id = 'tng-viral-session-layout';
+    style.textContent = `
+      .app {
+        height: calc(100% - 68px) !important;
+        margin-top: 68px !important;
+      }
+      @media (max-width: 700px) {
+        .app {
+          height: calc(100% - 76px) !important;
+          margin-top: 76px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+
+    const host = document.createElement('div');
+    host.id = 'tng-viral-session-root';
+    document.body.appendChild(host);
+    const root = host.attachShadow({ mode: 'open' });
+
+    root.innerHTML = `
+      <style>
+        :host { all: initial; }
+        *, *::before, *::after { box-sizing: border-box; }
+        .bar {
+          position: fixed; left: 10px; right: 10px; top: 8px; z-index: 2147482500;
+          min-height: 52px; border: 1px solid rgba(188,19,254,.42); border-radius: 13px;
+          background: rgba(3,2,7,.96); color: #fff; padding: 8px 10px;
+          box-shadow: 0 10px 28px rgba(0,0,0,.5), 0 0 20px rgba(188,19,254,.10);
+          backdrop-filter: blur(14px);
+          display: flex; align-items: center; justify-content: space-between; gap: 10px;
+          font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+        }
+        .left { min-width: 0; display: flex; align-items: center; gap: 10px; }
+        .rocket { font-size: 22px; line-height: 1; }
+        .info { min-width: 0; }
+        .titleline { display:flex; align-items:center; gap:9px; min-width:0; }
+        .title { font-size: 15px; font-weight: 900; letter-spacing:.04em; white-space:nowrap; }
+        .code { color:#FFD700; font: 800 15px/1 ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.15em; white-space:nowrap; }
+        .status { margin-top:5px; display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+        .tag { display:inline-flex; align-items:center; gap:5px; font-size:8px; font-weight:800; letter-spacing:.13em; text-transform:uppercase; white-space:nowrap; }
+        .hosttag { color:#BC13FE; }
+        .player { color:#22D3EE; }
+        .display { color:#FFD700; }
+        .people { color:#4ADE80; }
+        .dot { width:7px; height:7px; border-radius:999px; background:currentColor; box-shadow:0 0 8px currentColor; }
+        .actions { display:flex; flex-shrink:0; align-items:center; gap:7px; }
+        button {
+          border:1px solid rgba(255,255,255,.18); border-radius:9px; background:rgba(255,255,255,.03);
+          color:#fff; padding:9px 11px; cursor:pointer; font:800 9px/1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+          letter-spacing:.09em; text-transform:uppercase;
+        }
+        button:hover { border-color:rgba(255,215,0,.65); color:#FFD700; }
+        .leave { border-color:rgba(248,113,113,.45); color:#f87171; }
+        .leave:hover { border-color:#f87171; color:#fca5a5; }
+        @media (max-width:600px) {
+          .bar { top:6px; left:6px; right:6px; padding:8px; }
+          .title { font-size:13px; }
+          .code { font-size:13px; }
+          .status { gap:7px; }
+          .tag { font-size:7px; }
+          .actions button { padding:9px 8px; font-size:8px; }
+          .rocket { display:none; }
+        }
+      </style>
+      <div class="bar">
+        <div class="left">
+          <div class="rocket">🚀</div>
+          <div class="info">
+            <div class="titleline">
+              <span class="title">VIRAL!</span>
+              <span class="code">----</span>
+            </div>
+            <div class="status">
+              <span class="tag mode"></span>
+              <span class="tag displaytag" hidden><i class="dot"></i><span class="displaytext">DISPLAY</span></span>
+              <span class="tag people"><i class="dot"></i><span class="peercount">0 CONNECTED</span></span>
+            </div>
+          </div>
+        </div>
+        <div class="actions">
+          <button class="leave" type="button">${hostMode ? 'BACK TO HOST' : 'LEAVE GAME'}</button>
+        </div>
+      </div>
+    `;
+
+    const codeEl = root.querySelector('.code');
+    const modeEl = root.querySelector('.mode');
+    const displayTag = root.querySelector('.displaytag');
+    const displayText = root.querySelector('.displaytext');
+    const peerEl = root.querySelector('.peercount');
+    const leave = root.querySelector('.leave');
+
+    modeEl.className = `tag mode ${hostMode ? 'hosttag' : 'player'}`;
+    modeEl.innerHTML = `<i class="dot"></i><span>${hostMode ? 'LIVE HOST' : 'PLAYER'}</span>`;
+
+    async function exitHost() {
+      leave.disabled = true;
+      leave.textContent = 'EXITING…';
+
+      try {
+        const token = await getHostAuthToken().catch(() => '');
+        if (token) {
+          await fetch(`${RELAY_ORIGIN}/viral-display`, {
+            method: 'DELETE',
+            keepalive: true,
+            headers: {
+              Accept: 'application/json',
+              Authorization: `Bearer ${token}`,
+            },
+          }).catch(() => null);
+        }
+      } finally {
+        window.location.replace('/host');
+      }
+    }
+
+    leave.addEventListener('click', () => {
+      if (hostMode) {
+        exitHost();
+      } else {
+        window.location.replace('/games');
+      }
+    });
+
+    function refreshBar() {
+      const code = currentRoomCode();
+      codeEl.textContent = code || '----';
+
+      if (hostMode) {
+        displayTag.hidden = false;
+        displayTag.className = `tag displaytag ${viralDisplayAttached ? 'people' : 'display'}`;
+        displayText.textContent = viralDisplayAttached ? 'DISPLAY CONNECTED' : 'HOST ONLY';
+      } else {
+        displayTag.hidden = true;
+      }
+
+      const peers = Math.max(0, Number(viralPeerCount || 0));
+      peerEl.textContent = `${peers} CONNECTED`;
+    }
+
+    refreshBar();
+    const timer = window.setInterval(refreshBar, 750);
+    window.addEventListener('pagehide', () => window.clearInterval(timer), { once: true });
+  }
+
+  function startSessionBarDetection() {
+    if (requestedDisplay) return;
+
+    mountSessionBar();
+    if (document.getElementById('tng-viral-session-root')) return;
+
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      mountSessionBar();
+      if (document.getElementById('tng-viral-session-root') || attempts > 80) {
+        window.clearInterval(timer);
+      }
+    }, 125);
   }
 
   function mountFeedback() {
@@ -532,6 +712,7 @@
     }
 
     startHostDisplaySync();
+    startSessionBarDetection();
     autoHost();
     autoJoin();
     autoDisplayJoin();
