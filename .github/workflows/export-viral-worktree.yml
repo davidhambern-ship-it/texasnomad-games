@@ -1,0 +1,19 @@
+name: Export VIRAL Integration Worktree
+on:
+  push:
+    branches:
+      - feature/viral-human-test
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: zip -qr tng-worktree.zip . -x ".git/*"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tng-viral-worktree
+          path: tng-worktree.zip
+          retention-days: 1
