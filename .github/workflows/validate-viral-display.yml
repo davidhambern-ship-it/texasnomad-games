@@ -1,0 +1,35 @@
+name: Validate VIRAL external display
+
+on:
+  push:
+    branches:
+      - fix/viral-external-display
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check server and bridge syntax
+        run: |
+          node --check server.mjs
+          node --check server/viralLive.mjs
+          node --check public/viral/tng-bridge.js
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Confirm VIRAL display bridge
+        run: |
+          test -s dist/viral/index.html
+          test -s dist/viral/tng-bridge.js
+          grep -q 'tng-bridge.js' dist/viral/index.html
+          grep -q 'requestedDisplay' dist/viral/tng-bridge.js
