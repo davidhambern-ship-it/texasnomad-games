@@ -202,7 +202,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
                 : '⚡ CREATE ROOM'}
           </button>
 
-          {!game.standalone && (
+          {(!game.standalone || game.supportsDirectJoin) && (
             <div className="flex gap-2">
               <input
                 className="flex-1 px-3 py-2.5 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
@@ -482,6 +482,7 @@ const GAMES = [
     tags: ['1–12 Players', 'Party Board Game', 'Human Test'],
     path: '/games/viral',
     standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
