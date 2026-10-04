@@ -127,7 +127,6 @@ export default function DominoHost() {
     return (
       <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)' }}>
         <Header />
-        <TestFeedbackButton gameId="dominoes" roomCode={game.room_code} testerName={hostName} />
         <div className="tnd-root"><div className="tnd-lobby">
           <div className="tnd-panel" style={{ textAlign: 'center' }}>
             <h1>DOMINOES</h1>
@@ -166,6 +165,7 @@ export default function DominoHost() {
     return (
       <div className="min-h-screen" style={{ background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)' }}>
         <Header />
+        <TestFeedbackButton gameId="dominoes" roomCode={game.room_code} testerName={hostName} />
         <div className="tnd-root"><div className="tnd-lobby">
           <div className="tnd-panel">
             <h3>Room code</h3>
