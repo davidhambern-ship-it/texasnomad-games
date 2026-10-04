@@ -52,6 +52,7 @@ export const ALL_GAMES = [
     color: '#BC13FE',
     emoji: '🚀',
     path: '/games/viral',
+    hostPath: '/games/viral?host=1',
     standalone: true,
   },
   {
