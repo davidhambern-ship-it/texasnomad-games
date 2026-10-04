@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { dominoStore as base44 } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
