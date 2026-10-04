@@ -4565,6 +4565,79 @@ async function handleDominoApi(req, res) {
   });
 }
 
+
+let testFeedbackSchemaReady = null;
+
+async function ensureTestFeedbackSchema() {
+  if (!testFeedbackSchemaReady) {
+    testFeedbackSchemaReady = bffPool.query(`
+      create table if not exists public.tng_test_feedback (
+        id bigserial primary key,
+        game_id text not null,
+        room_code text,
+        report_type text not null,
+        message text not null,
+        tester_name text,
+        page_url text,
+        user_agent text,
+        created_at timestamptz not null default now()
+      )
+    `).catch((error) => {
+      testFeedbackSchemaReady = null;
+      throw error;
+    });
+  }
+  await testFeedbackSchemaReady;
+}
+
+async function handleTestFeedback(req, res) {
+  if (req.method !== 'POST') {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'Feedback only accepts POST.' },
+    });
+    return;
+  }
+
+  await ensureTestFeedbackSchema();
+
+  const body = await readJsonBody(req).catch(() => null);
+  const gameId = String(body?.gameId || '').trim().slice(0, 64);
+  const roomCode = String(body?.roomCode || '').trim().toUpperCase().slice(0, 16) || null;
+  const reportType = String(body?.reportType || 'feedback').trim().toLowerCase().slice(0, 32);
+  const message = String(body?.message || '').trim().slice(0, 3000);
+  const testerName = String(body?.testerName || '').trim().slice(0, 80) || null;
+  const pageUrl = String(body?.pageUrl || '').trim().slice(0, 1000) || null;
+  const userAgent = String(body?.userAgent || req.headers['user-agent'] || '').trim().slice(0, 500) || null;
+
+  if (!gameId || message.length < 3) {
+    sendJson(res, 400, {
+      error: { code: 'INVALID_FEEDBACK', message: 'Choose a game and enter a short report.' },
+    });
+    return;
+  }
+
+  const allowedTypes = new Set(['bug', 'confusing', 'feedback', 'idea', 'other']);
+  const cleanType = allowedTypes.has(reportType) ? reportType : 'other';
+
+  const result = await bffPool.query(
+    `
+      insert into public.tng_test_feedback
+        (game_id, room_code, report_type, message, tester_name, page_url, user_agent)
+      values ($1, $2, $3, $4, $5, $6, $7)
+      returning id, created_at
+    `,
+    [gameId, roomCode, cleanType, message, testerName, pageUrl, userAgent],
+  );
+
+  sendJson(res, 201, {
+    ok: true,
+    report: {
+      id: result.rows[0]?.id || null,
+      createdAt: result.rows[0]?.created_at || null,
+    },
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const origin = String(req.headers.origin || '');
   if (isAllowedBrowserOrigin(origin)) {
@@ -4638,6 +4711,19 @@ const server = http.createServer(async (req, res) => {
     if ((req.url || '').split('?')[0] === '/viral-live/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'viral-live', ...viralLive.stats() }));
+      return;
+    }
+
+    if ((req.url || '').split('?')[0] === '/viral-live/resolve' && req.method === 'GET') {
+      const url = new URL(req.url || '/viral-live/resolve', 'http://localhost');
+      const code = String(url.searchParams.get('code') || '').trim().toUpperCase();
+      const room = viralLive.resolveRoom(code);
+      sendJson(res, 200, { ok: true, gameId: 'viral', ...room });
+      return;
+    }
+
+    if ((req.url || '').startsWith('/test-feedback')) {
+      await handleTestFeedback(req, res);
       return;
     }
 
