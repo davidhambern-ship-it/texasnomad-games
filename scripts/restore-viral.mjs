@@ -8,9 +8,9 @@ const zipPath = path.join(root, 'vendor', 'viral', 'VIRAL_Website_Upload.zip');
 const outputDir = path.join(root, 'public', 'viral');
 const outputPath = path.join(outputDir, 'index.html');
 
-const EXPECTED_ZIP_SHA256 = '05b5fd5f5f3465446b1add020d42e8275e4b2239287457b3fbc46d44e6cf87ac';
-const EXPECTED_HTML_SHA256 = '6c3fada443222bf6b8927236df9bace2075a018c3144a66f446e5468d1a6120b';
-const EXPECTED_HTML_BYTES = 701748;
+const EXPECTED_ZIP_SHA256 = '448e9cd5a1cbcbdb993cea228572d43d878b5c937abc4e81d0a58871e207c295';
+const EXPECTED_HTML_SHA256 = 'b863db6af0162f939a0c415d6ceb925f9de602f0219a31e6d1f4adc77db2ca02';
+const EXPECTED_HTML_BYTES = 707298;
 const TARGET_ENTRY = 'viral/index.html';
 
 function sha256(buffer) {

@@ -5,6 +5,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
+import { createViralLive } from './server/viralLive.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -996,6 +997,9 @@ function getLiveSpectators(roomCode) {
 }
 
 const hostLiveWss = new WebSocketServer({ noServer: true });
+
+// VIRAL! online rooms (WebSocket relay at /viral-live)
+const viralLive = createViralLive({ isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin) });
 
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
@@ -4412,155 +4416,6 @@ async function handleBffApi(req, res) {
   sendJson(res, 404, { error: { code: 'NOT_FOUND', message: 'BFF route not found.' } });
 }
 
-
-let dominoSchemaReady = null;
-
-async function ensureDominoSchema() {
-  if (!dominoSchemaReady) {
-    dominoSchemaReady = bffPool.query(`
-      create table if not exists public.tng_domino_games (
-        id text primary key,
-        room_code text not null unique,
-        game_state jsonb not null,
-        created_at timestamptz not null default now(),
-        updated_at timestamptz not null default now()
-      )
-    `).catch((error) => {
-      dominoSchemaReady = null;
-      throw error;
-    });
-  }
-  await dominoSchemaReady;
-}
-
-function serializeDominoRow(row) {
-  if (!row) return null;
-  const state =
-    row.game_state && typeof row.game_state === 'object'
-      ? row.game_state
-      : {};
-
-  return {
-    ...state,
-    id: row.id,
-    room_code: row.room_code,
-    created_date: row.created_at,
-    updated_date: row.updated_at,
-  };
-}
-
-async function handleDominoApi(req, res) {
-  await ensureDominoSchema();
-
-  const url = new URL(req.url || '/domino-api', 'http://localhost');
-
-  if (req.method === 'GET') {
-    const roomCode = String(url.searchParams.get('room') || '').trim().toUpperCase();
-    if (!roomCode) {
-      sendJson(res, 400, {
-        error: { code: 'ROOM_REQUIRED', message: 'Domino room code is required.' },
-      });
-      return;
-    }
-
-    const result = await bffPool.query(
-      `
-        select id, room_code, game_state, created_at, updated_at
-        from public.tng_domino_games
-        where room_code = $1
-        limit 1
-      `,
-      [roomCode],
-    );
-
-    sendJson(res, 200, {
-      games: result.rows.map(serializeDominoRow),
-    });
-    return;
-  }
-
-  if (req.method === 'POST') {
-    const data = await readJsonBody(req).catch(() => null);
-    const roomCode = String(data?.room_code || '').trim().toUpperCase();
-
-    if (!data || !roomCode) {
-      sendJson(res, 400, {
-        error: { code: 'ROOM_REQUIRED', message: 'Domino room code is required.' },
-      });
-      return;
-    }
-
-    const id = `dom_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const gameState = {
-      ...data,
-      room_code: roomCode,
-    };
-
-    try {
-      const result = await bffPool.query(
-        `
-          insert into public.tng_domino_games (id, room_code, game_state)
-          values ($1, $2, $3::jsonb)
-          returning id, room_code, game_state, created_at, updated_at
-        `,
-        [id, roomCode, JSON.stringify(gameState)],
-      );
-
-      sendJson(res, 201, { game: serializeDominoRow(result.rows[0]) });
-    } catch (error) {
-      if (error?.code === '23505') {
-        sendJson(res, 409, {
-          error: {
-            code: 'ROOM_EXISTS',
-            message: 'That Domino room code is already in use. Create another room.',
-          },
-        });
-        return;
-      }
-      throw error;
-    }
-    return;
-  }
-
-  if (req.method === 'PATCH') {
-    const body = await readJsonBody(req).catch(() => null);
-    const id = String(body?.id || '').trim();
-    const data = body?.data;
-
-    if (!id || !data || typeof data !== 'object' || Array.isArray(data)) {
-      sendJson(res, 400, {
-        error: { code: 'GAME_REQUIRED', message: 'Domino game state is required.' },
-      });
-      return;
-    }
-
-    const result = await bffPool.query(
-      `
-        update public.tng_domino_games
-        set game_state = $2::jsonb,
-            updated_at = now()
-        where id = $1
-        returning id, room_code, game_state, created_at, updated_at
-      `,
-      [id, JSON.stringify(data)],
-    );
-
-    if (!result.rowCount) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This Domino room no longer exists.' },
-      });
-      return;
-    }
-
-    sendJson(res, 200, { game: serializeDominoRow(result.rows[0]) });
-    return;
-  }
-
-  sendJson(res, 405, {
-    error: { code: 'METHOD_NOT_ALLOWED', message: 'Unsupported Domino API method.' },
-  });
-}
-
 const server = http.createServer(async (req, res) => {
   const origin = String(req.headers.origin || '');
   if (isAllowedBrowserOrigin(origin)) {
@@ -4631,13 +4486,14 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if ((req.url || '').startsWith('/bff-api')) {
-      await handleBffApi(req, res);
+    if ((req.url || '').split('?')[0] === '/viral-live/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+      res.end(JSON.stringify({ ok: true, service: 'viral-live', ...viralLive.stats() }));
       return;
     }
 
-    if ((req.url || '').startsWith('/domino-api')) {
-      await handleDominoApi(req, res);
+    if ((req.url || '').startsWith('/bff-api')) {
+      await handleBffApi(req, res);
       return;
     }
 
@@ -4664,6 +4520,8 @@ const server = http.createServer(async (req, res) => {
 server.on('upgrade', async (request, socket, head) => {
   try {
     const url = new URL(request.url || '/', 'http://localhost');
+
+    if (viralLive.handleUpgrade(request, socket, head)) return;
 
     if (url.pathname === '/host-live') {
       const origin = String(request.headers.origin || '');
