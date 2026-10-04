@@ -1,0 +1,30 @@
+name: Validate VIRAL display ownership
+
+on:
+  push:
+    branches:
+      - fix/viral-display-no-self-verify
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check bridge syntax
+        run: node --check public/viral/tng-bridge.js
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Verify display clients cannot claim host ownership
+        run: |
+          test -s dist/viral/tng-bridge.js
+          grep -q 'if (requestedDisplay || requestedJoin) return false' dist/viral/tng-bridge.js
+          grep -q 'if (requestedDisplay || requestedJoin || displaySyncTimer) return' dist/viral/tng-bridge.js
