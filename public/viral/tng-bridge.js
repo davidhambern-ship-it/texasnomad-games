@@ -1,6 +1,7 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const requestedJoin = String(params.get('join') || '').trim().toUpperCase();
+  const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   const requestedHost = params.get('host') === '1';
 
   const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
@@ -197,6 +198,49 @@
     }, 125);
   }
 
+  function autoDisplayJoin() {
+    if (!/^[A-Z]{4}$/.test(requestedDisplay)) return;
+
+    let attempts = 0;
+    let submitted = false;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+
+      if (!submitted) {
+        const joinTab = document.getElementById('tJoin');
+        const codeInput = document.getElementById('jCode');
+        const joinButton = document.getElementById('jGo');
+
+        if (joinTab && (!codeInput || !joinButton)) {
+          joinTab.click();
+        }
+
+        const readyInput = document.getElementById('jCode');
+        const readyButton = document.getElementById('jGo');
+        if (readyInput && readyButton) {
+          readyInput.value = requestedDisplay;
+          readyInput.dispatchEvent(new Event('input', { bubbles: true }));
+          readyButton.click();
+          submitted = true;
+        }
+      }
+
+      if (submitted) {
+        const watchOnly = document.getElementById('watchOnly');
+        if (watchOnly) {
+          watchOnly.click();
+          window.setTimeout(() => {
+            document.getElementById('btnOverview')?.click();
+          }, 250);
+          window.clearInterval(timer);
+          return;
+        }
+      }
+
+      if (attempts >= 120) window.clearInterval(timer);
+    }, 125);
+  }
+
   function autoJoin() {
     if (!/^[A-Z]{4}$/.test(requestedJoin)) return;
 
@@ -227,10 +271,64 @@
   function currentRoomCode() {
     const fromJoin = String(params.get('join') || '').trim().toUpperCase();
     if (/^[A-Z]{4}$/.test(fromJoin)) return fromJoin;
+    if (/^[A-Z]{4}$/.test(requestedDisplay)) return requestedDisplay;
 
     const tag = String(document.getElementById('roomTag')?.textContent || '');
     const match = tag.match(/ROOM\s+([A-Z]{4})/i);
     return match ? match[1].toUpperCase() : '';
+  }
+
+  let cachedHostToken = '';
+  let displaySyncTimer = null;
+
+  async function getHostAuthToken(forceRefresh = false) {
+    if (cachedHostToken && !forceRefresh) return cachedHostToken;
+
+    const response = await fetch('https://auth.texasnomadgames.com/neon-auth/get-session', {
+      method: 'GET',
+      credentials: 'include',
+      headers: { Accept: 'application/json' },
+    });
+
+    if (!response.ok) return '';
+    const payload = await response.json().catch(() => null);
+    const token = payload?.session?.token || payload?.token || '';
+    if (token) cachedHostToken = token;
+    return token;
+  }
+
+  async function syncHostDisplay(forceRefresh = false) {
+    if (!requestedHost) return;
+
+    const token = await getHostAuthToken(forceRefresh).catch(() => '');
+    if (!token) return;
+
+    const send = async (authToken) => fetch(`${RELAY_ORIGIN}/viral-display`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        roomCode: currentRoomCode() || null,
+      }),
+    });
+
+    let response = await send(token).catch(() => null);
+    if (response?.status === 401 && !forceRefresh) {
+      cachedHostToken = '';
+      const fresh = await getHostAuthToken(true).catch(() => '');
+      if (fresh) response = await send(fresh).catch(() => null);
+    }
+  }
+
+  function startHostDisplaySync() {
+    if (!requestedHost || displaySyncTimer) return;
+    syncHostDisplay();
+    displaySyncTimer = window.setInterval(() => {
+      syncHostDisplay();
+    }, 4000);
   }
 
   function mountFeedback() {
@@ -379,10 +477,16 @@
 
   function boot() {
     installClaudeCompatibilityBridge();
-    revealOnlineTabs();
-    mountFeedback();
+
+    if (!requestedDisplay) {
+      revealOnlineTabs();
+      mountFeedback();
+    }
+
+    startHostDisplaySync();
     autoHost();
     autoJoin();
+    autoDisplayJoin();
   }
 
   if (document.readyState === 'loading') {

@@ -1575,6 +1575,37 @@ function WordSearchDisplay({ room }) {
   );
 }
 
+function ViralDisplay({ room }) {
+  const roomCode = String(room?.roomCode || '').trim().toUpperCase();
+
+  if (!/^[A-Z]{4}$/.test(roomCode)) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#050208] px-6 text-center text-white">
+        <div>
+          <div className="text-8xl">🚀</div>
+          <div className="mt-6 text-[9px] uppercase tracking-[0.28em] text-[#BC13FE]" style={PS2}>
+            VIRAL! GAME DISPLAY
+          </div>
+          <h1 className="mt-4 text-5xl font-semibold">VIRAL is ready.</h1>
+          <p className="mt-4 text-lg text-white/45">
+            Waiting for the Host to open the online room…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      key={roomCode}
+      title={`VIRAL room ${roomCode} display`}
+      src={`/viral/index.html?display=${encodeURIComponent(roomCode)}`}
+      className="h-full w-full border-0 bg-[#050208]"
+      allow="autoplay; fullscreen"
+    />
+  );
+}
+
 export default function GameDisplay({
   spectator = false,
   embedded = false,
@@ -1804,6 +1835,7 @@ export default function GameDisplay({
   }
 
   const squareBizMode = room?.gameId === 'square-biz';
+  const viralMode = room?.gameId === 'viral';
 
   return (
     <div
@@ -1811,8 +1843,8 @@ export default function GameDisplay({
         embedded ? 'h-full min-h-0' : 'h-[100dvh]'
       }`}
     >
-      {!squareBizMode && <AmbientBackdrop />}
-      {!squareBizMode && !embedded && (
+      {!squareBizMode && !viralMode && <AmbientBackdrop />}
+      {!squareBizMode && !viralMode && !embedded && (
         <DisplayHud
           room={room}
           isFullscreen={isFullscreen}
@@ -1833,7 +1865,7 @@ export default function GameDisplay({
         className={`relative z-10 overflow-hidden ${
           embedded
             ? 'h-full'
-            : squareBizMode
+            : squareBizMode || viralMode
               ? 'h-[100dvh]'
               : 'h-[calc(100dvh-4rem)]'
         }`}
@@ -1876,8 +1908,9 @@ export default function GameDisplay({
         {room?.gameId === 'bff' && (
           <BFFDisplay room={room} />
         )}
+        {room?.gameId === 'viral' && <ViralDisplay room={room} />}
 
-        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>

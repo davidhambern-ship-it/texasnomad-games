@@ -1001,6 +1001,83 @@ const hostLiveWss = new WebSocketServer({ noServer: true });
 // VIRAL! online rooms (WebSocket relay at /viral-live)
 const viralLive = createViralLive({ isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin) });
 
+const VIRAL_DISPLAY_TARGET_TTL_MS = 15000;
+const viralDisplayTargets = new Map();
+
+function getViralDisplayTarget(displayDeviceId) {
+  const key = String(displayDeviceId || '').trim();
+  if (!key) return null;
+
+  const target = viralDisplayTargets.get(key);
+  if (!target) return null;
+
+  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
+    viralDisplayTargets.delete(key);
+    return null;
+  }
+
+  return target;
+}
+
+async function handleViralDisplayTarget(req, res) {
+  if (!['POST', 'DELETE'].includes(req.method || '')) {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
+    });
+    return;
+  }
+
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  const { rows } = await bffPool.query(
+    `select display_device_id
+     from public.host_sessions
+     where host_account_id = $1::uuid
+       and ended_at is null
+       and status::text in ('pairing', 'ready', 'live')
+       and display_device_id is not null
+     order by updated_at desc
+     limit 1`,
+    [resolved.account.id],
+  );
+
+  const displayDeviceId = rows[0]?.display_device_id || null;
+  if (!displayDeviceId) {
+    sendJson(res, 200, {
+      ok: true,
+      displayAttached: false,
+      roomCode: null,
+    });
+    return;
+  }
+
+  if (req.method === 'DELETE') {
+    viralDisplayTargets.delete(String(displayDeviceId));
+    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
+    return;
+  }
+
+  const body = await readJsonBody(req).catch(() => ({}));
+  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
+  const roomCode = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
+
+  viralDisplayTargets.set(String(displayDeviceId), {
+    accountId: resolved.account.id,
+    roomCode,
+    updatedAt: Date.now(),
+  });
+
+  sendJson(res, 200, {
+    ok: true,
+    displayAttached: true,
+    roomCode,
+  });
+}
+
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
   hangman: '/hangman/host',
@@ -1768,6 +1845,27 @@ async function handleTngDisplayState(req, res) {
   }
 
   const room = payload?.room || null;
+
+  if (!room) {
+    const viralTarget = getViralDisplayTarget(displayId);
+    if (viralTarget) {
+      sendJson(res, 200, {
+        ...payload,
+        status: viralTarget.roomCode ? 'connected' : 'waiting_for_room',
+        room: {
+          id: `viral-display-${displayId}`,
+          gameId: 'viral',
+          roomCode: viralTarget.roomCode || '',
+          status: viralTarget.roomCode ? 'live' : 'lobby',
+          gameState: {
+            displayOnly: true,
+          },
+        },
+      });
+      return;
+    }
+  }
+
   if (!room || room.gameId !== 'word-search' || !isUuid(room.id)) {
     sendJson(res, 200, payload);
     return;
@@ -4711,6 +4809,11 @@ const server = http.createServer(async (req, res) => {
     if ((req.url || '').split('?')[0] === '/viral-live/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'viral-live', ...viralLive.stats() }));
+      return;
+    }
+
+    if ((req.url || '').startsWith('/viral-display')) {
+      await handleViralDisplayTarget(req, res);
       return;
     }
 
