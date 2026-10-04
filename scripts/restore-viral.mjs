@@ -1,0 +1,77 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { createHash } from 'node:crypto';
+import { inflateRawSync } from 'node:zlib';
+
+const root = process.cwd();
+const zipPath = path.join(root, 'vendor', 'viral', 'VIRAL_Website_Upload.zip');
+const outputDir = path.join(root, 'public', 'viral');
+const outputPath = path.join(outputDir, 'index.html');
+
+const EXPECTED_ZIP_SHA256 = '05b5fd5f5f3465446b1add020d42e8275e4b2239287457b3fbc46d44e6cf87ac';
+const EXPECTED_HTML_SHA256 = '6c3fada443222bf6b8927236df9bace2075a018c3144a66f446e5468d1a6120b';
+const EXPECTED_HTML_BYTES = 701748;
+const TARGET_ENTRY = 'viral/index.html';
+
+function sha256(buffer) {
+  return createHash('sha256').update(buffer).digest('hex');
+}
+
+const zip = fs.readFileSync(zipPath);
+const zipSha = sha256(zip);
+if (zipSha !== EXPECTED_ZIP_SHA256) {
+  throw new Error(`VIRAL source ZIP integrity check failed: ${zipSha}`);
+}
+
+let offset = 0;
+let html = null;
+
+while (offset + 30 <= zip.length) {
+  const signature = zip.readUInt32LE(offset);
+  if (signature === 0x02014b50 || signature === 0x06054b50) break;
+  if (signature !== 0x04034b50) {
+    throw new Error(`Unexpected VIRAL ZIP signature at byte ${offset}: 0x${signature.toString(16)}`);
+  }
+
+  const flags = zip.readUInt16LE(offset + 6);
+  const method = zip.readUInt16LE(offset + 8);
+  const compressedSize = zip.readUInt32LE(offset + 18);
+  const uncompressedSize = zip.readUInt32LE(offset + 22);
+  const nameLength = zip.readUInt16LE(offset + 26);
+  const extraLength = zip.readUInt16LE(offset + 28);
+  const nameStart = offset + 30;
+  const nameEnd = nameStart + nameLength;
+  const dataStart = nameEnd + extraLength;
+  const dataEnd = dataStart + compressedSize;
+  const name = zip.subarray(nameStart, nameEnd).toString('utf8');
+
+  if (flags & 0x08) throw new Error('VIRAL ZIP uses unsupported data descriptors.');
+
+  if (name === TARGET_ENTRY) {
+    const compressed = zip.subarray(dataStart, dataEnd);
+    if (method === 0) html = Buffer.from(compressed);
+    else if (method === 8) html = inflateRawSync(compressed);
+    else throw new Error(`Unsupported VIRAL ZIP compression method: ${method}`);
+
+    if (html.length !== uncompressedSize) {
+      throw new Error(`VIRAL ZIP size mismatch: expected ${uncompressedSize}, got ${html.length}`);
+    }
+    break;
+  }
+
+  offset = dataEnd;
+}
+
+if (!html) throw new Error(`Could not find ${TARGET_ENTRY} in VIRAL source ZIP.`);
+if (html.length !== EXPECTED_HTML_BYTES) {
+  throw new Error(`VIRAL HTML byte count changed: expected ${EXPECTED_HTML_BYTES}, got ${html.length}`);
+}
+
+const htmlSha = sha256(html);
+if (htmlSha !== EXPECTED_HTML_SHA256) {
+  throw new Error(`VIRAL HTML integrity check failed: ${htmlSha}`);
+}
+
+fs.mkdirSync(outputDir, { recursive: true });
+fs.writeFileSync(outputPath, html);
+console.log(`[VIRAL] Restored validated Claude build: ${html.length} bytes, sha256 ${htmlSha}`);
