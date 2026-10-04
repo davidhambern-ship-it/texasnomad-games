@@ -972,7 +972,7 @@ export default function PreviewHostPanel() {
                     disabled={busy}
                     onClick={() => {
                       if (game.standalone) {
-                        window.location.assign(game.path);
+                        window.location.assign(game.hostPath || game.path);
                         return;
                       }
                       createRoom(game);
