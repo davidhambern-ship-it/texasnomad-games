@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { dominoStore as base44 } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
+import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { getTeam, applyPlay, applyPass } from '@/lib/dominoEngine';
@@ -103,6 +104,7 @@ export default function DominoGame() {
     const open = game.players.map((p, i) => (!p.playerId && i !== 0 ? i : null)).filter(i => i !== null);
     return (
       <div style={BG}><Header />
+        <TestFeedbackButton gameId="dominoes" roomCode={roomCode} testerName={nameInput} />
         <div className="tnd-root"><div className="tnd-lobby">
           <div className="tnd-panel" style={{ textAlign: 'center' }}>
             <h1>DOMINOES</h1>
@@ -133,6 +135,7 @@ export default function DominoGame() {
   const seat = mySeat >= 0 ? mySeat : null;
   return (
     <div style={BG}><Header />
+      <TestFeedbackButton gameId="dominoes" roomCode={roomCode} testerName={nameInput} />
       <DominoTable game={game} mySeat={seat} roomCode={roomCode}
         onPlay={(id, side) => act(g => applyPlay(g, seat, id, side))}
         onPass={() => act(g => applyPass(g, seat))}
