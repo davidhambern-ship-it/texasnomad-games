@@ -195,28 +195,34 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {creating === game.id ? '⚙ CREATING…' : '⚡ CREATE ROOM'}
+            {game.standalone
+              ? '🚀 LAUNCH GAME'
+              : creating === game.id
+                ? '⚙ CREATING…'
+                : '⚡ CREATE ROOM'}
           </button>
 
-          <div className="flex gap-2">
-            <input
-              className="flex-1 px-3 py-2.5 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
-              style={{ background: '#0a0510', border: `1px solid ${glowColor}30`, minWidth: 0 }}
-              placeholder="ROOM CODE"
-              value={roomCode}
-              onChange={e => setRoomCode(e.target.value.toUpperCase())}
-              onKeyDown={e => e.key === 'Enter' && handleJoin()}
-              maxLength={8}
-            />
-            <button
-              onClick={handleJoin}
-              disabled={!String(roomCode || '').trim() || joining}
-              className="px-4 py-2.5 rounded-lg font-heading text-xs tracking-widest uppercase transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
-              style={{ background: `${glowColor2}20`, border: `1px solid ${glowColor2}60`, color: glowColor2 }}
-            >
-              {joining ? '…' : 'JOIN'}
-            </button>
-          </div>
+          {!game.standalone && (
+            <div className="flex gap-2">
+              <input
+                className="flex-1 px-3 py-2.5 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
+                style={{ background: '#0a0510', border: `1px solid ${glowColor}30`, minWidth: 0 }}
+                placeholder="ROOM CODE"
+                value={roomCode}
+                onChange={e => setRoomCode(e.target.value.toUpperCase())}
+                onKeyDown={e => e.key === 'Enter' && handleJoin()}
+                maxLength={8}
+              />
+              <button
+                onClick={handleJoin}
+                disabled={!String(roomCode || '').trim() || joining}
+                className="px-4 py-2.5 rounded-lg font-heading text-xs tracking-widest uppercase transition-all active:scale-95 disabled:opacity-30 flex-shrink-0"
+                style={{ background: `${glowColor2}20`, border: `1px solid ${glowColor2}60`, color: glowColor2 }}
+              >
+                {joining ? '…' : 'JOIN'}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Cabinet base screws */}
@@ -465,6 +471,20 @@ const GAMES = [
     featured: false,
   },
   {
+    id: 'viral',
+    title: 'VIRAL!',
+    tagline: 'Creator Journey',
+    color: '#BC13FE',
+    color2: '#FF5F1F',
+    marqueeText: 'ROLL • CREATE • GROW • GET SPONSORED • GO VIRAL',
+    screenText: '🚀 GO VIRAL',
+    description: 'Climb the creator journey from unknown to Streamer Mansion. Build followers, upgrade your setup, survive the chaos, and qualify for the finish.',
+    tags: ['1–12 Players', 'Party Board Game', 'Human Test'],
+    path: '/games/viral',
+    standalone: true,
+    featured: false,
+  },
+  {
     id: 'txd',
     title: 'TND — TexasNomad Dominoes',
     tagline: 'Texas Domino Showdown',
@@ -519,7 +539,6 @@ const CONSTRUCTION_DETAILS = {
 
 const COMING_SOON = [
   { title: 'Name That Track', emoji: '🎵', color: '#5a1a5a' },
-  { title: 'VIRAL!', emoji: '🚀', color: '#5a1a5a' },
   { title: '1 Player Games', emoji: '🎮', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
@@ -538,6 +557,12 @@ export default function Games() {
   };
 
   const handleCreateRoom = async (gameId) => {
+    // VIRAL is a validated standalone build with its own host/join flow.
+    if (gameId === 'viral') {
+      navigate('/games/viral');
+      return;
+    }
+
     // See That! is single-player only — no room needed
     if (gameId === 'see-that') {
       navigate('/games/see-that');

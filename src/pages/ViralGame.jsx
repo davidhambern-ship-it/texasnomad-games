@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 
 export default function ViralGame() {
   useEffect(() => {
-    window.location.replace('/viral');
+    window.location.replace('/viral/index.html');
   }, []);
 
   return (

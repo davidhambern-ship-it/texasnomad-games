@@ -970,7 +970,13 @@ export default function PreviewHostPanel() {
                   <button
                     key={game.id}
                     disabled={busy}
-                    onClick={() => createRoom(game)}
+                    onClick={() => {
+                      if (game.standalone) {
+                        window.location.assign(game.path);
+                        return;
+                      }
+                      createRoom(game);
+                    }}
                     className="border-2 rounded-xl p-6 bg-black/50"
                     style={{ borderColor: game.color + '55' }}
                   >
