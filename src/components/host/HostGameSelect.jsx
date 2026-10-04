@@ -46,6 +46,15 @@ export const ALL_GAMES = [
     path: '/games/word-search',
   },
   {
+    id: 'viral',
+    title: 'VIRAL!',
+    subtitle: 'CREATOR JOURNEY',
+    color: '#BC13FE',
+    emoji: '🚀',
+    path: '/games/viral',
+    standalone: true,
+  },
+  {
     id: 'sudoku',
     title: 'SUDOKU TN',
     subtitle: 'RACE THE GRID',
