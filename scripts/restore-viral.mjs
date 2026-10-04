@@ -72,6 +72,13 @@ if (htmlSha !== EXPECTED_HTML_SHA256) {
   throw new Error(`VIRAL HTML integrity check failed: ${htmlSha}`);
 }
 
+const bridgeTag = '<script src="/viral/tng-bridge.js"></script>';
+const sourceHtml = html.toString('utf8');
+if (!sourceHtml.includes('</body>')) {
+  throw new Error('VIRAL HTML is missing </body>; refusing to inject the TNG bridge.');
+}
+const deployedHtml = sourceHtml.replace('</body>', `${bridgeTag}</body>`);
+
 fs.mkdirSync(outputDir, { recursive: true });
-fs.writeFileSync(outputPath, html);
-console.log(`[VIRAL] Restored validated Claude build: ${html.length} bytes, sha256 ${htmlSha}`);
+fs.writeFileSync(outputPath, deployedHtml);
+console.log(`[VIRAL] Restored validated Claude build: ${html.length} source bytes, sha256 ${htmlSha}; TNG bridge injected into deployed copy.`);

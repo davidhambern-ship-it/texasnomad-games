@@ -2,7 +2,12 @@ import React, { useEffect } from 'react';
 
 export default function ViralGame() {
   useEffect(() => {
-    window.location.replace('/viral/index.html');
+    const params = new URLSearchParams(window.location.search);
+    const joinCode = String(params.get('join') || '').trim().toUpperCase();
+    const suffix = /^[A-Z]{4}$/.test(joinCode)
+      ? `?join=${encodeURIComponent(joinCode)}`
+      : '';
+    window.location.replace(`/viral/index.html${suffix}`);
   }, []);
 
   return (
