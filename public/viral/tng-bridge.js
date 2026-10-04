@@ -1,6 +1,201 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
   const requestedJoin = String(params.get('join') || '').trim().toUpperCase();
+  const requestedHost = params.get('host') === '1';
+
+  const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
+    ? window.location.origin
+    : 'https://tng-live-production.up.railway.app';
+
+  const API_BASE = RELAY_ORIGIN === window.location.origin ? '' : RELAY_ORIGIN;
+  const WS_BASE = RELAY_ORIGIN.replace(/^http/i, 'ws');
+
+  function installClaudeCompatibilityBridge() {
+    if (window.claude?.use) return;
+
+    function createRoomConnection(roomName) {
+      const normalized = String(roomName || '').trim().toLowerCase();
+      if (!/^viral-[a-z]{4}$/.test(normalized)) {
+        return Promise.reject(new Error('Invalid VIRAL room name.'));
+      }
+
+      return new Promise((resolve, reject) => {
+        const ws = new WebSocket(`${WS_BASE}/viral-live?room=${encodeURIComponent(normalized)}`);
+        const topicHandlers = new Map();
+        const peerHandlers = new Set();
+        let peers = [];
+        let settled = false;
+        let closedByUser = false;
+
+        const failTimer = window.setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          try { ws.close(); } catch {}
+          reject(new Error('Timed out connecting to the VIRAL room.'));
+        }, 8000);
+
+        function notifyTopic(topic, message) {
+          const handlers = topicHandlers.get(topic);
+          if (!handlers) return;
+          handlers.forEach((handler) => {
+            try { handler(message); } catch {}
+          });
+        }
+
+        function notifyPeers(change) {
+          peerHandlers.forEach((handler) => {
+            try { handler(change); } catch {}
+          });
+        }
+
+        function send(payload) {
+          if (ws.readyState !== WebSocket.OPEN) {
+            return Promise.reject(new Error('VIRAL room is not connected.'));
+          }
+          try {
+            ws.send(JSON.stringify(payload));
+            return Promise.resolve();
+          } catch (error) {
+            return Promise.reject(error);
+          }
+        }
+
+        const connection = {
+          emit(topic, data) {
+            return send({ t: 'emit', topic, data });
+          },
+          presence(presence) {
+            return send({ t: 'presence', p: presence || {} });
+          },
+          on(topic, handler) {
+            if (!topicHandlers.has(topic)) topicHandlers.set(topic, new Set());
+            topicHandlers.get(topic).add(handler);
+            return () => topicHandlers.get(topic)?.delete(handler);
+          },
+          onPeers(handler) {
+            peerHandlers.add(handler);
+            return () => peerHandlers.delete(handler);
+          },
+          peers() {
+            return peers.map((peer) => ({
+              ...peer,
+              presence: peer?.presence && typeof peer.presence === 'object'
+                ? { ...peer.presence }
+                : {},
+            }));
+          },
+          leave() {
+            closedByUser = true;
+            try { ws.close(1000, 'leave'); } catch {}
+          },
+        };
+
+        ws.addEventListener('message', (event) => {
+          let message;
+          try { message = JSON.parse(String(event.data || '')); } catch { return; }
+          if (!message || typeof message !== 'object') return;
+
+          if (message.t === 'welcome') {
+            peers = Array.isArray(message.peers) ? message.peers : [];
+            if (!settled) {
+              settled = true;
+              window.clearTimeout(failTimer);
+              resolve(connection);
+            }
+            return;
+          }
+
+          if (message.t === 'msg' && typeof message.topic === 'string') {
+            notifyTopic(message.topic, {
+              data: message.data,
+              from: message.from || null,
+              sameTab: false,
+            });
+            return;
+          }
+
+          if (message.t === 'peers') {
+            peers = Array.isArray(message.peers) ? message.peers : [];
+            notifyPeers({
+              joined: Array.isArray(message.joined) ? message.joined : [],
+              left: Array.isArray(message.left) ? message.left : [],
+              peers: connection.peers(),
+            });
+          }
+        });
+
+        ws.addEventListener('error', () => {
+          if (!settled) {
+            settled = true;
+            window.clearTimeout(failTimer);
+            reject(new Error('Could not connect to the VIRAL room.'));
+          }
+        });
+
+        ws.addEventListener('close', () => {
+          window.clearTimeout(failTimer);
+          if (!settled) {
+            settled = true;
+            reject(new Error('VIRAL room connection closed.'));
+            return;
+          }
+
+          if (!closedByUser) {
+            notifyPeers({
+              joined: [],
+              left: connection.peers(),
+              peers: [],
+            });
+          }
+          peers = [];
+        });
+      });
+    }
+
+    const roomApi = {
+      join(roomName) {
+        return createRoomConnection(roomName);
+      },
+    };
+
+    const userApi = {
+      canEdit() {
+        return true;
+      },
+    };
+
+    window.claude = {
+      ...(window.claude || {}),
+      use(kind) {
+        if (kind === 'room') return Promise.resolve(roomApi);
+        if (kind === 'user') return Promise.resolve(userApi);
+        return Promise.resolve(null);
+      },
+    };
+  }
+
+  function revealOnlineTabs() {
+    if (document.getElementById('tng-viral-online-tabs')) return;
+    const style = document.createElement('style');
+    style.id = 'tng-viral-online-tabs';
+    style.textContent = '#tHost,#tJoin{display:inline-flex!important}';
+    document.head.appendChild(style);
+  }
+
+  function autoHost() {
+    if (!requestedHost) return;
+
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      const hostTab = document.getElementById('tHost');
+      if (hostTab) {
+        hostTab.click();
+        window.clearInterval(timer);
+      }
+      if (attempts >= 80) window.clearInterval(timer);
+    }, 125);
+  }
 
   function autoJoin() {
     if (!/^[A-Z]{4}$/.test(requestedJoin)) return;
@@ -22,20 +217,16 @@
           codeInput.dispatchEvent(new Event('input', { bubbles: true }));
           joinButton.click();
           window.clearInterval(timer);
-        }, 60);
+        }, 80);
       }
 
       if (attempts >= 80) window.clearInterval(timer);
     }, 125);
   }
 
-  const API_BASE = window.location.hostname.endsWith('.up.railway.app')
-    ? ''
-    : 'https://tng-live-production.up.railway.app';
-
   function currentRoomCode() {
-    const fromQuery = String(params.get('join') || '').trim().toUpperCase();
-    if (/^[A-Z]{4}$/.test(fromQuery)) return fromQuery;
+    const fromJoin = String(params.get('join') || '').trim().toUpperCase();
+    if (/^[A-Z]{4}$/.test(fromJoin)) return fromJoin;
 
     const tag = String(document.getElementById('roomTag')?.textContent || '');
     const match = tag.match(/ROOM\s+([A-Z]{4})/i);
@@ -186,13 +377,17 @@
     });
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-      mountFeedback();
-      autoJoin();
-    }, { once: true });
-  } else {
+  function boot() {
+    installClaudeCompatibilityBridge();
+    revealOnlineTabs();
     mountFeedback();
+    autoHost();
     autoJoin();
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
   }
 })();
