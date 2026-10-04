@@ -10,7 +10,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc -p ./jsconfig.json",
     "preview": "vite preview",
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "prebuild": "node scripts/restore-viral.mjs"
   },
   "dependencies": {
     "@base44/sdk": "^0.8.49",

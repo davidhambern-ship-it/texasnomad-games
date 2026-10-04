@@ -148,9 +148,35 @@
           "value": "no-store, no-cache, must-revalidate, max-age=0"
         }
       ]
+    },
+    {
+      "source": "/viral",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
+    },
+    {
+      "source": "/viral/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache, must-revalidate, max-age=0"
+        }
+      ]
     }
   ],
   "rewrites": [
+    {
+      "source": "/viral",
+      "destination": "/viral/index.html"
+    },
+    {
+      "source": "/viral/",
+      "destination": "/viral/index.html"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
