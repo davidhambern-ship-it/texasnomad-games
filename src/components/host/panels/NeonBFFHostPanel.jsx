@@ -380,6 +380,7 @@ export default function NeonBFFHostPanel({ controllerId }) {
   const [pollError, setPollError] = useState('');
   const [busy, setBusy] = useState(false);
   const [selectedAnswer, setSelectedAnswer] = useState(0);
+  const [clockNow, setClockNow] = useState(() => Date.now());
   const [manualPoints, setManualPoints] = useState(10);
   const lastSoundCueRef = useRef(null);
 

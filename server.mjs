@@ -1001,7 +1001,7 @@ const hostLiveWss = new WebSocketServer({ noServer: true });
 // VIRAL! online rooms (WebSocket relay at /viral-live)
 const viralLive = createViralLive({ isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin) });
 
-const VIRAL_DISPLAY_TARGET_TTL_MS = 15000;
+const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
 const viralDisplayTargets = new Map();
 
 function getViralDisplayTarget(displayDeviceId) {
@@ -1063,13 +1063,10 @@ async function handleViralDisplayTarget(req, res) {
 
   const body = await readJsonBody(req).catch(() => ({}));
   const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
-  const roomCode = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
-
-  viralDisplayTargets.set(String(displayDeviceId), {
-    accountId: resolved.account.id,
-    roomCode,
-    updatedAt: Date.now(),
-  });
+  const incoming = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
+  // Sticky claim: a heartbeat without a readable code keeps the current room on screen.
+  const roomCode = incoming || viralDisplayTargets.get(String(displayDeviceId))?.roomCode || null;
+  viralDisplayTargets.set(String(displayDeviceId), { accountId: resolved.account.id, roomCode, updatedAt: Date.now() });
 
   sendJson(res, 200, {
     ok: true,

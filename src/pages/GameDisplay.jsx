@@ -1576,7 +1576,14 @@ function WordSearchDisplay({ room }) {
 }
 
 function ViralDisplay({ room }) {
-  const roomCode = String(room?.roomCode || '').trim().toUpperCase();
+  const rawCode = String(room?.roomCode || '').trim().toUpperCase();
+  // Sticky code: a one-poll flicker to empty must not unmount the game iframe
+  // (that reloads the VIRAL page and forces it to re-verify and re-join).
+  // The whole display still drops out when the room itself ends, because the
+  // GameDisplay stops receiving a room at all.
+  const lastViralCodeRef = useRef('');
+  if (/^[A-Z]{4}$/.test(rawCode)) lastViralCodeRef.current = rawCode;
+  const roomCode = lastViralCodeRef.current;
 
   if (!/^[A-Z]{4}$/.test(roomCode)) {
     return (
