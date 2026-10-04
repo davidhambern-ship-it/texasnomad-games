@@ -3,6 +3,7 @@
   const requestedJoin = String(params.get('join') || '').trim().toUpperCase();
   const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   const requestedHost = params.get('host') === '1';
+  let hostModeActive = requestedHost;
 
   const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
     ? window.location.origin
@@ -183,6 +184,29 @@
     document.head.appendChild(style);
   }
 
+  function detectHostMode() {
+    if (hostModeActive) return true;
+
+    const hostTab = document.getElementById('tHost');
+    const hostPanel =
+      document.getElementById('hostPanel') ||
+      document.getElementById('hostSetup') ||
+      document.getElementById('hOpen')?.closest('[role="tabpanel"], .panel, .view, section, div');
+
+    const hostTabSelected =
+      hostTab?.getAttribute('aria-selected') === 'true' ||
+      hostTab?.classList.contains('active') ||
+      hostTab?.classList.contains('selected');
+
+    const hostControlsVisible = Boolean(
+      document.getElementById('hOpen') &&
+      document.getElementById('hOpen').offsetParent !== null
+    );
+
+    hostModeActive = Boolean(hostTabSelected || hostControlsVisible || hostPanel?.offsetParent !== null);
+    return hostModeActive;
+  }
+
   function autoHost() {
     if (!requestedHost) return;
 
@@ -191,6 +215,7 @@
       attempts += 1;
       const hostTab = document.getElementById('tHost');
       if (hostTab) {
+        hostModeActive = true;
         hostTab.click();
         window.clearInterval(timer);
       }
@@ -292,13 +317,18 @@
 
     if (!response.ok) return '';
     const payload = await response.json().catch(() => null);
-    const token = payload?.session?.token || payload?.token || '';
+    const token =
+      payload?.data?.session?.token ||
+      payload?.data?.token ||
+      payload?.session?.token ||
+      payload?.token ||
+      '';
     if (token) cachedHostToken = token;
     return token;
   }
 
   async function syncHostDisplay(forceRefresh = false) {
-    if (!requestedHost) return;
+    if (!detectHostMode()) return;
 
     const token = await getHostAuthToken(forceRefresh).catch(() => '');
     if (!token) return;
@@ -316,6 +346,13 @@
     });
 
     let response = await send(token).catch(() => null);
+    try {
+      window.sessionStorage.setItem(
+        'tng_viral_display_sync',
+        response ? `status:${response.status}` : 'network-error'
+      );
+    } catch {}
+
     if (response?.status === 401 && !forceRefresh) {
       cachedHostToken = '';
       const fresh = await getHostAuthToken(true).catch(() => '');
@@ -324,7 +361,14 @@
   }
 
   function startHostDisplaySync() {
-    if (!requestedHost || displaySyncTimer) return;
+    if (displaySyncTimer) return;
+
+    const hostTab = document.getElementById('tHost');
+    hostTab?.addEventListener('click', () => {
+      hostModeActive = true;
+      syncHostDisplay();
+    });
+
     syncHostDisplay();
     displaySyncTimer = window.setInterval(() => {
       syncHostDisplay();
