@@ -185,6 +185,8 @@
   }
 
   function detectHostMode() {
+    // Joiners and watch-only display clients must never claim a paired TNG display.
+    if (requestedDisplay || requestedJoin) return false;
     if (hostModeActive) return true;
 
     const hostTab = document.getElementById('tHost');
@@ -361,7 +363,9 @@
   }
 
   function startHostDisplaySync() {
-    if (displaySyncTimer) return;
+    // A VIRAL display iframe uses ?display=ROOM and a player uses ?join=ROOM.
+    // Neither should run host verification/claim heartbeats.
+    if (requestedDisplay || requestedJoin || displaySyncTimer) return;
 
     const hostTab = document.getElementById('tHost');
     hostTab?.addEventListener('click', () => {
