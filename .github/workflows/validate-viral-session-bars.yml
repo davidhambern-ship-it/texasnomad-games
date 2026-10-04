@@ -1,0 +1,31 @@
+name: Validate VIRAL session bars
+
+on:
+  push:
+    branches:
+      - fix/viral-persistent-session-bars
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Check bridge syntax
+        run: node --check public/viral/tng-bridge.js
+      - name: Install
+        run: npm ci
+      - name: Build
+        run: npm run build
+      - name: Verify session bars
+        run: |
+          test -s dist/viral/tng-bridge.js
+          grep -q 'BACK TO HOST' dist/viral/tng-bridge.js
+          grep -q 'LEAVE GAME' dist/viral/tng-bridge.js
+          grep -q 'requestedDisplay || requestedJoin || displaySyncTimer' dist/viral/tng-bridge.js
