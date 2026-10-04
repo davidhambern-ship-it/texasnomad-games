@@ -120,6 +120,22 @@ export function createViralLive({ isAllowedOrigin = () => true } = {}) {
       wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request, room));
       return true;
     },
+    resolveRoom(code) {
+      const raw = String(code || '').trim().toLowerCase();
+      const roomName = raw.startsWith('viral-') ? raw : `viral-${raw}`;
+      if (!ROOM_RE.test(roomName)) {
+        return { live: false, roomCode: raw.toUpperCase(), peers: 0 };
+      }
+
+      const room = rooms.get(roomName);
+      const hostPresent = Boolean(room?.hostId && room.peers.has(room.hostId));
+      return {
+        live: hostPresent,
+        roomCode: roomName.slice(6).toUpperCase(),
+        peers: room?.peers.size || 0,
+        hasState: Boolean(room?.lastState),
+      };
+    },
     stats() { let peers = 0; for (const r of rooms.values()) peers += r.peers.size; return { rooms: rooms.size, peers }; },
   };
 }
