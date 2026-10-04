@@ -1,0 +1,128 @@
+name: Export Dominoes Claude Handoff
+
+on:
+  push:
+    branches:
+      - export/dominoes-claude-package-2026-10-04
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact branch
+        uses: actions/checkout@v4
+
+      - name: Build Dominoes handoff folder
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="TNG-Dominoes-Claude-Handoff"
+          mkdir -p "$ROOT"
+
+          FILES=(
+            "base44/entities/DominoGame.jsonc"
+            "src/lib/dominoEngine.js"
+            "src/components/domino/BoneyardBox.jsx"
+            "src/components/domino/DominoBoard.jsx"
+            "src/components/domino/DominoTile.jsx"
+            "src/components/domino/TXDDomino.jsx"
+            "src/pages/DominoGame.jsx"
+            "src/pages/DominoHost.jsx"
+            "src/data/texasNomadCharacters.js"
+            "src/api/base44Client.js"
+            "src/components/home/Header.jsx"
+            "src/App.jsx"
+            "src/pages/Games.jsx"
+            "src/index.css"
+            "package.json"
+            "vite.config.js"
+            "tailwind.config.js"
+            "jsconfig.json"
+          )
+
+          for FILE in "${FILES[@]}"; do
+            mkdir -p "$ROOT/$(dirname "$FILE")"
+            cp "$FILE" "$ROOT/$FILE"
+          done
+
+          mkdir -p "$ROOT/assets/dominoes"
+          curl -L --fail --silent --show-error \
+            "https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/348f82880_domino_front.png" \
+            -o "$ROOT/assets/dominoes/domino_front.png" || true
+          curl -L --fail --silent --show-error \
+            "https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/967ce20c4_domino_back.png" \
+            -o "$ROOT/assets/dominoes/domino_back.png" || true
+          curl -L --fail --silent --show-error \
+            "https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/9f8b50e18_crowned_b.png" \
+            -o "$ROOT/assets/dominoes/crowned_b.png" || true
+
+          cat > "$ROOT/CLAUDE_HANDOFF.md" <<'EOF'
+          # TNG Dominoes — Claude Handoff
+
+          This package was exported from the current `main` branch of:
+          `davidhambern-ship-it/texasnomad-games`
+
+          ## Core Dominoes files
+
+          - `src/lib/dominoEngine.js` — game rules, legal moves, board geometry, spinner/open-end logic, scoring, round logic helpers.
+          - `src/pages/DominoHost.jsx` — Host-side game creation/control and game-state updates.
+          - `src/pages/DominoGame.jsx` — player/game-table experience.
+          - `src/components/domino/DominoBoard.jsx` — shared board renderer.
+          - `src/components/domino/DominoTile.jsx` — domino tile renderer.
+          - `src/components/domino/TXDDomino.jsx` — TXD-styled domino renderer.
+          - `src/components/domino/BoneyardBox.jsx` — boneyard UI.
+          - `base44/entities/DominoGame.jsonc` — legacy Base44 DominoGame data schema.
+
+          ## Integration/context files
+
+          - `src/App.jsx` — routes for `/games/dominoes` and `/games/dominoes/host`.
+          - `src/pages/Games.jsx` — Dominoes catalog/card entry and Host navigation.
+          - `src/api/base44Client.js` — current legacy Base44 client used by Dominoes.
+          - `src/data/texasNomadCharacters.js` — character data referenced by Host/player seats.
+          - `src/components/home/Header.jsx` — shared page header used by Domino pages.
+          - build/style config files are included for context.
+
+          ## Important architecture note
+
+          Dominoes is currently one of the older TNG game implementations and still talks directly to the Base44 `DominoGame` entity. It has NOT yet been migrated into the newer Neon/Railway multiplayer room architecture used by the current live games. Treat this package as the complete existing Dominoes implementation to inspect/refactor, not as proof that Dominoes is already wired into the current production backend.
+
+          ## Current game design visible in the code
+
+          - Double-six set.
+          - Four-player 2v2 partner seating: seats 0 + 2 vs 1 + 3.
+          - Spinner support with left/right/top/bottom arms.
+          - Bounded table geometry with turns when chains approach table edges.
+          - Open-end scoring in multiples of five.
+          - Round scoring from losing-team pips.
+          - Score limit defaults to 100.
+          - Host and player views are separate routes.
+
+          ## Assets
+
+          The Domino components currently reference three Base44-hosted images:
+          - domino front
+          - domino back
+          - crowned-B pip art
+
+          Copies are included under `assets/dominoes/` when the export runner was able to retrieve them. The source URLs remain in the component code.
+
+          ## Suggested first step for Claude
+
+          Read `src/lib/dominoEngine.js`, then `src/pages/DominoHost.jsx`, then `src/pages/DominoGame.jsx`. After that, inspect the four components in `src/components/domino/` and the integration files.
+          EOF
+
+          git rev-parse HEAD > "$ROOT/SOURCE_COMMIT.txt"
+
+          zip -r "TNG-Dominoes-Claude-Handoff.zip" "$ROOT"
+
+      - name: Upload handoff ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: TNG-Dominoes-Claude-Handoff
+          path: TNG-Dominoes-Claude-Handoff.zip
+          if-no-files-found: error
+          retention-days: 7
