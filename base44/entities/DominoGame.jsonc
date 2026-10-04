@@ -58,7 +58,7 @@
     },
     "board": {
       "type": "array",
-      "description": "Played tiles in chain order",
+      "description": "Plays in order: { id, a, b, side: first|left|right|up|down, inner, outer, seat, n }. Positions are computed by layoutBoard() and never stored.",
       "items": {
         "type": "object"
       }
@@ -83,11 +83,24 @@
     },
     "roundWinner": {
       "type": "object",
-      "description": "{ team, points, playerName }"
+      "description": "{ team, points, playerName, winnerSeat, reason: domino|blocked|score, teamPips }"
     },
     "scoreLimit": {
       "type": "number",
-      "default": 100
+      "default": 150
+    },
+    "leadTile": {
+      "type": "string",
+      "description": "Tile that must open the round (the 6-6 in round 1), null otherwise"
+    },
+    "passes": {
+      "type": "number",
+      "default": 0,
+      "description": "Knocks in a row; 4 = blocked round"
+    },
+    "lastPlay": {
+      "type": "object",
+      "description": "{ seat, id, side, points, count, n } or { seat, pass: true, n } — drives sounds and score pop-ups"
     },
     "activityLog": {
       "type": "array",

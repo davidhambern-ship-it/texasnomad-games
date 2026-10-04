@@ -1,125 +1,85 @@
-import React, { useRef, useState, useLayoutEffect } from 'react';
+import React, { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import DominoTile from './DominoTile';
+import coinImg from './assets/tn-coin.png';
+import { layoutBoard, previewPlacement } from '@/lib/dominoEngine';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DominoBoard — renders played tiles inside a FIXED, non-scrolling table.
-// Coordinates (x,y in 0-100) map onto a square board layer centered in the
-// table. Dominoes stay a fixed size; branches turn inward at the table edges.
-// ─────────────────────────────────────────────────────────────────────────────
+// Which way a tile slides in from, by the seat that played it (relative to the viewer)
+const FROM = { bottom: [0, 1], left: [-1, 0], top: [0, -1], right: [1, 0] };
 
-export default function DominoBoard({ board = [], openEnds = {}, playableEnds = new Set(), onEndClick, interactive = false }) {
+/**
+ * DominoBoard — draws the played chain, auto-fitted to the felt.
+ *  board      engine board (play order)
+ *  ghostMoves [{ side, domino }] legal spots for the selected tile — shown as glowing ghosts, tap to play there
+ *  onGhost    (side) => void
+ *  seatPos    (seat) => 'bottom'|'left'|'top'|'right'  (for slide-in direction)
+ *  hint       text shown on an empty board
+ *  maxUnit    biggest tile size in px
+ */
+export default function DominoBoard({ board = [], ghostMoves = [], onGhost, seatPos, hint, maxUnit = 46, highlightN = null }) {
   const ref = useRef(null);
   const [dims, setDims] = useState({ w: 0, h: 0 });
-
   useLayoutEffect(() => {
     if (!ref.current) return;
-    const update = () => {
-      const r = ref.current.getBoundingClientRect();
-      setDims({ w: r.width, h: r.height });
-    };
+    const el = ref.current;
+    const update = () => setDims({ w: el.clientWidth, h: el.clientHeight });
     update();
     const ro = new ResizeObserver(update);
-    ro.observe(ref.current);
+    ro.observe(el);
     return () => ro.disconnect();
   }, []);
 
-  // Board layer is a square of side S = min(w,h), centered in the table.
-  const S = Math.min(dims.w, dims.h) || 300;
-  const offX = (dims.w - S) / 2;
-  const offY = (dims.h - S) / 2;
-  const unit = S * 0.045;   // domino narrow dimension (one half) in px
-  const dz = S * 0.07;     // drop-zone size in px
+  // The soft layout box follows the felt's shape: wide tables get long rows, phones get compact snakes
+  const aspect = dims.w && dims.h ? dims.w / dims.h : 1.6;
+  const halfH = 5.5, halfW = Math.max(5.5, Math.min(13, Math.round(halfH * aspect * 2) / 2));
+  const box = useMemo(() => ({ halfW, halfH }), [halfW]);
+  const layout = useMemo(() => layoutBoard(board, box), [board, box]);
+  const ghosts = useMemo(() => ghostMoves.map(m => ({ side: m.side, tile: previewPlacement(board, m.domino, m.side, box) })), [ghostMoves, board, box]);
 
-  const px = (x, y) => ({ left: x / 100 * S + offX, top: y / 100 * S + offY });
+  // Fit everything (placed tiles + ghost previews) inside the felt
+  let { minX, maxX, minY, maxY } = layout.bbox;
+  for (const g of ghosts) { const r = g.tile.rect; minX = Math.min(minX, r.cx - r.w / 2); maxX = Math.max(maxX, r.cx + r.w / 2); minY = Math.min(minY, r.cy - r.h / 2); maxY = Math.max(maxY, r.cy + r.h / 2); }
+  if (!board.length) { minX = -1; maxX = 1; minY = -1; maxY = 1; }
+  const pad = 0.8;
+  const bw = maxX - minX + pad * 2, bh = maxY - minY + pad * 2;
+  const W = dims.w || 600, H = dims.h || 400;
+  const U = Math.max(12, Math.min(maxUnit, W / bw, H / bh));
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const toPx = (r) => ({ left: W / 2 + (r.cx - cx - r.w / 2) * U, top: H / 2 + (r.cy - cy - r.h / 2) * U });
+  const newestN = board.length ? board.length - 1 : -1;
 
-  // ── Empty board ──
-  if (board.length === 0) {
-    const canPlay = interactive && !!onEndClick;
-    const c = px(50, 50);
-    return (
-      <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-        <div
-          onClick={canPlay ? () => onEndClick('first') : undefined}
-          style={{
-            position: 'absolute', left: c.left, top: c.top,
-            width: dz, height: dz, transform: 'translate(-50%,-50%)',
-            borderRadius: 8,
-            border: canPlay ? '2px dashed rgba(0,255,120,0.8)' : '1px dashed rgba(255,255,255,0.12)',
-            background: canPlay ? 'rgba(0,255,120,0.08)' : 'transparent',
-            boxShadow: canPlay ? '0 0 18px rgba(0,255,120,0.3)' : 'none',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: canPlay ? 'pointer' : 'default',
-          }}
-        >
-          <span style={{ fontSize: 7, fontFamily: "'Press Start 2P',monospace", color: canPlay ? 'rgba(0,255,120,0.8)' : 'rgba(255,255,255,0.15)' }}>
-            {canPlay ? 'PLAY FIRST TILE' : '— WAITING —'}
-          </span>
-        </div>
-      </div>
-    );
-  }
-
-  const DropZone = ({ side, pos, value, active }) => {
-    if (!pos) return null;
-    const p = px(pos.x, pos.y);
-    return (
-      <div
-        onClick={active ? () => onEndClick(side) : undefined}
-        onDragOver={e => e.preventDefault()}
-        onDrop={e => { e.preventDefault(); if (active && onEndClick) onEndClick(side); }}
-        style={{
-          position: 'absolute', left: p.left, top: p.top,
-          width: dz, height: dz, transform: 'translate(-50%,-50%)',
-          borderRadius: 8,
-          border: active ? '2px dashed rgba(0,255,120,0.9)' : '1px dashed rgba(255,255,255,0.07)',
-          background: active ? 'rgba(0,255,120,0.12)' : 'transparent',
-          boxShadow: active ? '0 0 14px rgba(0,255,120,0.5)' : 'none',
-          cursor: active ? 'pointer' : 'default',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all 0.15s', zIndex: 2,
-        }}
-      >
-        {active && value !== null && value !== undefined && (
-          <span style={{ fontSize: S * 0.04, fontWeight: 'bold', color: 'rgba(0,255,120,0.9)', fontFamily: 'monospace' }}>
-            {value}
-          </span>
-        )}
-      </div>
-    );
+  const renderTile = (t, extra = {}) => {
+    const p = toPx(t.rect);
+    const horizontal = t.rect.w > t.rect.h;
+    // First half = left (horizontal) / top (vertical)
+    const [h1, h2] = [...t.halves].sort((x, y) => (horizontal ? x.cx - y.cx : x.cy - y.cy));
+    return { p, horizontal, a: h1.pip, b: h2.pip };
   };
 
   return (
-    <div ref={ref} style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden' }}>
-      {board.map(t => {
-        const p = px(t.x ?? 50, t.y ?? 50);
+    <div ref={ref} className="tnd-board">
+      <img src={coinImg} alt="" className="tnd-coin" draggable={false} style={{ width: Math.min(W, H) * 0.42, height: Math.min(W, H) * 0.42 }} />
+      {!board.length && !ghosts.length && hint && <div className="tnd-board-hint">{hint}</div>}
+
+      {layout.tiles.map(t => {
+        const { p, horizontal, a, b } = renderTile(t);
+        const isNew = t.n === newestN;
+        const from = FROM[(seatPos && t.seat != null && seatPos(t.seat)) || 'bottom'];
         return (
-          <div key={t.id} style={{
-            position: 'absolute', left: p.left, top: p.top,
-            transform: 'translate(-50%,-50%)',
-            zIndex: 1,
-          }}>
-            <DominoTile
-              a={t.flip ? t.b : t.a}
-              b={t.flip ? t.a : t.b}
-              unit={unit}
-              vertical={t.orientation === 'v'}
-            />
+          <div key={t.id} className={`tnd-placed${isNew ? ' is-new' : ''}${highlightN === t.n ? ' is-last' : ''}`}
+            style={{ left: p.left, top: p.top, '--fx': `${from[0] * Math.max(W, H) * 0.45}px`, '--fy': `${from[1] * Math.max(W, H) * 0.45}px` }}>
+            <DominoTile a={a} b={b} unit={U} horizontal={horizontal} />
           </div>
         );
       })}
 
-      {interactive && onEndClick && (
-        <>
-          <DropZone side="left"   pos={openEnds.leftDrop}   value={openEnds.left}   active={playableEnds.has('left')} />
-          <DropZone side="right"  pos={openEnds.rightDrop}  value={openEnds.right}  active={playableEnds.has('right')} />
-          {openEnds.hasSpinner && (
-            <>
-              <DropZone side="top"    pos={openEnds.topDrop}    value={openEnds.top}    active={playableEnds.has('top')} />
-              <DropZone side="bottom" pos={openEnds.bottomDrop} value={openEnds.bottom} active={playableEnds.has('bottom')} />
-            </>
-          )}
-        </>
-      )}
+      {ghosts.map(g => {
+        const { p, horizontal, a, b } = renderTile(g.tile);
+        return (
+          <div key={`ghost-${g.side}`} className="tnd-placed tnd-ghost-wrap" style={{ left: p.left, top: p.top }}>
+            <DominoTile a={a} b={b} unit={U} horizontal={horizontal} ghost onClick={() => onGhost && onGhost(g.side)} title={`Play here (${g.side})`} />
+          </div>
+        );
+      })}
     </div>
   );
 }

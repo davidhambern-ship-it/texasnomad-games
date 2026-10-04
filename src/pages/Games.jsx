@@ -195,10 +195,9 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {game.standalone ? '🚀 PLAY HUMAN TEST' : (creating === game.id ? '⚙ CREATING…' : '⚡ CREATE ROOM')}
+            {creating === game.id ? '⚙ CREATING…' : '⚡ CREATE ROOM'}
           </button>
 
-          {!game.standalone && (
           <div className="flex gap-2">
             <input
               className="flex-1 px-3 py-2.5 rounded-lg text-white text-xs font-body focus:outline-none uppercase tracking-widest placeholder:text-white/20"
@@ -218,7 +217,6 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               {joining ? '…' : 'JOIN'}
             </button>
           </div>
-          )}
         </div>
 
         {/* Cabinet base screws */}
@@ -467,20 +465,6 @@ const GAMES = [
     featured: false,
   },
   {
-    id: 'viral',
-    title: 'VIRAL!',
-    tagline: "The Creator's Journey to Fame",
-    color: '#ff3b81',
-    color2: '#7c3aed',
-    marqueeText: 'BUILD YOUR FOLLOWING • UPGRADE YOUR GEAR • SURVIVE THE DRAMA • GO VIRAL',
-    screenText: '🚀 VIRAL!',
-    description: 'Race from zero followers to the Streamer Mansion in a creator-economy board game packed with gear, challenges, sponsorships, rivalries, and big moments.',
-    tags: ['1-12 Seats', 'Board Game', 'Human Test'],
-    path: '/viral',
-    standalone: true,
-    featured: false,
-  },
-  {
     id: 'txd',
     title: 'TND — TexasNomad Dominoes',
     tagline: 'Texas Domino Showdown',
@@ -489,14 +473,14 @@ const GAMES = [
     color2: '#FF5F1F',
     marqueeText: 'MATCH THE PIPS • PLAY YOUR TILES • CLEAR YOUR HAND • DOMINO!',
     screenText: '🁣 DOMINOES',
-    description: 'Classic Texas-style dominoes for 2–4 players. Match pips, drain your hand, and score big. First to 100 wins the table.',
-    tags: ['2-4 Players', 'Dominoes', 'Strategy'],
+    description: 'Texas-style partners dominoes. Match the pips, score every five on the board, and domino out to take your opponents\u2019 pips. First team to the target wins the table.',
+    tags: ['4 Players', '2v2 Partners', 'CPU fills seats'],
     path: '/games/dominoes',
     featured: false,
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['sudoku', 'see-that', 'word-wrangler', 'txd'];
+const IN_CONSTRUCTION_IDS = ['sudoku', 'see-that', 'word-wrangler'];
 
 const CONSTRUCTION_DETAILS = {
   sudoku: {
@@ -535,6 +519,7 @@ const CONSTRUCTION_DETAILS = {
 
 const COMING_SOON = [
   { title: 'Name That Track', emoji: '🎵', color: '#5a1a5a' },
+  { title: 'VIRAL!', emoji: '🚀', color: '#5a1a5a' },
   { title: '1 Player Games', emoji: '🎮', color: '#5a3a1a' },
   { title: 'Tournament', emoji: '🏆', color: '#5a4a0a' },
 ];
@@ -553,12 +538,6 @@ export default function Games() {
   };
 
   const handleCreateRoom = async (gameId) => {
-    // VIRAL human test runs Claude's validated standalone build unchanged.
-    if (gameId === 'viral') {
-      window.location.assign('/viral');
-      return;
-    }
-
     // See That! is single-player only — no room needed
     if (gameId === 'see-that') {
       navigate('/games/see-that');
