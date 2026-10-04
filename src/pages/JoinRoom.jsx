@@ -88,7 +88,8 @@ async function redirectSpecialGameRoom(roomCode) {
   // Dominoes owns its own persisted table state instead of a Neon GameRoom.
   try {
     const dominoes = await dominoStore.entities.DominoGame.filter({ room_code: code });
-    if (Array.isArray(dominoes) && dominoes.length > 0) {
+    const dominoRoom = Array.isArray(dominoes) ? dominoes[0] : null;
+    if (dominoRoom && String(dominoRoom.status || '').toLowerCase() !== 'finished') {
       window.location.replace(`/games/dominoes?room=${encodeURIComponent(code)}`);
       return true;
     }
