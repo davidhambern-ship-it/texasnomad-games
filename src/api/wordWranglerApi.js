@@ -1,3 +1,4 @@
+import { getNeonAuthToken } from '@/lib/neonAuth';
 // Client for Word Wrangler online races (server.mjs → server/wordWranglerApi.mjs)
 const IS_RAILWAY_TEMP_HOST =
   typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app');
@@ -10,15 +11,23 @@ export class WWApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'WWApiError'; this.status = status; this.code = code; }
 }
 
-async function call(path, { method = 'GET', body, token } = {}) {
+async function call(path, { method = 'GET', body, token, forceRefresh = false } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['X-WW-Token'] = token;
+
+  const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
   let res;
   try {
     res = await fetch(`${WW_API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
   } catch {
     throw new WWApiError('Can’t reach the Word Wrangler server. Check your connection.', 0, 'NETWORK');
+  }
+
+  if (res.status === 401 && authToken && !forceRefresh) {
+    return call(path, { method, body, token, forceRefresh: true });
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new WWApiError(data?.error?.message || 'Something went wrong.', res.status, data?.error?.code || 'ERROR');
