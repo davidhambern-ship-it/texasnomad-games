@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { getDialogueLine, getCatchphrase, DIALOGUE_COOLDOWN_MS } from '@/data/texasNomadDialogue';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
