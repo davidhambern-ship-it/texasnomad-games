@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import BSBigScreen from './BSBigScreen';
 import BSPhone from './BSPhone';
 import { bsApi, bsSeat } from '@/api/battleSudokuApi';
+import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 import { sfx } from './bsSfx';
 
 function useRoom(code, token, onGone) {
@@ -40,11 +41,34 @@ export function BSHost({ onExit }) {
     catch (e) { setErr(e.message); } finally { setCreating(false); }
   }, [apply]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!seat?.code) return undefined;
+
+    let alive = true;
+    const sync = async () => {
+      const result = await claimStandaloneDisplay('sudoku', seat.code).catch(() => null);
+      if (!alive || !result?.ok) return;
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 30000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      releaseStandaloneDisplay().catch(() => {});
+    };
+  }, [seat?.code]);
   const act = useCallback(async (action, payload = {}) => {
     try { const d = await bsApi.action(seat.code, seat.token, action, payload); apply(d); return d.result; }
     catch (e) { setErr(e.message); setTimeout(() => setErr(''), 3000); return null; }
   }, [seat, apply]);
-  const exit = () => { try { localStorage.removeItem('bs_host'); } catch { /* ignore */ } onExit(); };
+  const exit = () => {
+    releaseStandaloneDisplay().catch(() => {});
+    try { localStorage.removeItem('bs_host'); } catch { /* ignore */ }
+    onExit();
+  };
   if (!data) return <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>{err || error ? <><p>{err || error}</p><button type="button" className="bs-btn" onClick={() => { setErr(''); create(); }}>Try again</button> <button type="button" className="bs-btn ghost" onClick={onExit}>Back</button></> : 'Launching the fleet…'}</div></div>;
   return (
     <>
