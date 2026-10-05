@@ -1258,6 +1258,7 @@ const handleSeeThatApi = createSeeThatApi({
 const handleWordWranglerApi = createWordWranglerApi({
   store: wordWranglerRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
 });
 
 // BattleSudoku party rooms (/bs-api)
