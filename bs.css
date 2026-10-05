@@ -169,3 +169,23 @@
 @keyframes bs-toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 @keyframes bs-banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
 @keyframes bs-count { from { transform: scale(1.8); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1); } }
+
+/* ── Fleet vs Fleet ── */
+.bs-sides { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; min-height: 0; }
+.bs-sides.teams { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bs-sidegroup { display: flex; flex-direction: column; min-height: 0; min-width: 0; }
+.bs-sides.teams .bs-sidegroup { background: linear-gradient(180deg, color-mix(in srgb, var(--tc) 14%, transparent), transparent 60%); border-radius: 18px; padding: 0 6px 6px; }
+.bs-sidegroup .bs-fleets { flex: 1; }
+.bs-teamhead { display: flex; align-items: center; gap: 12px; height: 40px; margin-bottom: 6px; padding: 0 10px; border-bottom: 3px solid var(--tc); }
+.bs-teamhead b { font-family: 'Teko', sans-serif; font-size: 34px; line-height: 1; text-transform: uppercase; color: var(--tc); letter-spacing: .04em; }
+.bs-teamhead span { font-size: 14px; color: var(--bs-dim); }
+.bs-teamhead .sc { margin-left: auto; font-family: 'Teko', sans-serif; font-size: 36px; color: var(--bs-text); }
+.bs-lbrow.team { background: color-mix(in srgb, var(--tc) 16%, transparent); }
+.bs-teamcols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; text-align: left; }
+.bs-teamcol { border: 2px solid var(--tc); border-radius: 14px; padding: 10px; background: color-mix(in srgb, var(--tc) 10%, transparent); min-height: 90px; }
+.bs-teamcol h4 { margin: 0 0 8px; font-family: 'Teko', sans-serif; font-size: 28px; font-weight: 600; color: var(--tc); text-transform: uppercase; letter-spacing: .04em; }
+.bs-teamcol .bs-chip { margin: 0 6px 6px 0; }
+.bs-teamcol button.bs-chip { cursor: pointer; font: inherit; color: inherit; }
+.bs-ocean .bs-cell.allyaim::after { content: ""; position: absolute; width: 52%; height: 52%; border-radius: 50%; border: 2px dashed #7dffb2; box-shadow: 0 0 6px rgba(125, 255, 178, .5); pointer-events: none; }
+.bs-fleetpick { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.bs-teampill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-weight: 900; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; background: var(--tc); color: #06101e; }

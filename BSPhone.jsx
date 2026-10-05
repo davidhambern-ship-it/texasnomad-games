@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import BSGrid from './BSGrid';
 import { sfx } from './bsSfx';
-import { COST, MAX_SHELLS, cellName, lineName } from '@/lib/battleSudoku/game';
+import { COST, MAX_SHELLS, TEAMS, cellName, lineName } from '@/lib/battleSudoku/game';
 import { LINES } from '@/lib/battleSudoku/sudoku';
 
 const fmt = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
@@ -28,13 +28,17 @@ export default function BSPhone({ v, act, now, onExit }) {
   const [target, setTarget] = useState(null);
   const [tool, setTool] = useState('fire');
   const [dir, setDir] = useState('h');
+  const [defOwner, setDefOwner] = useState(null);
   const [busy, setBusy] = useState(false);
   const lastPhase = useRef(null);
   const lastIntel = useRef(null);
   const lastReveal = useRef(null);
 
   const left = v.phaseEndsAt - now;
-  const foes = v.players.filter(p => p.id !== me?.id && !p.ghost);
+  const teams = v.mode === 'teams';
+  const myTeam = teams && me ? TEAMS[me.team] : null;
+  const foes = v.players.filter(p => p.id !== me?.id && !p.ghost && (!teams || p.team !== me?.team));
+  const isBounty = (id) => (v.bounties || []).includes(id);
   const tgt = target && foes.find(f => f.id === target) ? target : (me?.rival && foes.find(f => f.id === me.rival) ? me.rival : foes[0]?.id);
 
   const say = (msg, kind = 'info') => setToast({ msg, kind, k: Date.now() + Math.random() });
@@ -44,7 +48,7 @@ export default function BSPhone({ v, act, now, onExit }) {
   // phase changes & news → sounds / toasts
   useEffect(() => {
     if (lastPhase.current && lastPhase.current !== v.phase) {
-      if (v.phase === 'battle') { sfx.horn(); setTab('enemy'); setTool('fire'); say(v.leader === me?.id ? 'Battle stations — there’s a bounty on YOU!' : 'Battle stations! Spend your shells.', 'info'); }
+      if (v.phase === 'battle') { sfx.horn(); setTab('enemy'); setTool('fire'); setDefOwner(null); say(isBounty(me?.id) ? 'Battle stations — there’s a bounty on YOU!' : 'Battle stations! Spend your shells.', 'info'); }
       if (v.phase === 'solve') setSel(null);
       if (v.phase === 'final') sfx.win();
     }
@@ -54,7 +58,8 @@ export default function BSPhone({ v, act, now, onExit }) {
     const n = me?.intel?.length || 0;
     if (lastIntel.current != null && n > lastIntel.current) {
       const p = me.intel[n - 1]; sfx.sonar();
-      say(`Sonar: ${players[p.target]?.name || 'rival'} has ${p.count} ship piece${p.count === 1 ? '' : 's'} in ${lineName(p.type, p.idx)}`, 'sonar');
+      const via = p.from && p.from !== me.id ? `${players[p.from]?.name || 'Teammate'}’s sonar` : 'Sonar';
+      say(`${via}: ${players[p.target]?.name || 'rival'} has ${p.count} ship piece${p.count === 1 ? '' : 's'} in ${lineName(p.type, p.idx)}`, 'sonar');
     }
     lastIntel.current = n;
   }, [me?.intel?.length]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -88,7 +93,7 @@ export default function BSPhone({ v, act, now, onExit }) {
 
   // ── header ──
   const header = (
-    <div className="bs-phead">
+    <div className="bs-phead" style={myTeam ? { boxShadow: `inset 0 -3px 0 ${myTeam.color}` } : undefined}>
       <span className="nm"><span className="bs-dot" style={{ background: players[me.id]?.color }} /><span className="t">{players[me.id]?.name}{me.ghost ? ' 👻' : ''}</span></span>
       <Shells have={me.shells} spent={v.phase === 'battle' ? spent : 0} />
       <span className={`bs-phase ${v.phase}`}><b>{v.phase === 'final' ? 'Done' : fmt(left)}</b><small>{PHASE[v.phase]}{v.volley ? ` · ${v.volley}/${v.settings.volleys}` : ''}</small></span>
@@ -100,7 +105,8 @@ export default function BSPhone({ v, act, now, onExit }) {
   if (v.phase === 'setup') {
     body = (
       <>
-        <div className="bs-banner"><b>Hide your fleet.</b> Rivals will fire at these squares — shuffle until you like it.</div>
+        {myTeam && <div className="bs-banner">You sail with the <span className="bs-teampill" style={{ '--tc': myTeam.color }}>{myTeam.name}</span>{(me.allies || []).length ? <> alongside {(me.allies || []).map(a => players[a.id]?.name).join(', ')}</> : ''}</div>}
+        <div className="bs-banner"><b>Hide your fleet.</b> {teams ? 'The other fleet' : 'Rivals'} will fire at these squares — shuffle until you like it.</div>
         <BSGrid ocean mine axis cell={(i) => ({ cls: shipAt[i] ? 'ship' : '' })} />
         <div className="bs-fleetkey">{me.ships.map(s => <span key={s.id}>{s.name} ({s.size})</span>)}</div>
         <div className="bs-row" style={{ justifyContent: 'center' }}>
@@ -141,6 +147,7 @@ export default function BSPhone({ v, act, now, onExit }) {
     const T = players[tgt];
     const myOrdersOn = (me.orders || []).filter(o => o.target === tgt);
     const aim = new Set(myOrdersOn.flatMap(o => o.cells || [o.cell]));
+    const allyAim = new Set((me.allyOrders || []).filter(o => o.target === tgt).flatMap(o => o.cells));
     const sunkCells = new Set((T?.sunk || []).flatMap(s => s.cells));
     // latest ping per line wins (counts drop as ships get hit)
     const intelMap = new Map();
@@ -157,28 +164,36 @@ export default function BSPhone({ v, act, now, onExit }) {
       if (!canAfford(kind)) { say(me.shells - spent <= 0 ? 'Out of shells — solve more next round!' : `Torpedo needs ${COST.torpedo} shells`, 'bad'); return; }
       run('order', { kind, target: tgt, cell: i, dir }, (r) => { if (r.ok) sfx.order(); });
     };
+    // which fleet am I defending? mine, or (Fleet vs Fleet) a teammate's
+    const defendable = [{ id: me.id, ghost: me.ghost, ships: me.ships, shields: me.shields }, ...(me.allies || [])].filter(f => !f.ghost);
+    const D = defendable.find(f => f.id === defOwner) || defendable[0] || null;
+    const dShipAt = {}; (D?.ships || []).forEach(sh => sh.cells.forEach(c => { dShipAt[c] = sh; }));
+    const dHits = new Set((D?.ships || []).flatMap(sh => sh.hits));
+    const defOrders = (me.orders || []).filter(o => (o.kind === 'repair' || o.kind === 'shield') && (o.owner || me.id) === D?.id);
+    const allyDef = new Set((me.allyOrders || []).filter(o => (o.kind === 'repair' || o.kind === 'shield') && o.owner === D?.id).flatMap(o => o.cells));
     const fleetTap = (i) => {
-      const existing = (me.orders || []).find(o => (o.kind === 'repair' || o.kind === 'shield') && o.cell === i);
+      if (!D) return;
+      const existing = defOrders.find(o => o.cell === i);
       if (existing) { run('cancel', { orderId: existing.id }); return; }
-      if (!shipAt[i]) { say('Tap one of your ships', 'info'); return; }
-      const kind = hitSet.has(i) ? 'repair' : 'shield';
+      if (!dShipAt[i]) { say('Tap one of the ships', 'info'); return; }
+      const kind = dHits.has(i) ? 'repair' : 'shield';
       if (!canAfford(kind)) { say('Out of shells', 'bad'); return; }
-      run('order', { kind, cell: i }, (r) => { if (r.ok) sfx.order(); });
+      run('order', { kind, cell: i, ...(D.id !== me.id ? { owner: D.id } : {}) }, (r) => { if (r.ok) sfx.order(); });
     };
-    const myDef = new Set((me.orders || []).filter(o => o.kind === 'repair' || o.kind === 'shield').map(o => o.cell));
+    const myDef = new Set(defOrders.map(o => o.cell));
     body = (
       <>
         <div className="bs-targets">
-          {!me.ghost && <button type="button" aria-pressed={tab === 'fleet'} style={{ '--c': '#8fc4ff' }} onClick={() => setTab('fleet')}>🛡 My fleet</button>}
+          {defendable.length > 0 && <button type="button" aria-pressed={tab === 'fleet'} style={{ '--c': '#8fc4ff' }} onClick={() => setTab('fleet')}>🛡 {teams ? 'Defend' : 'My fleet'}</button>}
           {foes.map(f => <button key={f.id} type="button" aria-pressed={tab === 'enemy' && tgt === f.id} style={{ '--c': f.color }} onClick={() => { setTab('enemy'); setTarget(f.id); }}>
-            <span className="bs-dot" style={{ background: f.color }} />{f.name}{v.leader === f.id ? <span className="bty">★</span> : null}{me.rival === f.id ? ' · rival' : ''}</button>)}
+            <span className="bs-dot" style={{ background: f.color }} />{f.name}{isBounty(f.id) ? <span className="bty">★</span> : null}{me.rival === f.id ? ' · rival' : ''}</button>)}
         </div>
         {tab === 'enemy' && T ? (
           <>
-            <div className="bs-banner"><b style={{ color: T.color }}>{T.name}’s waters</b> · {T.shipsLeft} ship{T.shipsLeft === 1 ? '' : 's'} afloat{v.leader === T.id ? ' · ★ bounty: hits pay +1 shell' : ''}</div>
+            <div className="bs-banner"><b style={{ color: T.color }}>{T.name}’s waters</b> · {T.shipsLeft} ship{T.shipsLeft === 1 ? '' : 's'} afloat{isBounty(T.id) ? ' · ★ bounty: hits pay +1 shell' : ''}{allyAim.size ? <> · <span style={{ color: '#7dffb2' }}>◌ = teammate’s aim</span></> : ''}</div>
             <BSGrid ocean axis cell={(i) => {
               const m = T.marks[i];
-              return { cls: [sunkCells.has(i) ? 'sunk' : m === 'hit' ? 'hit' : m === 'miss' ? 'miss' : '', aim.has(i) ? 'aim' : '', lit.has(i) && !m ? 'lit' : '', clear.has(i) && !m && !lit.has(i) ? 'clear' : ''].join(' ') };
+              return { cls: [sunkCells.has(i) ? 'sunk' : m === 'hit' ? 'hit' : m === 'miss' ? 'miss' : '', aim.has(i) ? 'aim' : '', allyAim.has(i) && !m && !aim.has(i) ? 'allyaim' : '', lit.has(i) && !m ? 'lit' : '', clear.has(i) && !m && !lit.has(i) ? 'clear' : ''].join(' ') };
             }} onCell={fireAt}
               overlay={(cs) => intel.map((x, k) => {
                 // rows: badge on the right edge · columns: bottom edge · boxes: box centre
@@ -192,13 +207,14 @@ export default function BSPhone({ v, act, now, onExit }) {
               <button type="button" aria-pressed={tool === 'fire'} onClick={() => setTool('fire')}>💥 Fire<small>1 shell</small></button>
               <button type="button" aria-pressed={tool === 'torpedo'} disabled={me.shells < COST.torpedo} onClick={() => setTool('torpedo')}>🚀 Torpedo<small>3 · 3 squares</small></button>
               <button type="button" disabled={tool !== 'torpedo'} onClick={() => setDir(d => (d === 'h' ? 'v' : 'h'))}>{dir === 'h' ? '↔' : '↕'}<small>torpedo direction</small></button>
-              <button type="button" onClick={() => setTab('fleet')} disabled={me.ghost}>🛡 Defend<small>repair / shield</small></button>
+              <button type="button" onClick={() => setTab('fleet')} disabled={!defendable.length}>🛡 Defend<small>repair / shield</small></button>
             </div>
           </>
         ) : (
           <>
-            <div className="bs-banner"><b>Your fleet.</b> Tap a damaged piece to <b>repair</b> it, or a healthy piece to <b>shield</b> it (1 shell each).</div>
-            <BSGrid ocean mine axis cell={(i) => ({ cls: [shipAt[i] ? 'ship' : '', hitSet.has(i) ? (shipAt[i] && shipAt[i].hits.length >= shipAt[i].size ? 'sunk' : 'hit') : '', me.shields.includes(i) ? 'shield' : '', myDef.has(i) ? 'aim' : ''].join(' ') })} onCell={fleetTap} />
+            {defendable.length > 1 && <div className="bs-fleetpick">{defendable.map(f => <button key={f.id} type="button" className="bs-chip" aria-pressed={D?.id === f.id} style={{ '--c': D?.id === f.id ? players[f.id]?.color : 'var(--bs-line)', cursor: 'pointer', color: 'inherit', font: 'inherit' }} onClick={() => setDefOwner(f.id)}><span className="bs-dot" style={{ background: players[f.id]?.color }} />{f.id === me.id ? 'My fleet' : players[f.id]?.name}{f.ships.some(sh => sh.hits.length && sh.hits.length < sh.size) ? ' 🔧' : ''}</button>)}</div>}
+            <div className="bs-banner"><b>{!D || D.id === me.id ? 'Your fleet.' : `${players[D.id]?.name}’s fleet.`}</b> Tap a damaged piece to <b>repair</b> it, or a healthy piece to <b>shield</b> it (1 shell each).</div>
+            {D ? <BSGrid ocean mine axis cell={(i) => ({ cls: [dShipAt[i] ? 'ship' : '', dHits.has(i) ? (dShipAt[i] && dShipAt[i].hits.length >= dShipAt[i].size ? 'sunk' : 'hit') : '', D.shields.includes(i) ? 'shield' : '', myDef.has(i) ? 'aim' : allyDef.has(i) ? 'allyaim' : ''].join(' ') })} onCell={fleetTap} /> : <div className="bs-banner">Nothing left to defend — fire away!</div>}
           </>
         )}
         <div className="bs-banner">{me.shells - spent} shell{me.shells - spent === 1 ? '' : 's'} left · tap an aimed square again to cancel · leftover shells are banked</div>
@@ -206,6 +222,8 @@ export default function BSPhone({ v, act, now, onExit }) {
     );
   } else if (v.phase === 'reveal' && v.reveal) {
     const mine = v.reveal.events.filter(e => e.by === me.id || e.target === me.id);
+    const allyIds = new Set((me.allies || []).map(a => a.id));
+    const teamNews = teams ? v.reveal.events.filter(e => e.result === 'hit' && e.by !== me.id && e.target !== me.id && (allyIds.has(e.by) || allyIds.has(e.target))) : [];
     body = (
       <>
         <div className="bs-banner"><b>Volley {v.reveal.volley}</b> — watch the big screen!</div>
@@ -219,18 +237,26 @@ export default function BSPhone({ v, act, now, onExit }) {
             if (e.result === 'miss' && byMe) return <div key={k} className="miss">Splash at {cellName(e.cell)} on {who}</div>;
             return null;
           }) : <div className="miss">Quiet volley for you.</div>}
+          {teamNews.map((e, k) => <div key={`t${k}`} className={e.sunk ? 'sink' : allyIds.has(e.by) ? 'hit' : 'miss'}>{allyIds.has(e.by) ? `${players[e.by]?.name} hit ${players[e.target]?.name}` : `${players[e.by]?.name} hit your teammate ${players[e.target]?.name}`}{e.sunk ? ` — sank the ${e.shipName}!` : ''}</div>)}
         </div>
       </>
     );
   } else if (v.phase === 'final') {
     const ranked = v.players.slice().sort((a, b) => b.score - a.score);
     const rank = ranked.findIndex(p => p.id === me.id) + 1;
+    const teamWin = teams && v.winnerTeam != null;
+    const won = teamWin ? v.winnerTeam === me.team : v.winner === me.id;
     body = (
       <div className="bs-card" style={{ textAlign: 'center' }}>
-        <h2 className="bs-h" style={{ fontSize: 48, color: v.winner === me.id ? 'var(--bs-green)' : 'var(--bs-brass)' }}>{v.winner === me.id ? 'Victory!' : `${players[v.winner]?.name || 'Someone'} wins`}</h2>
-        <p className="bs-sub">{v.winReason === 'admiral' ? "Admiral's Victory — finished the Sudoku" : v.winReason === 'last' ? 'Last Fleet Floating' : 'Most points after the final volley'}</p>
+        <h2 className="bs-h" style={{ fontSize: 48, color: won ? 'var(--bs-green)' : 'var(--bs-brass)' }}>{won ? 'Victory!' : teamWin ? `${TEAMS[v.winnerTeam].name} wins` : `${players[v.winner]?.name || 'Someone'} wins`}</h2>
+        {teamWin ? (
+          <>
+            <p className="bs-sub">{v.winReason === 'admiral' ? `${players[v.winner]?.name} finished the Sudoku — Admiral's Victory` : v.winReason === 'fleet' ? 'The enemy fleet was sunk' : 'Most combined points after the final volley'}</p>
+            <div className="bs-row" style={{ justifyContent: 'center' }}>{(v.teams || []).map(t => <span key={t.id} className="bs-chip" style={{ '--c': t.color }}>{t.name} · {t.score}</span>)}</div>
+          </>
+        ) : <p className="bs-sub">{v.winReason === 'admiral' ? "Admiral's Victory — finished the Sudoku" : v.winReason === 'last' ? 'Last Fleet Floating' : 'Most points after the final volley'}</p>}
         <p className="bs-sub">You finished <b>#{rank}</b> · {players[me.id].score} pts · {players[me.id].stats.hits} hits · {players[me.id].stats.sinks} sinks</p>
-        <div className="bs-list" style={{ marginTop: 10, textAlign: 'left' }}>{ranked.map((p, i) => <div key={p.id}>{i + 1}. <b style={{ color: p.color }}>{p.name}</b> — {p.score}</div>)}</div>
+        <div className="bs-list" style={{ marginTop: 10, textAlign: 'left' }}>{ranked.map((p, i) => <div key={p.id}>{i + 1}. <b style={{ color: teams ? TEAMS[p.team]?.color : p.color }}>{p.name}</b> — {p.score}</div>)}</div>
         {onExit && <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={onExit}>Leave</button>}
       </div>
     );

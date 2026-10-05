@@ -3,6 +3,7 @@ import BSBigScreen from './BSBigScreen';
 import BSPhone from './BSPhone';
 import { bsApi, bsSeat } from '@/api/battleSudokuApi';
 import { sfx } from './bsSfx';
+import { TEAMS } from '@/lib/battleSudoku/game';
 
 function useRoom(code, token, onGone) {
   const [data, setData] = useState(null);
@@ -101,11 +102,19 @@ export function BSPlayer({ code, name, setName, onExit }) {
   }
   if (!room.game) {
     const meR = room.roster.find(p => p.id === data.you.id);
+    const teamMode = room.settings?.mode === 'teams';
+    const T = teamMode ? TEAMS[meR?.team || 0] : null;
     return (
       <div className="bs-wrap" style={{ maxWidth: 520 }}>
         <div className="bs-card" style={{ textAlign: 'center' }}>
-          <span className="bs-chip" style={{ '--c': meR?.color, fontSize: 20 }}><span className="bs-dot" style={{ background: meR?.color }} />{data.you.name}</span>
-          <h2 className="bs-h" style={{ fontSize: 44, color: 'var(--bs-brass)', marginTop: 14 }}>You’re aboard!</h2>
+          <span className="bs-chip" style={{ '--c': T ? T.color : meR?.color, fontSize: 20 }}><span className="bs-dot" style={{ background: T ? T.color : meR?.color }} />{data.you.name}</span>
+          <h2 className="bs-h" style={{ fontSize: 44, color: T ? T.color : 'var(--bs-brass)', marginTop: 14 }}>{T ? `${T.name}!` : 'You’re aboard!'}</h2>
+          {T && (
+            <>
+              <p className="bs-sub">Fleet vs Fleet — your crew: {room.roster.filter(p => (p.team || 0) === (meR?.team || 0)).map(p => p.name).join(', ')}</p>
+              <button type="button" className="bs-btn small" onClick={() => act('team')}>⇄ Switch to {TEAMS[(meR?.team || 0) === 1 ? 0 : 1].name}</button>
+            </>
+          )}
           <p className="bs-sub">Watch the big screen. When the battle starts you’ll hide your fleet, then solve the same Sudoku as everyone else. Correct numbers load your cannon; every volley you fire at rivals’ hidden fleets.</p>
           <p className="bs-sub">{room.roster.length} captain{room.roster.length === 1 ? '' : 's'} in battle {code}</p>
           <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={leave}>Leave</button>

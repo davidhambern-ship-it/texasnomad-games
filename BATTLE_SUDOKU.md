@@ -26,6 +26,22 @@ BattleSudoku replaces the old Base44 Sudoku at `/games/sudoku`. It is Sudoku cro
    - **Last fleet afloat.**
    - **Most points** after the final volley. Points: cell 10, hit 30, sink 100, finish 500, surviving 200.
 
+## Fleet vs Fleet (teams)
+
+The host picks **Free-for-all** or **Fleet vs Fleet** in the lobby. In solo mode, the same choice plays you plus CPU allies against a CPU fleet (1 v 1 up to 4 v 4).
+
+- **Teams.** Captains split into the **Red Fleet** and the **Blue Fleet**. New captains join the smaller fleet. On the TV, the host taps a captain to move them, or uses **Shuffle teams**. Players can also switch fleets from their phone while in the lobby. Each fleet needs at least one captain to start.
+- **Same solving.** Everyone still solves the same puzzle on their own phone, and each captain hides their own five ships. Captains wear shades of their fleet's colour.
+- **Fire only at the other fleet.** Teammates' planned shots show as dashed green rings on your target grid, so nobody wastes shells on the same square.
+- **Team sonar.** A completed line pings your rival (an enemy captain that rotates each volley), and the ping is shared with your whole fleet.
+- **Defend teammates.** On the Defend tab you can repair or shield a teammate's ships as well as your own.
+- **Bounties.** Each fleet's top solver carries a bounty, and hits on them pay the shooter +1 shell.
+- **Ways to win:**
+  - Sink every enemy captain's whole fleet.
+  - Have any captain on your fleet finish the Sudoku (Admiral's Victory).
+  - Have the most **combined** points after the final volley.
+- **MVP.** The winning fleet's top scorer is named MVP.
+
 ## Code map
 
 | Path | What |
@@ -37,7 +53,7 @@ BattleSudoku replaces the old Base44 Sudoku at `/games/sudoku`. It is Sudoku cro
 | `src/api/battleSudokuApi.js` | Client: `bsApi`, `bsSeat`, `resolveBattleSudokuRoom` |
 | `src/components/battleSudoku/*` | TV (`BSBigScreen`), phone (`BSPhone`), grid, solo, online wrappers, sounds, CSS |
 | `src/pages/SudokuGame.jsx` | Page: menu, solo, host, join |
-| `scripts/battle-sudoku-sim.mjs` | `node scripts/battle-sudoku-sim.mjs` runs 60 CPU games and checks invariants |
+| `scripts/battle-sudoku-sim.mjs` | `node scripts/battle-sudoku-sim.mjs` runs 60 free-for-all and 60 Fleet vs Fleet CPU games and checks invariants |
 
 The server is authoritative. The solution and every fleet stay on the server. `view()` sends each phone only its own fleet, and the public marks for everyone else.
 
@@ -58,10 +74,9 @@ Send the token in the `X-BS-Token` header.
 - `POST /bs-api/rooms` returns `{ roomCode, token, room }`. The token is the host token.
 - `GET /bs-api/rooms/:code` returns `{ room, you }`.
 - `POST /bs-api/rooms/:code/action` with `{ action, ... }`:
-  - Host actions: `settings {difficulty, solveSec, battleSec, volleys}`, `addCpu`, `kick {playerId}`, `start`, `lobby`.
-  - Player actions: `join {name}` (returns a token), `leave`, `shuffle`, `ready`, `place {cell, digit}`, `order {kind, target, cell, dir}`, `cancel {orderId}`.
+  - Host actions: `settings {mode, difficulty, solveSec, battleSec, volleys}` (`mode` is `ffa` or `teams`), `addCpu`, `kick {playerId}`, `team {playerId}` (swap fleets), `shuffleTeams`, `start`, `lobby`.
+  - Player actions: `join {name}` (returns a token), `leave`, `team` (swap own fleet, lobby only), `shuffle`, `ready`, `place {cell, digit}`, `order {kind, target, cell, dir, owner}` (`owner` = the teammate whose ship you repair or shield), `cancel {orderId}`.
 
-## Later
+## Notes
 
-- Teams mode ("Fleet vs Fleet").
 - Room state lives in memory, so a Railway restart ends the live battles.

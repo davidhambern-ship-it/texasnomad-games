@@ -18,7 +18,7 @@ export default function SudokuGame() {
   const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' ? 'host' : 'menu');
   const [code, setCode] = useState('');
   const [name, setName] = useState(() => { try { return localStorage.getItem('bs_name') || ''; } catch { return ''; } });
-  const [solo, setSolo] = useState({ rivals: 2, level: 'normal', difficulty: 'normal' });
+  const [solo, setSolo] = useState({ mode: 'ffa', rivals: 2, level: 'normal', difficulty: 'normal' });
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
@@ -28,7 +28,7 @@ export default function SudokuGame() {
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
   else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <BSPlayer code={room} name={name} setName={setName} onExit={toMenu} />;
-  else if (screen === 'solo') body = <BSSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} difficulty={solo.difficulty} onExit={toMenu} />;
+  else if (screen === 'solo') body = <BSSolo name={name || 'You'} mode={solo.mode} rivals={solo.rivals} level={solo.level} difficulty={solo.difficulty} onExit={toMenu} />;
   else if (screen === 'solosetup') {
     const Seg = ({ k, opts }) => <div className="bs-seg">{opts.map(([v, l]) => <button key={v} type="button" aria-pressed={solo[k] === v} onClick={() => setSolo(s => ({ ...s, [k]: v }))}>{l}</button>)}</div>;
     body = (
@@ -36,7 +36,11 @@ export default function SudokuGame() {
         <div className="bs-card bs-grid2">
           <h2 className="bs-h" style={{ fontSize: 44, color: 'var(--bs-brass)' }}>Solo vs CPU</h2>
           <input className="bs-input" value={name} maxLength={14} placeholder="CAPTAIN NAME" onChange={e => setName(e.target.value)} />
-          <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Rivals</span><Seg k="rivals" opts={[[1, '1 (duel)'], [2, '2'], [3, '3'], [5, '5']]} /></div>
+          <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Mode</span><div className="bs-seg">{[['ffa', 'Free-for-all'], ['teams', 'Fleet vs Fleet']].map(([v, l]) => <button key={v} type="button" aria-pressed={solo.mode === v} onClick={() => setSolo(s => ({ ...s, mode: v, rivals: v === 'teams' ? ([1, 3, 5, 7].includes(s.rivals) ? s.rivals : 3) : Math.min(s.rivals, 5) }))}>{l}</button>)}</div></div>
+          {solo.mode === 'teams'
+            ? <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Fleets</span><Seg k="rivals" opts={[[1, '1 v 1'], [3, '2 v 2'], [5, '3 v 3'], [7, '4 v 4']]} /></div>
+            : <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Rivals</span><Seg k="rivals" opts={[[1, '1 (duel)'], [2, '2'], [3, '3'], [5, '5']]} /></div>}
+          {solo.mode === 'teams' && <p className="bs-sub" style={{ margin: 0 }}>You and CPU allies (Red Fleet) take on a CPU Blue Fleet. Teammates share sonar and can patch each other’s ships.</p>}
           <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>CPU skill</span><Seg k="level" opts={[['easy', 'Rookies'], ['normal', 'Sailors'], ['hard', 'Admirals']]} /></div>
           <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Puzzle</span><Seg k="difficulty" opts={[['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]} /></div>
           <div className="bs-row"><button type="button" className="bs-btn primary" onClick={() => { sfx.unlock(); try { localStorage.setItem('bs_name', name.trim()); } catch { /* ignore */ } setScreen('solo'); }}>Set sail</button><button type="button" className="bs-btn ghost" onClick={toMenu}>Back</button></div>
@@ -61,8 +65,8 @@ export default function SudokuGame() {
             {err && <div className="bs-err">{err}</div>}
           </div>
           <div className="bs-modes">
-            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}><div className="bs-h">Host a battle</div><p>Open this on the TV. Captains join on their phones (2–8, add CPU captains to fill out the fleet).</p></button>
-            <button type="button" className="bs-mode" onClick={() => setScreen('solosetup')}><div className="bs-h">Solo vs CPU</div><p>Duel one CPU captain or take on up to five — right here on this device.</p></button>
+            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}><div className="bs-h">Host a battle</div><p>Open this on the TV. Captains join on their phones (2–8, add CPU captains to fill out the fleet). Free-for-all or Fleet vs Fleet.</p></button>
+            <button type="button" className="bs-mode" onClick={() => setScreen('solosetup')}><div className="bs-h">Solo vs CPU</div><p>Duel one CPU captain, take on up to five, or team up with CPU allies in Fleet vs Fleet — right here on this device.</p></button>
           </div>
           <div className="bs-card">
             <div className="bs-label">How it plays</div>

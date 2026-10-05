@@ -10,8 +10,11 @@
 //   POST /bs-api/rooms                       → { roomCode, token, ...view }   (host)
 //   GET  /bs-api/rooms/:code                 → view (player view with a player token)
 //   POST /bs-api/rooms/:code/action { action, ... }
-//        host:   settings{difficulty,solveSec,battleSec,volleys} · addCpu{level} · kick{playerId} · start · lobby
-//        player: join{name} · leave · shuffle · ready · place{cell,digit} · order{kind,target,cell,dir} · cancel{orderId}
+//        host:   settings{mode,difficulty,solveSec,battleSec,volleys} · addCpu{level} · kick{playerId}
+//                team{playerId} (swap fleets) · shuffleTeams · start · lobby
+//        player: join{name} · leave · team (swap own fleet, lobby only) · shuffle · ready
+//                place{cell,digit} · order{kind,target,cell,dir,owner} · cancel{orderId}
+// mode: 'ffa' (free-for-all) or 'teams' (Fleet vs Fleet: Red vs Blue)
 // ─────────────────────────────────────────────────────────────────────────────
 import { randomBytes } from 'node:crypto';
 import * as G from '../src/lib/battleSudoku/game.js';
@@ -48,7 +51,7 @@ export function createBattleSudokuApi() {
   function view(room, me, now) {
     const base = {
       code: room.code, stage: room.game ? 'game' : 'lobby', settings: room.settings, now,
-      roster: room.players.map(p => ({ id: p.id, name: p.name, color: p.color, cpu: p.cpu || 0, online: p.cpu || now - (p.lastSeen || 0) < 15000 })),
+      roster: room.players.map(p => ({ id: p.id, name: p.name, color: p.color, cpu: p.cpu || 0, team: p.team || 0, online: p.cpu || now - (p.lastSeen || 0) < 15000 })),
     };
     if (room.game) base.game = G.view(room.game, me ? me.id : null, now);
     return { room: base, you: me ? { id: me.id, name: me.name, color: me.color } : null };
@@ -62,6 +65,7 @@ export function createBattleSudokuApi() {
       case 'settings': {
         need(isHost, 'Only the host can change settings.');
         const s = room.settings;
+        if (['ffa', 'teams'].includes(body.mode) && body.mode !== s.mode) { s.mode = body.mode; if (s.mode === 'teams') balanceTeams(room); }
         if (['easy', 'normal', 'hard'].includes(body.difficulty)) s.difficulty = body.difficulty;
         if (SOLVE.includes(Number(body.solveSec))) s.solveSec = Number(body.solveSec);
         if (BATTLE.includes(Number(body.battleSec))) s.battleSec = Number(body.battleSec);
@@ -74,7 +78,7 @@ export function createBattleSudokuApi() {
         need(room.players.length < MAX_PLAYERS, 'The room is full.', 'FULL', 409);
         const used = new Set(room.players.map(p => p.name));
         const [name, lvl] = CPU_NAMES.find(([n]) => !used.has(n)) || [`CPU ${room.players.length + 1}`, 5];
-        room.players.push({ id: newId(), name, cpu: Number(body.level) || lvl, color: nextColor(room), token: null });
+        room.players.push({ id: newId(), name, cpu: Number(body.level) || lvl, color: nextColor(room), token: null, team: smallerTeam(room) });
         return {};
       }
       case 'kick': {
@@ -83,11 +87,27 @@ export function createBattleSudokuApi() {
         room.players = room.players.filter(p => p.id !== body.playerId);
         return {};
       }
+      case 'team': {
+        need(!room.game, 'Teams are locked during a battle.', 'IN_GAME', 409);
+        const p = isHost ? room.players.find(x => x.id === body.playerId) : me;
+        need(p, 'Join the game first.', 'NO_SEAT');
+        p.team = p.team === 1 ? 0 : 1;
+        return {};
+      }
+      case 'shuffleTeams': {
+        need(isHost, 'Only the host can shuffle teams.');
+        need(!room.game, 'Teams are locked during a battle.', 'IN_GAME', 409);
+        const ps = room.players.slice();
+        for (let i = ps.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [ps[i], ps[j]] = [ps[j], ps[i]]; }
+        ps.forEach((p, i) => { p.team = i % 2; });
+        return {};
+      }
       case 'start': {
         need(isHost, 'Only the host can start.');
         need(room.players.length >= 2, 'You need at least 2 captains — add a CPU.', 'PLAYERS', 409);
+        if (room.settings.mode === 'teams') need([0, 1].every(t => room.players.some(p => (p.team || 0) === t)), 'Both fleets need at least one captain.', 'TEAMS', 409);
         room.game = G.createGame({ seed: `${room.code}-${now}-${Math.random()}`, settings: room.settings, now,
-          players: room.players.map(p => ({ id: p.id, name: p.name, color: p.color, cpu: p.cpu || 0 })) });
+          players: room.players.map(p => ({ id: p.id, name: p.name, color: p.color, cpu: p.cpu || 0, team: p.team || 0 })) });
         return {};
       }
       case 'lobby': {
@@ -107,6 +127,12 @@ export function createBattleSudokuApi() {
       }
       default: throw err(400, 'UNKNOWN_ACTION', 'Unknown action.');
     }
+  }
+  const smallerTeam = (room) => (room.players.filter(p => (p.team || 0) === 1).length < room.players.filter(p => (p.team || 0) === 0).length ? 1 : 0);
+  function balanceTeams(room) {
+    const counts = [0, 1].map(t => room.players.filter(p => (p.team || 0) === t).length);
+    if (Math.abs(counts[0] - counts[1]) <= 1) return;
+    room.players.forEach((p, i) => { p.team = i % 2; });
   }
   const nextColor = (room) => { const used = new Set(room.players.map(p => p.color)); return COLORS.find(c => !used.has(c)) || COLORS[room.players.length % COLORS.length]; };
 
@@ -152,7 +178,7 @@ export function createBattleSudokuApi() {
             if (!name) throw err(400, 'NAME_REQUIRED', 'Type your name first.');
             if (room.players.filter(p => !p.cpu).length >= MAX_PLAYERS) throw err(409, 'FULL', 'This game is full.');
             if (room.players.length >= MAX_PLAYERS) { const i = room.game ? -1 : room.players.findIndex(p => p.cpu); if (i < 0) throw err(409, 'FULL', 'This game is full.'); room.players.splice(i, 1); }
-            me = { id: newId(), name, token: newToken(), color: nextColor(room), lastSeen: t };
+            me = { id: newId(), name, token: newToken(), color: nextColor(room), lastSeen: t, team: smallerTeam(room) };
             room.players.push(me); issued = me.token;
           }
           me.lastSeen = t;
