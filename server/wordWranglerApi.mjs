@@ -62,18 +62,60 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createWordWranglerApi() {
+export function createWordWranglerApi({ store = null } = {}) {
   const rooms = new Map();
+  const lastCheckpoint = new Map();
   let lastSweep = Date.now();
 
-  const sweep = () => {
+  async function loadRoom(code) {
+    let room = rooms.get(code) || null;
+    if (!room && store) {
+      room = await store.load(code);
+      if (room) rooms.set(code, room);
+    }
+    return room;
+  }
+
+  async function saveRoom(room, { force = false } = {}) {
+    if (!room?.code) return;
+    rooms.set(room.code, room);
+    if (!store) return;
+
+    const now = Date.now();
+    const last = lastCheckpoint.get(room.code) || 0;
+    if (!force && now - last < 3000) return;
+
+    await store.save(room.code, room);
+    lastCheckpoint.set(room.code, now);
+  }
+
+  async function sweep() {
     const cutoff = Date.now() - ROOM_TTL_MS;
-    for (const [k, r] of rooms) if (r.updatedAt < cutoff) rooms.delete(k);
-  };
-  const newCode = () => {
+    for (const [code, room] of rooms) {
+      if (room.updatedAt < cutoff) {
+        rooms.delete(code);
+        lastCheckpoint.delete(code);
+      }
+    }
+    if (store) await store.cleanup();
+  }
+
+  async function roomCount() {
+    return store ? store.count() : rooms.size;
+  }
+
+  async function roomExists(code) {
+    if (rooms.has(code)) return true;
+    return store ? store.exists(code) : false;
+  }
+
+  const newCode = async () => {
     for (let i = 0; i < 50; i++) {
-      const c = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join('');
-      if (!rooms.has(c)) return c;
+      const c = Array.from(
+        { length: 5 },
+        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
+      ).join('');
+      if (!(await roomExists(c))) return c;
     }
     throw err(503, 'NO_CODE', 'Try again in a moment.');
   };
@@ -200,31 +242,47 @@ export function createWordWranglerApi() {
     const token = String(req.headers['x-ww-token'] || '');
     const now = Date.now();
     try {
-      if (now - lastSweep > 10 * 60 * 1000) { lastSweep = now; sweep(); }
-      if (req.method === 'GET' && path === '/health') return send(res, 200, { ok: true, service: 'word-wrangler', rooms: rooms.size });
+      if (now - lastSweep > 10 * 60 * 1000) {
+        lastSweep = now;
+        await sweep();
+      }
+      if (req.method === 'GET' && path === '/health') {
+        return send(res, 200, {
+          ok: true,
+          service: 'word-wrangler',
+          rooms: await roomCount(),
+          persistent: Boolean(store),
+        });
+      }
 
       if (req.method === 'POST' && path === '/rooms') {
         const body = await readBody(req);
         const name = clean(body.name);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Enter your name.');
-        if (rooms.size > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = newCode();
+        if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
+        const code = await newCode();
         const host = { id: newId(), name, token: newToken(), isAI: false, st: null, lastSeen: now };
         const room = { code, phase: 'lobby', round: 0, duration: 150, seed: null, startsAt: 0, endsAt: 0, hostId: host.id, players: [host], createdAt: now, updatedAt: now };
-        rooms.set(code, room);
+        await saveRoom(room, { force: true });
         return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
       }
 
       const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
-      const room = rooms.get(code);
+      const room = await loadRoom(code);
       if (!room) return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found.` } });
 
       if (req.method === 'GET' && !m[2]) {
         tick(room, now);
         const me = findMe(room, token);
         if (me) me.lastSeen = now;
+
+        if (token || room.phase === 'countdown' || room.phase === 'playing') {
+          room.updatedAt = now;
+          await saveRoom(room);
+        }
+
         return send(res, 200, view(room, me, now, url.searchParams.get('full') === '1'));
       }
 
@@ -251,11 +309,13 @@ export function createWordWranglerApi() {
           }
           me.lastSeen = t;
           room.updatedAt = t;
+          await saveRoom(room, { force: true });
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const result = act(room, me, body, t);
         if (me) me.lastSeen = t;
         room.updatedAt = t;
+        await saveRoom(room, { force: true });
         const out = { result, ...view(room, me, t, !!result.desync) };
         return send(res, 200, out);
       }
