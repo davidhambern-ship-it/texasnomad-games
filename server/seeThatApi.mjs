@@ -75,7 +75,10 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createSeeThatApi({ store = null } = {}) {
+export function createSeeThatApi({
+  store = null,
+  resolveIdentity = async () => null,
+} = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
   let lastSweep = Date.now();
@@ -271,11 +274,15 @@ export function createSeeThatApi({ store = null } = {}) {
       if (req.method === 'GET' && path === '/scenes') return send(res, 200, { scenes: scenes().list });
 
       if (req.method === 'POST' && path === '/rooms') {
+        const hostIdentity = await resolveIdentity(req);
+        if (!hostIdentity?.accountId) {
+          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting See That.');
+        }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now — try again soon.');
         const S = scenes();
         const code = await newCode();
         const room = {
-          code, hostToken: newToken(), phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
+          code, hostToken: newToken(), hostAccountId: hostIdentity.accountId, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
           settings: { sceneId: S.list[0]?.id || 'random', count: 10, seconds: 120, rounds: 3, difficulty: 'normal' }, createdAt: now, updatedAt: now,
         };
         await saveRoom(room, { force: true });
@@ -289,8 +296,16 @@ export function createSeeThatApi({ store = null } = {}) {
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
       if (!room) return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Game ${code} wasn’t found.` } });
-      const isHost = token && token === room.hostToken;
-      const findMe = () => (token && !isHost ? room.players.find(p => p.token === token) || null : null);
+      const tokenClaimsHost = Boolean(token && token === room.hostToken);
+      let isHost = false;
+      if (tokenClaimsHost) {
+        const hostIdentity = await resolveIdentity(req);
+        isHost = Boolean(
+          hostIdentity?.accountId &&
+          (!room.hostAccountId || String(room.hostAccountId) === String(hostIdentity.accountId))
+        );
+      }
+      const findMe = () => (token && !tokenClaimsHost ? room.players.find(p => p.token === token) || null : null);
 
       if (req.method === 'GET' && !m[2]) {
         const beforePhase = room.phase;
@@ -312,14 +327,36 @@ export function createSeeThatApi({ store = null } = {}) {
         tick(room, t);
         room.updatedAt = t;
         if (body.action === 'join') {
-          let me = findMe(), issued;
+          const identity = await resolveIdentity(req);
+          if (!identity?.accountId || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining See That.');
+          }
+
+          let me = findMe() || room.players.find(
+            p => String(p.accountId || '') === String(identity.accountId),
+          ) || null;
+          let issued;
+
           if (!me) {
-            const name = clean(body.name);
-            if (!name) throw err(400, 'NAME_REQUIRED', 'Type your name first.');
+            const name = clean(identity.publicName);
+            if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             if (room.players.length >= MAX_PLAYERS) throw err(409, 'FULL', 'This game is full.');
             const used = new Set(room.players.map(p => p.color));
-            me = { id: newId(), name, token: newToken(), color: COLORS.find(c => !used.has(c)) || COLORS[room.players.length % COLORS.length], total: 0, lastSeen: t };
-            room.players.push(me); issued = me.token;
+            me = {
+              id: newId(),
+              accountId: identity.accountId,
+              name,
+              token: newToken(),
+              color: COLORS.find(c => !used.has(c)) || COLORS[room.players.length % COLORS.length],
+              total: 0,
+              lastSeen: t,
+            };
+            room.players.push(me);
+            issued = me.token;
+          } else if (!token || token !== me.token) {
+            me.name = clean(identity.publicName);
+            me.token = newToken();
+            issued = me.token;
           }
           me.lastSeen = t;
           await saveRoom(room, { force: true });
