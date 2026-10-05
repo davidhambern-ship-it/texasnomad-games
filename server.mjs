@@ -1252,6 +1252,7 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
 const handleSeeThatApi = createSeeThatApi({
   store: seeThatRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
 });
 
 // Word Wrangler online races (/ww-api)
