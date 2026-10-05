@@ -1,12 +1,6 @@
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' &&
-  window.location.hostname.endsWith('.up.railway.app');
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
-const ROOM_REGISTRY_BASE =
-  import.meta.env.VITE_TNG_ROOM_REGISTRY_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-rooms'
-    : 'https://tng-live-production.up.railway.app/tng-rooms');
+const ROOM_REGISTRY_BASE = tngServiceUrl('/tng-rooms');
 
 export class TngRoomRegistryError extends Error {
   constructor(message, { code = 'ROOM_REGISTRY_ERROR', status = 0 } = {}) {
