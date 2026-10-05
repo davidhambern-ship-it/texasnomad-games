@@ -5127,6 +5127,53 @@ async function verifyDominoHostRequest(req, row = null) {
   return verified;
 }
 
+async function maybeRecordDominoResults(row, state) {
+  if (!row || !state) return;
+
+  const phase = String(state.phase || '').toLowerCase();
+  const finished =
+    state.status === 'finished' ||
+    ['game_over', 'game-over', 'finished', 'complete', 'completed'].includes(phase);
+
+  if (!finished) return;
+
+  const sessionKey = String(
+    state.statsSessionKey ||
+    `${row.id}:${state.matchStartedAt || row.created_at || row.room_code}`
+  ).trim();
+
+  if (!sessionKey) return;
+
+  const scoreA = Number(state.teamScores?.teamA || 0);
+  const scoreB = Number(state.teamScores?.teamB || 0);
+  const winningTeam = scoreA === scoreB ? null : (scoreA > scoreB ? 0 : 1);
+
+  const results = (Array.isArray(state.players) ? state.players : [])
+    .map((player, seat) => ({ player, seat }))
+    .filter(({ player }) => !player?.isAI && isUuid(player?.accountId))
+    .map(({ player, seat }) => {
+      const team = seat % 2;
+      return {
+        accountId: player.accountId,
+        score: team === 0 ? scoreA : scoreB,
+        won: winningTeam !== null && team === winningTeam,
+      };
+    });
+
+  if (!results.length) return;
+
+  try {
+    await recordStandaloneGameResults({
+      gameId: 'dominoes',
+      sessionKey,
+      roomCode: row.room_code,
+      results,
+    });
+  } catch (error) {
+    console.warn('[dominoes] result recording failed', error?.message || error);
+  }
+}
+
 function reconcileDominoSeatTokens(state, seatTokens) {
   const current =
     seatTokens && typeof seatTokens === 'object'
@@ -5560,6 +5607,11 @@ async function handleDominoApi(req, res) {
 
       await client.query('commit');
 
+      await maybeRecordDominoResults(
+        updated.rows[0],
+        updated.rows[0].game_state,
+      );
+
       sendJson(res, 200, {
         game: serializeDominoRow(
           updated.rows[0],
@@ -5620,7 +5672,23 @@ async function handleDominoApi(req, res) {
       return;
     }
 
+    const previousState = cleanDominoGameState(row.game_state, row.room_code);
     const nextState = cleanDominoGameState(data, row.room_code);
+
+    const previousPhase = String(previousState.phase || '').toLowerCase();
+    const nextPhase = String(nextState.phase || '').toLowerCase();
+    const startsNewMatch =
+      nextPhase === 'playing' &&
+      ['waiting', 'game_over', 'game-over', 'finished', 'complete', 'completed'].includes(previousPhase);
+
+    if (startsNewMatch) {
+      nextState.statsSessionKey = `dominoes:${row.room_code}:${randomBytes(8).toString('hex')}`;
+      nextState.matchStartedAt = Date.now();
+    } else if (!nextState.statsSessionKey && previousState.statsSessionKey) {
+      nextState.statsSessionKey = previousState.statsSessionKey;
+      nextState.matchStartedAt = previousState.matchStartedAt || nextState.matchStartedAt;
+    }
+
     const nextSeatTokens = reconcileDominoSeatTokens(nextState, row.seat_tokens);
 
     const result = await bffPool.query(
@@ -5635,6 +5703,11 @@ async function handleDominoApi(req, res) {
           seat_tokens, created_at, updated_at
       `,
       [id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
+    );
+
+    await maybeRecordDominoResults(
+      result.rows[0],
+      result.rows[0].game_state,
     );
 
     sendJson(res, 200, {
