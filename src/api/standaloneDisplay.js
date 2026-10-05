@@ -1,14 +1,7 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' &&
-  window.location.hostname.endsWith('.up.railway.app');
-
-const DISPLAY_TARGET_BASE =
-  import.meta.env.VITE_TNG_STANDALONE_DISPLAY_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/standalone-display'
-    : 'https://tng-live-production.up.railway.app/standalone-display');
+const DISPLAY_TARGET_BASE = tngServiceUrl('/standalone-display');
 
 async function request(method, { gameId = '', roomCode = '', forceRefresh = false } = {}) {
   const token = await getNeonAuthToken({ forceRefresh }).catch(() => '');
