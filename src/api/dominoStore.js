@@ -1,14 +1,7 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' &&
-  window.location.hostname.endsWith('.up.railway.app');
-
-const DOMINO_API_BASE =
-  import.meta.env.VITE_DOMINO_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/domino-api'
-    : 'https://tng-live-production.up.railway.app/domino-api');
+const DOMINO_API_BASE = tngServiceUrl('/domino-api');
 
 function readLocal(key) {
   try { return localStorage.getItem(key) || ''; } catch { return ''; }
