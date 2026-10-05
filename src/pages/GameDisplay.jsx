@@ -41,6 +41,24 @@ function savedDisplay() {
   }
 }
 
+
+function currentFullscreenElement() {
+  return document.fullscreenElement || document.webkitFullscreenElement || null;
+}
+
+async function enterFullscreen() {
+  const target = document.documentElement;
+  const request = target.requestFullscreen || target.webkitRequestFullscreen;
+  if (!request) throw new Error('Fullscreen is not supported by this browser.');
+  await request.call(target);
+}
+
+async function leaveFullscreen() {
+  const exit = document.exitFullscreen || document.webkitExitFullscreen;
+  if (!exit) return;
+  await exit.call(document);
+}
+
 function HangmanBoard({ wrongCount, maxWrong }) {
   const danger = wrongCount >= maxWrong;
 
@@ -1761,7 +1779,7 @@ export default function GameDisplay({
   const [notifications, setNotifications] = useState([]);
   const [status, setStatus] = useState(spectator ? 'connecting' : (initial ? 'connecting' : 'unpaired'));
   const [error, setError] = useState('');
-  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(document.fullscreenElement));
+  const [isFullscreen, setIsFullscreen] = useState(() => Boolean(currentFullscreenElement()));
 
   useEffect(() => {
     if (!embedded) return;
@@ -1777,11 +1795,15 @@ export default function GameDisplay({
 
   useEffect(() => {
     const onFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      setIsFullscreen(Boolean(currentFullscreenElement()));
     };
 
     document.addEventListener('fullscreenchange', onFullscreenChange);
-    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFullscreenChange);
+      document.removeEventListener('webkitfullscreenchange', onFullscreenChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -1975,13 +1997,14 @@ export default function GameDisplay({
 
   async function toggleFullscreen() {
     try {
-      if (!document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
+      if (!currentFullscreenElement()) {
+        await enterFullscreen();
       } else {
-        await document.exitFullscreen();
+        await leaveFullscreen();
       }
     } catch (fullscreenError) {
-      setError('Fullscreen was blocked by the browser. Use Chrome\'s fullscreen control instead.');
+      console.warn('[TNG Display] fullscreen request failed:', fullscreenError);
+      setError('Fullscreen was blocked by the browser. Use the browser\'s fullscreen control instead.');
     }
   }
 
