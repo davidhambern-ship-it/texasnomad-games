@@ -1073,6 +1073,7 @@ const viralLive = createViralLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
   verifyHostAuthorization: verifyViralHostAuthorization,
   resolvePlayerIdentity: resolveViralPlayerIdentity,
+  recordResults: recordStandaloneGameResults,
   store: viralRoomStore,
 });
 
