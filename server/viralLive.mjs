@@ -83,7 +83,11 @@ export function createViralLive({
     r.updatedAt = updatedAt;
     lastCheckpoint.set(name, now);
   }
-  const peerList = (r) => [...r.peers].map(([id, p]) => ({ id, presence: p.presence || {} }));
+  const peerList = (r) => [...r.peers].map(([id, p]) => {
+    const presence = p.presence || {};
+    const { accountId, ...publicPresence } = presence;
+    return { id, presence: publicPresence };
+  });
   const send = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
   const broadcast = (r, obj, exceptId) => { const s = JSON.stringify(obj); for (const [id, p] of r.peers) if (id !== exceptId && p.ws.readyState === 1) { try { p.ws.send(s); } catch { /* closed */ } } };
 
