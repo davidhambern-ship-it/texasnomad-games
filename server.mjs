@@ -5515,7 +5515,7 @@ async function handleDominoApi(req, res) {
       service: 'dominoes',
       kind: 'standalone',
       joinPath: `/games/dominoes?room=${encodeURIComponent(roomCode)}`,
-      spectatePath: null,
+      spectatePath: `/games/dominoes?display=${encodeURIComponent(roomCode)}`,
       hostAccountId: verifiedHost.accountId,
       ttlMs: DOMINO_ROOM_TTL_MS,
     });
