@@ -6,6 +6,7 @@ import { dominoStore } from '@/api/dominoStore';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { resolveViralRoom } from '@/api/viralRoomStore';
 import { resolveSeeThatRoom } from '@/api/seeThatApi';
+import { resolveWordWranglerRoom } from '@/api/wordWranglerApi';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
@@ -96,6 +97,19 @@ async function redirectSpecialGameRoom(roomCode) {
       }
     } catch {
       // Keep resolving; a failed See That lookup should not block other room types.
+    }
+  }
+
+  // Word Wrangler online races use five-letter codes on /ww-api.
+  if (/^[A-Z]{5}$/.test(code)) {
+    try {
+      const wordWrangler = await resolveWordWranglerRoom(code);
+      if (wordWrangler) {
+        window.location.replace(`/games/word-wrangler?room=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed Word Wrangler lookup should not block other room types.
     }
   }
 
