@@ -1092,6 +1092,75 @@ async function handleTngRoomRegistry(req, res) {
     return;
   }
 
+  if (req.method === 'POST' && path === '/register-core') {
+    const resolved = await resolveAuthenticatedTngAccount(req);
+    if (!resolved.ok) {
+      sendJson(res, resolved.status, resolved.payload);
+      return;
+    }
+
+    const body = await readJsonBody(req).catch(() => ({}));
+    const roomCode = String(body?.roomCode || '').trim().toUpperCase();
+    const requestedGameId = String(body?.gameId || '').trim();
+
+    if (!/^[A-Z0-9]{4,8}$/.test(roomCode) || !requestedGameId) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_ROOM', message: 'A valid core TNG room is required.' },
+      });
+      return;
+    }
+
+    const roomResult = await bffPool.query(
+      `select room_code, game_id, host_account_id, status::text as status, completed_at
+       from public.game_rooms
+       where room_code = $1
+       order by created_at desc
+       limit 1`,
+      [roomCode],
+    );
+
+    const room = roomResult.rows[0] || null;
+    if (
+      !room ||
+      String(room.host_account_id || '') !== String(resolved.account.id) ||
+      String(room.game_id || '') !== requestedGameId ||
+      room.completed_at ||
+      ['completed', 'closed', 'ended', 'finished'].includes(
+        String(room.status || '').toLowerCase(),
+      )
+    ) {
+      sendJson(res, 409, {
+        error: {
+          code: 'CORE_ROOM_NOT_ACTIVE',
+          message: 'That core room is not an active room owned by this Host.',
+        },
+      });
+      return;
+    }
+
+    const registered = await roomRegistry.registerCore({
+      code: roomCode,
+      gameId: requestedGameId,
+      hostAccountId: resolved.account.id,
+    });
+
+    if (!registered) {
+      sendJson(res, 409, {
+        error: {
+          code: 'ROOM_CODE_TAKEN',
+          message: 'That room code is already reserved by another TNG game.',
+        },
+      });
+      return;
+    }
+
+    sendJson(res, 200, {
+      ok: true,
+      room: await roomRegistry.resolve(roomCode),
+    });
+    return;
+  }
+
   sendJson(res, 405, {
     error: { code: 'METHOD_NOT_ALLOWED', message: 'Unsupported room registry operation.' },
   });
