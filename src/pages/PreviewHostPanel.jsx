@@ -70,6 +70,24 @@ export default function PreviewHostPanel() {
   const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
   const hostBoardRef = useRef(null);
+  const requestedGameHandledRef = useRef(false);
+  const requestedGameIdRef = useRef(
+    typeof window === 'undefined'
+      ? ''
+      : String(new URLSearchParams(window.location.search).get('game') || '').trim(),
+  );
+
+  function clearRequestedGameParam() {
+    if (typeof window === 'undefined') return;
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('game')) return;
+    url.searchParams.delete('game');
+    window.history.replaceState(
+      window.history.state,
+      '',
+      `${url.pathname}${url.search}${url.hash}`,
+    );
+  }
 
   function isStaleRoom(room) {
     if (!room) return false;
@@ -642,6 +660,48 @@ export default function PreviewHostPanel() {
       setBusy(false);
     }
   }
+
+  // The arcade can deep-link a core multiplayer game with /host?game=<id>.
+  // Wait until the Host Controller (and, when required, the Game Display) is
+  // actually ready before creating the Neon room. Consume the query once so a
+  // reload/end-room cycle can never create duplicate rooms by accident.
+  useEffect(() => {
+    const requestedGameId = requestedGameIdRef.current;
+    if (!requestedGameId || requestedGameHandledRef.current) return;
+
+    const game = ALL_GAMES.find((entry) => entry.id === requestedGameId);
+    if (!game) {
+      requestedGameHandledRef.current = true;
+      clearRequestedGameParam();
+      setError(`TNG does not recognize the requested game: ${requestedGameId}`);
+      return;
+    }
+
+    // If this Host recovered an existing room, preserve it. The user can end
+    // that room explicitly before starting another one.
+    if (
+      activeRoom ||
+      phase === 'room' ||
+      phase === 'stale-room' ||
+      phase === 'host-recovery'
+    ) {
+      requestedGameHandledRef.current = true;
+      clearRequestedGameParam();
+      return;
+    }
+
+    if (phase !== 'ready' || !controllerId || busy) return;
+
+    requestedGameHandledRef.current = true;
+    clearRequestedGameParam();
+
+    if (game.standalone) {
+      window.location.assign(game.hostPath || game.path);
+      return;
+    }
+
+    createRoom(game);
+  }, [phase, controllerId, activeRoom, busy]);
 
   async function updateGameState(statePatch) {
     if (!controllerId) return;
