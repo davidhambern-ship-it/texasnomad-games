@@ -264,7 +264,7 @@ export function createWordWranglerApi({
         if (!identity?.accountId || !identity?.publicName) {
           throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting Word Wrangler.');
         }
-        const name = clean(identity.publicName);
+        const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
         const code = await newCode();
@@ -318,7 +318,7 @@ export function createWordWranglerApi({
           ) || null;
 
           if (!me) {
-            const name = clean(identity.publicName);
+            const name = clean(identity.publicName, 32);
             if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             const humans = room.players.filter(p => !p.isAI).length;
             if (room.players.length >= MAX_PLAYERS) {
@@ -341,7 +341,7 @@ export function createWordWranglerApi({
           } else if (!token || token !== me.token) {
             // Same signed-in TNG account returning from another browser state:
             // reclaim the same seat instead of creating a duplicate player.
-            me.name = clean(identity.publicName);
+            me.name = clean(identity.publicName, 32);
             me.token = newToken();
             issued = me.token;
           }
