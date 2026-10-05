@@ -4667,7 +4667,7 @@ let dominoSchemaReady = null;
 
 async function ensureDominoSchema() {
   if (!dominoSchemaReady) {
-    dominoSchemaReady = bffPool.query(\`
+    dominoSchemaReady = bffPool.query(`
       create table if not exists public.tng_domino_games (
         id text primary key,
         room_code text not null unique,
@@ -4683,7 +4683,7 @@ async function ensureDominoSchema() {
         add column if not exists host_account_id uuid,
         add column if not exists host_token_hash text,
         add column if not exists seat_tokens jsonb not null default '{}'::jsonb;
-    \`).catch((error) => {
+    `).catch((error) => {
       dominoSchemaReady = null;
       throw error;
     });
@@ -4802,7 +4802,7 @@ function sanitizeDominoStateForViewer(state, access = null) {
           hand: canSeeHand
             ? hand
             : hand.map((_, index) => ({
-                id: \`hidden-\${seat}-\${index}\`,
+                id: `hidden-\${seat}-\${index}`,
                 hidden: true,
               })),
         };
@@ -4817,7 +4817,7 @@ function sanitizeDominoStateForViewer(state, access = null) {
 
 async function loadDominoRowByRoom(roomCode, client = bffPool, forUpdate = false) {
   const result = await client.query(
-    \`
+    `
       select
         id,
         room_code,
@@ -4831,7 +4831,7 @@ async function loadDominoRowByRoom(roomCode, client = bffPool, forUpdate = false
       where room_code = $1
       limit 1
       \${forUpdate ? 'for update' : ''}
-    \`,
+    `,
     [roomCode],
   );
   return result.rows[0] || null;
@@ -4940,20 +4940,20 @@ async function handleDominoApi(req, res) {
       return;
     }
 
-    const id = \`dom_\${Date.now()}_\${randomBytes(5).toString('hex')}\`;
+    const id = `dom_\${Date.now()}_\${randomBytes(5).toString('hex')}`;
     const hostToken = dominoToken();
     const gameState = cleanDominoGameState(data, roomCode);
 
     try {
       const result = await bffPool.query(
-        \`
+        `
           insert into public.tng_domino_games
             (id, room_code, game_state, host_account_id, host_token_hash, seat_tokens)
           values ($1, $2, $3::jsonb, $4::uuid, $5, '{}'::jsonb)
           returning
             id, room_code, game_state, host_account_id, host_token_hash,
             seat_tokens, created_at, updated_at
-        \`,
+        `,
         [
           id,
           roomCode,
@@ -5041,7 +5041,7 @@ async function handleDominoApi(req, res) {
         return;
       }
 
-      const playerId = \`p_\${randomBytes(10).toString('base64url')}\`;
+      const playerId = `p_\${randomBytes(10).toString('base64url')}`;
       const seatToken = dominoToken();
       const players = state.players.map((player, index) =>
         index === seat
@@ -5066,7 +5066,7 @@ async function handleDominoApi(req, res) {
       };
 
       const updated = await client.query(
-        \`
+        `
           update public.tng_domino_games
           set game_state = $2::jsonb,
               seat_tokens = $3::jsonb,
@@ -5075,7 +5075,7 @@ async function handleDominoApi(req, res) {
           returning
             id, room_code, game_state, host_account_id, host_token_hash,
             seat_tokens, created_at, updated_at
-        \`,
+        `,
         [row.id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
       );
 
@@ -5173,7 +5173,7 @@ async function handleDominoApi(req, res) {
       }
 
       const updated = await client.query(
-        \`
+        `
           update public.tng_domino_games
           set game_state = $2::jsonb,
               updated_at = now()
@@ -5181,7 +5181,7 @@ async function handleDominoApi(req, res) {
           returning
             id, room_code, game_state, host_account_id, host_token_hash,
             seat_tokens, created_at, updated_at
-        \`,
+        `,
         [row.id, JSON.stringify(cleanDominoGameState(next, row.room_code))],
       );
 
@@ -5215,14 +5215,14 @@ async function handleDominoApi(req, res) {
     }
 
     const current = await bffPool.query(
-      \`
+      `
         select
           id, room_code, game_state, host_account_id, host_token_hash,
           seat_tokens, created_at, updated_at
         from public.tng_domino_games
         where id = $1
         limit 1
-      \`,
+      `,
       [id],
     );
     const row = current.rows[0] || null;
@@ -5251,7 +5251,7 @@ async function handleDominoApi(req, res) {
     const nextSeatTokens = reconcileDominoSeatTokens(nextState, row.seat_tokens);
 
     const result = await bffPool.query(
-      \`
+      `
         update public.tng_domino_games
         set game_state = $2::jsonb,
             seat_tokens = $3::jsonb,
@@ -5260,7 +5260,7 @@ async function handleDominoApi(req, res) {
         returning
           id, room_code, game_state, host_account_id, host_token_hash,
           seat_tokens, created_at, updated_at
-      \`,
+      `,
       [id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
     );
 
