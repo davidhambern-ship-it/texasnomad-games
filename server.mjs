@@ -84,20 +84,7 @@ const LIVE_BROWSER_ORIGINS = new Set(
 );
 
 function isAllowedBrowserOrigin(origin) {
-  if (!origin) return false;
-  if (LIVE_BROWSER_ORIGINS.has(origin)) return true;
-
-  try {
-    const url = new URL(origin);
-    const host = url.hostname.toLowerCase();
-    return url.protocol === 'https:' && (
-      host === 'app.base44.com' ||
-      (host.endsWith('.base44.app') &&
-        (host.startsWith('preview--') || host.startsWith('preview-sandbox--')))
-    );
-  } catch {
-    return false;
-  }
+  return Boolean(origin && LIVE_BROWSER_ORIGINS.has(origin));
 }
 
 async function readRawBody(req) {
@@ -391,8 +378,29 @@ async function proxyNeonAuth(req, res) {
 }
 
 const { Pool } = pg;
+
+function normalizePgConnectionString(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return raw;
+
+  try {
+    const url = new URL(raw);
+    const sslMode = String(url.searchParams.get('sslmode') || '').toLowerCase();
+
+    // pg 8 currently treats these modes as verify-full, but pg 9 will adopt
+    // weaker libpq semantics. Make the existing secure behavior explicit now.
+    if (['prefer', 'require', 'verify-ca'].includes(sslMode)) {
+      url.searchParams.set('sslmode', 'verify-full');
+    }
+
+    return url.toString();
+  } catch {
+    return raw;
+  }
+}
+
 const bffPool = new Pool({
-  connectionString: process.env.DATABASE_URL,
+  connectionString: normalizePgConnectionString(process.env.DATABASE_URL),
   max: 5,
   idleTimeoutMillis: 30000,
 });
