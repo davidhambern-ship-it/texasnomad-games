@@ -14,12 +14,12 @@ import {
   restoreTngBrowserSession,
   waitForNeonSession,
 } from '@/lib/neonAuth';
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
 const AuthContext = createContext();
 
 const DEVICE_HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000;
-const SESSION_LIFECYCLE_URL =
-  'https://tng-live-production.up.railway.app/tng-session';
+const SESSION_LIFECYCLE_URL = tngServiceUrl('/tng-session');
 
 function currentDeviceIds() {
   try {
