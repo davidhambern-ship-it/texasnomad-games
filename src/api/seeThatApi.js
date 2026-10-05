@@ -16,15 +16,23 @@ export class STApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'STApiError'; this.status = status; this.code = code; }
 }
 
-async function call(path, { method = 'GET', body, token } = {}) {
+async function call(path, { method = 'GET', body, token, forceRefresh = false } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['X-ST-Token'] = token;
+
+  const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
   let res;
   try {
     res = await fetch(`${ST_API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' });
   } catch {
     throw new STApiError('Can’t reach the See That server. Check your connection.', 0, 'NETWORK');
+  }
+
+  if (res.status === 401 && authToken && !forceRefresh) {
+    return call(path, { method, body, token, forceRefresh: true });
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new STApiError(data?.error?.message || 'Something went wrong.', res.status, data?.error?.code || 'ERROR');
