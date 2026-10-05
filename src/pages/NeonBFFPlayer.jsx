@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Radio, Users, Zap } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import BFFTngBoard from '@/components/bff/BFFTngBoard.jsx';
