@@ -3,6 +3,7 @@ import WWPlay from './WWPlay';
 import { Avatar, Confetti, Countdown, RIVALS, colorFor } from './WWShared';
 import { createGame } from '@/lib/wordWranglerEngine';
 import { wwApi, wwSeat } from '@/api/wordWranglerApi';
+import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 import { soundManager } from '@/lib/wordWranglerSound';
 
 const DURS = [[90, '1:30'], [150, '2:30'], [240, '4:00']];
@@ -139,6 +140,26 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     autoHostStarted.current = true;
     host();
   }, [autoHost, identityReady, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ownsRoom = Boolean(data?.you?.isHost);
+  useEffect(() => {
+    if (!ownsRoom || !code) return undefined;
+
+    let alive = true;
+    const sync = async () => {
+      const result = await claimStandaloneDisplay('word-wrangler', code).catch(() => null);
+      if (!alive || !result?.ok) return;
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 30000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      releaseStandaloneDisplay().catch(() => {});
+    };
+  }, [ownsRoom, code]);
 
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
@@ -318,6 +339,97 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
           <button type="button" className="ww-btn ghost small" onClick={leave}>Leave room</button>
           <button type="button" className="ww-btn ghost small" onClick={() => setMuted(!muted)}>{muted ? 'Sound off' : 'Sound on'}</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+
+export function WWDisplay({ code }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!code) return undefined;
+    let alive = true;
+    let timer = null;
+
+    const tick = async () => {
+      try {
+        const next = await wwApi.getRoom(code);
+        if (!alive) return;
+        setData(next);
+        setError('');
+      } catch (e) {
+        if (!alive) return;
+        setError(e?.message || 'The Word Wrangler room could not be loaded.');
+      }
+
+      if (alive) timer = window.setTimeout(tick, 900);
+    };
+
+    tick();
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [code]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const room = data?.room;
+  if (!room) {
+    return (
+      <div className="ww-menu">
+        <div className="ww-card" style={{ textAlign: 'center' }}>
+          <h1 className="ww-h ww-title">Word Wrangler</h1>
+          <p className="ww-sub">{error || `Connecting to race ${code}…`}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const serverNow = Number(room.now || now);
+  const players = room.players.slice().sort((a, b) => b.score - a.score);
+  const colorIdx = Object.fromEntries(room.players.map((p, i) => [p.id, i]));
+  const left = room.endsAt
+    ? Math.max(0, Math.ceil((Number(room.endsAt) - serverNow) / 1000))
+    : null;
+
+  return (
+    <div className="ww-menu">
+      <div className="ww-card" style={{ width: 'min(1000px, 94vw)' }}>
+        <div className="ww-label" style={{ textAlign: 'center' }}>TNG GAME DISPLAY · ROOM {code}</div>
+        <h1 className="ww-h ww-title" style={{ textAlign: 'center' }}>Word Wrangler</h1>
+        <div className="ww-row" style={{ justifyContent: 'center', marginBottom: 18 }}>
+          <span className="tag">{String(room.phase || 'lobby').replace('_', ' ').toUpperCase()}</span>
+          {left != null && <span className="tag">{Math.floor(left / 60)}:{String(left % 60).padStart(2, '0')}</span>}
+          <span className="tag">Round {room.round || 0}</span>
+        </div>
+
+        <div className="ww-lb">
+          {players.map((p, i) => (
+            <div key={p.id} className="ww-lbrow">
+              <span className="rk">{i === 0 && room.phase === 'over' ? '👑' : i + 1}</span>
+              <Avatar className="ava" name={p.name} charId={p.isAI ? p.char : null} color={colorFor(colorIdx[p.id])} size={46} />
+              <span className="nm">
+                {p.name}{p.isAI ? ' · CPU' : ''}
+                <small>{p.words} words{p.last ? ` · ${p.last.w.toUpperCase()} +${p.last.p}` : ''}</small>
+              </span>
+              <span className="sc" style={{ fontSize: 24 }}>{Number(p.score || 0).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+
+        {!players.length && (
+          <p className="ww-sub" style={{ textAlign: 'center', marginTop: 16 }}>
+            Waiting for players to join…
+          </p>
+        )}
       </div>
     </div>
   );
