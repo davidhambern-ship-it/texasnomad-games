@@ -9,6 +9,7 @@ import { createViralLive } from './server/viralLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
+import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -1208,13 +1209,30 @@ async function handleSeeThatDisplayTarget(req, res) {
   });
 }
 
+// Standalone live-room snapshots survive Railway container replacement.
+// The game modules still keep a hot in-process cache; Postgres is the recovery
+// source when a new container receives the next request for an active room.
+const seeThatRoomStore = createLiveRoomStore(bffPool, {
+  service: 'see-that',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
+const wordWranglerRoomStore = createLiveRoomStore(bffPool, {
+  service: 'word-wrangler',
+  ttlMs: 2 * 60 * 60 * 1000,
+});
+const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
+  service: 'battle-sudoku',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
+
 // See That?! party rooms (/st-api)
-const handleSeeThatApi = createSeeThatApi();
+const handleSeeThatApi = createSeeThatApi({ store: seeThatRoomStore });
 
 // Word Wrangler online races (/ww-api)
-const handleWordWranglerApi = createWordWranglerApi();
+const handleWordWranglerApi = createWordWranglerApi({ store: wordWranglerRoomStore });
+
 // BattleSudoku party rooms (/bs-api)
-const handleBattleSudokuApi = createBattleSudokuApi();
+const handleBattleSudokuApi = createBattleSudokuApi({ store: battleSudokuRoomStore });
 
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
