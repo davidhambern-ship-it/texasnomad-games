@@ -1,41 +1,49 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-import Home from '@/pages/Home';
-import Welcome from '@/pages/Welcome';
-import BFFGame from '@/pages/BFFGame';
-import SquareBizGame from '@/pages/SquareBizGame';
-import HangmanGame from '@/pages/HangmanGame';
-import SpadesGame from '@/pages/SpadesGame';
-import GamePlaceholder from '@/pages/GamePlaceholder';
-import JoinRoom from '@/pages/JoinRoom';
-import PlaceholderPage from '@/pages/PlaceholderPage';
-import HostPanel from '@/pages/HostPanel';
-import Games from '@/pages/Games';
-import About from '@/pages/About';
-import Contact from '@/pages/Contact';
-import WordSearchGame from '@/pages/WordSearchGame';
-import ViralGame from '@/pages/ViralGame';
-import SudokuGame from '@/pages/SudokuGame';
-import SeeThatGame from '@/pages/SeeThatGame';
-import WordWranglerGame from '@/pages/WordWranglerGame';
-import DominoHost from '@/pages/DominoHost';
-import DominoGame from '@/pages/DominoGame';
-import NeonPlayerProfile from '@/pages/NeonPlayerProfile';
-import Register from '@/pages/Register';
-import Login from '@/pages/Login';
-import ForgotPassword from '@/pages/ForgotPassword';
-import ResetPassword from '@/pages/ResetPassword';
-import TngOnboarding from '@/pages/TngOnboarding';
-import GameDisplay from '@/pages/GameDisplay';
 import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
+
+const Home = lazy(() => import('@/pages/Home'));
+const Welcome = lazy(() => import('@/pages/Welcome'));
+const BFFGame = lazy(() => import('@/pages/BFFGame'));
+const SquareBizGame = lazy(() => import('@/pages/SquareBizGame'));
+const HangmanGame = lazy(() => import('@/pages/HangmanGame'));
+const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
+const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
+const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
+const HostPanel = lazy(() => import('@/pages/HostPanel'));
+const Games = lazy(() => import('@/pages/Games'));
+const About = lazy(() => import('@/pages/About'));
+const Contact = lazy(() => import('@/pages/Contact'));
+const WordSearchGame = lazy(() => import('@/pages/WordSearchGame'));
+const ViralGame = lazy(() => import('@/pages/ViralGame'));
+const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
+const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
+const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
+const DominoHost = lazy(() => import('@/pages/DominoHost'));
+const DominoGame = lazy(() => import('@/pages/DominoGame'));
+const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
+const Register = lazy(() => import('@/pages/Register'));
+const Login = lazy(() => import('@/pages/Login'));
+const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
+const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
+const TngOnboarding = lazy(() => import('@/pages/TngOnboarding'));
+const GameDisplay = lazy(() => import('@/pages/GameDisplay'));
+
+function RouteFallback() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-[#05030b]">
+      <div className="w-8 h-8 border-4 border-slate-700 border-t-[#FFD700] rounded-full animate-spin" />
+    </div>
+  );
+}
 
 function HomeGate() {
   let welcomeComplete = false;
@@ -169,8 +177,9 @@ const AuthenticatedApp = () => {
 
   // Render the main app
   return (
-    <Routes>
-      <Route path="/welcome" element={<Welcome />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/welcome" element={<Welcome />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
       <Route path="/onboarding" element={<TngOnboarding />} />
@@ -197,8 +206,9 @@ const AuthenticatedApp = () => {
       <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+        <Route path="*" element={<PageNotFound />} />
+      </Routes>
+    </Suspense>
   );
 };
 
