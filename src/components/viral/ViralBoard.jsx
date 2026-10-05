@@ -3,7 +3,6 @@ import { motion } from 'framer-motion';
 import { 
   DISTRICTS, 
   SPACE_TYPES, 
-  SPECIAL_SPACES,
   BUILDINGS,
   getDistrict,
   SPACE_POSITIONS,
