@@ -91,10 +91,29 @@ export default function DominoHost() {
     setHostError('');
     try {
       const players = [0, 1, 2, 3].map(i => (i === 0 ? { ...emptySeat(0), playerId: `host_${Date.now()}`, playerName: hostName.trim(), connected: true, isHost: true } : emptySeat(i)));
-      const created = await base44.entities.DominoGame.create({
-        room_code: generateRoomCode(), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
-        currentSeat: 0, roundNumber: 1, teamScores: { teamA: 0, teamB: 0 }, scoreLimit, activityLog: [],
-      });
+
+      let created = null;
+      let lastCollision = null;
+
+      for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
+        try {
+          created = await base44.entities.DominoGame.create({
+            room_code: generateRoomCode(), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
+            currentSeat: 0, roundNumber: 1, teamScores: { teamA: 0, teamB: 0 }, scoreLimit, activityLog: [],
+          });
+        } catch (error) {
+          if (['ROOM_CODE_TAKEN', 'ROOM_EXISTS'].includes(error?.code)) {
+            lastCollision = error;
+            continue;
+          }
+          throw error;
+        }
+      }
+
+      if (!created) {
+        throw lastCollision || new Error('TNG could not reserve a Domino room code.');
+      }
+
       try { localStorage.setItem(HOST_KEY, created.room_code); } catch { /* ignore */ }
       setGame(created);
     } catch (error) {
