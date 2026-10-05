@@ -52,6 +52,12 @@ const HOST_ROSTER_API_BASE =
     ? '/tng-host-stage'
     : 'https://tng-live-production.up.railway.app/tng-host-stage');
 
+const ROOM_REGISTRY_API_BASE =
+  import.meta.env.VITE_TNG_ROOM_REGISTRY_BASE ||
+  (IS_RAILWAY_TEMP_HOST
+    ? '/tng-rooms'
+    : 'https://tng-live-production.up.railway.app/tng-rooms');
+
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
     super(message);
@@ -532,13 +538,59 @@ export const tngApi = {
       body:{ replaceDisplay },
     }),
     createRoom: async (deviceId, gameId) => {
-      const result = await request('/api/host/room', {
-        method:'POST',
-        deviceId,
-        body:{ gameId },
-      });
-      requestHostLiveRefresh();
-      return result;
+      let lastCollision = null;
+
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        const result = await request('/api/host/room', {
+          method:'POST',
+          deviceId,
+          body:{ gameId },
+        });
+
+        const roomCode = String(
+          result?.room?.roomCode ||
+          result?.room?.room_code ||
+          '',
+        ).trim().toUpperCase();
+
+        if (!roomCode) {
+          requestHostLiveRefresh();
+          return result;
+        }
+
+        try {
+          await request('/register-core', {
+            method:'POST',
+            deviceId,
+            apiBase:ROOM_REGISTRY_API_BASE,
+            body:{ roomCode, gameId },
+          });
+
+          requestHostLiveRefresh();
+          return result;
+        } catch (error) {
+          if (
+            !(error instanceof TngApiError) ||
+            error.code !== 'ROOM_CODE_TAKEN'
+          ) {
+            throw error;
+          }
+
+          lastCollision = error;
+
+          // The upstream room exists already, but its public code belongs to
+          // another TNG game. End it before asking for a fresh global code.
+          await request('/api/host/room', {
+            method:'DELETE',
+            deviceId,
+          }).catch(() => {});
+        }
+      }
+
+      throw lastCollision || new TngApiError(
+        'TNG could not reserve a unique room code. Try again.',
+        { code:'NO_ROOM_CODE', status:503 },
+      );
     },
     endRoom: async (deviceId) => {
       const result = await request('/api/host/room', { method:'DELETE', deviceId });
