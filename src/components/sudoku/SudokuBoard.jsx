@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { getPeers, hasConflict } from '@/lib/sudokuEngine';
+import React from 'react';
+import { getPeers } from '@/lib/sudokuEngine';
 
 const DIFF_COLORS = {
   easy: '#4ade80',
