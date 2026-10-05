@@ -1,5 +1,5 @@
 import React from 'react';
-import TNCharacterStatus, { getAIStatus } from './TNCharacterStatus';
+import { getAIStatus } from './TNCharacterStatus';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
