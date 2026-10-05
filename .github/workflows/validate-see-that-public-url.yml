@@ -1,0 +1,31 @@
+name: Validate See That public join URL
+
+on:
+  push:
+    branches:
+      - fix/see-that-public-join-url
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify public join URL
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const s = fs.readFileSync('src/components/seeThat/STOnline.jsx', 'utf8');
+          if (s.includes('window.location.host')) throw new Error('See That still derives its join URL from the current host');
+          if (!s.includes("'https://texasnomadgames.com'")) throw new Error('Public TNG origin missing');
+          NODE
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build
+        run: npm run build
