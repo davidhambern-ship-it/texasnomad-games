@@ -20,6 +20,53 @@ export class TngApiError extends Error {
   }
 }
 
+
+const TRANSIENT_HTTP_STATUSES = new Set([429, 502, 503, 504]);
+
+function sleep(ms) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function fetchWithRecovery(url, options = {}, { allowRetry = false } = {}) {
+  const attempts = allowRetry ? 2 : 1;
+  let lastNetworkError = null;
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, options);
+
+      if (
+        attempt + 1 < attempts &&
+        TRANSIENT_HTTP_STATUSES.has(response.status)
+      ) {
+        const retryAfter = Number(response.headers.get('retry-after'));
+        const delay = Number.isFinite(retryAfter) && retryAfter > 0
+          ? Math.min(1500, retryAfter * 1000)
+          : 350;
+        await sleep(delay);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastNetworkError = error;
+      if (
+        attempt + 1 >= attempts ||
+        (typeof navigator !== 'undefined' && navigator.onLine === false)
+      ) {
+        break;
+      }
+      await sleep(350);
+    }
+  }
+
+  throw new TngApiError('TNG could not reach the game service.', {
+    code: 'NETWORK',
+    status: 0,
+    details: lastNetworkError?.message || null,
+  });
+}
+
 async function request(path, {
   method='GET',
   body,
@@ -56,17 +103,8 @@ async function request(path, {
     body: requestBody,
   };
 
-  let response;
-
-  try {
-    response = await fetch(url, fetchOptions);
-  } catch (networkError) {
-    throw new TngApiError('TNG could not reach the game service.', {
-      code: 'NETWORK',
-      status: 0,
-      details: networkError?.message || null,
-    });
-  }
+  const allowRetry = method === 'GET' || method === 'HEAD';
+  let response = await fetchWithRecovery(url, fetchOptions, { allowRetry });
 
   // Neon Auth JWTs are intentionally short-lived. If a request happens on the
   // edge of a token refresh, fetch one fresh token and retry once before
@@ -76,15 +114,7 @@ async function request(path, {
     if (freshToken) {
       headers.Authorization = `Bearer ${freshToken}`;
 
-      try {
-        response = await fetch(url, fetchOptions);
-      } catch (networkError) {
-        throw new TngApiError('TNG could not reach the game service.', {
-          code: 'NETWORK',
-          status: 0,
-          details: networkError?.message || null,
-        });
-      }
+      response = await fetchWithRecovery(url, fetchOptions, { allowRetry });
     }
   }
 
@@ -109,6 +139,7 @@ const hostLive = {
   controllerId: null,
   connecting: null,
   reconnectTimer: null,
+  reconnectAttempts: 0,
   intentionallyClosed: false,
   roomReceived: false,
   room: null,
@@ -171,6 +202,55 @@ function requestHostLiveRefresh() {
   }
 }
 
+
+function scheduleHostLiveReconnect(deviceId, { immediate = false } = {}) {
+  if (
+    hostLive.intentionallyClosed ||
+    hostLive.controllerId !== deviceId ||
+    hostLive.reconnectTimer ||
+    hostLive.socket?.readyState === WebSocket.OPEN
+  ) {
+    return;
+  }
+
+  const attempt = hostLive.reconnectAttempts;
+  const delay = immediate
+    ? 0
+    : Math.min(10_000, 750 * (2 ** Math.min(attempt, 4)));
+
+  if (!immediate) hostLive.reconnectAttempts += 1;
+
+  hostLive.reconnectTimer = window.setTimeout(() => {
+    hostLive.reconnectTimer = null;
+    hostLive.connecting = null;
+    ensureHostLiveConnection(deviceId).catch((error) => {
+      console.warn('[TNG Host Live] reconnect failed:', error);
+      scheduleHostLiveReconnect(deviceId);
+    });
+  }, delay);
+}
+
+function recoverHostLiveConnection() {
+  const deviceId = hostLive.controllerId;
+  if (!deviceId || hostLive.intentionallyClosed) return;
+  if (hostLive.socket?.readyState === WebSocket.OPEN) return;
+
+  if (hostLive.reconnectTimer) {
+    window.clearTimeout(hostLive.reconnectTimer);
+    hostLive.reconnectTimer = null;
+  }
+
+  scheduleHostLiveReconnect(deviceId, { immediate: true });
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('online', recoverHostLiveConnection);
+  window.addEventListener('pageshow', recoverHostLiveConnection);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') recoverHostLiveConnection();
+  });
+}
+
 function closeHostLiveConnection() {
   hostLive.intentionallyClosed = true;
 
@@ -186,6 +266,7 @@ function closeHostLiveConnection() {
   hostLive.socket = null;
   hostLive.controllerId = null;
   hostLive.connecting = null;
+  hostLive.reconnectAttempts = 0;
   hostLive.roomReceived = false;
   hostLive.room = null;
   hostLive.games.clear();
@@ -260,6 +341,7 @@ async function ensureHostLiveConnection(deviceId) {
         }
 
         if (message?.type === 'host-live-ready') {
+          hostLive.reconnectAttempts = 0;
           hostLive.roomReceived = true;
           hostLive.room = message.room ?? null;
           resolveHostLiveWaiters(hostLiveKey('room'), { room: hostLive.room });
@@ -304,10 +386,16 @@ async function ensureHostLiveConnection(deviceId) {
         }
 
         if (message?.type === 'auth-failed') {
-          fail(new TngApiError('The Host live connection could not authenticate.', {
+          const authError = new TngApiError('The Host live connection could not authenticate.', {
             code: 'AUTH_REQUIRED',
             status: message.status || 401,
-          }));
+          });
+
+          if (!settled) {
+            fail(authError);
+          } else {
+            try { socket.close(4001, 'Host auth refresh failed'); } catch {}
+          }
         }
       });
 
@@ -332,16 +420,9 @@ async function ensureHostLiveConnection(deviceId) {
 
         if (
           !hostLive.intentionallyClosed &&
-          hostLive.controllerId === deviceId &&
-          !hostLive.reconnectTimer
+          hostLive.controllerId === deviceId
         ) {
-          hostLive.reconnectTimer = window.setTimeout(() => {
-            hostLive.reconnectTimer = null;
-            hostLive.connecting = null;
-            ensureHostLiveConnection(deviceId).catch((error) => {
-              console.warn('[TNG Host Live] reconnect failed:', error);
-            });
-          }, 1000);
+          scheduleHostLiveReconnect(deviceId);
         }
       });
     });
