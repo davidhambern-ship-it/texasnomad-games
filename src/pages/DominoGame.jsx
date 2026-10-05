@@ -5,7 +5,7 @@ import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
-import { getTeam, applyPlay, applyPass } from '@/lib/dominoEngine';
+import { getTeam } from '@/lib/dominoEngine';
 import '@/components/domino/domino.css';
 
 const BG = { background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)', minHeight: '100vh' };
@@ -55,25 +55,76 @@ export default function DominoGame() {
     } catch { /* ignore */ }
   }, [game?.id]);
 
+  // If the Host removes this seat, the server also revokes its seat token.
+  // Drop the stale local seat immediately so this browser cannot keep acting
+  // like it still owns a place at the table.
+  useEffect(() => {
+    if (!game || mySeat == null || mySeat < 0) return;
+
+    try {
+      const savedPid = localStorage.getItem(`dom_pid_${roomCode}`) || '';
+      const currentPid = String(game.players?.[mySeat]?.playerId || '');
+      if (savedPid && currentPid === savedPid) return;
+
+      base44.entities.DominoGame.clearSeatToken(roomCode);
+      localStorage.removeItem(`dom_seat_${roomCode}`);
+      localStorage.removeItem(`dom_pid_${roomCode}`);
+      setMySeat(null);
+      setMsg('The Host changed that seat. Pick an open seat to rejoin.');
+    } catch { /* ignore */ }
+  }, [game?.updated_date, game?.players, mySeat, roomCode]);
+
   const takeSeat = async (seat) => {
     if (!nameInput.trim()) { setMsg('Type your name first'); return; }
-    const fresh = await fetchRoom(roomCode);
-    if (!fresh) { setMsg('Room not found'); return; }
-    if (fresh.players[seat].playerId) { setMsg('Someone just took that seat — pick another'); setGame(fresh); return; }
-    const pid = `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const updated = { ...fresh, players: fresh.players.map((p, i) => (i === seat ? { ...p, playerId: pid, playerName: nameInput.trim(), isAI: false, connected: true } : p)) };
-    await base44.entities.DominoGame.update(fresh.id, updated);
-    setGame(updated); setMySeat(seat);
-    try { localStorage.setItem(`dom_seat_${roomCode}`, String(seat)); localStorage.setItem(`dom_pid_${roomCode}`, pid); localStorage.setItem('dom_player_name', nameInput.trim()); } catch { /* ignore */ }
+
+    try {
+      const joined = await base44.entities.DominoGame.join(
+        roomCode,
+        seat,
+        nameInput.trim(),
+      );
+
+      if (!joined?.game || !joined?.playerId) {
+        setMsg('TNG could not claim that seat.');
+        return;
+      }
+
+      setGame(joined.game);
+      setMySeat(seat);
+      setMsg('');
+
+      try {
+        localStorage.setItem(`dom_seat_${roomCode}`, String(seat));
+        localStorage.setItem(`dom_pid_${roomCode}`, joined.playerId);
+        localStorage.setItem('dom_player_name', nameInput.trim());
+      } catch { /* ignore */ }
+    } catch (error) {
+      setMsg(error?.message || 'Could not take that seat.');
+      const fresh = await fetchRoom(roomCode).catch(() => null);
+      if (fresh) setGame(fresh);
+    }
   };
 
-  const act = async (fn) => {
-    const fresh = await fetchRoom(roomCode);
-    if (!fresh) return 'Lost connection to the room';
-    const next = fn(fresh);
-    if (next.error) return next.error;
-    await base44.entities.DominoGame.update(fresh.id, next);
-    setGame(next); return null;
+  const act = async (action, payload = {}) => {
+    try {
+      const result = await base44.entities.DominoGame.action(
+        roomCode,
+        action,
+        payload,
+      );
+      if (result?.game) setGame(result.game);
+      return null;
+    } catch (error) {
+      if (['PLAYER_AUTH_REQUIRED', 'SEAT_CHANGED'].includes(error?.code)) {
+        base44.entities.DominoGame.clearSeatToken(roomCode);
+        try {
+          localStorage.removeItem(`dom_seat_${roomCode}`);
+          localStorage.removeItem(`dom_pid_${roomCode}`);
+        } catch { /* ignore */ }
+        setMySeat(null);
+      }
+      return error?.message || 'The move could not be sent.';
+    }
   };
 
   if (loading) return <div style={{ ...BG, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div className="tnd-root" style={{ textAlign: 'center' }}>Finding the table…</div></div>;
@@ -91,7 +142,7 @@ export default function DominoGame() {
               onChange={e => setCodeInput(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && codeInput.trim() && setSearchParams({ room: codeInput.trim() })} />
             <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
               <button type="button" className="tnd-btn primary" style={{ flex: 1 }} disabled={!codeInput.trim()} onClick={() => setSearchParams({ room: codeInput.trim() })}>Find table</button>
-              <button type="button" className="tnd-btn" onClick={() => navigate('/games/dominoes/host')}>Host a game</button>
+              <button type="button" className="tnd-btn" onClick={() => navigate('/host?game=dominoes')}>Host a game</button>
             </div>
           </div>
         </div></div>
@@ -137,8 +188,8 @@ export default function DominoGame() {
     <div style={BG}><Header />
       <TestFeedbackButton gameId="dominoes" roomCode={roomCode} testerName={nameInput} />
       <DominoTable game={game} mySeat={seat} roomCode={roomCode}
-        onPlay={(id, side) => act(g => applyPlay(g, seat, id, side))}
-        onPass={() => act(g => applyPass(g, seat))}
+        onPlay={(id, side) => act('play', { dominoId: id, side })}
+        onPass={() => act('pass')}
         onLeave={() => navigate('/games')}
         notice={game.phase === 'waiting' ? 'You’re seated! Waiting for the host to start…' : null} />
     </div>
