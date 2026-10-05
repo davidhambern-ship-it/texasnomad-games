@@ -86,6 +86,16 @@ export const ALL_GAMES = [
     hostPath: '/games/word-wrangler?host=1',
     standalone: true,
   },
+  {
+    id: 'sudoku',
+    title: 'BATTLESUDOKU',
+    subtitle: 'SOLVE · FIRE · SINK',
+    color: '#22d3ee',
+    emoji: '⚓',
+    path: '/games/sudoku',
+    hostPath: '/games/sudoku?host=1',
+    standalone: true,
+  },
 ];
 
 export function HostGameIcon({ game, size = 'lg' }) {

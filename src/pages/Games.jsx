@@ -434,16 +434,18 @@ const GAMES = [
   },
   {
     id: 'sudoku',
-    title: 'Sudoku TN',
-    tagline: 'Race to Fill the Grid',
+    title: 'BattleSudoku',
+    tagline: 'Solve to Load · Fire to Sink',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/98aee295b_generated_image.png',
     color: '#22d3ee',
     color2: '#0ea5e9',
-    marqueeText: 'FILL THE GRID • BEAT THE CLOCK • UNIQUE PUZZLES • FIRST TO FINISH WINS',
-    screenText: '🔢 RACE THE GRID',
-    description: 'Competitive multiplayer Sudoku! Each player gets a unique puzzle. 3 minutes on the clock — first to complete wins. 3 mistakes and you\'re out.',
-    tags: ['Multiplayer', 'Puzzle', 'Race'],
+    marqueeText: 'HIDE YOUR FLEET • SOLVE TO LOAD SHELLS • FIRE VOLLEYS • SINK THEIR SHIPS',
+    screenText: '⚓ BATTLESUDOKU',
+    description: 'Sudoku meets Battleship. Your fleet hides under your own puzzle — every correct number loads a shell, then everyone fires a volley at rival waters. Hits blow your numbers off the board. Last fleet afloat, first full grid, or most points wins.',
+    tags: ['1–8 Players', 'Puzzle', 'Party Battle'],
     path: '/games/sudoku',
+    standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
@@ -511,17 +513,9 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['sudoku'];
+const IN_CONSTRUCTION_IDS = [];
 
 const CONSTRUCTION_DETAILS = {
-  sudoku: {
-    status: 'Puzzle systems + multiplayer race tuning',
-    how: [
-      'Every player gets a valid Sudoku board built for the same round.',
-      'Players race the clock while mistakes add pressure and penalties.',
-      'The finished version will support clean solo play plus competitive live-room races.',
-    ],
-  },
   txd: {
     status: 'Domino placement + table geometry',
     how: [
