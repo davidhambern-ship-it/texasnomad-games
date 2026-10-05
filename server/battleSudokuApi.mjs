@@ -40,10 +40,62 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createBattleSudokuApi() {
+export function createBattleSudokuApi({ store = null } = {}) {
   const rooms = new Map();
+  const lastCheckpoint = new Map();
   let lastSweep = Date.now();
-  const newCode = () => { for (let i = 0; i < 50; i++) { const c = Array.from({ length: 5 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join(''); if (!rooms.has(c)) return c; } throw err(503, 'NO_CODE', 'Try again.'); };
+
+  async function loadRoom(code) {
+    let room = rooms.get(code) || null;
+    if (!room && store) {
+      room = await store.load(code);
+      if (room) rooms.set(code, room);
+    }
+    return room;
+  }
+
+  async function saveRoom(room, { force = false } = {}) {
+    if (!room?.code) return;
+    rooms.set(room.code, room);
+    if (!store) return;
+
+    const now = Date.now();
+    const last = lastCheckpoint.get(room.code) || 0;
+    if (!force && now - last < 3000) return;
+
+    await store.save(room.code, room);
+    lastCheckpoint.set(room.code, now);
+  }
+
+  async function sweepRooms(now) {
+    for (const [code, room] of rooms) {
+      if (now - Number(room.updatedAt || 0) > ROOM_TTL_MS) {
+        rooms.delete(code);
+        lastCheckpoint.delete(code);
+      }
+    }
+    if (store) await store.cleanup();
+  }
+
+  async function roomCount() {
+    return store ? store.count() : rooms.size;
+  }
+
+  async function roomExists(code) {
+    if (rooms.has(code)) return true;
+    return store ? store.exists(code) : false;
+  }
+
+  const newCode = async () => {
+    for (let i = 0; i < 50; i++) {
+      const c = Array.from(
+        { length: 5 },
+        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
+      ).join('');
+      if (!(await roomExists(c))) return c;
+    }
+    throw err(503, 'NO_CODE', 'Try again.');
+  };
 
   function view(room, me, now) {
     const base = {
@@ -116,27 +168,45 @@ export function createBattleSudokuApi() {
     const token = String(req.headers['x-bs-token'] || '');
     const now = Date.now();
     try {
-      if (now - lastSweep > 10 * 60 * 1000) { lastSweep = now; for (const [k, r] of rooms) if (now - r.updatedAt > ROOM_TTL_MS) rooms.delete(k); }
-      if (req.method === 'GET' && path === '/health') return send(res, 200, { ok: true, service: 'battle-sudoku', rooms: rooms.size });
+      if (now - lastSweep > 10 * 60 * 1000) {
+        lastSweep = now;
+        await sweepRooms(now);
+      }
+      if (req.method === 'GET' && path === '/health') {
+        return send(res, 200, {
+          ok: true,
+          service: 'battle-sudoku',
+          rooms: await roomCount(),
+          persistent: Boolean(store),
+        });
+      }
       if (req.method === 'POST' && path === '/rooms') {
-        if (rooms.size > 1000) throw err(503, 'BUSY', 'Too many games right now.');
-        const code = newCode();
+        if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
+        const code = await newCode();
         const room = { code, hostToken: newToken(), players: [], game: null, settings: { ...G.DEFAULTS }, createdAt: now, updatedAt: now };
-        rooms.set(code, room);
+        await saveRoom(room, { force: true });
         const v = view(room, null, now); v.you = { isHost: true };
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
       }
       const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
-      const room = rooms.get(code);
+      const room = await loadRoom(code);
       if (!room) return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Game ${code} wasn’t found.` } });
       const isHost = token && token === room.hostToken;
       const findMe = () => (token && !isHost ? room.players.find(p => p.token === token) || null : null);
       if (room.game) G.tick(room.game, now);
 
       if (req.method === 'GET' && !m[2]) {
-        const me = findMe(); if (me) me.lastSeen = now;
+        const beforePhase = room.game?.phase || null;
+        const me = findMe();
+        if (me) me.lastSeen = now;
+        if (token || room.game) room.updatedAt = now;
+
+        await saveRoom(room, {
+          force: beforePhase !== (room.game?.phase || null),
+        });
+
         const v = view(room, me, now); if (isHost) v.you = { isHost: true };
         return send(res, 200, v);
       }
@@ -156,11 +226,13 @@ export function createBattleSudokuApi() {
             room.players.push(me); issued = me.token;
           }
           me.lastSeen = t;
+          await saveRoom(room, { force: true });
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const me = findMe();
         const result = act(room, isHost ? 'host' : me, body, t);
         if (me) me.lastSeen = t;
+        await saveRoom(room, { force: true });
         const v = view(room, me, t); if (isHost) v.you = { isHost: true };
         return send(res, 200, { result, ...v });
       }
