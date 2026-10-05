@@ -7,11 +7,15 @@ import { soundManager } from '@/lib/wordWranglerSound';
 
 const DURS = [[90, '1:30'], [150, '2:30'], [240, '4:00']];
 
+const TNG_PUBLIC_ORIGIN = String(
+  import.meta.env.VITE_TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
+).replace(/\/+$/, '');
+
 /**
  * Online race. Everyone gets the same seed, plays on their own copy of the board,
  * and the server replays every word to keep the leaderboard honest.
  */
-export default function WWOnline({ dict, code: initialCode, name, setName, onExit, onCode, muted, setMuted }) {
+export default function WWOnline({ dict, code: initialCode, name, setName, onExit, onCode, muted, setMuted, autoHost = false }) {
   const [code, setCode] = useState(initialCode || '');
   const [seat, setSeat] = useState(() => (initialCode ? wwSeat.get(initialCode) : null));
   const [data, setData] = useState(null);
@@ -26,6 +30,8 @@ export default function WWOnline({ dict, code: initialCode, name, setName, onExi
   const [cpuPick, setCpuPick] = useState('lemonade');
   const stRef = useRef(null);
   const queue = useRef(Promise.resolve());
+  const autoHostStarted = useRef(false);
+  const autoHostNameReady = useRef(Boolean(String(name || '').trim()));
   const seatRef = useRef(seat);
   seatRef.current = seat;
   stRef.current = st;
@@ -121,6 +127,21 @@ export default function WWOnline({ dict, code: initialCode, name, setName, onExi
       setSeat(s); setCode(d.roomCode); onCode && onCode(d.roomCode); apply(d);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
+  useEffect(() => {
+    if (
+      !autoHost ||
+      autoHostStarted.current ||
+      !autoHostNameReady.current ||
+      code ||
+      seat ||
+      data ||
+      busy
+    ) return;
+
+    autoHostStarted.current = true;
+    host();
+  }, [autoHost, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
     if (!/^[A-Z]{5}$/.test(cc)) { setError('Room codes are 5 letters.'); return; }
@@ -140,7 +161,7 @@ export default function WWOnline({ dict, code: initialCode, name, setName, onExi
     onExit();
   };
 
-  const invite = code ? `${window.location.origin}/games/word-wrangler?room=${code}` : '';
+  const invite = code ? `${TNG_PUBLIC_ORIGIN}/games/word-wrangler?room=${code}` : '';
   const copy = async () => { try { await navigator.clipboard.writeText(invite); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch { window.prompt('Copy this invite link:', invite); } };
 
   // ── no room yet: host or join ──
