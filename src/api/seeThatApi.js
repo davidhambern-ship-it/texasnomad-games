@@ -1,16 +1,9 @@
 // Client for See That?! party rooms (server.mjs → server/seeThatApi.mjs)
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { TNG_SERVICE_ORIGIN, tngServiceUrl } from '@/lib/tngServiceOrigin';
 
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app');
-
-const ST_SERVICE_ORIGIN =
-  import.meta.env.VITE_ST_SERVICE_ORIGIN ||
-  (IS_RAILWAY_TEMP_HOST ? '' : 'https://tng-live-production.up.railway.app');
-
-export const ST_API_BASE =
-  import.meta.env.VITE_ST_API_BASE ||
-  `${ST_SERVICE_ORIGIN}/st-api`;
+const ST_SERVICE_ORIGIN = TNG_SERVICE_ORIGIN;
+export const ST_API_BASE = tngServiceUrl('/st-api');
 
 export class STApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'STApiError'; this.status = status; this.code = code; }
