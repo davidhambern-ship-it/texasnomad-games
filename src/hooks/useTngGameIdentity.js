@@ -53,13 +53,19 @@ export function clearTngGameIdentityCache() {
 
 export function useTngGameIdentity() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
-  const [state, setState] = useState(() => ({
-    loading: true,
-    error: '',
-    profile: cachedIdentity?.profile || null,
-    publicName: cachedIdentity?.publicName || '',
-    handle: cachedIdentity?.handle || '',
-  }));
+  const [state, setState] = useState(() => {
+    const sameUser =
+      cachedIdentity &&
+      cachedIdentityUserId === String(user?.id || '');
+
+    return {
+      loading: !sameUser,
+      error: '',
+      profile: sameUser ? cachedIdentity.profile : null,
+      publicName: sameUser ? cachedIdentity.publicName : '',
+      handle: sameUser ? cachedIdentity.handle : '',
+    };
+  });
 
   useEffect(() => {
     let alive = true;
