@@ -658,34 +658,25 @@ export default function Games() {
   const [constructionGame, setConstructionGame] = useState(null);
 
   const handleCreateRoom = (gameId) => {
-    // Standalone games own their room lifecycle and should launch directly into
-    // their dedicated Host flow instead of touching the retired Base44 room system.
-    const standaloneHostPaths = {
-      viral: '/games/viral?host=1',
-      'see-that': '/games/see-that?host=1',
-      'word-wrangler': '/games/word-wrangler?host=1',
-      sudoku: '/games/sudoku?host=1',
-      txd: '/games/dominoes/host',
-    };
-
-    if (standaloneHostPaths[gameId]) {
-      navigate(standaloneHostPaths[gameId]);
-      return;
-    }
-
-    // Core multiplayer games are created by the production Neon Host Controller.
-    // The Host Panel consumes ?game= and creates the room only after the Host
-    // session/display setup is ready.
-    const centralHostGames = new Set([
+    // Every multiplayer Host launch goes through the TNG Host Controller first.
+    // Core games create a Neon room there; standalone games are handed off to
+    // their own live service only after the authenticated Host session is ready.
+    const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
+    const hostableGames = new Set([
       'bff',
       'square-biz',
       'hangman',
       'spades',
       'word-search',
+      'viral',
+      'see-that',
+      'word-wrangler',
+      'sudoku',
+      'dominoes',
     ]);
 
-    if (centralHostGames.has(gameId)) {
-      navigate(`/host?game=${encodeURIComponent(gameId)}`);
+    if (hostableGames.has(hostGameId)) {
+      navigate(`/host?game=${encodeURIComponent(hostGameId)}`);
       return;
     }
 
