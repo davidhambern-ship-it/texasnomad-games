@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const DISPLAY = { fontFamily: "Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" };
 const MONO = { fontFamily: "'Press Start 2P', monospace" };
@@ -579,7 +579,7 @@ export function SquareBizIntro({
 
   return (
     <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
-      <audio ref={audioRef} src={audioSrc} preload="auto" playsInline />
+      <audio ref={audioRef} src={audioSrc} preload="auto" />
       <div className="absolute inset-0 opacity-45" style={{
         background:
           'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
