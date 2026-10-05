@@ -1788,12 +1788,25 @@ export default function GameDisplay({
     if (spectator || !display?.deviceId || !display?.token) return undefined;
 
     let cancelled = false;
+    let timer = null;
+    let inFlight = false;
+    let failures = 0;
+
+    const schedule = (delayMs) => {
+      if (cancelled) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(refresh, delayMs);
+    };
 
     async function refresh() {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+
       try {
         const payload = await tngApi.display.getState(display.deviceId, display.token);
         if (cancelled) return;
 
+        failures = 0;
         setStatus(payload.status || 'connected');
         setRoom(payload.room || null);
         if (Array.isArray(payload.notifications) && payload.notifications.length > 0) {
@@ -1810,10 +1823,9 @@ export default function GameDisplay({
           });
         }
         setError('');
+        schedule(1000);
       } catch (stateError) {
         if (cancelled) return;
-
-        setError(stateError.message || 'The Game Display connection was lost.');
 
         if (stateError.status === 401) {
           localStorage.removeItem('tng_display_device_id');
@@ -1822,18 +1834,41 @@ export default function GameDisplay({
           setRoom(null);
           setNotifications([]);
           setStatus('unpaired');
+          cancelled = true;
+          return;
         }
+
+        failures += 1;
+        setStatus('reconnecting');
+        if (failures >= 2) {
+          setError('Display connection interrupted. TNG is reconnecting automatically…');
+        }
+
+        const delay = Math.min(5000, 1000 * (2 ** Math.min(failures - 1, 2)));
+        schedule(delay);
+      } finally {
+        inFlight = false;
       }
     }
 
+    const recoverNow = () => schedule(0);
+    const recoverVisible = () => {
+      if (document.visibilityState === 'visible') recoverNow();
+    };
+
     refresh();
-    const interval = window.setInterval(refresh, 1000);
+    window.addEventListener('online', recoverNow);
+    window.addEventListener('pageshow', recoverNow);
+    document.addEventListener('visibilitychange', recoverVisible);
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener('online', recoverNow);
+      window.removeEventListener('pageshow', recoverNow);
+      document.removeEventListener('visibilitychange', recoverVisible);
     };
-  }, [display?.deviceId, display?.token]);
+  }, [spectator, display?.deviceId, display?.token]);
 
   useEffect(() => {
     if (!spectator) return undefined;
@@ -1845,8 +1880,20 @@ export default function GameDisplay({
     }
 
     let cancelled = false;
+    let timer = null;
+    let inFlight = false;
+    let failures = 0;
+
+    const schedule = (delayMs) => {
+      if (cancelled) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(refreshSpectator, delayMs);
+    };
 
     async function refreshSpectator() {
+      if (cancelled || inFlight) return;
+      inFlight = true;
+
       try {
         const registeredRoom = await resolveTngRoom(spectatorRoomCode);
         if (cancelled) return;
@@ -1860,31 +1907,57 @@ export default function GameDisplay({
           setRoom(null);
           setStatus('ended');
           setError('This game does not have a read-only spectator view yet.');
+          cancelled = true;
           return;
         }
 
         const payload = await tngApi.spectator.getState(spectatorRoomCode);
         if (cancelled) return;
 
+        failures = 0;
         setRoom(payload.room || null);
         setStatus(payload.status || 'spectating');
         setError('');
+        schedule(1000);
       } catch (spectatorError) {
         if (cancelled) return;
 
-        setError(spectatorError?.message || 'The spectator connection was lost.');
         if (spectatorError?.status === 404) {
           setStatus('ended');
+          setError('This live room has ended.');
+          cancelled = true;
+          return;
         }
+
+        failures += 1;
+        setStatus('reconnecting');
+        if (failures >= 2) {
+          setError('Spectator connection interrupted. TNG is reconnecting automatically…');
+        }
+
+        const delay = Math.min(5000, 1000 * (2 ** Math.min(failures - 1, 2)));
+        schedule(delay);
+      } finally {
+        inFlight = false;
       }
     }
 
+    const recoverNow = () => schedule(0);
+    const recoverVisible = () => {
+      if (document.visibilityState === 'visible') recoverNow();
+    };
+
     refreshSpectator();
-    const interval = window.setInterval(refreshSpectator, 1000);
+    window.addEventListener('online', recoverNow);
+    window.addEventListener('pageshow', recoverNow);
+    document.addEventListener('visibilitychange', recoverVisible);
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      if (timer) window.clearTimeout(timer);
+      window.removeEventListener('online', recoverNow);
+      window.removeEventListener('pageshow', recoverNow);
+      document.removeEventListener('visibilitychange', recoverVisible);
     };
   }, [spectator, spectatorRoomCode]);
 
@@ -2020,7 +2093,7 @@ export default function GameDisplay({
         {!room && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
-              {status === 'connecting' ? (
+              {['connecting', 'reconnecting'].includes(status) ? (
                 <Loader2 className="mx-auto mb-6 h-14 w-14 animate-spin text-[#BC13FE]" />
               ) : (
                 <CheckCircle2 className="mx-auto mb-6 h-16 w-16 text-green-400" />
@@ -2035,9 +2108,11 @@ export default function GameDisplay({
                     ? status === 'ended'
                       ? 'This live room has ended.'
                       : `Watching room ${spectatorRoomCode} without taking a player seat.`
-                    : status === 'waiting_for_room'
-                      ? 'Waiting for the Host to choose a game…'
-                      : 'Connected to the Host Controller.'}
+                    : status === 'reconnecting'
+                      ? 'Connection interrupted — reconnecting automatically…'
+                      : status === 'waiting_for_room'
+                        ? 'Waiting for the Host to choose a game…'
+                        : 'Connected to the Host Controller.'}
                 </span>
               </div>
 
