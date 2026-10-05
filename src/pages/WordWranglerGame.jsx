@@ -1,10 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '@/components/home/Header';
-import WWSolo from '@/components/wordWrangler/WWSolo';
 import WWOnline, { WWDisplay } from '@/components/wordWrangler/WWOnline';
 import WWIcon from '@/components/wordWrangler/WWIcons';
-import { Avatar, RIVALS, loadBest } from '@/components/wordWrangler/WWShared';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { SPECIALS } from '@/lib/wordWranglerEngine';
@@ -18,14 +16,12 @@ export default function WordWranglerGame() {
   const displayParam = (params.get('display') || '').toUpperCase();
   const validDisplay = /^[A-Z]{5}$/.test(displayParam) ? displayParam : '';
   const [launchedFromHost] = useState(() => params.get('host') === '1');
-  const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | solo | cpu | pickcpu | online
+  const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | online
   const [dict, setDict] = useState(null);
   const [dictErr, setDictErr] = useState('');
   const identity = useTngGameIdentity();
   const name = identity.publicName;
-  const [rival, setRival] = useState(RIVALS[2]);
   const [muted, setMuted] = useState(() => { try { return localStorage.getItem('ww_muted') === '1'; } catch { return false; } });
-  const best = loadBest();
 
   useEffect(() => { try { localStorage.setItem('ww_muted', muted ? '1' : '0'); } catch { /* ignore */ } }, [muted]);
   useEffect(() => {
@@ -67,33 +63,8 @@ export default function WordWranglerGame() {
         <p className="ww-sub">{dictErr || 'Saddling up the dictionary…'}</p>
       </div></div>
     );
-  } else if (screen === 'solo') {
-    body = <WWSolo dict={dict} playerName={name || 'You'} onExit={toMenu} muted={muted} setMuted={setMuted} />;
-  } else if (screen === 'cpu') {
-    body = <WWSolo dict={dict} rival={rival} playerName={name || 'You'} onExit={toMenu} muted={muted} setMuted={setMuted} />;
   } else if (screen === 'online') {
     body = <WWOnline dict={dict} code={validRoom} name={name} identityReady={!identity.loading && Boolean(name)} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
-  } else if (screen === 'pickcpu') {
-    body = (
-      <div className="ww-menu">
-        <div className="ww-card">
-          <h2 className="ww-h" style={{ fontSize: 44, color: 'var(--ww-gold)' }}>Pick your rival</h2>
-          <p className="ww-sub">You both get the same tiles. Most points when the clock runs out wins.</p>
-          <div className="ww-crew" style={{ marginTop: 14 }}>
-            {RIVALS.map(r => (
-              <button key={r.id} type="button" className="ww-crewbtn" aria-pressed={rival.id === r.id} onClick={() => setRival(r)}>
-                <Avatar name={r.name} charId={r.id} color={r.color} />
-                <span><b>{r.name}</b><small>{r.title} · level {r.level}</small>{best[`cpu_${r.id}`] ? <small>Your best: {best[`cpu_${r.id}`].toLocaleString()}</small> : null}</span>
-              </button>
-            ))}
-          </div>
-          <div className="ww-row" style={{ marginTop: 16 }}>
-            <button type="button" className="ww-btn primary" onClick={() => setScreen('cpu')}>Saddle up vs {rival.name}</button>
-            <button type="button" className="ww-btn ghost" onClick={toMenu}>Back</button>
-          </div>
-        </div>
-      </div>
-    );
   } else {
     body = (
       <div className="ww-menu">
@@ -109,20 +80,10 @@ export default function WordWranglerGame() {
           {identity.error && <div className="ww-err">{identity.error}</div>}
         </div>
         <div className="ww-modes">
-          <button type="button" className="ww-mode" onClick={() => setScreen('solo')}>
-            <div className="ww-h">Solo Rush</div>
-            <p>Score big before the rope burns down. Sapphires add time. Chase your best score.</p>
-            <span className="tag">{best.solo ? `Best ${best.solo.toLocaleString()}` : '1 player'}</span>
-          </button>
-          <button type="button" className="ww-mode" onClick={() => setScreen('pickcpu')}>
-            <div className="ww-h">Vs CPU</div>
-            <p>Race a Texas Nomad rival on the same tiles — from Tank the rookie to Berna the legend.</p>
-            <span className="tag">6 rivals</span>
-          </button>
           <button type="button" className="ww-mode" onClick={() => setScreen('online')}>
             <div className="ww-h">Online Race</div>
             <p>Host a room, share the code, and race friends live on identical boards.</p>
-            <span className="tag">Up to 8 players</span>
+            <span className="tag">2–8 players</span>
           </button>
         </div>
         <div className="ww-card">
