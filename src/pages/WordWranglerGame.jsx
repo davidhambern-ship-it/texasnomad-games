@@ -4,10 +4,11 @@ import Header from '@/components/home/Header';
 import WWSolo from '@/components/wordWrangler/WWSolo';
 import WWOnline from '@/components/wordWrangler/WWOnline';
 import WWIcon from '@/components/wordWrangler/WWIcons';
-import { Avatar, RIVALS, loadBest, loadName, saveName } from '@/components/wordWrangler/WWShared';
+import { Avatar, RIVALS, loadBest } from '@/components/wordWrangler/WWShared';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { SPECIALS } from '@/lib/wordWranglerEngine';
+import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import '@/components/wordWrangler/ww.css';
 
 export default function WordWranglerGame() {
@@ -18,7 +19,8 @@ export default function WordWranglerGame() {
   const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | solo | cpu | pickcpu | online
   const [dict, setDict] = useState(null);
   const [dictErr, setDictErr] = useState('');
-  const [name, setName] = useState(loadName);
+  const identity = useTngGameIdentity();
+  const name = identity.publicName;
   const [rival, setRival] = useState(RIVALS[2]);
   const [muted, setMuted] = useState(() => { try { return localStorage.getItem('ww_muted') === '1'; } catch { return false; } });
   const best = loadBest();
@@ -58,7 +60,7 @@ export default function WordWranglerGame() {
   } else if (screen === 'cpu') {
     body = <WWSolo dict={dict} rival={rival} playerName={name || 'You'} onExit={toMenu} muted={muted} setMuted={setMuted} />;
   } else if (screen === 'online') {
-    body = <WWOnline dict={dict} code={validRoom} name={name} setName={(n) => { setName(n); }} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
+    body = <WWOnline dict={dict} code={validRoom} name={name} identityReady={!identity.loading && Boolean(name)} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
   } else if (screen === 'pickcpu') {
     body = (
       <div className="ww-menu">
@@ -88,8 +90,11 @@ export default function WordWranglerGame() {
           <p className="ww-sub">Drag through touching letters to rope in real words. Long words and rare letters pay big.</p>
         </div>
         <div className="ww-card">
-          <div className="ww-label" style={{ marginBottom: 6 }}>Your name</div>
-          <input className="ww-input" value={name} maxLength={18} placeholder="YOUR NAME" onChange={e => setName(e.target.value)} onBlur={() => saveName(name.trim())} />
+          <div className="ww-label" style={{ marginBottom: 6 }}>TNG player</div>
+          <div className="ww-sub">
+            Playing as <b style={{ color: 'var(--ww-gold)' }}>{name || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+          </div>
+          {identity.error && <div className="ww-err">{identity.error}</div>}
         </div>
         <div className="ww-modes">
           <button type="button" className="ww-mode" onClick={() => setScreen('solo')}>
@@ -102,7 +107,7 @@ export default function WordWranglerGame() {
             <p>Race a Texas Nomad rival on the same tiles — from Tank the rookie to Berna the legend.</p>
             <span className="tag">6 rivals</span>
           </button>
-          <button type="button" className="ww-mode" onClick={() => { saveName(name.trim()); setScreen('online'); }}>
+          <button type="button" className="ww-mode" onClick={() => setScreen('online')}>
             <div className="ww-h">Online Race</div>
             <p>Host a room, share the code, and race friends live on identical boards.</p>
             <span className="tag">Up to 8 players</span>
