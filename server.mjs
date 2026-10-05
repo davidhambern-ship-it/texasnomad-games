@@ -1197,6 +1197,7 @@ const viralLive = createViralLive({
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
 const viralDisplayTargets = new Map();
 const seeThatDisplayTargets = new Map();
+const standaloneDisplayTargets = new Map();
 
 function getViralDisplayTarget(displayDeviceId) {
   const key = String(displayDeviceId || '').trim();
@@ -1226,6 +1227,103 @@ function getSeeThatDisplayTarget(displayDeviceId) {
   }
 
   return target;
+}
+
+function getStandaloneDisplayTarget(displayDeviceId) {
+  const key = String(displayDeviceId || '').trim();
+  if (!key) return null;
+
+  const target = standaloneDisplayTargets.get(key);
+  if (!target) return null;
+
+  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
+    standaloneDisplayTargets.delete(key);
+    return null;
+  }
+
+  return target;
+}
+
+async function handleStandaloneDisplayTarget(req, res) {
+  if (!['POST', 'DELETE'].includes(req.method || '')) {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
+    });
+    return;
+  }
+
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  const { rows } = await bffPool.query(
+    `select display_device_id
+     from public.host_sessions
+     where host_account_id = $1::uuid
+       and ended_at is null
+       and status::text in ('pairing', 'ready', 'live')
+       and display_device_id is not null
+     order by updated_at desc
+     limit 1`,
+    [resolved.account.id],
+  );
+
+  const displayDeviceId = rows[0]?.display_device_id || null;
+  if (!displayDeviceId) {
+    sendJson(res, 200, {
+      ok: true,
+      displayAttached: false,
+      roomCode: null,
+    });
+    return;
+  }
+
+  const key = String(displayDeviceId);
+
+  if (req.method === 'DELETE') {
+    standaloneDisplayTargets.delete(key);
+    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
+    return;
+  }
+
+  const body = await readJsonBody(req).catch(() => ({}));
+  const roomCode = String(body?.roomCode || '').trim().toUpperCase();
+  const gameId = String(body?.gameId || '').trim();
+
+  const room = await roomRegistry.resolve(roomCode);
+  if (
+    !room ||
+    room.kind !== 'standalone' ||
+    room.gameId !== gameId ||
+    (room.hostAccountId &&
+      String(room.hostAccountId) !== String(resolved.account.id))
+  ) {
+    sendJson(res, 403, {
+      error: {
+        code: 'DISPLAY_ROOM_NOT_OWNED',
+        message: 'That standalone room is not owned by this TNG Host.',
+      },
+    });
+    return;
+  }
+
+  viralDisplayTargets.delete(key);
+  seeThatDisplayTargets.delete(key);
+  standaloneDisplayTargets.set(key, {
+    accountId: resolved.account.id,
+    gameId,
+    roomCode,
+    updatedAt: Date.now(),
+  });
+
+  sendJson(res, 200, {
+    ok: true,
+    displayAttached: true,
+    gameId,
+    roomCode,
+  });
 }
 
 async function handleViralDisplayTarget(req, res) {
@@ -1277,6 +1375,7 @@ async function handleViralDisplayTarget(req, res) {
   const roomCode = incoming || viralDisplayTargets.get(String(displayDeviceId))?.roomCode || null;
   // A paired screen can be owned by only one standalone game at a time.
   seeThatDisplayTargets.delete(String(displayDeviceId));
+  standaloneDisplayTargets.delete(String(displayDeviceId));
   viralDisplayTargets.set(String(displayDeviceId), { accountId: resolved.account.id, roomCode, updatedAt: Date.now() });
 
   sendJson(res, 200, {
@@ -1337,6 +1436,7 @@ async function handleSeeThatDisplayTarget(req, res) {
 
   // A paired screen can be owned by only one standalone game at a time.
   viralDisplayTargets.delete(displayKey);
+  standaloneDisplayTargets.delete(displayKey);
   seeThatDisplayTargets.set(displayKey, {
     accountId: resolved.account.id,
     roomCode,
@@ -2382,9 +2482,11 @@ async function handleTngDisplayState(req, res) {
   if (!room) {
     const viralTarget = getViralDisplayTarget(displayId);
     const seeThatTarget = getSeeThatDisplayTarget(displayId);
+    const genericTarget = getStandaloneDisplayTarget(displayId);
     const standaloneTarget = [
       viralTarget ? { ...viralTarget, gameId: 'viral' } : null,
       seeThatTarget ? { ...seeThatTarget, gameId: 'see-that' } : null,
+      genericTarget || null,
     ]
       .filter(Boolean)
       .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
@@ -6064,6 +6166,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/see-that-display')) {
       await handleSeeThatDisplayTarget(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/standalone-display')) {
+      await handleStandaloneDisplayTarget(req, res);
       return;
     }
 
