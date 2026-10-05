@@ -1676,6 +1676,65 @@ function BattleSudokuDisplay({ room }) {
   );
 }
 
+function WordWranglerDisplay({ room }) {
+  const roomCode = String(room?.roomCode || '').trim().toUpperCase();
+
+  if (!/^[A-Z]{5}$/.test(roomCode)) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#120d08] px-6 text-center text-white">
+        <div>
+          <div className="text-8xl">🤠</div>
+          <div className="mt-6 text-[9px] uppercase tracking-[0.28em] text-[#FFD23F]" style={PS2}>
+            WORD WRANGLER GAME DISPLAY
+          </div>
+          <h1 className="mt-4 text-5xl font-semibold">Word Wrangler is ready.</h1>
+          <p className="mt-4 text-lg text-white/45">Waiting for the Host to open the race…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      key={roomCode}
+      title={`Word Wrangler room ${roomCode} display`}
+      src={`/games/word-wrangler?display=${encodeURIComponent(roomCode)}`}
+      className="h-full w-full border-0 bg-[#120d08]"
+      allow="autoplay; fullscreen"
+    />
+  );
+}
+
+function DominoDisplay({ room }) {
+  const roomCode = String(room?.roomCode || '').trim().toUpperCase();
+
+  if (!/^[A-Z0-9]{4,8}$/.test(roomCode)) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#08060c] px-6 text-center text-white">
+        <div>
+          <div className="text-8xl">🁣</div>
+          <div className="mt-6 text-[9px] uppercase tracking-[0.28em] text-[#FFD700]" style={PS2}>
+            DOMINOES GAME DISPLAY
+          </div>
+          <h1 className="mt-4 text-5xl font-semibold">Dominoes is ready.</h1>
+          <p className="mt-4 text-lg text-white/45">Waiting for the Host to open the table…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      key={roomCode}
+      title={`Dominoes room ${roomCode} display`}
+      src={`/games/dominoes?display=${encodeURIComponent(roomCode)}`}
+      className="h-full w-full border-0 bg-[#08060c]"
+      allow="autoplay; fullscreen"
+    />
+  );
+}
+
+
 export default function GameDisplay({
   spectator = false,
   embedded = false,
@@ -1923,6 +1982,8 @@ export default function GameDisplay({
   const viralMode = room?.gameId === 'viral';
   const seeThatMode = room?.gameId === 'see-that';
   const battleSudokuMode = room?.gameId === 'sudoku';
+  const wordWranglerMode = room?.gameId === 'word-wrangler';
+  const dominoMode = room?.gameId === 'dominoes';
 
   return (
     <div
@@ -1930,8 +1991,8 @@ export default function GameDisplay({
         embedded ? 'h-full min-h-0' : 'h-[100dvh]'
       }`}
     >
-      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && <AmbientBackdrop />}
-      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !embedded && (
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !wordWranglerMode && !dominoMode && <AmbientBackdrop />}
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !wordWranglerMode && !dominoMode && !embedded && (
         <DisplayHud
           room={room}
           isFullscreen={isFullscreen}
@@ -1952,7 +2013,7 @@ export default function GameDisplay({
         className={`relative z-10 overflow-hidden ${
           embedded
             ? 'h-full'
-            : squareBizMode || viralMode || seeThatMode || battleSudokuMode
+            : squareBizMode || viralMode || seeThatMode || battleSudokuMode || wordWranglerMode || dominoMode
               ? 'h-[100dvh]'
               : 'h-[calc(100dvh-4rem)]'
         }`}
@@ -1998,8 +2059,10 @@ export default function GameDisplay({
         {room?.gameId === 'viral' && <ViralDisplay room={room} />}
         {room?.gameId === 'see-that' && <SeeThatDisplay room={room} />}
           {room?.gameId === 'sudoku' && <BattleSudokuDisplay room={room} />}
+          {room?.gameId === 'word-wrangler' && <WordWranglerDisplay room={room} />}
+          {room?.gameId === 'dominoes' && <DominoDisplay room={room} />}
 
-        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that', 'sudoku'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that', 'sudoku', 'word-wrangler', 'dominoes'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>
