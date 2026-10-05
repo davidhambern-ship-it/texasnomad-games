@@ -31,30 +31,63 @@ const TOPICS = new Set(['state', 'act']);
 export function createViralLive({
   isAllowedOrigin = () => true,
   verifyHostAuthorization = async () => null,
+  store = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
   const rooms = new Map(); // name → { peers, lastState, lastStateAt, hostId, hostAccountId }
+  const lastCheckpoint = new Map();
 
-  const getRoom = (name) => {
+  async function getRoom(name) {
     let r = rooms.get(name);
-    if (!r) {
-      r = {
-        peers: new Map(),
-        lastState: null,
-        lastStateAt: 0,
-        hostId: null,
-        hostAccountId: null,
-      };
-      rooms.set(name, r);
+    if (r) return r;
+
+    let saved = null;
+    if (store) {
+      saved = await store.load(name).catch(() => null);
     }
+
+    r = {
+      peers: new Map(),
+      lastState: saved?.lastState || null,
+      lastStateAt: Number(saved?.lastStateAt || 0),
+      hostId: null,
+      hostAccountId: saved?.hostAccountId || null,
+      updatedAt: Number(saved?.updatedAt || saved?.lastStateAt || Date.now()),
+    };
+    rooms.set(name, r);
     return r;
-  };
+  }
+
+  async function persistRoom(name, r, { force = false } = {}) {
+    if (!store || !r) return;
+
+    const now = Date.now();
+    const last = lastCheckpoint.get(name) || 0;
+    if (!force && now - last < 3000) return;
+
+    const updatedAt = Math.max(
+      Number(r.lastStateAt || 0),
+      Number(r.updatedAt || 0),
+      now,
+    );
+
+    await store.save(name, {
+      code: name,
+      lastState: r.lastState || null,
+      lastStateAt: Number(r.lastStateAt || 0),
+      hostAccountId: r.hostAccountId || null,
+      updatedAt,
+    });
+
+    r.updatedAt = updatedAt;
+    lastCheckpoint.set(name, now);
+  }
   const peerList = (r) => [...r.peers].map(([id, p]) => ({ id, presence: p.presence || {} }));
   const send = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
   const broadcast = (r, obj, exceptId) => { const s = JSON.stringify(obj); for (const [id, p] of r.peers) if (id !== exceptId && p.ws.readyState === 1) { try { p.ws.send(s); } catch { /* closed */ } } };
 
-  wss.on('connection', (ws, req, roomName) => {
-    const r = getRoom(roomName);
+  wss.on('connection', async (ws, req, roomName) => {
+    const r = await getRoom(roomName);
     if (r.peers.size >= MAX_PEERS) { ws.close(1013, 'Room is full'); return; }
     const id = randomBytes(6).toString('base64url');
     r.peers.set(id, { ws, presence: {} });
@@ -131,7 +164,9 @@ export function createViralLive({
           clean.role = 'host';
           r.hostAccountId = accountId;
           r.hostId = id;
+          r.updatedAt = now;
           me.presence = clean;
+          await persistRoom(roomName, r, { force: true });
 
           send(ws, {
             t: 'msg',
@@ -151,7 +186,10 @@ export function createViralLive({
       if (m.t === 'emit' && TOPICS.has(m.topic)) {
         if (m.topic === 'state') {
           if (r.hostId !== id) return; // only the host broadcasts the game
-          r.lastState = m.data; r.lastStateAt = now;
+          r.lastState = m.data;
+          r.lastStateAt = now;
+          r.updatedAt = now;
+          await persistRoom(roomName, r);
         }
         broadcast(r, { t: 'msg', topic: m.topic, data: m.data ?? null, from: id }, id);
       }
@@ -160,19 +198,32 @@ export function createViralLive({
       r.peers.delete(id);
       if (r.hostId === id) r.hostId = null;
       broadcast(r, { t: 'peers', joined: [], left: [{ id }], peers: peerList(r) });
-      if (!r.peers.size && !r.lastState) rooms.delete(roomName);
+      if (!r.peers.size && !r.lastState) {
+        rooms.delete(roomName);
+        lastCheckpoint.delete(roomName);
+        if (store) store.remove(roomName).catch(() => {});
+      }
     });
     ws.on('error', () => {});
   });
 
   // Heartbeat: drop dead sockets, forget old empty rooms
-  const timer = setInterval(() => {
+  const timer = setInterval(async () => {
     for (const ws of wss.clients) {
       if (!ws.isAlive) { try { ws.terminate(); } catch { /* gone */ } continue; }
       ws.isAlive = false; try { ws.ping(); } catch { /* gone */ }
     }
+
     const cutoff = Date.now() - KEEP_STATE_MS;
-    for (const [name, r] of rooms) if (!r.peers.size && r.lastStateAt < cutoff) rooms.delete(name);
+    for (const [name, r] of rooms) {
+      if (!r.peers.size && r.lastStateAt < cutoff) {
+        rooms.delete(name);
+        lastCheckpoint.delete(name);
+        if (store) await store.remove(name).catch(() => {});
+      }
+    }
+
+    if (store) await store.cleanup().catch(() => {});
   }, 25000);
   timer.unref?.();
 
@@ -192,20 +243,39 @@ export function createViralLive({
       wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request, room));
       return true;
     },
-    resolveRoom(code) {
+    async resolveRoom(code) {
       const raw = String(code || '').trim().toLowerCase();
       const roomName = raw.startsWith('viral-') ? raw : `viral-${raw}`;
       if (!ROOM_RE.test(roomName)) {
         return { live: false, roomCode: raw.toUpperCase(), peers: 0 };
       }
 
-      const room = rooms.get(roomName);
+      let room = rooms.get(roomName) || null;
+      if (!room && store) {
+        const saved = await store.load(roomName).catch(() => null);
+        if (saved) {
+          room = {
+            peers: new Map(),
+            lastState: saved.lastState || null,
+            lastStateAt: Number(saved.lastStateAt || 0),
+            hostId: null,
+            hostAccountId: saved.hostAccountId || null,
+            updatedAt: Number(saved.updatedAt || saved.lastStateAt || Date.now()),
+          };
+          rooms.set(roomName, room);
+        }
+      }
+
       const hostPresent = Boolean(room?.hostId && room.peers.has(room.hostId));
+      const hasState = Boolean(room?.lastState);
       return {
-        live: hostPresent,
+        // Persisted state still identifies this as a VIRAL room while the Host
+        // reconnects after a container replacement.
+        live: hostPresent || hasState,
+        hostPresent,
         roomCode: roomName.slice(6).toUpperCase(),
         peers: room?.peers.size || 0,
-        hasState: Boolean(room?.lastState),
+        hasState,
       };
     },
     stats() { let peers = 0; for (const r of rooms.values()) peers += r.peers.size; return { rooms: rooms.size, peers }; },
