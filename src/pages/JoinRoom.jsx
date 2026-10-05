@@ -1,16 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { base44 } from '@/api/base44Client';
-import { dominoStore } from '@/api/dominoStore';
 import { TngApiError, tngApi } from '@/api/tngApi';
-import { resolveViralRoom } from '@/api/viralRoomStore';
-import { resolveSeeThatRoom } from '@/api/seeThatApi';
-import { resolveWordWranglerRoom } from '@/api/wordWranglerApi';
-import { resolveBattleSudokuRoom } from '@/api/battleSudokuApi';
+import { resolveTngRoom } from '@/api/roomRegistry';
 import { useAuth } from '@/lib/AuthContext';
-import { isBase44Preview } from '@/lib/previewTngProfile';
-import { isNeonStaging } from '@/lib/neonAuth';
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -70,76 +63,6 @@ function gameTitle(gameId) {
     .split('-')
     .map((part) => part ? part[0].toUpperCase() + part.slice(1) : '')
     .join(' ');
-}
-
-async function redirectSpecialGameRoom(roomCode) {
-  const code = String(roomCode || '').trim().toUpperCase();
-
-  // VIRAL uses a four-letter room code backed by its live WebSocket relay.
-  if (/^[A-Z]{4}$/.test(code)) {
-    try {
-      const viral = await resolveViralRoom(code);
-      if (viral?.live) {
-        window.location.replace(`/viral/index.html?join=${encodeURIComponent(code)}`);
-        return true;
-      }
-    } catch {
-      // Keep resolving; a failed VIRAL lookup should not block other room types.
-    }
-  }
-
-  // See That?! rooms use five-letter codes on the dedicated /st-api server.
-  if (/^[A-Z]{5}$/.test(code)) {
-    try {
-      const seeThat = await resolveSeeThatRoom(code);
-      if (seeThat) {
-        window.location.replace(`/games/see-that?room=${encodeURIComponent(code)}`);
-        return true;
-      }
-    } catch {
-      // Keep resolving; a failed See That lookup should not block other room types.
-    }
-  }
-
-  // Word Wrangler online races use five-letter codes on /ww-api.
-  if (/^[A-Z]{5}$/.test(code)) {
-    try {
-      const wordWrangler = await resolveWordWranglerRoom(code);
-      if (wordWrangler) {
-        window.location.replace(`/games/word-wrangler?room=${encodeURIComponent(code)}`);
-        return true;
-      }
-    } catch {
-      // Keep resolving; a failed Word Wrangler lookup should not block other room types.
-    }
-  }
-
-  // BattleSudoku party rooms also use five-letter codes, on /bs-api.
-  if (/^[A-Z]{5}$/.test(code)) {
-    try {
-      const battleSudoku = await resolveBattleSudokuRoom(code);
-      if (battleSudoku) {
-        window.location.replace(`/games/sudoku?room=${encodeURIComponent(code)}`);
-        return true;
-      }
-    } catch {
-      // Keep resolving; a failed BattleSudoku lookup should not block other room types.
-    }
-  }
-
-  // Dominoes owns its own persisted table state instead of a Neon GameRoom.
-  try {
-    const dominoes = await dominoStore.entities.DominoGame.filter({ room_code: code });
-    const dominoRoom = Array.isArray(dominoes) ? dominoes[0] : null;
-    if (dominoRoom && String(dominoRoom.status || '').toLowerCase() !== 'finished') {
-      window.location.replace(`/games/dominoes?room=${encodeURIComponent(code)}`);
-      return true;
-    }
-  } catch {
-    // Fall through to the normal room-not-found message.
-  }
-
-  return false;
 }
 
 async function claimSpadesSeat(deviceId, roomCode, joinedPayload) {
@@ -227,108 +150,43 @@ export default function JoinRoom() {
       setError(null);
 
       try {
-        if (isNeonStaging) {
-          if (!isAuthenticated) {
-            const next = encodeURIComponent(`/join/${roomCode}`);
-            window.location.replace(`/login?next=${next}`);
-            return;
-          }
-
-          const payload = await tngApi.spectator.getState(roomCode);
-          if (cancelled) return;
-
-          if (!payload?.room?.gameId) {
-            if (await redirectSpecialGameRoom(roomCode)) return;
-            setError(`Room "${roomCode}" could not be loaded.`);
-            setLoadingRoom(false);
-            return;
-          }
-
-          setRoomInfo(payload.room);
-          setLoadingRoom(false);
+        if (!isAuthenticated) {
+          const next = encodeURIComponent(`/join/${roomCode}`);
+          window.location.replace(`/login?next=${next}`);
           return;
         }
 
-        if (isBase44Preview) {
-          if (!isAuthenticated) {
-            const next = encodeURIComponent(`/join/${roomCode}`);
-            window.location.replace(`/login?next=${next}`);
-            return;
-          }
+        const registeredRoom = await resolveTngRoom(roomCode);
+        if (cancelled) return;
 
-          let deviceId = await ensurePlayerDevice(user?.id);
-
-          try {
-            let payload = validatePlayerJoin(
-              await tngApi.player.joinRoom(deviceId, roomCode),
-              roomCode,
-            );
-
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
-            const gamePath = GAME_PATHS[payload.room?.gameId];
-
-            if (!gamePath) {
-              setError(`Unknown game type for room "${roomCode}".`);
-              setLoadingRoom(false);
-              return;
-            }
-
-            window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
-            return;
-          } catch (joinError) {
-            if (
-              joinError instanceof TngApiError &&
-              ['INVALID_PLAYER_DEVICE', 'PLAYER_DEVICE_REQUIRED'].includes(joinError.code)
-            ) {
-              localStorage.removeItem('tng_player_device_id');
-              deviceId = await ensurePlayerDevice(user?.id);
-
-              let payload = validatePlayerJoin(
-                await tngApi.player.joinRoom(deviceId, roomCode),
-                roomCode,
-              );
-
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
-
-              const gamePath = GAME_PATHS[payload.room?.gameId];
-              if (!gamePath) {
-                setError(`Unknown game type for room "${roomCode}".`);
-                setLoadingRoom(false);
-                return;
-              }
-
-              window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
-              return;
-            }
-
-            throw joinError;
-          }
-        }
-
-        const rooms = await base44.entities.GameRoom.filter({ room_code: roomCode });
-        if (!rooms || rooms.length === 0) {
-          if (await redirectSpecialGameRoom(roomCode)) return;
+        if (!registeredRoom) {
           setError(`Room "${roomCode}" not found. Check the code and try again.`);
           setLoadingRoom(false);
           return;
         }
 
-        const room = rooms[0];
-        const gamePath = GAME_PATHS[room.game_id];
-        if (!gamePath) {
-          setError(`Unknown game type for room "${roomCode}".`);
+        // Standalone games own their own join/seat screens. The registry gives
+        // us the destination directly, so /join/CODE no longer probes every
+        // game service one by one.
+        if (registeredRoom.kind === 'standalone') {
+          window.location.replace(registeredRoom.joinPath);
+          return;
+        }
+
+        // Core TNG rooms still use the central player/spectator lifecycle.
+        const payload = await tngApi.spectator.getState(roomCode);
+        if (cancelled) return;
+
+        if (!payload?.room?.gameId) {
+          setError(`Room "${roomCode}" could not be loaded.`);
           setLoadingRoom(false);
           return;
         }
 
-        window.location.replace(`${gamePath}?room=${roomCode}`);
+        setRoomInfo(payload.room);
+        setLoadingRoom(false);
       } catch (roomError) {
         if (cancelled) return;
-        if (await redirectSpecialGameRoom(roomCode)) return;
         setError(
           roomError?.message ||
           `Room "${roomCode}" could not be loaded. Check the code and try again.`,
@@ -342,7 +200,7 @@ export default function JoinRoom() {
     return () => {
       cancelled = true;
     };
-  }, [roomCode, user?.id, isAuthenticated, isLoadingAuth]);
+  }, [roomCode, isAuthenticated, isLoadingAuth]);
 
   async function joinGame() {
     if (!roomInfo || joining) return;
