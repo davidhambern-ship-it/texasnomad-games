@@ -40,8 +40,14 @@ export default function Login() {
     ? requestedNext
     : '/';
 
+  const tngSsoReturn = new URL('https://texasnomadgames.com/login');
+  tngSsoReturn.searchParams.set('sso', '1');
+  if (nextPath !== '/') tngSsoReturn.searchParams.set('next', nextPath);
+
   const bernaverseSsoUrl =
-    'https://bernaverse.hireberna.app/sso.html?app=tng';
+    `https://bernaverse.hireberna.app/sso.html?app=tng&return=${encodeURIComponent(tngSsoReturn.toString())}`;
+  const bernaverseSignupUrl =
+    `https://bernaverse.hireberna.app/?auth=signup&app=tng&return=${encodeURIComponent(tngSsoReturn.toString())}`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -182,7 +188,7 @@ export default function Login() {
       footer={
         <>
           New to TNG?{' '}
-          <a href="https://bernaverse.hireberna.app/?auth=signup&app=tng" style={{ color: '#BC13FE', fontWeight: 600 }}>Create your BERNAverse account</a>
+          <a href={bernaverseSignupUrl} style={{ color: '#BC13FE', fontWeight: 600 }}>Create your BERNAverse account</a>
         </>
       }
     >
