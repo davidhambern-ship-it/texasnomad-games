@@ -14,7 +14,8 @@ export default function WordWranglerGame() {
   const [params, setParams] = useSearchParams();
   const roomParam = (params.get('room') || '').toUpperCase();
   const validRoom = /^[A-Z]{5}$/.test(roomParam) ? roomParam : '';
-  const [screen, setScreen] = useState(validRoom ? 'online' : 'menu'); // menu | solo | cpu | pickcpu | online
+  const [launchedFromHost] = useState(() => params.get('host') === '1');
+  const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | solo | cpu | pickcpu | online
   const [dict, setDict] = useState(null);
   const [dictErr, setDictErr] = useState('');
   const [name, setName] = useState(loadName);
@@ -29,8 +30,20 @@ export default function WordWranglerGame() {
     return () => { alive = false; };
   }, []);
 
-  const toMenu = () => { setScreen('menu'); if (params.get('room')) setParams({}, { replace: true }); };
-  const setRoom = (c) => setParams(c ? { room: c } : {}, { replace: true });
+  const toMenu = () => {
+    if (launchedFromHost) {
+      window.location.replace('/host');
+      return;
+    }
+    setScreen('menu');
+    if (params.get('room')) setParams({}, { replace: true });
+  };
+  const setRoom = (c) => setParams(
+    c
+      ? { room: c, ...(launchedFromHost ? { host: '1' } : {}) }
+      : (launchedFromHost ? { host: '1' } : {}),
+    { replace: true },
+  );
 
   let body;
   if (!dict) {
@@ -45,7 +58,7 @@ export default function WordWranglerGame() {
   } else if (screen === 'cpu') {
     body = <WWSolo dict={dict} rival={rival} playerName={name || 'You'} onExit={toMenu} muted={muted} setMuted={setMuted} />;
   } else if (screen === 'online') {
-    body = <WWOnline dict={dict} code={validRoom} name={name} setName={(n) => { setName(n); }} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} />;
+    body = <WWOnline dict={dict} code={validRoom} name={name} setName={(n) => { setName(n); }} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
   } else if (screen === 'pickcpu') {
     body = (
       <div className="ww-menu">
