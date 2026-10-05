@@ -40,7 +40,10 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createBattleSudokuApi({ store = null } = {}) {
+export function createBattleSudokuApi({
+  store = null,
+  resolveIdentity = async () => null,
+} = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
   let lastSweep = Date.now();
@@ -181,9 +184,23 @@ export function createBattleSudokuApi({ store = null } = {}) {
         });
       }
       if (req.method === 'POST' && path === '/rooms') {
+        const hostIdentity = await resolveIdentity(req);
+        if (!hostIdentity?.accountId) {
+          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting BattleSudoku.');
+        }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
         const code = await newCode();
-        const room = { code, hostToken: newToken(), players: [], game: null, settings: { ...G.DEFAULTS }, createdAt: now, updatedAt: now };
+        const room = {
+          code,
+          hostToken: newToken(),
+          hostAccountId: hostIdentity.accountId,
+          hostName: hostIdentity.publicName || 'Host',
+          players: [],
+          game: null,
+          settings: { ...G.DEFAULTS },
+          createdAt: now,
+          updatedAt: now,
+        };
         await saveRoom(room, { force: true });
         const v = view(room, null, now); v.you = { isHost: true };
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
@@ -193,8 +210,22 @@ export function createBattleSudokuApi({ store = null } = {}) {
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
       if (!room) return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Game ${code} wasn’t found.` } });
-      const isHost = token && token === room.hostToken;
-      const findMe = () => (token && !isHost ? room.players.find(p => p.token === token) || null : null);
+      const tokenClaimsHost = Boolean(token && token === room.hostToken);
+      let requestIdentity = null;
+      if (token) requestIdentity = await resolveIdentity(req);
+
+      const isHost = Boolean(
+        tokenClaimsHost &&
+        requestIdentity?.accountId &&
+        (!room.hostAccountId || String(room.hostAccountId) === String(requestIdentity.accountId))
+      );
+
+      const findMe = () => (
+        token && !tokenClaimsHost
+          ? room.players.find(p => p.token === token) || null
+          : null
+      );
+
       if (room.game) G.tick(room.game, now);
 
       if (req.method === 'GET' && !m[2]) {
@@ -216,20 +247,51 @@ export function createBattleSudokuApi({ store = null } = {}) {
         if (room.game) G.tick(room.game, t);
         room.updatedAt = t;
         if (body.action === 'join') {
-          let me = findMe(), issued;
+          const identity = requestIdentity || await resolveIdentity(req);
+          if (!identity?.accountId || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining BattleSudoku.');
+          }
+
+          let me = findMe() || room.players.find(
+            p => String(p.accountId || '') === String(identity.accountId),
+          ) || null;
+          let issued;
+
           if (!me) {
-            const name = clean(body.name);
-            if (!name) throw err(400, 'NAME_REQUIRED', 'Type your name first.');
+            const name = clean(identity.publicName);
+            if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             if (room.players.filter(p => !p.cpu).length >= MAX_PLAYERS) throw err(409, 'FULL', 'This game is full.');
-            if (room.players.length >= MAX_PLAYERS) { const i = room.game ? -1 : room.players.findIndex(p => p.cpu); if (i < 0) throw err(409, 'FULL', 'This game is full.'); room.players.splice(i, 1); }
-            me = { id: newId(), name, token: newToken(), color: nextColor(room), lastSeen: t };
-            room.players.push(me); issued = me.token;
+            if (room.players.length >= MAX_PLAYERS) {
+              const i = room.game ? -1 : room.players.findIndex(p => p.cpu);
+              if (i < 0) throw err(409, 'FULL', 'This game is full.');
+              room.players.splice(i, 1);
+            }
+            me = {
+              id: newId(),
+              accountId: identity.accountId,
+              name,
+              token: newToken(),
+              color: nextColor(room),
+              lastSeen: t,
+            };
+            room.players.push(me);
+            issued = me.token;
+          } else if (!token || token !== me.token) {
+            me.name = clean(identity.publicName);
+            me.token = newToken();
+            issued = me.token;
           }
           me.lastSeen = t;
           await saveRoom(room, { force: true });
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const me = findMe();
+        if (me?.accountId) {
+          const identity = requestIdentity || await resolveIdentity(req);
+          if (!identity?.accountId || String(identity.accountId) !== String(me.accountId)) {
+            throw err(403, 'IDENTITY_MISMATCH', 'That BattleSudoku seat belongs to another TNG account.');
+          }
+        }
         const result = act(room, isHost ? 'host' : me, body, t);
         if (me) me.lastSeen = t;
         await saveRoom(room, { force: true });
