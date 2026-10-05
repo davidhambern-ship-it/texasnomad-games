@@ -338,7 +338,7 @@ export function createSeeThatApi({
           let issued;
 
           if (!me) {
-            const name = clean(identity.publicName);
+            const name = clean(identity.publicName, 32);
             if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             if (room.players.length >= MAX_PLAYERS) throw err(409, 'FULL', 'This game is full.');
             const used = new Set(room.players.map(p => p.color));
@@ -354,7 +354,7 @@ export function createSeeThatApi({
             room.players.push(me);
             issued = me.token;
           } else if (!token || token !== me.token) {
-            me.name = clean(identity.publicName);
+            me.name = clean(identity.publicName, 32);
             me.token = newToken();
             issued = me.token;
           }
