@@ -1,5 +1,3 @@
-import React from 'react';
-import { motion } from 'framer-motion';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
