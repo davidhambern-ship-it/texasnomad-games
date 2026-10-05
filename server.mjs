@@ -1264,6 +1264,7 @@ const handleWordWranglerApi = createWordWranglerApi({
 const handleBattleSudokuApi = createBattleSudokuApi({
   store: battleSudokuRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
 });
 
 const HOST_LIVE_GAME_PATHS = {
