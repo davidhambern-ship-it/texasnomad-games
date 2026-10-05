@@ -266,6 +266,7 @@ export function createRoomRegistry(pool) {
           service,
           room_kind: 'standalone',
           join_path: `/viral/index.html?join=${encodeURIComponent(code)}`,
+          spectate_path: `/viral/index.html?display=${encodeURIComponent(code)}`,
           host_account_id: hostAccountId,
           expires_at: row.expires_at,
         });
