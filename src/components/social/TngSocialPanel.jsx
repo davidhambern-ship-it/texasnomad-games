@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, Check, Mail, MessageCircle, Search, Send, UserPlus, Users, X } from 'lucide-react';
+import { Bell, MessageCircle, Search, Send, UserPlus, Users } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
 import { getPublicTngName } from '@/lib/publicTngName';
