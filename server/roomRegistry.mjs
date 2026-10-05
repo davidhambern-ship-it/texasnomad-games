@@ -346,7 +346,11 @@ export function createRoomRegistry(pool) {
         if (registered.service === 'core') {
           const core = await loadCoreRoom(code);
           if (!core) {
-            await this.close(code);
+            await pool.query(
+              `delete from public.tng_room_registry
+               where room_code = $1 and service = 'core'`,
+              [code],
+            );
             return null;
           }
         }
