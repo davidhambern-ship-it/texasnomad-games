@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getCardBack } from '@/lib/spadesCardImages';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
