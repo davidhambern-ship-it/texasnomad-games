@@ -33,6 +33,9 @@ export function createViralLive({
   verifyHostAuthorization = async () => null,
   resolvePlayerIdentity = async () => null,
   recordResults = async () => ({ recorded: 0 }),
+  claimRoomCode = async () => true,
+  touchRoomCode = async () => {},
+  releaseRoomCode = async () => {},
   store = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
@@ -87,6 +90,10 @@ export function createViralLive({
       playerAccounts: r.playerAccounts || {},
       gameSerial: Math.max(1, Number(r.gameSerial || 1)),
       updatedAt,
+    });
+
+    await touchRoomCode(name.slice(6).toUpperCase(), {
+      ttlMs: KEEP_STATE_MS,
     });
 
     r.updatedAt = updatedAt;
@@ -278,6 +285,30 @@ export function createViralLive({
             return;
           }
 
+          const publicCode = roomName.slice(6).toUpperCase();
+          const claimed = await claimRoomCode({
+            code: publicCode,
+            gameId: 'viral',
+            service: 'viral-live',
+            kind: 'standalone',
+            joinPath: `/viral/index.html?join=${encodeURIComponent(publicCode)}`,
+            spectatePath: null,
+            hostAccountId: accountId,
+            ttlMs: KEEP_STATE_MS,
+          });
+
+          if (!claimed) {
+            me.presence = clean;
+            send(ws, {
+              t: 'msg',
+              topic: '__tng_host_auth',
+              data: { ok: false, code: 'ROOM_CODE_TAKEN' },
+              from: 'tng',
+            });
+            broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
+            return;
+          }
+
           clean.role = 'host';
           r.hostAccountId = accountId;
           r.hostId = id;
@@ -343,6 +374,7 @@ export function createViralLive({
         rooms.delete(roomName);
         lastCheckpoint.delete(roomName);
         if (store) store.remove(roomName).catch(() => {});
+        releaseRoomCode(roomName.slice(6).toUpperCase(), 'viral-live').catch(() => {});
       }
     });
     ws.on('error', () => {});
@@ -361,6 +393,7 @@ export function createViralLive({
         rooms.delete(name);
         lastCheckpoint.delete(name);
         if (store) await store.remove(name).catch(() => {});
+        await releaseRoomCode(name.slice(6).toUpperCase(), 'viral-live').catch(() => {});
       }
     }
 
