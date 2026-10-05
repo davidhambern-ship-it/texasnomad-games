@@ -31,11 +31,18 @@ export default function SeeThatGame() {
 
   useEffect(() => { loadSceneList().then(setScenes).catch(() => setScenes([])); }, []);
   const toMenu = () => { setScreen('menu'); setPractice(null); setParams({}, { replace: true }); };
+  const leaveHost = () => {
+    if (directHost) {
+      window.location.replace('/host');
+      return;
+    }
+    toMenu();
+  };
 
   if (display) return <div className="st-root"><STDisplay code={display} scenes={scenes} /></div>;
 
   let body;
-  if (screen === 'host') body = <STHost scenes={scenes} onExit={toMenu} />;
+  if (screen === 'host') body = <STHost scenes={scenes} onExit={leaveHost} />;
   else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <STPlayer code={room} name={name} setName={setName} onExit={toMenu} />;
   else if (screen === 'editor') body = <STEditor onExit={toMenu} />;
   else if (screen === 'practice' && practice) body = <STPractice key={practice.k} scene={practice.scene} imageUrl={practice.scene.__img} count={10} seconds={120} name={name || 'You'} onExit={toMenu} />;
