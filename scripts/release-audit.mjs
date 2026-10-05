@@ -136,6 +136,16 @@ ok(
 );
 
 ok(
+  'retired template dependencies removed',
+  !pkg.dependencies?.['react-quill'] &&
+    !pkg.dependencies?.moment &&
+    !pkg.dependencies?.lodash &&
+    !pkg.dependencies?.['tailwindcss-animate'] &&
+    Boolean(pkg.devDependencies?.['tailwindcss-animate']),
+  'Unused editor/date/direct-lodash dependencies or runtime Tailwind tooling were reintroduced',
+);
+
+ok(
   'dead Base44 room hook removed',
   !(await exists('src/hooks/useGameRoom.js')),
   'src/hooks/useGameRoom.js should stay retired',
