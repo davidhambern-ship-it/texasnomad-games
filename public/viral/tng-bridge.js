@@ -181,6 +181,130 @@
     };
   }
 
+  function installHostAuthorizationBridge() {
+    if (
+      window.__TNG_VIRAL_HOST_AUTH_BRIDGED__ ||
+      !window.claude ||
+      typeof window.claude.use !== 'function'
+    ) {
+      return;
+    }
+
+    const originalUse = window.claude.use.bind(window.claude);
+
+    window.claude.use = async function useWithTngHostAuth(kind) {
+      const api = await originalUse(kind);
+      if (kind !== 'room' || !api || typeof api.join !== 'function') return api;
+
+      return new Proxy(api, {
+        get(target, prop, receiver) {
+          if (prop !== 'join') {
+            const value = Reflect.get(target, prop, receiver);
+            return typeof value === 'function' ? value.bind(target) : value;
+          }
+
+          return async function joinWithTngHostAuth(roomName) {
+            const connection = await target.join(roomName);
+            if (!connection || typeof connection.presence !== 'function') {
+              return connection;
+            }
+
+            const originalPresence = connection.presence.bind(connection);
+
+            return new Proxy(connection, {
+              get(conn, key, connReceiver) {
+                if (key !== 'presence') {
+                  const value = Reflect.get(conn, key, connReceiver);
+                  return typeof value === 'function' ? value.bind(conn) : value;
+                }
+
+                return async function authorizedPresence(presence) {
+                  const payload =
+                    presence && typeof presence === 'object'
+                      ? { ...presence }
+                      : {};
+
+                  if (payload.role !== 'host') {
+                    return originalPresence(payload);
+                  }
+
+                  window.TNG_VIRAL_HOST_AUTH = 'verifying';
+
+                  const token = await getHostAuthToken().catch(() => '');
+                  let deviceId = '';
+                  try {
+                    deviceId = String(
+                      window.localStorage.getItem('tng_device_id') || '',
+                    ).trim();
+                  } catch {}
+
+                  if (!token || !deviceId) {
+                    window.TNG_VIRAL_HOST_AUTH = 'denied';
+                    throw new Error(
+                      'VIRAL Host mode requires an active TNG Host Controller.',
+                    );
+                  }
+
+                  payload._tngHostAuth = { token, deviceId };
+
+                  return new Promise((resolve, reject) => {
+                    let settled = false;
+                    let unsubscribe = () => {};
+
+                    const finish = (ok, message) => {
+                      if (settled) return;
+                      settled = true;
+                      window.clearTimeout(timer);
+                      try { unsubscribe(); } catch {}
+
+                      window.TNG_VIRAL_HOST_AUTH = ok ? 'verified' : 'denied';
+
+                      if (ok) {
+                        resolve();
+                      } else {
+                        reject(new Error(message || 'TNG Host authorization failed.'));
+                      }
+                    };
+
+                    const timer = window.setTimeout(() => {
+                      finish(false, 'TNG Host authorization timed out.');
+                    }, 7000);
+
+                    try {
+                      unsubscribe = connection.on('__tng_host_auth', (message) => {
+                        const data = message?.data || {};
+                        if (data.ok === true) {
+                          finish(true);
+                          return;
+                        }
+
+                        if (data.code === 'ROOM_HOST_OWNED') {
+                          finish(false, 'That VIRAL room is already owned by another TNG Host.');
+                          return;
+                        }
+
+                        finish(false, 'This browser is not authorized as the TNG Host.');
+                      });
+                    } catch {
+                      finish(false, 'TNG Host authorization could not start.');
+                      return;
+                    }
+
+                    originalPresence(payload).catch((error) => {
+                      finish(false, error?.message || 'TNG Host authorization could not be sent.');
+                    });
+                  });
+                };
+              },
+            });
+          };
+        },
+      });
+    };
+
+    window.__TNG_VIRAL_HOST_AUTH_BRIDGED__ = true;
+  }
+
   function revealOnlineTabs() {
     if (document.getElementById('tng-viral-online-tabs')) return;
     const style = document.createElement('style');
@@ -705,6 +829,7 @@
 
   function boot() {
     installClaudeCompatibilityBridge();
+    installHostAuthorizationBridge();
 
     if (!requestedDisplay) {
       revealOnlineTabs();
