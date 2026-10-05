@@ -43,9 +43,11 @@ function send(res, status, payload) {
 export function createBattleSudokuApi({
   store = null,
   resolveIdentity = async () => null,
+  recordResults = async () => ({ recorded: 0 }),
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
+  const recordedSessions = new Set();
   let lastSweep = Date.now();
 
   async function loadRoom(code) {
@@ -57,9 +59,51 @@ export function createBattleSudokuApi({
     return room;
   }
 
+  async function maybeRecordResults(room) {
+    const game = room?.game;
+    if (!room?.code || !game || game.phase !== 'final') return;
+
+    const sessionKey = String(game.seed || '').trim();
+    if (!sessionKey || recordedSessions.has(sessionKey)) return;
+
+    const results = room.players
+      .filter((player) => (
+        !player.cpu &&
+        player.accountId &&
+        game.players?.[player.id]
+      ))
+      .map((player) => ({
+        accountId: player.accountId,
+        score: Number(game.players[player.id]?.score || 0),
+        won: String(game.winner || '') === String(player.id),
+      }));
+
+    if (!results.length) {
+      recordedSessions.add(sessionKey);
+      return;
+    }
+
+    try {
+      await recordResults({
+        gameId: 'sudoku',
+        sessionKey,
+        roomCode: room.code,
+        results,
+      });
+      recordedSessions.add(sessionKey);
+    } catch (error) {
+      // Stats must never break the live game. Leave the session unmarked so a
+      // later room poll/action retries the idempotent recorder.
+      console.warn('[battle-sudoku] result recording failed', error?.message || error);
+    }
+  }
+
   async function saveRoom(room, { force = false } = {}) {
     if (!room?.code) return;
     rooms.set(room.code, room);
+
+    await maybeRecordResults(room);
+
     if (!store) return;
 
     const now = Date.now();
