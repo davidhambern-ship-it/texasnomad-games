@@ -1,10 +1,16 @@
 // Client for See That?! party rooms (server.mjs → server/seeThatApi.mjs)
+import { getNeonAuthToken } from '@/lib/neonAuth';
+
 const IS_RAILWAY_TEMP_HOST =
   typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app');
 
+const ST_SERVICE_ORIGIN =
+  import.meta.env.VITE_ST_SERVICE_ORIGIN ||
+  (IS_RAILWAY_TEMP_HOST ? '' : 'https://tng-live-production.up.railway.app');
+
 export const ST_API_BASE =
   import.meta.env.VITE_ST_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST ? '/st-api' : 'https://tng-live-production.up.railway.app/st-api');
+  `${ST_SERVICE_ORIGIN}/st-api`;
 
 export class STApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'STApiError'; this.status = status; this.code = code; }
@@ -47,6 +53,42 @@ export async function loadScene(id) {
   const r = await fetch(`/see-that/scenes/${encodeURIComponent(id)}.json`, { cache: 'no-store' });
   if (!r.ok) throw new Error('Scene not found');
   return r.json();
+}
+
+async function displayClaimRequest(method, roomCode = '', forceRefresh = false) {
+  const token = await getNeonAuthToken({ forceRefresh }).catch(() => '');
+  if (!token) return { ok: false, displayAttached: false, reason: 'no-auth' };
+
+  const response = await fetch(`${ST_SERVICE_ORIGIN}/see-that-display`, {
+    method,
+    keepalive: method === 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: method === 'POST' ? JSON.stringify({ roomCode }) : undefined,
+  }).catch(() => null);
+
+  if (response?.status === 401 && !forceRefresh) {
+    return displayClaimRequest(method, roomCode, true);
+  }
+
+  if (!response) return { ok: false, displayAttached: false, reason: 'network' };
+  const payload = await response.json().catch(() => ({}));
+  return { ...payload, ok: response.ok && payload?.ok !== false };
+}
+
+export function claimSeeThatDisplay(roomCode) {
+  const code = String(roomCode || '').trim().toUpperCase();
+  if (!/^[A-Z]{5}$/.test(code)) {
+    return Promise.resolve({ ok: false, displayAttached: false, reason: 'bad-code' });
+  }
+  return displayClaimRequest('POST', code);
+}
+
+export function releaseSeeThatDisplay() {
+  return displayClaimRequest('DELETE');
 }
 
 export const stSeat = {
