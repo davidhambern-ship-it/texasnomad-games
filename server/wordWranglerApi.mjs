@@ -66,6 +66,9 @@ export function createWordWranglerApi({
   store = null,
   resolveIdentity = async () => null,
   recordResults = async () => ({ recorded: 0 }),
+  claimRoomCode = async () => true,
+  touchRoomCode = async () => {},
+  releaseRoomCode = async () => {},
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
@@ -129,6 +132,7 @@ export function createWordWranglerApi({
     if (!force && now - last < 3000) return;
 
     await store.save(room.code, room);
+    await touchRoomCode(room.code, { ttlMs: ROOM_TTL_MS });
     lastCheckpoint.set(room.code, now);
   }
 
@@ -152,36 +156,30 @@ export function createWordWranglerApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async () => {
+  const newCode = async (hostAccountId) => {
     for (let i = 0; i < 50; i++) {
       const c = Array.from(
         { length: 5 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
-      if (!(await roomExists(c))) return c;
-    }
-    throw err(503, 'NO_CODE', 'Try again in a moment.');
-  };
 
-  // advance the room clock: countdown → playing → over, and let CPUs play
-  function tick(room, now = Date.now()) {
-    if (room.phase === 'countdown' && now >= room.startsAt) room.phase = 'playing';
-    if (room.phase === 'playing' || (room.phase === 'over' && room.cpuPending)) {
-      const until = Math.min(now, room.endsAt);
-      const D = room.players.some(p => p.isAI) ? dictionary() : null;
-      for (const p of room.players) {
-        if (!p.isAI || !p.st) continue;
-        for (let guard = 0; guard < 40 && p.nextAt <= until; guard++) {
-          const pick = E.cpuPickWord(p.st, D.trie, p.level, { common: D.common });
-          if (pick) { const r = E.applyWord(p.st, pick.path, D.dict); if (r.ok) { p.st = r.state; p.last = { w: r.word, p: r.points, at: p.nextAt }; } }
-          else p.st = E.shuffleBoard(p.st);
-          p.nextAt += E.cpuDelayMs(p.level);
-        }
-      }
-      room.cpuPending = false;
+      if (await roomExists(c)) continue;
+
+      const claimed = await claimRoomCode({
+        code: c,
+        gameId: 'word-wrangler',
+        service: 'word-wrangler',
+        kind: 'standalone',
+        joinPath: '/games/word-wrangler?room=' + encodeURIComponent(c),
+        spectatePath: null,
+        hostAccountId,
+        ttlMs: ROOM_TTL_MS,
+      });
+
+      if (claimed) return c;
     }
-    if (room.phase === 'playing' && now >= room.endsAt) room.phase = 'over';
-  }
+    throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
+  };
 
   function pubPlayer(room, p, now, reveal) {
     const st = p.st;
@@ -307,7 +305,7 @@ export function createWordWranglerApi({
         const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode();
+        const code = await newCode(hostIdentity.accountId);
         const host = {
           id: newId(),
           accountId: identity.accountId,
@@ -318,7 +316,12 @@ export function createWordWranglerApi({
           lastSeen: now,
         };
         const room = { code, phase: 'lobby', round: 0, duration: 150, seed: null, startsAt: 0, endsAt: 0, hostId: host.id, players: [host], createdAt: now, updatedAt: now };
-        await saveRoom(room, { force: true });
+        try {
+          await saveRoom(room, { force: true });
+        } catch (error) {
+          await releaseRoomCode(room.code, 'word-wrangler').catch(() => {});
+          throw error;
+        }
         return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
       }
 
