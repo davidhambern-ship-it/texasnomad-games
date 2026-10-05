@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import WWSolo from '@/components/wordWrangler/WWSolo';
-import WWOnline from '@/components/wordWrangler/WWOnline';
+import WWOnline, { WWDisplay } from '@/components/wordWrangler/WWOnline';
 import WWIcon from '@/components/wordWrangler/WWIcons';
 import { Avatar, RIVALS, loadBest } from '@/components/wordWrangler/WWShared';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
@@ -15,6 +15,8 @@ export default function WordWranglerGame() {
   const [params, setParams] = useSearchParams();
   const roomParam = (params.get('room') || '').toUpperCase();
   const validRoom = /^[A-Z]{5}$/.test(roomParam) ? roomParam : '';
+  const displayParam = (params.get('display') || '').toUpperCase();
+  const validDisplay = /^[A-Z]{5}$/.test(displayParam) ? displayParam : '';
   const [launchedFromHost] = useState(() => params.get('host') === '1');
   const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | solo | cpu | pickcpu | online
   const [dict, setDict] = useState(null);
@@ -46,6 +48,16 @@ export default function WordWranglerGame() {
       : (launchedFromHost ? { host: '1' } : {}),
     { replace: true },
   );
+
+  if (validDisplay) {
+    return (
+      <div className="ww-root">
+        <div className="ww-wrap">
+          <WWDisplay code={validDisplay} />
+        </div>
+      </div>
+    );
+  }
 
   let body;
   if (!dict) {
