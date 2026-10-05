@@ -31,6 +31,7 @@ const TOPICS = new Set(['state', 'act']);
 export function createViralLive({
   isAllowedOrigin = () => true,
   verifyHostAuthorization = async () => null,
+  resolvePlayerIdentity = async () => null,
   store = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
@@ -114,8 +115,51 @@ export function createViralLive({
         const p = m.p && typeof m.p === 'object' ? m.p : {};
         const clean = {};
 
-        if (typeof p.seat === 'string' && p.seat.length <= 24) clean.seat = p.seat;
-        if (typeof p.name === 'string') clean.name = p.name.slice(0, 24);
+        if (p.role !== 'host' && typeof p.seat === 'string' && p.seat.length <= 24) {
+          const playerAuth =
+            p._tngPlayerAuth && typeof p._tngPlayerAuth === 'object'
+              ? p._tngPlayerAuth
+              : {};
+
+          let identity = null;
+          try {
+            identity = await resolvePlayerIdentity({
+              token: String(playerAuth.token || ''),
+              roomName,
+              request: req,
+            });
+          } catch {
+            identity = null;
+          }
+
+          if (!identity?.accountId || !identity?.publicName) {
+            me.presence = {};
+            send(ws, {
+              t: 'msg',
+              topic: '__tng_player_auth',
+              data: { ok: false, code: 'PLAYER_AUTH_REQUIRED' },
+              from: 'tng',
+            });
+            broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
+            return;
+          }
+
+          // One signed-in TNG account owns at most one online VIRAL seat.
+          for (const [peerId, peer] of r.peers) {
+            if (
+              peerId !== id &&
+              String(peer.presence?.accountId || '') === String(identity.accountId)
+            ) {
+              peer.presence = {};
+            }
+          }
+
+          clean.seat = p.seat;
+          clean.name = String(identity.publicName).slice(0, 24);
+          clean.accountId = String(identity.accountId);
+        } else if (typeof p.name === 'string') {
+          clean.name = p.name.slice(0, 24);
+        }
 
         if (p.role === 'host') {
           const hostAuth =
@@ -179,6 +223,14 @@ export function createViralLive({
         }
 
         me.presence = clean;
+        if (clean.seat && clean.accountId) {
+          send(ws, {
+            t: 'msg',
+            topic: '__tng_player_auth',
+            data: { ok: true, seat: clean.seat, name: clean.name },
+            from: 'tng',
+          });
+        }
         broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
         return;
       }
