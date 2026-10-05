@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { generateRoomCode, getDefaultGameState } from '@/lib/roomUtils';
 import { base44 } from '@/api/base44Client';
 
-const VIRAL_CABINET_IMAGE = 'https://raw.githubusercontent.com/davidhambern-ship-it/texasnomad-games/main/VIRAL_Cabinet_Image.png';
+const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
 // This list is the single source of truth for ALL games on the platform.
 // When a new game is added, add it here and it automatically appears in the Host Panel.
