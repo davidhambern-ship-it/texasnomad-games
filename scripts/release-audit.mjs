@@ -24,6 +24,7 @@ async function exists(path) {
 const [
   app,
   games,
+  hostPanel,
   tngApi,
   main,
   display,
@@ -36,6 +37,7 @@ const [
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
+  text('src/pages/PreviewHostPanel.jsx'),
   text('src/api/tngApi.js'),
   text('src/main.jsx'),
   text('src/pages/GameDisplay.jsx'),
@@ -167,6 +169,15 @@ ok(
   display.includes('let inFlight = false;') &&
     display.includes("setStatus('reconnecting')"),
   'Display/Spectator recovery polling is missing',
+);
+
+ok(
+  'Host-only mode separated from legacy test state',
+  hostPanel.includes('function readHostDisplayMode()') &&
+    hostPanel.includes("localStorage.removeItem('tng_player_test_mode')") &&
+    !hostPanel.includes('resumeTestRoom') &&
+    !hostPanel.includes('playerTestMode'),
+  'Host-only production mode is still coupled to the legacy player-test flag',
 );
 
 ok(
