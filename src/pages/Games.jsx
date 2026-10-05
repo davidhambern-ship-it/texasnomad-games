@@ -253,7 +253,14 @@ function ConstructionCabinet({ game, onOpen }) {
           <img src={game.image} alt={game.title} className="h-full w-full object-cover opacity-55 transition-transform duration-300 group-hover:scale-105 group-hover:opacity-75" />
         ) : game.screenComponent ? (
           <div className="h-full w-full opacity-55">{game.screenComponent}</div>
-        ) : null}
+        ) : (
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 opacity-70" style={{ color: game.color }}>
+            <div className="text-5xl drop-shadow-[0_0_18px_currentColor]">{game.constructionIcon || '🎮'}</div>
+            <div className="px-4 text-center text-[9px] tracking-[0.2em] uppercase" style={{ fontFamily: "'Press Start 2P', monospace", textShadow: '0 0 12px currentColor' }}>
+              {game.screenText || game.title}
+            </div>
+          </div>
+        )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#050208] via-transparent to-transparent" />
         <div className="absolute left-3 top-3 rounded-full border border-[#FFD700]/45 bg-black/75 px-3 py-1 text-[6px] tracking-widest text-[#FFD700] uppercase" style={{ fontFamily: "'Press Start 2P', monospace" }}>
           🚧 IN CONSTRUCTION
@@ -499,6 +506,76 @@ const GAMES = [
     featured: false,
   },
   {
+    id: 'uno',
+    title: 'UNO',
+    tagline: 'Match · Reverse · Draw · Shout UNO',
+    color: '#ef4444',
+    color2: '#facc15',
+    marqueeText: 'MATCH THE COLOR • MATCH THE NUMBER • HIT THEM WITH ACTION CARDS • GET TO ONE',
+    screenText: 'UNO',
+    constructionIcon: '🟥',
+    description: 'The fast card-shedding game where you match by color or number, use action cards to flip the momentum, and try to empty your hand before everybody else.',
+    tags: ['Card Game', 'Party', 'Fast Play'],
+    path: '/games/uno',
+    featured: false,
+  },
+  {
+    id: 'poker',
+    title: 'Poker',
+    tagline: 'Read the Table · Build the Hand',
+    color: '#22c55e',
+    color2: '#facc15',
+    marqueeText: 'READ THE TABLE • BET SMART • BUILD YOUR HAND • TAKE THE POT',
+    screenText: '♠ POKER',
+    constructionIcon: '♠️',
+    description: 'A TNG poker table built around Texas Hold’em-style play: private cards, shared community cards, betting rounds, bluffing, and one pot everybody wants.',
+    tags: ['Cards', 'Strategy', 'Table Game'],
+    path: '/games/poker',
+    featured: false,
+  },
+  {
+    id: 'bowling',
+    title: 'Bowling',
+    tagline: 'Line It Up · Let It Roll',
+    color: '#38bdf8',
+    color2: '#f472b6',
+    marqueeText: 'LINE IT UP • PICK YOUR POWER • ROLL THE BALL • CHASE THE STRIKE',
+    screenText: '🎳 BOWLING',
+    constructionIcon: '🎳',
+    description: 'Digital lane bowling for TNG. Set your line, control the throw, knock down pins, and battle through full frames for the highest score.',
+    tags: ['Sports', 'Turn Based', 'Party'],
+    path: '/games/bowling',
+    featured: false,
+  },
+  {
+    id: 'snake',
+    title: 'Snake',
+    tagline: 'Eat · Grow · Don’t Crash',
+    color: '#4ade80',
+    color2: '#a3e635',
+    marqueeText: 'EAT • GROW • TURN FAST • DON’T HIT THE WALL • OUTLAST THEM',
+    screenText: '🐍 SNAKE',
+    constructionIcon: '🐍',
+    description: 'The classic arcade survival game rebuilt for TNG: keep moving, collect food, grow longer, avoid collisions, and survive longer than the competition.',
+    tags: ['Arcade', 'Quick Play', 'Competitive'],
+    path: '/games/snake',
+    featured: false,
+  },
+  {
+    id: 'phase-10',
+    title: 'Phase 10',
+    tagline: 'Complete the Phase · Move Ahead',
+    color: '#818cf8',
+    color2: '#fb923c',
+    marqueeText: 'BUILD SETS • BUILD RUNS • COMPLETE THE PHASE • MOVE TO THE NEXT',
+    screenText: '🔟 PHASE 10',
+    constructionIcon: '🔟',
+    description: 'A progressive card game where every hand gives you a specific combination to complete. Finish your phase to advance; miss it and you stay behind while everybody else moves on.',
+    tags: ['Card Game', 'Progression', 'Party'],
+    path: '/games/phase-10',
+    featured: false,
+  },
+  {
     id: 'txd',
     title: 'TND — TexasNomad Dominoes',
     tagline: 'Texas Domino Showdown',
@@ -514,9 +591,49 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = [];
+const IN_CONSTRUCTION_IDS = ['uno', 'poker', 'bowling', 'snake', 'phase-10'];
 
 const CONSTRUCTION_DETAILS = {
+  uno: {
+    status: 'Live multiplayer table flow + action-card timing',
+    how: [
+      'Each player starts with a hand and plays a card that matches the current color or number.',
+      'Action cards can skip a turn, reverse play, force draws, or change the active color and swing the whole round.',
+      'The first player to empty their hand wins the round — but getting down to one card means you need to call UNO before somebody catches you.',
+    ],
+  },
+  poker: {
+    status: 'Texas Hold’em table, betting controls + private player hands',
+    how: [
+      'Each player gets private cards while the table reveals shared community cards over several betting rounds.',
+      'Players can check, bet, call, raise or fold while trying to build the strongest five-card hand — or convince everybody else they already have it.',
+      'The pot goes to the last player standing after folds or to the best hand at showdown.',
+    ],
+  },
+  bowling: {
+    status: 'Lane physics, shot control + frame scoring',
+    how: [
+      'Players take turns setting the angle and power of each throw before sending the ball down the lane.',
+      'Pins react to the shot and the game tracks strikes, spares, open frames and the standard running score.',
+      'After the final frame, the player with the highest total takes the lane.',
+    ],
+  },
+  snake: {
+    status: 'Responsive movement, collision rules + multiplayer race modes',
+    how: [
+      'Your snake moves constantly while you steer around the board and collect food to grow longer.',
+      'Running into a wall, yourself, or another dangerous trail can end the run, so every extra segment makes survival harder.',
+      'TNG modes can turn the classic score chase into simultaneous survival races where the last snake alive — or highest score — wins.',
+    ],
+  },
+  'phase-10': {
+    status: 'Card engine, phase tracking + round progression',
+    how: [
+      'Every round gives players a required card combination such as sets, runs, or cards of the same color.',
+      'Complete your current phase, lay it down, and work to get rid of the rest of your hand before the round ends.',
+      'Players who finish their phase advance to the next challenge; players who do not must repeat that phase next round.',
+    ],
+  },
   txd: {
     status: 'Domino placement + table geometry',
     how: [
