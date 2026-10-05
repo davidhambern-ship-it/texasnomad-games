@@ -41,10 +41,11 @@ async function request(path = '', {
     ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
   };
 
+  const authToken = await getNeonAuthToken().catch(() => '');
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
   if (host) {
-    const token = await getNeonAuthToken().catch(() => '');
     const deviceId = readLocal('tng_device_id');
-    if (token) headers.Authorization = `Bearer ${token}`;
     if (deviceId) headers['X-TNG-Device-ID'] = deviceId;
 
     const savedHostToken = readLocal(hostTokenKey(roomCode));
@@ -120,11 +121,11 @@ const DominoGame = {
     return payload?.game || null;
   },
 
-  async join(roomCode, seat, name) {
+  async join(roomCode, seat) {
     const code = String(roomCode || '').trim().toUpperCase();
     const payload = await request('/join', {
       method: 'POST',
-      body: { roomCode: code, seat, name },
+      body: { roomCode: code, seat },
       roomCode: code,
     });
 
