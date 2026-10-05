@@ -1570,7 +1570,27 @@ async function resolveAuthenticatedTngAccount(req) {
   return { ok: true, account, profile };
 }
 
+const TNG_IDENTITY_CACHE_TTL_MS = 30 * 1000;
+const tngIdentityCache = new Map();
+
+function pruneTngIdentityCache(now = Date.now()) {
+  if (tngIdentityCache.size < 250) return;
+  for (const [key, entry] of tngIdentityCache) {
+    if (Number(entry?.expiresAt || 0) <= now) tngIdentityCache.delete(key);
+  }
+}
+
 async function resolveAuthenticatedTngIdentity(req) {
+  const authKey = String(req?.headers?.authorization || '').trim();
+  const now = Date.now();
+
+  if (authKey) {
+    const cached = tngIdentityCache.get(authKey);
+    if (cached && Number(cached.expiresAt || 0) > now) {
+      return cached.value;
+    }
+    if (cached) tngIdentityCache.delete(authKey);
+  }
   const resolved = await resolveAuthenticatedTngAccount(req);
   if (!resolved.ok) return resolved;
 
@@ -1607,7 +1627,7 @@ async function resolveAuthenticatedTngIdentity(req) {
 
   const publicName = rawHandle ? `@${rawHandle}` : fallbackName;
 
-  return {
+  const result = {
     ...resolved,
     profile: mergedProfile,
     identity: {
@@ -1616,6 +1636,16 @@ async function resolveAuthenticatedTngIdentity(req) {
       publicName,
     },
   };
+
+  if (authKey) {
+    pruneTngIdentityCache(now);
+    tngIdentityCache.set(authKey, {
+      value: result,
+      expiresAt: now + TNG_IDENTITY_CACHE_TTL_MS,
+    });
+  }
+
+  return result;
 }
 
 async function resolveStandaloneGameIdentity(req) {
