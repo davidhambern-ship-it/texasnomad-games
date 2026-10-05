@@ -1,11 +1,7 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 // Client for BattleSudoku party rooms (server.mjs → server/battleSudokuApi.mjs)
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app');
-
-export const BS_API_BASE =
-  import.meta.env.VITE_BS_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST ? '/bs-api' : 'https://tng-live-production.up.railway.app/bs-api');
+export const BS_API_BASE = tngServiceUrl('/bs-api');
 
 export class BSApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'BSApiError'; this.status = status; this.code = code; }
