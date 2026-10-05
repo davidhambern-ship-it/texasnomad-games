@@ -5173,6 +5173,28 @@ async function verifyDominoHostRequest(req, row = null) {
   return verified;
 }
 
+const DOMINO_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function syncDominoRoomRegistry(row, state) {
+  if (!row?.room_code) return;
+
+  const phase = String(state?.phase || '').toLowerCase();
+  const status = String(state?.status || '').toLowerCase();
+  const finished =
+    ['finished', 'completed', 'closed'].includes(status) ||
+    ['game_over', 'game-over', 'finished', 'completed'].includes(phase);
+
+  if (finished) {
+    await roomRegistry.close(row.room_code);
+    return;
+  }
+
+  await roomRegistry.touch(row.room_code, {
+    ttlMs: DOMINO_ROOM_TTL_MS,
+    status: 'live',
+  });
+}
+
 async function maybeRecordDominoResults(row, state) {
   if (!row || !state) return;
 
@@ -5270,6 +5292,9 @@ async function handleDominoApi(req, res) {
     const access = dominoSeatAccess(row, readDominoToken(req));
     const safeState = sanitizeDominoStateForViewer(row.game_state, access);
 
+    await roomRegistry.resolve(roomCode);
+    await syncDominoRoomRegistry(row, row.game_state);
+
     sendJson(res, 200, {
       games: [serializeDominoRow(row, safeState)],
       access: access
@@ -5297,6 +5322,27 @@ async function handleDominoApi(req, res) {
     if (!data || !/^[A-Z0-9]{5,8}$/.test(roomCode)) {
       sendJson(res, 400, {
         error: { code: 'ROOM_REQUIRED', message: 'A valid Domino room code is required.' },
+      });
+      return;
+    }
+
+    const registryClaimed = await roomRegistry.claim({
+      code: roomCode,
+      gameId: 'dominoes',
+      service: 'dominoes',
+      kind: 'standalone',
+      joinPath: `/games/dominoes?room=${encodeURIComponent(roomCode)}`,
+      spectatePath: null,
+      hostAccountId: verifiedHost.accountId,
+      ttlMs: DOMINO_ROOM_TTL_MS,
+    });
+
+    if (!registryClaimed) {
+      sendJson(res, 409, {
+        error: {
+          code: 'ROOM_CODE_TAKEN',
+          message: 'That TNG room code is already in use. Create another room.',
+        },
       });
       return;
     }
@@ -5347,6 +5393,7 @@ async function handleDominoApi(req, res) {
         hostToken,
       });
     } catch (error) {
+      await roomRegistry.release(roomCode, 'dominoes').catch(() => {});
       if (error?.code === '23505') {
         sendJson(res, 409, {
           error: {
@@ -5657,6 +5704,10 @@ async function handleDominoApi(req, res) {
         updated.rows[0],
         updated.rows[0].game_state,
       );
+      await syncDominoRoomRegistry(
+        updated.rows[0],
+        updated.rows[0].game_state,
+      );
 
       sendJson(res, 200, {
         game: serializeDominoRow(
@@ -5752,6 +5803,10 @@ async function handleDominoApi(req, res) {
     );
 
     await maybeRecordDominoResults(
+      result.rows[0],
+      result.rows[0].game_state,
+    );
+    await syncDominoRoomRegistry(
       result.rows[0],
       result.rows[0].game_state,
     );
