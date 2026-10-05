@@ -77,7 +77,17 @@ const sourceHtml = html.toString('utf8');
 if (!sourceHtml.includes('</body>')) {
   throw new Error('VIRAL HTML is missing </body>; refusing to inject the TNG bridge.');
 }
-const deployedHtml = sourceHtml.replace('</body>', `${bridgeTag}</body>`);
+
+const legacyRelay = "return 'wss://tng-live-production.up.railway.app';";
+if (!sourceHtml.includes(legacyRelay)) {
+  throw new Error('VIRAL HTML relay bootstrap changed; refusing to apply an unverified TNG relay patch.');
+}
+
+const tngRelayHtml = sourceHtml.replace(
+  legacyRelay,
+  "return 'wss://auth.texasnomadgames.com';",
+);
+const deployedHtml = tngRelayHtml.replace('</body>', `${bridgeTag}</body>`);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, deployedHtml);
