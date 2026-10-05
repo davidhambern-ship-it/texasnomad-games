@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { generateRoomCode, getDefaultGameState } from '@/lib/roomUtils';
 import { base44 } from '@/api/base44Client';
 
+const VIRAL_CABINET_IMAGE = 'https://raw.githubusercontent.com/davidhambern-ship-it/texasnomad-games/main/VIRAL_Cabinet_Image.png';
+
 // This list is the single source of truth for ALL games on the platform.
 // When a new game is added, add it here and it automatically appears in the Host Panel.
 export const ALL_GAMES = [
@@ -50,7 +52,7 @@ export const ALL_GAMES = [
     title: 'VIRAL!',
     subtitle: 'CREATOR JOURNEY',
     color: '#BC13FE',
-    emoji: '🚀',
+    image: VIRAL_CABINET_IMAGE,
     path: '/games/viral',
     hostPath: '/games/viral?host=1',
     standalone: true,
@@ -146,7 +148,13 @@ export default function HostGameSelect({ onSelect, currentGame, onAdminSelect })
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            <div className="text-5xl mb-2">{pendingGame.emoji}</div>
+            {pendingGame.image ? (
+              <div className="mb-3 overflow-hidden rounded-xl border" style={{ borderColor: `${pendingGame.color}55` }}>
+                <img src={pendingGame.image} alt={pendingGame.title} className="aspect-video w-full object-cover" />
+              </div>
+            ) : (
+              <div className="text-5xl mb-2">{pendingGame.emoji}</div>
+            )}
             <h2 className="text-xl tracking-[0.15em] uppercase mb-1" style={{ color: pendingGame.color, fontFamily: "'Press Start 2P', monospace", textShadow: `0 0 15px ${pendingGame.color}` }}>
               {pendingGame.title}
             </h2>
@@ -244,7 +252,13 @@ export default function HostGameSelect({ onSelect, currentGame, onAdminSelect })
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = game.color; e.currentTarget.style.boxShadow = `0 0 25px ${game.color}40`; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${game.color}40`; e.currentTarget.style.boxShadow = 'none'; }}
           >
-            <span className="text-5xl mb-3">{game.emoji}</span>
+            {game.image ? (
+              <span className="mb-3 block w-full overflow-hidden rounded-lg border" style={{ borderColor: `${game.color}45` }}>
+                <img src={game.image} alt={game.title} className="aspect-video w-full object-cover" />
+              </span>
+            ) : (
+              <span className="text-5xl mb-3">{game.emoji}</span>
+            )}
             <span className="text-xl tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: game.color, textShadow: `0 0 15px ${game.color}60` }}>
               {game.title}
             </span>
