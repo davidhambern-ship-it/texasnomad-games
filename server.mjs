@@ -1107,6 +1107,9 @@ const viralLive = createViralLive({
   verifyHostAuthorization: verifyViralHostAuthorization,
   resolvePlayerIdentity: resolveViralPlayerIdentity,
   recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
   store: viralRoomStore,
 });
 
@@ -1287,6 +1290,9 @@ const handleSeeThatApi = createSeeThatApi({
   store: seeThatRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
 // Word Wrangler online races (/ww-api)
@@ -1294,6 +1300,9 @@ const handleWordWranglerApi = createWordWranglerApi({
   store: wordWranglerRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
 // BattleSudoku party rooms (/bs-api)
@@ -1301,6 +1310,9 @@ const handleBattleSudokuApi = createBattleSudokuApi({
   store: battleSudokuRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
 const HOST_LIVE_GAME_PATHS = {
@@ -5895,6 +5907,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/tng-stats')) {
       await handleTngStats(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/tng-rooms')) {
+      await handleTngRoomRegistry(req, res);
       return;
     }
 
