@@ -157,8 +157,7 @@ const DominoGame = {
   },
 };
 
-// Drop-in compatibility surface for the old Base44 DominoGame calls.
-// This intentionally mirrors only the methods Dominoes actually uses.
+// First-party Dominoes store surface used by the Host and player views.
 export const dominoStore = {
   entities: {
     DominoGame,
