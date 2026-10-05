@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { dominoStore as base44 } from '@/api/dominoStore';
+import { dominoStore } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
@@ -12,7 +12,7 @@ import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 const BG = { background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)', minHeight: '100vh' };
 
 async function fetchRoom(code) {
-  const rows = await base44.entities.DominoGame.filter({ room_code: code });
+  const rows = await dominoStore.entities.DominoGame.filter({ room_code: code });
   return rows[0] || null;
 }
 
@@ -48,7 +48,7 @@ export default function DominoGame() {
     load();
     const poll = setInterval(load, 2000);
     let unsub;
-    try { unsub = base44.entities.DominoGame.subscribe(ev => { if (alive && ev.data?.room_code === roomCode) setGame(ev.data); }); } catch { /* polling only */ }
+    try { unsub = dominoStore.entities.DominoGame.subscribe(ev => { if (alive && ev.data?.room_code === roomCode) setGame(ev.data); }); } catch { /* polling only */ }
     return () => { alive = false; clearInterval(poll); try { unsub && unsub(); } catch { /* ignore */ } };
   }, [roomCode]);
 
@@ -72,7 +72,7 @@ export default function DominoGame() {
       const currentPid = String(game.players?.[mySeat]?.playerId || '');
       if (savedPid && currentPid === savedPid) return;
 
-      base44.entities.DominoGame.clearSeatToken(roomCode);
+      dominoStore.entities.DominoGame.clearSeatToken(roomCode);
       localStorage.removeItem(`dom_seat_${roomCode}`);
       localStorage.removeItem(`dom_pid_${roomCode}`);
       setMySeat(null);
@@ -84,7 +84,7 @@ export default function DominoGame() {
     if (!nameInput.trim()) { setMsg('Type your name first'); return; }
 
     try {
-      const joined = await base44.entities.DominoGame.join(
+      const joined = await dominoStore.entities.DominoGame.join(
         roomCode,
         seat,
       );
@@ -111,7 +111,7 @@ export default function DominoGame() {
 
   const act = async (action, payload = {}) => {
     try {
-      const result = await base44.entities.DominoGame.action(
+      const result = await dominoStore.entities.DominoGame.action(
         roomCode,
         action,
         payload,
@@ -120,7 +120,7 @@ export default function DominoGame() {
       return null;
     } catch (error) {
       if (['PLAYER_AUTH_REQUIRED', 'SEAT_CHANGED'].includes(error?.code)) {
-        base44.entities.DominoGame.clearSeatToken(roomCode);
+        dominoStore.entities.DominoGame.clearSeatToken(roomCode);
         try {
           localStorage.removeItem(`dom_seat_${roomCode}`);
           localStorage.removeItem(`dom_pid_${roomCode}`);
