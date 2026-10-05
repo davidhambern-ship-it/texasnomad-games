@@ -4802,7 +4802,7 @@ function sanitizeDominoStateForViewer(state, access = null) {
           hand: canSeeHand
             ? hand
             : hand.map((_, index) => ({
-                id: `hidden-\${seat}-\${index}`,
+                id: `hidden-${seat}-${index}`,
                 hidden: true,
               })),
         };
@@ -4830,7 +4830,7 @@ async function loadDominoRowByRoom(roomCode, client = bffPool, forUpdate = false
       from public.tng_domino_games
       where room_code = $1
       limit 1
-      \${forUpdate ? 'for update' : ''}
+      ${forUpdate ? 'for update' : ''}
     `,
     [roomCode],
   );
@@ -4940,7 +4940,7 @@ async function handleDominoApi(req, res) {
       return;
     }
 
-    const id = `dom_\${Date.now()}_\${randomBytes(5).toString('hex')}`;
+    const id = `dom_${Date.now()}_${randomBytes(5).toString('hex')}`;
     const hostToken = dominoToken();
     const gameState = cleanDominoGameState(data, roomCode);
 
@@ -5041,7 +5041,7 @@ async function handleDominoApi(req, res) {
         return;
       }
 
-      const playerId = `p_\${randomBytes(10).toString('base64url')}`;
+      const playerId = `p_${randomBytes(10).toString('base64url')}`;
       const seatToken = dominoToken();
       const players = state.players.map((player, index) =>
         index === seat
