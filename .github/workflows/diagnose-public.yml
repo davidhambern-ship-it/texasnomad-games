@@ -1,0 +1,33 @@
+name: Diagnose Public TNG Hosting
+
+on:
+  push:
+    branches: [phase15-diagnose-public]
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose DNS and hosting
+        run: |
+          echo "=== DNS A ==="
+          dig +short texasnomadgames.com A || true
+          echo "=== DNS AAAA ==="
+          dig +short texasnomadgames.com AAAA || true
+          echo "=== WWW CNAME/A ==="
+          dig +short www.texasnomadgames.com CNAME || true
+          dig +short www.texasnomadgames.com A || true
+          echo "=== NAMESERVERS ==="
+          dig +short texasnomadgames.com NS || true
+          echo "=== ROOT HEADERS ==="
+          curl -sS -I --max-time 20 https://texasnomadgames.com/ || true
+          echo "=== WWW HEADERS ==="
+          curl -sS -I --max-time 20 https://www.texasnomadgames.com/ || true
+          echo "=== BUILD META HEADERS ==="
+          curl -sS -D - --max-time 20 https://texasnomadgames.com/build-meta.json -o /tmp/build-meta.json || true
+          echo "=== BUILD META ==="
+          cat /tmp/build-meta.json || true
