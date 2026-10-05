@@ -28,6 +28,9 @@ const [
   wordWrangler,
   battleSudoku,
   dominoHost,
+  dominoGame,
+  dominoStore,
+  tngProfile,
   tngApi,
   main,
   display,
@@ -44,6 +47,9 @@ const [
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
   text('src/pages/DominoHost.jsx'),
+  text('src/pages/DominoGame.jsx'),
+  text('src/api/dominoStore.js'),
+  text('src/lib/tngProfile.js'),
   text('src/api/tngApi.js'),
   text('src/main.jsx'),
   text('src/pages/GameDisplay.jsx'),
@@ -133,6 +139,45 @@ ok(
   'dead Base44 room hook removed',
   !(await exists('src/hooks/useGameRoom.js')),
   'src/hooks/useGameRoom.js should stay retired',
+);
+
+ok(
+  'legacy Base44 preview/profile layer removed',
+  !(await exists('src/lib/previewTngProfile.js')) &&
+    !app.includes('isBase44Preview') &&
+    !app.includes('previewTngProfile') &&
+    tngProfile.includes('getTngProfile') &&
+    tngProfile.includes('createTngProfile'),
+  'Legacy Base44 preview profile code was reintroduced',
+);
+
+ok(
+  'Dominoes uses first-party store naming',
+  !dominoHost.includes('base44') &&
+    !dominoGame.includes('base44') &&
+    !dominoStore.includes('Base44'),
+  'Dominoes still carries Base44 compatibility naming',
+);
+
+ok(
+  'legacy Base44 preview origins removed',
+  !server.includes('app.base44.com') &&
+    !server.includes('.base44.app'),
+  'Server still allows legacy Base44 preview origins',
+);
+
+ok(
+  'Postgres SSL behavior pinned securely',
+  server.includes("url.searchParams.set('sslmode', 'verify-full')") &&
+    server.includes('normalizePgConnectionString(process.env.DATABASE_URL)'),
+  'Postgres connection string is not explicitly pinned to verify-full SSL',
+);
+
+ok(
+  'browser compatibility data refreshed',
+  lockRaw.includes('"node_modules/caniuse-lite"') &&
+    lockRaw.includes('"version": "1.0.30001814"'),
+  'caniuse-lite browser compatibility data is stale',
 );
 
 ok(
