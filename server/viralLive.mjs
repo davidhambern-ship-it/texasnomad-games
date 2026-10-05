@@ -66,7 +66,7 @@ export function createViralLive({
     broadcast(r, { t: 'peers', joined: [{ id, presence: {} }], left: [], peers: peerList(r) }, id);
 
     ws.on('pong', () => { ws.isAlive = true; });
-    ws.on('message', (raw, isBinary) => {
+    ws.on('message', async (raw, isBinary) => {
       if (isBinary) return;
       const now = Date.now();
       if (now - budgetAt > 10000) { budget = MAX_MSGS_PER_10S; budgetAt = now; }
