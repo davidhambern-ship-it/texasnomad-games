@@ -166,6 +166,13 @@ export default function HostGameSelect({ onSelect, currentGame, onAdminSelect })
   const [error, setError] = useState('');
 
   const handleGameClick = (game) => {
+    // BattleSudoku owns its live room/code lifecycle on /bs-api.
+    // Skip the legacy GameRoom setup and launch its dedicated host flow.
+    if (game?.id === 'sudoku' && game?.standalone) {
+      window.location.assign(game.hostPath || game.path);
+      return;
+    }
+
     setPendingGame(game);
     setRoomCode('');
     setError('');
