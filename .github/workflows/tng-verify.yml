@@ -47,6 +47,24 @@ jobs:
           path: npm-audit-production.json
           retention-days: 1
 
+      - name: Generate safe dependency remediation preview
+        if: always()
+        run: |
+          npm audit fix --package-lock-only --omit=dev || true
+          npm audit --omit=dev --json > npm-audit-after-safe-fix.json || true
+          npx --yes depcheck@1.4.7 --json > depcheck.json || true
+
+      - name: Upload dependency remediation preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-remediation-preview
+          path: |
+            package-lock.json
+            npm-audit-after-safe-fix.json
+            depcheck.json
+          retention-days: 1
+
   production-smoke:
     name: Production release certification
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
