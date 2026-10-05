@@ -4,7 +4,7 @@ import Header from '@/components/home/Header';
 import { base44 } from '@/api/base44Client';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
 
-const VIRAL_CABINET_IMAGE = 'https://raw.githubusercontent.com/davidhambern-ship-it/texasnomad-games/main/VIRAL_Cabinet_Image.png';
+const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
 // ── Particle System ──────────────────────────────────────────────────────────
 function Particles() {
