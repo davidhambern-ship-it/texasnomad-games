@@ -441,7 +441,7 @@ const GROUND_URI="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5v
     try { var q = new URLSearchParams(location.search).get('relay'); if (q) return q.replace(/\/$/, ''); } catch (e) {}
     var h = location.hostname;
     if (/\.up\.railway\.app$/.test(h) || h === 'localhost' || h === '127.0.0.1') return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;
-    return 'wss://tng-live-production.up.railway.app';
+    return 'wss://auth.texasnomadgames.com';
   }
 
   function setStatus(s) {
