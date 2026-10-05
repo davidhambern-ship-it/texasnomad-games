@@ -1111,18 +1111,30 @@ async function handleTngRoomRegistry(req, res) {
     }
 
     const roomResult = await bffPool.query(
-      `select room_code, game_id, host_account_id, status::text as status, completed_at
-       from public.game_rooms
-       where room_code = $1
-       order by created_at desc
+      `select
+         gr.room_code,
+         gr.game_id,
+         gr.status::text as status,
+         gr.completed_at,
+         exists (
+           select 1
+           from public.room_participants rp
+           where rp.room_id = gr.id
+             and rp.account_id = $2::uuid
+             and rp.left_at is null
+             and rp.role::text in ('host_player', 'host')
+         ) as owned_by_host
+       from public.game_rooms gr
+       where gr.room_code = $1
+       order by gr.created_at desc
        limit 1`,
-      [roomCode],
+      [roomCode, resolved.account.id],
     );
 
     const room = roomResult.rows[0] || null;
     if (
       !room ||
-      String(room.host_account_id || '') !== String(resolved.account.id) ||
+      room.owned_by_host !== true ||
       String(room.game_id || '') !== requestedGameId ||
       room.completed_at ||
       ['completed', 'closed', 'ended', 'finished'].includes(
