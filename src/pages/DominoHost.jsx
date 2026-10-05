@@ -13,7 +13,10 @@ const emptySeat = (i) => ({ seat: i, playerId: null, playerName: null, hand: [],
 const aiLevel = (p) => { const c = TEXASNOMAD_CHARACTERS.find(x => x.id === p?.aiCharacterId); return Math.max(3, Math.min(10, Math.round((c?.traits?.intelligence ?? 65) / 10))); };
 
 async function fetchRoom(code) {
-  const rows = await base44.entities.DominoGame.filter({ room_code: code });
+  const rows = await base44.entities.DominoGame.filter(
+    { room_code: code },
+    { host: true },
+  );
   return rows[0] || null;
 }
 
@@ -37,7 +40,15 @@ export default function DominoHost() {
   const [aiTick, setAiTick] = useState(0);
   useEffect(() => { gameRef.current = game; }, [game]);
 
-  const save = async (g) => { await base44.entities.DominoGame.update(g.id, g); setGame(g); return g; };
+  const save = async (g) => {
+    const saved = await base44.entities.DominoGame.update(
+      g.id,
+      g,
+      { roomCode: g.room_code },
+    );
+    setGame(saved || g);
+    return saved || g;
+  };
 
   // Live updates (subscription + polling fallback)
   useEffect(() => {
