@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tng-verify-${{ github.ref }}
@@ -64,6 +64,28 @@ jobs:
             npm-audit-after-safe-fix.json
             depcheck.json
           retention-days: 1
+
+      - name: Apply safe dependency cleanup
+        if: github.event_name == 'push' && github.event.head_commit.message == 'Phase 15: stage dependency cleanup'
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+          for (const name of ['react-quill', 'lodash', 'moment']) {
+            delete pkg.dependencies[name];
+          }
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          NODE
+          npm install --package-lock-only --legacy-peer-deps
+          npm audit fix --package-lock-only --omit=dev || true
+          npm ci --legacy-peer-deps
+          npm run ci:verify
+          npm audit --omit=dev --json > npm-audit-final.json || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "Phase 15: apply safe dependency cleanup"
+          git push
 
   production-smoke:
     name: Production release certification
