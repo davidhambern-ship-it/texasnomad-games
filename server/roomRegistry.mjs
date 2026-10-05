@@ -298,6 +298,37 @@ export function createRoomRegistry(pool) {
   }
 
   return {
+    async registerCore({
+      code: value,
+      gameId,
+      hostAccountId = null,
+    } = {}) {
+      const code = cleanCode(value);
+      const basePath = CORE_GAME_PATHS[gameId];
+      if (!code || !basePath) return false;
+
+      await ensureSchema(pool);
+      await cleanupCode(code);
+
+      const existing = await loadRegistry(code);
+      if (existing && String(existing.service || '') !== 'core') {
+        return false;
+      }
+
+      const row = await upsertDiscovered({
+        room_code: code,
+        game_id: gameId,
+        service: 'core',
+        room_kind: 'core',
+        join_path: `${basePath}?room=${encodeURIComponent(code)}&neon=1`,
+        spectate_path: `/spectate/${encodeURIComponent(code)}`,
+        host_account_id: hostAccountId || null,
+        expires_at: null,
+      });
+
+      return Boolean(row);
+    },
+
     async resolve(value) {
       const code = cleanCode(value);
       if (!code) return null;
