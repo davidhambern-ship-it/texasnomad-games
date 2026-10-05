@@ -1048,9 +1048,14 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 }
 
 // VIRAL! online rooms (WebSocket relay at /viral-live)
+const viralRoomStore = createLiveRoomStore(bffPool, {
+  service: 'viral-live',
+  ttlMs: 6 * 60 * 60 * 1000,
+});
 const viralLive = createViralLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
   verifyHostAuthorization: verifyViralHostAuthorization,
+  store: viralRoomStore,
 });
 
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
@@ -5455,7 +5460,7 @@ const server = http.createServer(async (req, res) => {
     if ((req.url || '').split('?')[0] === '/viral-live/resolve' && req.method === 'GET') {
       const url = new URL(req.url || '/viral-live/resolve', 'http://localhost');
       const code = String(url.searchParams.get('code') || '').trim().toUpperCase();
-      const room = viralLive.resolveRoom(code);
+      const room = await viralLive.resolveRoom(code);
       sendJson(res, 200, { ok: true, gameId: 'viral', ...room });
       return;
     }
