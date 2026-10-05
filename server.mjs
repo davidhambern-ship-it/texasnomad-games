@@ -2115,6 +2115,49 @@ async function handleTngStats(req, res) {
     return;
   }
 
+  if (req.method === 'POST' && path === '/local-result') {
+    const body = await readJsonBody(req).catch(() => ({}));
+    const gameId = String(body?.gameId || '').trim();
+    const sessionKey = String(body?.sessionKey || '').trim();
+
+    const allowedGames = new Set(['square-biz', 'spades', 'word-search']);
+    if (!allowedGames.has(gameId)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_GAME', message: 'That local TNG game is not eligible for this stats route.' },
+      });
+      return;
+    }
+
+    if (!sessionKey || sessionKey.length > 160) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_SESSION', message: 'A valid local game session is required.' },
+      });
+      return;
+    }
+
+    const score = Math.max(
+      0,
+      Math.min(2_147_483_647, Math.round(Number(body?.score) || 0)),
+    );
+
+    const result = await recordStandaloneGameResults({
+      gameId,
+      sessionKey: `local:${sessionKey}`,
+      results: [{
+        accountId: account.id,
+        score,
+        won: body?.won === true,
+      }],
+    });
+
+    sendJson(res, 200, {
+      ok: true,
+      recorded: Number(result?.recorded || 0),
+      gameId,
+    });
+    return;
+  }
+
   if (req.method === 'POST' && path === '/quit') {
     const body = await readJsonBody(req).catch(() => ({}));
     const roomCode = String(body?.roomCode || req.headers['x-tng-room-code'] || '')
