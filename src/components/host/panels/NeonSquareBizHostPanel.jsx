@@ -4,7 +4,6 @@ import { Loader2 } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import {
   SquareBizBoard,
-  SquareBizCueCard,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
 import { getPublicTngName } from '@/lib/publicTngName';
