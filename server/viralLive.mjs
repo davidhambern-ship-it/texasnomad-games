@@ -32,11 +32,13 @@ export function createViralLive({
   isAllowedOrigin = () => true,
   verifyHostAuthorization = async () => null,
   resolvePlayerIdentity = async () => null,
+  recordResults = async () => ({ recorded: 0 }),
   store = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
   const rooms = new Map(); // name → { peers, lastState, lastStateAt, hostId, hostAccountId }
   const lastCheckpoint = new Map();
+  const recordedSessions = new Set();
 
   async function getRoom(name) {
     let r = rooms.get(name);
@@ -53,6 +55,11 @@ export function createViralLive({
       lastStateAt: Number(saved?.lastStateAt || 0),
       hostId: null,
       hostAccountId: saved?.hostAccountId || null,
+      playerAccounts:
+        saved?.playerAccounts && typeof saved.playerAccounts === 'object'
+          ? saved.playerAccounts
+          : {},
+      gameSerial: Math.max(1, Number(saved?.gameSerial || 1)),
       updatedAt: Number(saved?.updatedAt || saved?.lastStateAt || Date.now()),
     };
     rooms.set(name, r);
@@ -77,12 +84,67 @@ export function createViralLive({
       lastState: r.lastState || null,
       lastStateAt: Number(r.lastStateAt || 0),
       hostAccountId: r.hostAccountId || null,
+      playerAccounts: r.playerAccounts || {},
+      gameSerial: Math.max(1, Number(r.gameSerial || 1)),
       updatedAt,
     });
 
     r.updatedAt = updatedAt;
     lastCheckpoint.set(name, now);
   }
+  async function maybeRecordResults(roomName, r, state) {
+    if (!state || !state.w || !Array.isArray(state.ro) || !Array.isArray(state.pl)) return;
+
+    const serial = Math.max(1, Number(r.gameSerial || 1));
+    const sessionKey = `${roomName}:${serial}`;
+    if (recordedSessions.has(sessionKey)) return;
+
+    const results = [];
+
+    state.ro.forEach((row, index) => {
+      if (!Array.isArray(row)) return;
+
+      const playerId = String(row[0] || '');
+      const isAi = Boolean(row[3]);
+      if (!playerId || isAi) return;
+
+      const account =
+        r.playerAccounts?.[playerId] ||
+        (!Boolean(row[4]) && r.hostAccountId
+          ? { accountId: r.hostAccountId }
+          : null);
+
+      const accountId = String(account?.accountId || '');
+      if (!accountId) return;
+
+      const playerState = Array.isArray(state.pl[index]) ? state.pl[index] : [];
+      const followers = Math.max(0, Math.round(Number(playerState[1]) || 0));
+
+      results.push({
+        accountId,
+        score: followers,
+        won: String(state.w) === playerId,
+      });
+    });
+
+    if (!results.length) {
+      recordedSessions.add(sessionKey);
+      return;
+    }
+
+    try {
+      await recordResults({
+        gameId: 'viral',
+        sessionKey,
+        roomCode: roomName.slice(6).toUpperCase(),
+        results,
+      });
+      recordedSessions.add(sessionKey);
+    } catch (error) {
+      console.warn('[viral-live] result recording failed', error?.message || error);
+    }
+  }
+
   const peerList = (r) => [...r.peers].map(([id, p]) => {
     const presence = p.presence || {};
     const { accountId, ...publicPresence } = presence;
@@ -161,6 +223,13 @@ export function createViralLive({
           clean.seat = p.seat;
           clean.name = String(identity.publicName).slice(0, 24);
           clean.accountId = String(identity.accountId);
+
+          r.playerAccounts = r.playerAccounts || {};
+          r.playerAccounts[clean.seat] = {
+            accountId: clean.accountId,
+            name: clean.name,
+          };
+          r.updatedAt = now;
         } else if (typeof p.name === 'string') {
           clean.name = p.name.slice(0, 24);
         }
@@ -228,6 +297,7 @@ export function createViralLive({
 
         me.presence = clean;
         if (clean.seat && clean.accountId) {
+          await persistRoom(roomName, r, { force: true });
           send(ws, {
             t: 'msg',
             topic: '__tng_player_auth',
@@ -247,10 +317,20 @@ export function createViralLive({
       if (m.t === 'emit' && TOPICS.has(m.topic)) {
         if (m.topic === 'state') {
           if (r.hostId !== id) return; // only the host broadcasts the game
+
+          const previousWinner = r.lastState?.w || null;
+          const nextWinner = m.data?.w || null;
+
+          if (previousWinner && !nextWinner) {
+            r.gameSerial = Math.max(1, Number(r.gameSerial || 1)) + 1;
+          }
+
           r.lastState = m.data;
           r.lastStateAt = now;
           r.updatedAt = now;
-          await persistRoom(roomName, r);
+
+          await maybeRecordResults(roomName, r, m.data);
+          await persistRoom(roomName, r, { force: Boolean(nextWinner) });
         }
         broadcast(r, { t: 'msg', topic: m.topic, data: m.data ?? null, from: id }, id);
       }
@@ -321,6 +401,11 @@ export function createViralLive({
             lastStateAt: Number(saved.lastStateAt || 0),
             hostId: null,
             hostAccountId: saved.hostAccountId || null,
+            playerAccounts:
+              saved.playerAccounts && typeof saved.playerAccounts === 'object'
+                ? saved.playerAccounts
+                : {},
+            gameSerial: Math.max(1, Number(saved.gameSerial || 1)),
             updatedAt: Number(saved.updatedAt || saved.lastStateAt || Date.now()),
           };
           rooms.set(roomName, room);
