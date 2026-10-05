@@ -1,11 +1,7 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 // Client for Word Wrangler online races (server.mjs → server/wordWranglerApi.mjs)
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app');
-
-export const WW_API_BASE =
-  import.meta.env.VITE_WW_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST ? '/ww-api' : 'https://tng-live-production.up.railway.app/ww-api');
+export const WW_API_BASE = tngServiceUrl('/ww-api');
 
 export class WWApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'WWApiError'; this.status = status; this.code = code; }
