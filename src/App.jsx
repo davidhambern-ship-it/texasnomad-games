@@ -7,7 +7,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-import { getPreviewTngProfile, isBase44Preview } from '@/lib/previewTngProfile';
+import { getTngProfile } from '@/lib/tngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
 
 const Home = lazy(() => import('@/pages/Home'));
@@ -58,14 +58,14 @@ function HomeGate() {
 const AuthenticatedApp = () => {
   const { user, isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
   const location = useLocation();
-  const profileGateEnabled = isBase44Preview || isNeonStaging;
+  const profileGateEnabled = isNeonStaging;
   const [profileState, setProfileState] = useState('idle');
   const [profileError, setProfileError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
 
-    async function checkPreviewProfile() {
+    async function checkTngProfile() {
       if (!profileGateEnabled || isLoadingAuth || isLoadingPublicSettings || !isAuthenticated || !user) {
         setProfileState('idle');
         setProfileError('');
@@ -76,18 +76,18 @@ const AuthenticatedApp = () => {
       setProfileError('');
 
       try {
-        const profile = await getPreviewTngProfile(user);
+        const profile = await getTngProfile(user);
         if (cancelled) return;
         setProfileState(profile ? 'ready' : 'missing');
       } catch (error) {
         if (cancelled) return;
-        console.error('[TNG Preview profile gate] profile check failed:', error);
+        console.error('[TNG profile gate] profile check failed:', error);
         setProfileError(error.message || 'TNG could not verify your profile.');
         setProfileState('error');
       }
     }
 
-    checkPreviewProfile();
+    checkTngProfile();
     return () => { cancelled = true; };
   }, [
     user?.id,
@@ -99,7 +99,7 @@ const AuthenticatedApp = () => {
     profileGateEnabled,
   ]);
 
-  // Show loading spinner while checking app public settings, auth, or Preview TNG profile
+  // Show loading spinner while checking app public settings, auth, or TNG profile
   if (
     isLoadingPublicSettings ||
     isLoadingAuth ||
