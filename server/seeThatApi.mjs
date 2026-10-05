@@ -78,9 +78,11 @@ function send(res, status, payload) {
 export function createSeeThatApi({
   store = null,
   resolveIdentity = async () => null,
+  recordResults = async () => ({ recorded: 0 }),
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
+  const recordedSessions = new Set();
   let lastSweep = Date.now();
 
   async function loadRoom(code) {
@@ -92,9 +94,49 @@ export function createSeeThatApi({
     return room;
   }
 
+  async function maybeRecordResults(room) {
+    if (!room?.code || room.phase !== 'final') return;
+
+    const sessionKey = [
+      room.code,
+      room.round?.startsAt || room.endedAt || room.updatedAt || room.createdAt,
+      room.roundNo || 0,
+    ].join(':');
+
+    if (recordedSessions.has(sessionKey)) return;
+
+    const humans = room.players.filter((player) => player.accountId);
+    if (!humans.length) {
+      recordedSessions.add(sessionKey);
+      return;
+    }
+
+    const topScore = Math.max(...humans.map((player) => Number(player.total || 0)));
+    const results = humans.map((player) => ({
+      accountId: player.accountId,
+      score: Number(player.total || 0),
+      won: Number(player.total || 0) === topScore,
+    }));
+
+    try {
+      await recordResults({
+        gameId: 'see-that',
+        sessionKey,
+        roomCode: room.code,
+        results,
+      });
+      recordedSessions.add(sessionKey);
+    } catch (error) {
+      console.warn('[see-that] result recording failed', error?.message || error);
+    }
+  }
+
   async function saveRoom(room, { force = false } = {}) {
     if (!room?.code) return;
     rooms.set(room.code, room);
+
+    await maybeRecordResults(room);
+
     if (!store) return;
 
     const now = Date.now();
