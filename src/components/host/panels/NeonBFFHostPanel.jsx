@@ -10,10 +10,7 @@ import {
   RotateCcw,
   Radio,
   Trophy,
-  Volume2,
   Frown,
-  Sparkles,
-  Zap,
   Undo2,
   Pencil
 
