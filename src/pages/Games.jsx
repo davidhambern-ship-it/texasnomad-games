@@ -4,6 +4,8 @@ import Header from '@/components/home/Header';
 import { base44 } from '@/api/base44Client';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
 
+const VIRAL_CABINET_IMAGE = 'https://raw.githubusercontent.com/davidhambern-ship-it/texasnomad-games/main/VIRAL_Cabinet_Image.png';
+
 // ── Particle System ──────────────────────────────────────────────────────────
 function Particles() {
   const canvasRef = useRef(null);
@@ -476,8 +478,9 @@ const GAMES = [
     tagline: 'Creator Journey',
     color: '#BC13FE',
     color2: '#FF5F1F',
+    image: VIRAL_CABINET_IMAGE,
     marqueeText: 'ROLL • CREATE • GROW • GET SPONSORED • GO VIRAL',
-    screenText: '🚀 GO VIRAL',
+    screenText: 'GO VIRAL',
     description: 'Climb the creator journey from unknown to Streamer Mansion. Build followers, upgrade your setup, survive the chaos, and qualify for the finish.',
     tags: ['1–12 Players', 'Party Board Game', 'Human Test'],
     path: '/games/viral',
