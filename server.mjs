@@ -1734,6 +1734,119 @@ async function claimLegacyPlayerStats(accountId, email) {
   }
 }
 
+let standaloneGameResultSchemaReady = null;
+
+async function ensureStandaloneGameResultSchema() {
+  if (!standaloneGameResultSchemaReady) {
+    standaloneGameResultSchemaReady = bffPool.query(`
+      create table if not exists public.tng_game_result_events (
+        game_id text not null,
+        session_key text not null,
+        account_id uuid not null,
+        room_code text,
+        score integer not null default 0,
+        won boolean not null default false,
+        recorded_at timestamptz not null default now(),
+        primary key (game_id, session_key, account_id)
+      );
+
+      create index if not exists tng_game_result_events_account_idx
+        on public.tng_game_result_events (account_id, recorded_at desc);
+    `).catch((error) => {
+      standaloneGameResultSchemaReady = null;
+      throw error;
+    });
+  }
+
+  await standaloneGameResultSchemaReady;
+}
+
+async function recordStandaloneGameResults({
+  gameId,
+  sessionKey,
+  roomCode = null,
+  results = [],
+} = {}) {
+  const cleanGameId = String(gameId || '').trim();
+  const cleanSessionKey = String(sessionKey || '').trim();
+
+  if (!cleanGameId || !cleanSessionKey || !Array.isArray(results) || !results.length) {
+    return { recorded: 0 };
+  }
+
+  await ensureStandaloneGameResultSchema();
+
+  const client = await bffPool.connect();
+  let recorded = 0;
+
+  try {
+    await client.query('begin');
+
+    for (const result of results) {
+      const accountId = String(result?.accountId || '').trim();
+      if (!isUuid(accountId)) continue;
+
+      const score = Math.max(
+        0,
+        Math.min(2_147_483_647, Math.round(Number(result?.score) || 0)),
+      );
+      const won = result?.won === true;
+
+      const event = await client.query(
+        `
+          insert into public.tng_game_result_events
+            (game_id, session_key, account_id, room_code, score, won)
+          values ($1, $2, $3::uuid, $4, $5, $6)
+          on conflict (game_id, session_key, account_id) do nothing
+          returning account_id
+        `,
+        [
+          cleanGameId,
+          cleanSessionKey,
+          accountId,
+          roomCode ? String(roomCode).trim().toUpperCase() : null,
+          score,
+          won,
+        ],
+      );
+
+      if (!event.rowCount) continue;
+
+      recorded += 1;
+
+      await client.query(
+        `
+          insert into public.player_game_stats
+            (account_id, game_id, games_played, wins, losses, quit_games, total_score, best_score, updated_at)
+          values ($1::uuid, $2, 1, $3, $4, 0, $5, $5, now())
+          on conflict (account_id, game_id) do update set
+            games_played = public.player_game_stats.games_played + 1,
+            wins = public.player_game_stats.wins + excluded.wins,
+            losses = public.player_game_stats.losses + excluded.losses,
+            total_score = public.player_game_stats.total_score + excluded.total_score,
+            best_score = greatest(public.player_game_stats.best_score, excluded.best_score),
+            updated_at = now()
+        `,
+        [
+          accountId,
+          cleanGameId,
+          won ? 1 : 0,
+          won ? 0 : 1,
+          score,
+        ],
+      );
+    }
+
+    await client.query('commit');
+    return { recorded };
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 async function handleTngStats(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const path = sourceUrl.pathname.replace(/^\/tng-stats/, '') || '/';
