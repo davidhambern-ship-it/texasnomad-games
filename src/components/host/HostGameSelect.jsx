@@ -66,6 +66,16 @@ export const ALL_GAMES = [
     hostPath: '/games/dominoes/host',
     standalone: true,
   },
+  {
+    id: 'see-that',
+    title: 'SEE THAT?!',
+    subtitle: 'HIDDEN OBJECT PARTY',
+    color: '#4ade80',
+    emoji: '👁',
+    path: '/games/see-that',
+    hostPath: '/games/see-that?host=1',
+    standalone: true,
+  },
 ];
 
 export function HostGameIcon({ game, size = 'lg' }) {

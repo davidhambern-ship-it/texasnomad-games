@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
-import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -1005,6 +1004,7 @@ const viralLive = createViralLive({ isAllowedOrigin: (origin) => isAllowedBrowse
 
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
 const viralDisplayTargets = new Map();
+const seeThatDisplayTargets = new Map();
 
 function getViralDisplayTarget(displayDeviceId) {
   const key = String(displayDeviceId || '').trim();
@@ -1015,6 +1015,21 @@ function getViralDisplayTarget(displayDeviceId) {
 
   if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
     viralDisplayTargets.delete(key);
+    return null;
+  }
+
+  return target;
+}
+
+function getSeeThatDisplayTarget(displayDeviceId) {
+  const key = String(displayDeviceId || '').trim();
+  if (!key) return null;
+
+  const target = seeThatDisplayTargets.get(key);
+  if (!target) return null;
+
+  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
+    seeThatDisplayTargets.delete(key);
     return null;
   }
 
@@ -1068,6 +1083,8 @@ async function handleViralDisplayTarget(req, res) {
   const incoming = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
   // Sticky claim: a heartbeat without a readable code keeps the current room on screen.
   const roomCode = incoming || viralDisplayTargets.get(String(displayDeviceId))?.roomCode || null;
+  // A paired screen can be owned by only one standalone game at a time.
+  seeThatDisplayTargets.delete(String(displayDeviceId));
   viralDisplayTargets.set(String(displayDeviceId), { accountId: resolved.account.id, roomCode, updatedAt: Date.now() });
 
   sendJson(res, 200, {
@@ -1076,8 +1093,70 @@ async function handleViralDisplayTarget(req, res) {
     roomCode,
   });
 }
-// Word Wrangler online races (/ww-api)
-const handleWordWranglerApi = createWordWranglerApi();
+
+async function handleSeeThatDisplayTarget(req, res) {
+  if (!['POST', 'DELETE'].includes(req.method || '')) {
+    sendJson(res, 405, {
+      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
+    });
+    return;
+  }
+
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  const { rows } = await bffPool.query(
+    `select display_device_id
+     from public.host_sessions
+     where host_account_id = $1::uuid
+       and ended_at is null
+       and status::text in ('pairing', 'ready', 'live')
+       and display_device_id is not null
+     order by updated_at desc
+     limit 1`,
+    [resolved.account.id],
+  );
+
+  const displayDeviceId = rows[0]?.display_device_id || null;
+  if (!displayDeviceId) {
+    sendJson(res, 200, {
+      ok: true,
+      displayAttached: false,
+      roomCode: null,
+    });
+    return;
+  }
+
+  const displayKey = String(displayDeviceId);
+
+  if (req.method === 'DELETE') {
+    seeThatDisplayTargets.delete(displayKey);
+    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
+    return;
+  }
+
+  const body = await readJsonBody(req).catch(() => ({}));
+  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
+  const incoming = /^[A-Z]{5}$/.test(requestedCode) ? requestedCode : null;
+  const roomCode = incoming || seeThatDisplayTargets.get(displayKey)?.roomCode || null;
+
+  // A paired screen can be owned by only one standalone game at a time.
+  viralDisplayTargets.delete(displayKey);
+  seeThatDisplayTargets.set(displayKey, {
+    accountId: resolved.account.id,
+    roomCode,
+    updatedAt: Date.now(),
+  });
+
+  sendJson(res, 200, {
+    ok: true,
+    displayAttached: true,
+    roomCode,
+  });
+}
 
 // See That?! party rooms (/st-api)
 const handleSeeThatApi = createSeeThatApi();
@@ -1852,15 +1931,25 @@ async function handleTngDisplayState(req, res) {
 
   if (!room) {
     const viralTarget = getViralDisplayTarget(displayId);
-    if (viralTarget) {
+    const seeThatTarget = getSeeThatDisplayTarget(displayId);
+    const standaloneTarget = [
+      viralTarget ? { ...viralTarget, gameId: 'viral' } : null,
+      seeThatTarget ? { ...seeThatTarget, gameId: 'see-that' } : null,
+    ]
+      .filter(Boolean)
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
+
+    if (standaloneTarget) {
+      const gameId = standaloneTarget.gameId;
+      const roomCode = standaloneTarget.roomCode || '';
       sendJson(res, 200, {
         ...payload,
-        status: viralTarget.roomCode ? 'connected' : 'waiting_for_room',
+        status: roomCode ? 'connected' : 'waiting_for_room',
         room: {
-          id: `viral-display-${displayId}`,
-          gameId: 'viral',
-          roomCode: viralTarget.roomCode || '',
-          status: viralTarget.roomCode ? 'live' : 'lobby',
+          id: `${gameId}-display-${displayId}`,
+          gameId,
+          roomCode,
+          status: roomCode ? 'live' : 'lobby',
           gameState: {
             displayOnly: true,
           },
@@ -4821,6 +4910,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/see-that-display')) {
+      await handleSeeThatDisplayTarget(req, res);
+      return;
+    }
+
     if ((req.url || '').split('?')[0] === '/viral-live/resolve' && req.method === 'GET') {
       const url = new URL(req.url || '/viral-live/resolve', 'http://localhost');
       const code = String(url.searchParams.get('code') || '').trim().toUpperCase();
@@ -4841,11 +4935,6 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/st-api')) {
       await handleSeeThatApi(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/ww-api')) {
-      await handleWordWranglerApi(req, res);
       return;
     }
 

@@ -5,6 +5,7 @@ import { base44 } from '@/api/base44Client';
 import { dominoStore } from '@/api/dominoStore';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { resolveViralRoom } from '@/api/viralRoomStore';
+import { resolveSeeThatRoom } from '@/api/seeThatApi';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
@@ -82,6 +83,19 @@ async function redirectSpecialGameRoom(roomCode) {
       }
     } catch {
       // Keep resolving; a failed VIRAL lookup should not block other room types.
+    }
+  }
+
+  // See That?! rooms use five-letter codes on the dedicated /st-api server.
+  if (/^[A-Z]{5}$/.test(code)) {
+    try {
+      const seeThat = await resolveSeeThatRoom(code);
+      if (seeThat) {
+        window.location.replace(`/games/see-that?room=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed See That lookup should not block other room types.
     }
   }
 
