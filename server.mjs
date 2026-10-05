@@ -1001,8 +1001,55 @@ function getLiveSpectators(roomCode) {
 
 const hostLiveWss = new WebSocketServer({ noServer: true });
 
+async function verifyViralHostAuthorization({ token, deviceId }) {
+  const cleanToken = String(token || '').trim();
+  const cleanDeviceId = String(deviceId || '').trim();
+
+  if (!cleanToken || !isUuid(cleanDeviceId)) return null;
+
+  const resolved = await resolveAuthenticatedTngAccount({
+    headers: {
+      authorization: `Bearer ${cleanToken}`,
+    },
+  });
+
+  if (!resolved.ok) return null;
+
+  const { rows } = await bffPool.query(
+    `select
+       hs.id,
+       hs.host_account_id,
+       hs.controller_device_id
+     from public.host_sessions hs
+     join public.device_sessions ds
+       on ds.id = hs.controller_device_id
+     where hs.host_account_id = $1::uuid
+       and hs.controller_device_id = $2::uuid
+       and hs.ended_at is null
+       and hs.status::text in ('pairing', 'ready', 'live')
+       and ds.status::text in ('connected', 'active')
+       and ds.last_heartbeat_at > now() - interval '30 minutes'
+       and (ds.expires_at is null or ds.expires_at > now())
+     order by hs.updated_at desc
+     limit 1`,
+    [resolved.account.id, cleanDeviceId],
+  );
+
+  const session = rows[0] || null;
+  if (!session) return null;
+
+  return {
+    accountId: String(resolved.account.id),
+    hostSessionId: String(session.id),
+    controllerDeviceId: String(session.controller_device_id),
+  };
+}
+
 // VIRAL! online rooms (WebSocket relay at /viral-live)
-const viralLive = createViralLive({ isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin) });
+const viralLive = createViralLive({
+  isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
+  verifyHostAuthorization: verifyViralHostAuthorization,
+});
 
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
 const viralDisplayTargets = new Map();
