@@ -295,6 +295,7 @@ export function createViralLive({
             spectatePath: null,
             hostAccountId: accountId,
             ttlMs: KEEP_STATE_MS,
+            allowExisting: true,
           });
 
           if (!claimed) {
