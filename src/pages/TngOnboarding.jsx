@@ -7,9 +7,9 @@ import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { startTngBrowserSession, waitForNeonSession } from '@/lib/neonAuth';
 import {
-  createPreviewTngProfile,
-  getPreviewTngProfile,
-} from '@/lib/previewTngProfile';
+  createTngProfile,
+  getTngProfile,
+} from '@/lib/tngProfile';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -52,7 +52,7 @@ export default function TngOnboarding() {
       setDisplayName(user.full_name || user.email?.split('@')[0] || '');
 
       try {
-        const profile = await getPreviewTngProfile(user);
+        const profile = await getTngProfile(user);
         if (cancelled) return;
 
         if (profile) {
@@ -89,7 +89,7 @@ export default function TngOnboarding() {
     setError('');
 
     try {
-      await createPreviewTngProfile(user, { displayName, handle });
+      await createTngProfile(user, { displayName, handle });
       await tngApi.stats.getProfile().catch(() => null);
       await tngApi.bernaverse.ensureFree().catch((membershipError) => {
         console.warn('[TNG Onboarding] BERNAverse FREE enrollment deferred:', membershipError);
