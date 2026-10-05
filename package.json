@@ -18,7 +18,8 @@
     "test:games": "npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku",
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games && npm run test:release",
     "test:release": "node scripts/release-audit.mjs",
-    "smoke:production": "node scripts/production-smoke.mjs"
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "start:web": "node scripts/static-web.mjs"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
