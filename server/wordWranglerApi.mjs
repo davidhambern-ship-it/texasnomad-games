@@ -65,9 +65,11 @@ function send(res, status, payload) {
 export function createWordWranglerApi({
   store = null,
   resolveIdentity = async () => null,
+  recordResults = async () => ({ recorded: 0 }),
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
+  const recordedSessions = new Set();
   let lastSweep = Date.now();
 
   async function loadRoom(code) {
@@ -79,9 +81,47 @@ export function createWordWranglerApi({
     return room;
   }
 
+  async function maybeRecordResults(room) {
+    if (!room?.code || room.phase !== 'over' || !room.seed) return;
+
+    const sessionKey = String(room.seed);
+    if (recordedSessions.has(sessionKey)) return;
+
+    const humans = room.players.filter(
+      (player) => !player.isAI && player.accountId && player.st,
+    );
+
+    if (!humans.length) {
+      recordedSessions.add(sessionKey);
+      return;
+    }
+
+    const topScore = Math.max(...humans.map((player) => Number(player.st?.score || 0)));
+    const results = humans.map((player) => ({
+      accountId: player.accountId,
+      score: Number(player.st?.score || 0),
+      won: Number(player.st?.score || 0) === topScore,
+    }));
+
+    try {
+      await recordResults({
+        gameId: 'word-wrangler',
+        sessionKey,
+        roomCode: room.code,
+        results,
+      });
+      recordedSessions.add(sessionKey);
+    } catch (error) {
+      console.warn('[word-wrangler] result recording failed', error?.message || error);
+    }
+  }
+
   async function saveRoom(room, { force = false } = {}) {
     if (!room?.code) return;
     rooms.set(room.code, room);
+
+    await maybeRecordResults(room);
+
     if (!store) return;
 
     const now = Date.now();
