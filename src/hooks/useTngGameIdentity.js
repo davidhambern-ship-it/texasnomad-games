@@ -5,12 +5,16 @@ import { useAuth } from '@/lib/AuthContext';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 let cachedIdentity = null;
+let cachedIdentityUserId = '';
 let pendingIdentity = null;
+let pendingIdentityUserId = '';
 
 async function loadIdentity(user) {
-  if (cachedIdentity) return cachedIdentity;
+  const userId = String(user?.id || '');
+  if (cachedIdentity && cachedIdentityUserId === userId) return cachedIdentity;
 
-  if (!pendingIdentity) {
+  if (!pendingIdentity || pendingIdentityUserId !== userId) {
+    pendingIdentityUserId = userId;
     pendingIdentity = tngApi.profile.get()
       .then((payload) => {
         const profile = payload?.profile || payload || {};
@@ -26,10 +30,14 @@ async function loadIdentity(user) {
             .trim()
             .replace(/^@/, ''),
         };
+        cachedIdentityUserId = userId;
         return cachedIdentity;
       })
       .finally(() => {
-        pendingIdentity = null;
+        if (pendingIdentityUserId === userId) {
+          pendingIdentity = null;
+          pendingIdentityUserId = '';
+        }
       });
   }
 
@@ -38,7 +46,9 @@ async function loadIdentity(user) {
 
 export function clearTngGameIdentityCache() {
   cachedIdentity = null;
+  cachedIdentityUserId = '';
   pendingIdentity = null;
+  pendingIdentityUserId = '';
 }
 
 export function useTngGameIdentity() {
@@ -67,7 +77,7 @@ export function useTngGameIdentity() {
       return () => { alive = false; };
     }
 
-    if (cachedIdentity) {
+    if (cachedIdentity && cachedIdentityUserId === String(user?.id || '')) {
       setState({
         loading: false,
         error: '',
