@@ -7,6 +7,7 @@ import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
+import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -1160,6 +1161,9 @@ async function handleSeeThatDisplayTarget(req, res) {
 
 // See That?! party rooms (/st-api)
 const handleSeeThatApi = createSeeThatApi();
+
+// Word Wrangler online races (/ww-api)
+const handleWordWranglerApi = createWordWranglerApi();
 
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
@@ -4935,6 +4939,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/st-api')) {
       await handleSeeThatApi(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/ww-api')) {
+      await handleWordWranglerApi(req, res);
       return;
     }
 

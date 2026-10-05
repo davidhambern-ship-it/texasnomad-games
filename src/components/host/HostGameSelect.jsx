@@ -76,6 +76,16 @@ export const ALL_GAMES = [
     hostPath: '/games/see-that?host=1',
     standalone: true,
   },
+  {
+    id: 'word-wrangler',
+    title: 'WORD WRANGLER',
+    subtitle: 'LIVE WORD RACE',
+    color: '#BC13FE',
+    emoji: '🔤',
+    path: '/games/word-wrangler',
+    hostPath: '/games/word-wrangler?host=1',
+    standalone: true,
+  },
 ];
 
 export function HostGameIcon({ game, size = 'lg' }) {
