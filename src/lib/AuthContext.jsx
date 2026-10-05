@@ -182,11 +182,13 @@ export const AuthProvider = ({ children }) => {
     heartbeat();
     const interval = window.setInterval(heartbeat, DEVICE_HEARTBEAT_INTERVAL_MS);
     window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('online', heartbeat);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       window.clearInterval(interval);
       window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('online', heartbeat);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [isAuthenticated]);
