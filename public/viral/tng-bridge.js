@@ -9,7 +9,7 @@
 
   const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
     ? window.location.origin
-    : 'https://tng-live-production.up.railway.app';
+    : 'https://auth.texasnomadgames.com';
 
   const API_BASE = RELAY_ORIGIN === window.location.origin ? '' : RELAY_ORIGIN;
   const WS_BASE = RELAY_ORIGIN.replace(/^http/i, 'ws');
@@ -483,7 +483,7 @@
   async function getHostAuthToken(forceRefresh = false) {
     if (cachedHostToken && !forceRefresh) return cachedHostToken;
 
-    const response = await fetch('https://auth.texasnomadgames.com/neon-auth/get-session', {
+    const response = await fetch(`${RELAY_ORIGIN}/neon-auth/get-session`, {
       method: 'GET',
       credentials: 'include',
       headers: { Accept: 'application/json' },
