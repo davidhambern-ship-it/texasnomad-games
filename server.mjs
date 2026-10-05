@@ -1049,6 +1049,19 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
   };
 }
 
+async function resolveViralPlayerIdentity({ token }) {
+  const cleanToken = String(token || '').trim();
+  if (!cleanToken) return null;
+
+  const resolved = await resolveAuthenticatedTngIdentity({
+    headers: {
+      authorization: `Bearer ${cleanToken}`,
+    },
+  }).catch(() => null);
+
+  return resolved?.ok ? resolved.identity : null;
+}
+
 // VIRAL! online rooms (WebSocket relay at /viral-live)
 const viralRoomStore = createLiveRoomStore(bffPool, {
   service: 'viral-live',
@@ -1057,6 +1070,7 @@ const viralRoomStore = createLiveRoomStore(bffPool, {
 const viralLive = createViralLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
   verifyHostAuthorization: verifyViralHostAuthorization,
+  resolvePlayerIdentity: resolveViralPlayerIdentity,
   store: viralRoomStore,
 });
 
