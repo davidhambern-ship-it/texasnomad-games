@@ -21,6 +21,8 @@ jobs:
           echo "=== WWW CNAME/A ==="
           dig +short www.texasnomadgames.com CNAME || true
           dig +short www.texasnomadgames.com A || true
+          echo "=== VERIFY TXT ==="
+          dig +short TXT _railway-verify.www.texasnomadgames.com || true
           echo "=== NAMESERVERS ==="
           dig +short texasnomadgames.com NS || true
           echo "=== ROOT HEADERS ==="
@@ -33,3 +35,5 @@ jobs:
           cat /tmp/build-meta.json || true
 
 # diagnostic rerun 1791243033119
+
+# txt diagnostic 1791243075940
