@@ -1,3 +1,5 @@
+import { buildFingerprint } from './build-fingerprint.mjs';
+
 const PUBLIC_ORIGIN = String(
   process.env.TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
 ).replace(/\/$/, '');
@@ -66,12 +68,7 @@ async function check(name, task) {
   }
 }
 
-async function waitForExactCommit() {
-  if (!EXPECTED_COMMIT) {
-    console.log('INFO  EXPECTED_COMMIT not set; skipping exact deploy wait.');
-    return;
-  }
-
+async function waitForExactProduction(expectedFingerprint) {
   const deadline = Date.now() + WAIT_MS;
   let serviceSeen = '';
   let publicSeen = '';
@@ -81,7 +78,7 @@ async function waitForExactCommit() {
     try {
       const [healthResult, buildResult] = await Promise.all([
         json(`${SERVICE_ORIGIN}/healthz`),
-        json(`${PUBLIC_ORIGIN}/build-meta.json?release=${encodeURIComponent(EXPECTED_COMMIT)}`),
+        json(`${PUBLIC_ORIGIN}/build-meta.json?fp=${encodeURIComponent(expectedFingerprint)}`),
       ]);
 
       if (healthResult.response.ok) {
@@ -89,15 +86,24 @@ async function waitForExactCommit() {
       }
 
       if (buildResult.response.ok) {
-        publicSeen = String(buildResult.payload?.commit || '');
+        publicSeen = String(buildResult.payload?.fingerprint || '');
+      } else {
+        publicSeen = `http-${buildResult.response.status}`;
       }
 
-      if (serviceSeen === EXPECTED_COMMIT && publicSeen === EXPECTED_COMMIT) {
-        pass('exact production commit active', EXPECTED_COMMIT.slice(0, 12));
+      const serviceReady = !EXPECTED_COMMIT || serviceSeen === EXPECTED_COMMIT;
+      const publicReady = publicSeen === expectedFingerprint;
+
+      if (serviceReady && publicReady) {
+        pass(
+          'exact production build active',
+          `${EXPECTED_COMMIT ? EXPECTED_COMMIT.slice(0, 12) : 'service-ready'} / ${expectedFingerprint.slice(0, 12)}`,
+        );
         return;
       }
 
-      lastError = `service=${serviceSeen || 'unknown'} public=${publicSeen || 'unknown'}`;
+      lastError =
+        `service=${serviceSeen || 'unknown'} public=${publicSeen || 'unknown'} expected-fp=${expectedFingerprint.slice(0, 12)}`;
     } catch (error) {
       lastError = error?.message || String(error);
     }
@@ -107,7 +113,7 @@ async function waitForExactCommit() {
   }
 
   throw new Error(
-    `Production did not converge on ${EXPECTED_COMMIT}. Last state: ${lastError}`,
+    `Production did not converge on the expected build. Last state: ${lastError}`,
   );
 }
 
@@ -138,10 +144,14 @@ async function main() {
   if (EXPECTED_COMMIT) console.log(`Commit:  ${EXPECTED_COMMIT}`);
   console.log('');
 
+  const { fingerprint: expectedFingerprint, files: fingerprintFiles } = await buildFingerprint();
+  console.log(`Source fingerprint: ${expectedFingerprint} (${fingerprintFiles} files)`);
+  console.log('');
+
   try {
-    await waitForExactCommit();
+    await waitForExactProduction(expectedFingerprint);
   } catch (error) {
-    fail('exact production commit active', error?.message || String(error));
+    fail('exact production build active', error?.message || String(error));
     process.exit(1);
   }
 
@@ -211,10 +221,10 @@ async function main() {
     const { response, payload } = await json(`${PUBLIC_ORIGIN}/build-meta.json`);
     if (!response.ok) throw new Error(`status ${response.status}`);
     if (payload?.app !== 'texasnomad-games') throw new Error('wrong build metadata payload');
-    if (EXPECTED_COMMIT && payload?.commit !== EXPECTED_COMMIT) {
-      throw new Error(`commit mismatch: ${payload?.commit || 'missing'}`);
+    if (payload?.fingerprint !== expectedFingerprint) {
+      throw new Error(`fingerprint mismatch: ${payload?.fingerprint || 'missing'}`);
     }
-    return String(payload?.commit || 'unknown').slice(0, 12);
+    return expectedFingerprint.slice(0, 12);
   });
 
   await check('entry assets load', async () => {
