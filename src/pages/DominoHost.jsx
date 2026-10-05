@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { dominoStore as base44 } from '@/api/dominoStore';
+import { dominoStore } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
@@ -13,7 +13,7 @@ const HOST_KEY = 'dom_host_room';
 const emptySeat = (i) => ({ seat: i, playerId: null, playerName: null, hand: [], isAI: false, connected: false });
 
 async function fetchRoom(code) {
-  const rows = await base44.entities.DominoGame.filter(
+  const rows = await dominoStore.entities.DominoGame.filter(
     { room_code: code },
     { host: true },
   );
@@ -38,7 +38,7 @@ export default function DominoHost() {
   const [copied, setCopied] = useState(false);
   const [savedRoom] = useState(() => { try { return localStorage.getItem(HOST_KEY); } catch { return null; } });
   const savedRoomAuthorized = Boolean(
-    savedRoom && base44.entities.DominoGame.hostToken(savedRoom),
+    savedRoom && dominoStore.entities.DominoGame.hostToken(savedRoom),
   );
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function DominoHost() {
   }, [game?.room_code]);
 
   const save = async (g) => {
-    const saved = await base44.entities.DominoGame.update(
+    const saved = await dominoStore.entities.DominoGame.update(
       g.id,
       g,
       { roomCode: g.room_code },
@@ -73,7 +73,7 @@ export default function DominoHost() {
   // Live updates (subscription + polling fallback)
   useEffect(() => {
     if (!game?.id) return;
-    const unsub = base44.entities.DominoGame.subscribe(ev => { if (ev.data && ev.id === game.id) setGame(ev.data); });
+    const unsub = dominoStore.entities.DominoGame.subscribe(ev => { if (ev.data && ev.id === game.id) setGame(ev.data); });
     const poll = setInterval(async () => { try { const g = await fetchRoom(game.room_code); if (g) setGame(g); } catch { /* offline */ } }, 3000);
     return () => { try { unsub && unsub(); } catch { /* ignore */ } clearInterval(poll); };
   }, [game?.id]);
@@ -90,7 +90,7 @@ export default function DominoHost() {
 
       for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
         try {
-          created = await base44.entities.DominoGame.create({
+          created = await dominoStore.entities.DominoGame.create({
             room_code: generateRoomCode(), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
             currentSeat: 0, roundNumber: 1, teamScores: { teamA: 0, teamB: 0 }, scoreLimit, activityLog: [],
           });
