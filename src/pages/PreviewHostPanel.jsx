@@ -23,6 +23,25 @@ function readEmbeddedDisplay() {
   return deviceId && token ? { deviceId, token } : null;
 }
 
+function readHostDisplayMode() {
+  if (typeof window === 'undefined') return 'external';
+
+  const saved = localStorage.getItem('tng_host_display_mode');
+  if (saved === 'embedded' || saved === 'external') {
+    return saved;
+  }
+
+  // Migrate the old Host-only implementation away from the misleading
+  // player-test flag. Host-only is a normal production mode now.
+  if (localStorage.getItem('tng_player_test_mode') === '1') {
+    localStorage.setItem('tng_host_display_mode', 'embedded');
+    localStorage.removeItem('tng_player_test_mode');
+    return 'embedded';
+  }
+
+  return 'external';
+}
+
 function detectHostViewport() {
   if (typeof window === 'undefined') {
     return { kind: 'desktop', orientation: 'landscape', width: 1280, height: 800 };
@@ -50,9 +69,6 @@ export default function PreviewHostPanel() {
   const [controllerId, setControllerId] = useState(null);
   const [pairing, setPairing] = useState(null);
   const [repairingDisplay, setRepairingDisplay] = useState(false);
-  const [playerTestMode, setPlayerTestMode] = useState(
-    () => localStorage.getItem('tng_player_test_mode') === '1',
-  );
   const [activeRoom, setActiveRoom] = useState(null);
   const [roomState, setRoomState] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -62,10 +78,7 @@ export default function PreviewHostPanel() {
   const [rosterError, setRosterError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recoveryRoute, setRecoveryRoute] = useState(null);
-  const [displayMode, setDisplayMode] = useState(
-    () => localStorage.getItem('tng_host_display_mode') ||
-      (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external'),
-  );
+  const [displayMode, setDisplayMode] = useState(readHostDisplayMode);
   const [embeddedDisplay, setEmbeddedDisplay] = useState(readEmbeddedDisplay);
   const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
@@ -158,18 +171,8 @@ export default function PreviewHostPanel() {
 
   function setHostDisplayMode(mode) {
     localStorage.setItem('tng_host_display_mode', mode);
+    localStorage.removeItem('tng_player_test_mode');
     setDisplayMode(mode);
-
-    // The backend currently requires a paired display identity before rooms
-    // can start. Embedded mode uses a private virtual display on the Host
-    // device while the user experiences a true one-screen Host setup.
-    if (mode === 'embedded') {
-      localStorage.setItem('tng_player_test_mode', '1');
-      setPlayerTestMode(true);
-    } else {
-      localStorage.removeItem('tng_player_test_mode');
-      setPlayerTestMode(false);
-    }
   }
 
   async function ensureEmbeddedDisplay(deviceId, replaceDisplay = false) {
@@ -265,10 +268,8 @@ export default function PreviewHostPanel() {
   }
 
   async function startOrReplaceController(deviceId) {
-    const resumeTestRoom = localStorage.getItem('tng_player_test_mode') === '1';
-
     try {
-      return await tngApi.host.startSession(deviceId, false, resumeTestRoom);
+      return await tngApi.host.startSession(deviceId);
     } catch (sessionError) {
       if (
         sessionError instanceof TngApiError &&
@@ -277,7 +278,7 @@ export default function PreviewHostPanel() {
         localStorage.removeItem('tng_device_id');
         const replacementId = await createController();
         setControllerId(replacementId);
-        return await tngApi.host.startSession(replacementId, false, resumeTestRoom);
+        return await tngApi.host.startSession(replacementId);
       }
 
       // HOST_ALREADY_CONTROLLED is intentionally allowed to bubble up.
@@ -344,9 +345,7 @@ export default function PreviewHostPanel() {
             return;
           }
 
-          const savedMode =
-            localStorage.getItem('tng_host_display_mode') ||
-            (localStorage.getItem('tng_player_test_mode') === '1' ? 'embedded' : 'external');
+          const savedMode = readHostDisplayMode();
 
           if (savedMode === 'embedded') {
             setHostDisplayMode('embedded');
@@ -360,11 +359,10 @@ export default function PreviewHostPanel() {
           return;
         }
 
-        const testModeActive =
-          localStorage.getItem('tng_player_test_mode') === '1';
+        const savedMode = readHostDisplayMode();
 
         if (session.hostSession?.displayDeviceId) {
-          if (displayMode === 'embedded' || testModeActive) {
+          if (savedMode === 'embedded') {
             setHostDisplayMode('embedded');
             await ensureEmbeddedDisplay(deviceId);
             if (cancelled) return;
@@ -377,7 +375,7 @@ export default function PreviewHostPanel() {
           return;
         }
 
-        if (testModeActive || displayMode === 'embedded') {
+        if (savedMode === 'embedded') {
           setHostDisplayMode('embedded');
           await ensureEmbeddedDisplay(deviceId);
           if (cancelled) return;
@@ -733,15 +731,9 @@ export default function PreviewHostPanel() {
       setRosterError('');
       setSelectedGame(null);
 
-      if (playerTestMode) {
-        setPairing(null);
-        setRepairingDisplay(false);
-        localStorage.setItem('tng_player_test_mode', '1');
-        setPlayerTestMode(true);
-        setPhase('ready');
-      } else {
-        setPhase('ready');
-      }
+      setPairing(null);
+      setRepairingDisplay(false);
+      setPhase('ready');
     } catch (roomError) {
       setError(roomError.message || 'The room could not be disconnected.');
     } finally {
@@ -889,22 +881,6 @@ export default function PreviewHostPanel() {
                   DISCONNECT OLD ROOM
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {phase === 'test-recovery' && (
-          <div className="h-full flex items-center justify-center px-4">
-            <div className="max-w-xl text-center rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/5 p-8">
-              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-[#FFD700]" />
-              <div className="text-[#FFD700]" style={PS2}>PLAYER TEST MODE</div>
-              <h2 className="mt-4 text-2xl">Test room recovery needed</h2>
-              <p className="mt-3 text-sm leading-relaxed text-white/50">
-                {error || 'TNG could not find a recoverable live test room for this Host session.'}
-              </p>
-              <p className="mt-3 text-sm text-white/65">
-                Your Host login is valid. Reconnect the normal display only if you want to start a new room.
-              </p>
             </div>
           </div>
         )}
