@@ -22,7 +22,6 @@ import About from '@/pages/About';
 import Contact from '@/pages/Contact';
 import WordSearchGame from '@/pages/WordSearchGame';
 import ViralGame from '@/pages/ViralGame';
-import NameThatTrackGame from '@/pages/NameThatTrackGame';
 import SudokuGame from '@/pages/SudokuGame';
 import SeeThatGame from '@/pages/SeeThatGame';
 import WordWranglerGame from '@/pages/WordWranglerGame';
@@ -191,7 +190,6 @@ const AuthenticatedApp = () => {
       <Route path="/contact" element={<Contact />} />
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
-      <Route path="/games/name-that-track" element={<NameThatTrackGame />} />
       <Route path="/games/sudoku" element={<SudokuGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />

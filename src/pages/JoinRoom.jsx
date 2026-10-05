@@ -14,7 +14,6 @@ const GAME_PATHS = {
   sudoku: '/games/sudoku',
   'see-that': '/games/see-that',
   viral: '/games/viral',
-  'name-that-track': '/games/name-that-track',
 };
 
 async function ensurePlayerDevice(accountId) {
