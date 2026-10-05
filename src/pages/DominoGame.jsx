@@ -27,7 +27,11 @@ function SeatAvatar({ p, seat }) {
 export default function DominoGame() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  const roomCode = searchParams.get('room')?.toUpperCase() || '';
+  const displayCode = searchParams.get('display')?.toUpperCase() || '';
+  const displayMode = /^[A-Z0-9]{4,8}$/.test(displayCode);
+  const roomCode = displayMode
+    ? displayCode
+    : (searchParams.get('room')?.toUpperCase() || '');
 
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(!!roomCode);
@@ -146,6 +150,19 @@ export default function DominoGame() {
             </div>
           </div>
         </div></div>
+      </div>
+    );
+  }
+
+  if (displayMode) {
+    return (
+      <div style={BG}>
+        <DominoTable
+          game={game}
+          mySeat={null}
+          roomCode={roomCode}
+          notice={game.phase === 'waiting' ? 'Waiting for the Host to start…' : null}
+        />
       </div>
     );
   }
