@@ -6,7 +6,6 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
-import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -1076,9 +1075,6 @@ async function handleViralDisplayTarget(req, res) {
     roomCode,
   });
 }
-// Word Wrangler online races (/ww-api)
-const handleWordWranglerApi = createWordWranglerApi();
-
 // See That?! party rooms (/st-api)
 const handleSeeThatApi = createSeeThatApi();
 
@@ -4841,11 +4837,6 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/st-api')) {
       await handleSeeThatApi(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/ww-api')) {
-      await handleWordWranglerApi(req, res);
       return;
     }
 
