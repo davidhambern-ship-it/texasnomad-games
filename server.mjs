@@ -10,6 +10,7 @@ import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
+import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -1062,6 +1063,38 @@ async function resolveViralPlayerIdentity({ token }) {
   }).catch(() => null);
 
   return resolved?.ok ? resolved.identity : null;
+}
+
+// One public room-code namespace across every TNG game. Standalone games
+// reserve codes here before publishing them; the resolver backfills older rooms.
+const roomRegistry = createRoomRegistry(bffPool);
+
+async function handleTngRoomRegistry(req, res) {
+  const url = new URL(req.url || '/tng-rooms', 'http://localhost');
+  const path = url.pathname.replace(/^\/tng-rooms/, '') || '/';
+
+  if (req.method === 'GET' && path === '/resolve') {
+    const code = String(url.searchParams.get('code') || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_ROOM_CODE', message: 'Enter a valid TNG room code.' },
+      });
+      return;
+    }
+
+    const room = await roomRegistry.resolve(code);
+    sendJson(res, 200, { ok: true, room });
+    return;
+  }
+
+  if (req.method === 'GET' && path === '/health') {
+    sendJson(res, 200, { ok: true, service: 'tng-room-registry' });
+    return;
+  }
+
+  sendJson(res, 405, {
+    error: { code: 'METHOD_NOT_ALLOWED', message: 'Unsupported room registry operation.' },
+  });
 }
 
 // VIRAL! online rooms (WebSocket relay at /viral-live)
