@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
-import { VIRAL_AI_CHARACTERS } from '@/data/viralAI';
 import { generateBoard } from '@/data/viralBoardData';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
