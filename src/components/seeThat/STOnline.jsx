@@ -26,7 +26,11 @@ function useRoom(code, token, onGone) {
   return { data, offset, error, apply, setError };
 }
 
-const joinUrlFor = () => `${window.location.host}/games/see-that`;
+const TNG_PUBLIC_ORIGIN = String(
+  import.meta.env.VITE_TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
+).replace(/\/+$/, '');
+
+const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN}/games/see-that`;
 
 /** The big screen. Creates a room (or resumes one) and shows lobby → rounds → podium. */
 export function STHost({ scenes, onExit }) {
