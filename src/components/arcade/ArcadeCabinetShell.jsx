@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 
 // Cabinet themes per game
 const CABINET_THEMES = {
