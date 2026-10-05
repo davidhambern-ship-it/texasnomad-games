@@ -62,7 +62,10 @@ function send(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
-export function createWordWranglerApi({ store = null } = {}) {
+export function createWordWranglerApi({
+  store = null,
+  resolveIdentity = async () => null,
+} = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
   let lastSweep = Date.now();
@@ -256,12 +259,24 @@ export function createWordWranglerApi({ store = null } = {}) {
       }
 
       if (req.method === 'POST' && path === '/rooms') {
-        const body = await readBody(req);
-        const name = clean(body.name);
-        if (!name) throw err(400, 'NAME_REQUIRED', 'Enter your name.');
+        await readBody(req);
+        const identity = await resolveIdentity(req);
+        if (!identity?.accountId || !identity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting Word Wrangler.');
+        }
+        const name = clean(identity.publicName);
+        if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
         const code = await newCode();
-        const host = { id: newId(), name, token: newToken(), isAI: false, st: null, lastSeen: now };
+        const host = {
+          id: newId(),
+          accountId: identity.accountId,
+          name,
+          token: newToken(),
+          isAI: false,
+          st: null,
+          lastSeen: now,
+        };
         const room = { code, phase: 'lobby', round: 0, duration: 150, seed: null, startsAt: 0, endsAt: 0, hostId: host.id, players: [host], createdAt: now, updatedAt: now };
         await saveRoom(room, { force: true });
         return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
@@ -294,8 +309,12 @@ export function createWordWranglerApi({ store = null } = {}) {
         let issued;
         if (body.action === 'join') {
           if (!me) {
-            const name = clean(body.name);
-            if (!name) throw err(400, 'NAME_REQUIRED', 'Type your name first.');
+            const identity = await resolveIdentity(req);
+            if (!identity?.accountId || !identity?.publicName) {
+              throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
+            }
+            const name = clean(identity.publicName);
+            if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             const humans = room.players.filter(p => !p.isAI).length;
             if (room.players.length >= MAX_PLAYERS) {
               // bump a CPU to make room for a human
@@ -303,7 +322,15 @@ export function createWordWranglerApi({ store = null } = {}) {
               if (cpu < 0 || humans >= MAX_PLAYERS) throw err(409, 'FULL', 'This room is full.');
               room.players.splice(cpu, 1);
             }
-            me = { id: newId(), name, token: newToken(), isAI: false, st: null, lastSeen: t };
+            me = {
+              id: newId(),
+              accountId: identity.accountId,
+              name,
+              token: newToken(),
+              isAI: false,
+              st: null,
+              lastSeen: t,
+            };
             room.players.push(me);
             issued = me.token;
           }
