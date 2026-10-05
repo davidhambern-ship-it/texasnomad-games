@@ -1009,7 +1009,7 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 
   if (!cleanToken || !isUuid(cleanDeviceId)) return null;
 
-  const resolved = await resolveAuthenticatedTngAccount({
+  const resolved = await resolveAuthenticatedTngIdentity({
     headers: {
       authorization: `Bearer ${cleanToken}`,
     },
@@ -1042,6 +1042,8 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 
   return {
     accountId: String(resolved.account.id),
+    publicName: resolved.identity?.publicName || null,
+    handle: resolved.identity?.handle || null,
     hostSessionId: String(session.id),
     controllerDeviceId: String(session.controller_device_id),
   };
@@ -1231,13 +1233,22 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
 });
 
 // See That?! party rooms (/st-api)
-const handleSeeThatApi = createSeeThatApi({ store: seeThatRoomStore });
+const handleSeeThatApi = createSeeThatApi({
+  store: seeThatRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+});
 
 // Word Wrangler online races (/ww-api)
-const handleWordWranglerApi = createWordWranglerApi({ store: wordWranglerRoomStore });
+const handleWordWranglerApi = createWordWranglerApi({
+  store: wordWranglerRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+});
 
 // BattleSudoku party rooms (/bs-api)
-const handleBattleSudokuApi = createBattleSudokuApi({ store: battleSudokuRoomStore });
+const handleBattleSudokuApi = createBattleSudokuApi({
+  store: battleSudokuRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+});
 
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
@@ -1542,7 +1553,60 @@ async function resolveAuthenticatedTngAccount(req) {
     };
   }
 
-  return { ok: true, account };
+  return { ok: true, account, profile };
+}
+
+async function resolveAuthenticatedTngIdentity(req) {
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) return resolved;
+
+  const { rows } = await bffPool.query(
+    `select display_name, handle, normalized_handle
+     from public.player_profiles
+     where account_id = $1::uuid
+     limit 1`,
+    [resolved.account.id],
+  );
+
+  const stored = rows[0] || {};
+  const mergedProfile = {
+    ...(resolved.profile || {}),
+    ...stored,
+  };
+
+  const rawHandle = String(
+    stored.handle ||
+    stored.normalized_handle ||
+    mergedProfile.handle ||
+    mergedProfile.normalizedHandle ||
+    mergedProfile.normalized_handle ||
+    ''
+  ).trim().replace(/^@/, '');
+
+  const fallbackName = String(
+    stored.display_name ||
+    mergedProfile.displayName ||
+    mergedProfile.display_name ||
+    resolved.account.email?.split('@')[0] ||
+    'Nomad'
+  ).trim();
+
+  const publicName = rawHandle ? `@${rawHandle}` : fallbackName;
+
+  return {
+    ...resolved,
+    profile: mergedProfile,
+    identity: {
+      accountId: String(resolved.account.id),
+      handle: rawHandle ? `@${rawHandle}` : '',
+      publicName,
+    },
+  };
+}
+
+async function resolveStandaloneGameIdentity(req) {
+  const resolved = await resolveAuthenticatedTngIdentity(req);
+  return resolved.ok ? resolved.identity : null;
 }
 
 async function claimLegacyPlayerStats(accountId, email) {
