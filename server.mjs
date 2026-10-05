@@ -8,6 +8,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
+import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -1164,6 +1165,8 @@ const handleSeeThatApi = createSeeThatApi();
 
 // Word Wrangler online races (/ww-api)
 const handleWordWranglerApi = createWordWranglerApi();
+// BattleSudoku party rooms (/bs-api)
+const handleBattleSudokuApi = createBattleSudokuApi();
 
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
@@ -4842,7 +4845,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
@@ -4934,6 +4937,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/bff-api')) {
       await handleBffApi(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/bs-api')) {
+      await handleBattleSudokuApi(req, res);
       return;
     }
 

@@ -5,8 +5,9 @@ import { base44 } from '@/api/base44Client';
 import { dominoStore } from '@/api/dominoStore';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { resolveViralRoom } from '@/api/viralRoomStore';
-import { resolveWordWranglerRoom } from '@/api/wordWranglerApi';
 import { resolveSeeThatRoom } from '@/api/seeThatApi';
+import { resolveWordWranglerRoom } from '@/api/wordWranglerApi';
+import { resolveBattleSudokuRoom } from '@/api/battleSudokuApi';
 import { useAuth } from '@/lib/AuthContext';
 import { isBase44Preview } from '@/lib/previewTngProfile';
 import { isNeonStaging } from '@/lib/neonAuth';
@@ -87,17 +88,42 @@ async function redirectSpecialGameRoom(roomCode) {
     }
   }
 
-  // Word Wrangler races use five-letter codes on the /ww-api room server.
+  // See That?! rooms use five-letter codes on the dedicated /st-api server.
   if (/^[A-Z]{5}$/.test(code)) {
-    const ww = await resolveWordWranglerRoom(code);
-    if (ww) {
-      window.location.replace(`/games/word-wrangler?room=${encodeURIComponent(code)}`);
-      return true;
+    try {
+      const seeThat = await resolveSeeThatRoom(code);
+      if (seeThat) {
+        window.location.replace(`/games/see-that?room=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed See That lookup should not block other room types.
     }
-    const st = await resolveSeeThatRoom(code);
-    if (st) {
-      window.location.replace(`/games/see-that?room=${encodeURIComponent(code)}`);
-      return true;
+  }
+
+  // Word Wrangler online races use five-letter codes on /ww-api.
+  if (/^[A-Z]{5}$/.test(code)) {
+    try {
+      const wordWrangler = await resolveWordWranglerRoom(code);
+      if (wordWrangler) {
+        window.location.replace(`/games/word-wrangler?room=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed Word Wrangler lookup should not block other room types.
+    }
+  }
+
+  // BattleSudoku party rooms also use five-letter codes, on /bs-api.
+  if (/^[A-Z]{5}$/.test(code)) {
+    try {
+      const battleSudoku = await resolveBattleSudokuRoom(code);
+      if (battleSudoku) {
+        window.location.replace(`/games/sudoku?room=${encodeURIComponent(code)}`);
+        return true;
+      }
+    } catch {
+      // Keep resolving; a failed BattleSudoku lookup should not block other room types.
     }
   }
 

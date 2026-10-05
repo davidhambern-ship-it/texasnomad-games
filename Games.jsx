@@ -197,11 +197,13 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {game.standalone
-              ? '🚀 LAUNCH GAME'
-              : creating === game.id
-                ? '⚙ CREATING…'
-                : '⚡ CREATE ROOM'}
+            {game.launchLabel
+              ? game.launchLabel
+              : game.standalone
+                ? '🚀 LAUNCH GAME'
+                : creating === game.id
+                  ? '⚙ CREATING…'
+                  : '⚡ CREATE ROOM'}
           </button>
 
           {(!game.standalone || game.supportsDirectJoin) && (
@@ -432,16 +434,18 @@ const GAMES = [
   },
   {
     id: 'sudoku',
-    title: 'Sudoku TN',
-    tagline: 'Race to Fill the Grid',
+    title: 'BattleSudoku',
+    tagline: 'Solve to Load · Fire to Sink',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/98aee295b_generated_image.png',
     color: '#22d3ee',
     color2: '#0ea5e9',
-    marqueeText: 'FILL THE GRID • BEAT THE CLOCK • UNIQUE PUZZLES • FIRST TO FINISH WINS',
-    screenText: '🔢 RACE THE GRID',
-    description: 'Competitive multiplayer Sudoku! Each player gets a unique puzzle. 3 minutes on the clock — first to complete wins. 3 mistakes and you\'re out.',
-    tags: ['Multiplayer', 'Puzzle', 'Race'],
+    marqueeText: 'HIDE YOUR FLEET • SOLVE TO LOAD SHELLS • FIRE VOLLEYS • SINK THEIR SHIPS',
+    screenText: '⚓ BATTLESUDOKU',
+    description: 'Sudoku meets Battleship. Your fleet hides under your own puzzle — every correct number loads a shell, then everyone fires a volley at rival waters. Hits blow your numbers off the board. Last fleet afloat, first full grid, or most points wins.',
+    tags: ['1–8 Players', 'Puzzle', 'Party Battle'],
     path: '/games/sudoku',
+    standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
@@ -456,6 +460,9 @@ const GAMES = [
     description: 'The scene goes on the big screen and everyone races to spot the hidden objects on their phones. First tap claims it, combos pay big, and wild tapping gets you locked out.',
     tags: ['1–12 Players', 'Hidden Object', 'Party'],
     path: '/games/see-that',
+    standalone: true,
+    supportsDirectJoin: true,
+    launchLabel: '⚡ HOST LIVE GAME',
     featured: false,
   },
   {
@@ -465,11 +472,13 @@ const GAMES = [
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/37cb5bd26_generated_image.png',
     color: '#BC13FE',
     color2: '#FF5F1F',
-    marqueeText: 'TRACE WORDS • STRIKE GOLD • CATCH OUTLAWS • BEAT THE FUSE',
+    marqueeText: 'TRACE WORDS • DROP TILES • FIND GEMS • BEAT THE ROPE',
     screenText: '🔤 WORD WRANGLER',
-    description: 'Drag through touching letters on a board of gold to rope in real words before the burning fuse hits the keg. Rubies, emeralds and diamonds multiply your score. Play solo, race a CPU rival, or race friends online.',
+    description: 'Trace real words through touching tiles while the burning rope counts down. Play Solo Rush, race a TexasNomad CPU rival, or host an online race for up to eight players on identical boards.',
     tags: ['1–8 Players', 'Word Game', 'Online Race'],
     path: '/games/word-wrangler',
+    standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
@@ -504,33 +513,9 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['sudoku'];
+const IN_CONSTRUCTION_IDS = [];
 
 const CONSTRUCTION_DETAILS = {
-  sudoku: {
-    status: 'Puzzle systems + multiplayer race tuning',
-    how: [
-      'Every player gets a valid Sudoku board built for the same round.',
-      'Players race the clock while mistakes add pressure and penalties.',
-      'The finished version will support clean solo play plus competitive live-room races.',
-    ],
-  },
-  'see-that': {
-    status: 'Scene production + hidden-object interaction',
-    how: [
-      'A detailed scene hides a fixed set of objects in known locations.',
-      'Players scan the image and tap what they find before the timer expires.',
-      'Future scenes can rotate themes, object lists, difficulty and score challenges.',
-    ],
-  },
-  'word-wrangler': {
-    status: 'Board generation + special-tile rules',
-    how: [
-      'Players connect adjacent letters to build valid words from the live grid.',
-      'Found words score by length while letters cascade and reshape the board.',
-      'Special tiles — including bonus and bomb-style pieces — turn each board into controlled chaos.',
-    ],
-  },
   txd: {
     status: 'Domino placement + table geometry',
     how: [
@@ -567,14 +552,10 @@ export default function Games() {
       return;
     }
 
-    // See That! is single-player only — no room needed
+    // See That?! owns its own live room flow on /st-api.
+    // Launch directly as Host from the main game-room selection.
     if (gameId === 'see-that') {
-      navigate('/games/see-that');
-      return;
-    }
-    // Word Wrangler has its own menu (solo, vs CPU, online race)
-    if (gameId === 'word-wrangler') {
-      navigate('/games/word-wrangler');
+      navigate('/games/see-that?host=1');
       return;
     }
     // TXD Dominoes — goes to dedicated host panel
