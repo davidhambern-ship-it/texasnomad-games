@@ -9,7 +9,8 @@
 //
 // Wire protocol (JSON text frames):
 //   client → server   { t:'emit', topic, data }      relay to everyone else in the room
-//                     { t:'presence', p }            set my presence object (e.g. {role:'host'} / {seat:'p3'})
+//                     { t:'presence', p }            set presence. Host claims must include
+//                                                    p._tngHostAuth={token,deviceId}
 //                     { t:'ping' }
 //   server → client   { t:'welcome', id, peers }     after connecting (peers = [{id, presence}], me included)
 //                     { t:'msg', topic, data, from }
@@ -27,13 +28,25 @@ const KEEP_STATE_MS = 6 * 60 * 60 * 1000; // remember the last snapshot of an em
 const ROOM_RE = /^viral-[a-z]{4}$/;
 const TOPICS = new Set(['state', 'act']);
 
-export function createViralLive({ isAllowedOrigin = () => true } = {}) {
+export function createViralLive({
+  isAllowedOrigin = () => true,
+  verifyHostAuthorization = async () => null,
+} = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
-  const rooms = new Map(); // name → { peers: Map<id, {ws, presence}>, lastState, lastStateAt, hostId }
+  const rooms = new Map(); // name → { peers, lastState, lastStateAt, hostId, hostAccountId }
 
   const getRoom = (name) => {
     let r = rooms.get(name);
-    if (!r) { r = { peers: new Map(), lastState: null, lastStateAt: 0, hostId: null }; rooms.set(name, r); }
+    if (!r) {
+      r = {
+        peers: new Map(),
+        lastState: null,
+        lastStateAt: 0,
+        hostId: null,
+        hostAccountId: null,
+      };
+      rooms.set(name, r);
+    }
     return r;
   };
   const peerList = (r) => [...r.peers].map(([id, p]) => ({ id, presence: p.presence || {} }));
@@ -67,11 +80,70 @@ export function createViralLive({ isAllowedOrigin = () => true } = {}) {
       if (m.t === 'presence') {
         const p = m.p && typeof m.p === 'object' ? m.p : {};
         const clean = {};
-        if (p.role === 'host') clean.role = 'host';
+
         if (typeof p.seat === 'string' && p.seat.length <= 24) clean.seat = p.seat;
         if (typeof p.name === 'string') clean.name = p.name.slice(0, 24);
+
+        if (p.role === 'host') {
+          const hostAuth =
+            p._tngHostAuth && typeof p._tngHostAuth === 'object'
+              ? p._tngHostAuth
+              : {};
+
+          let verified = null;
+          try {
+            verified = await verifyHostAuthorization({
+              token: String(hostAuth.token || ''),
+              deviceId: String(hostAuth.deviceId || ''),
+              roomName,
+              request: req,
+            });
+          } catch {
+            verified = null;
+          }
+
+          const accountId = String(verified?.accountId || '');
+          const roomOwnedByAnotherAccount =
+            r.hostAccountId &&
+            accountId &&
+            String(r.hostAccountId) !== accountId;
+
+          if (!accountId || roomOwnedByAnotherAccount) {
+            // A client may call itself "host", but without a verified active TNG
+            // Host Controller it remains an ordinary peer and can never publish
+            // authoritative game state.
+            me.presence = clean;
+            send(ws, {
+              t: 'msg',
+              topic: '__tng_host_auth',
+              data: {
+                ok: false,
+                code: roomOwnedByAnotherAccount
+                  ? 'ROOM_HOST_OWNED'
+                  : 'HOST_AUTH_REQUIRED',
+              },
+              from: 'tng',
+            });
+            broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
+            return;
+          }
+
+          clean.role = 'host';
+          r.hostAccountId = accountId;
+          r.hostId = id;
+          me.presence = clean;
+
+          send(ws, {
+            t: 'msg',
+            topic: '__tng_host_auth',
+            data: { ok: true },
+            from: 'tng',
+          });
+          broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
+          return;
+        }
+
         me.presence = clean;
-        if (clean.role === 'host') r.hostId = id; // the latest host connection owns the table
         broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
         return;
       }
