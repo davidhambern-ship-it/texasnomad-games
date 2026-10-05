@@ -96,8 +96,8 @@ export function STDisplay({ code, scenes }) {
   return <STBigScreen data={data} isHost={false} act={() => {}} scenes={scenes} offset={offset} onExit={() => {}} joinUrl={joinUrlFor()} />;
 }
 
-/** A player's phone: join with a name, then hunt. */
-export function STPlayer({ code, name, setName, onExit }) {
+/** A player's phone: join with the signed-in TNG identity, then hunt. */
+export function STPlayer({ code, name, identityReady = false, onExit }) {
   const [seat, setSeat] = useState(() => stSeat.get(code));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -106,11 +106,10 @@ export function STPlayer({ code, name, setName, onExit }) {
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 200); return () => clearInterval(t); }, []);
 
   const join = async () => {
-    if (!name.trim()) { setErr('Type your name first.'); return; }
+    if (!identityReady) { setErr('Loading your TNG player profile…'); return; }
     setBusy(true); setErr(''); sfx.unlock();
     try {
-      try { localStorage.setItem('st_name', name.trim()); } catch { /* ignore */ }
-      const d = await stApi.action(code, seat?.token, 'join', { name: name.trim() });
+      const d = await stApi.action(code, seat?.token, 'join');
       const s = { token: d.token, playerId: d.playerId };
       stSeat.set(code, s); setSeat(s); apply(d);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
@@ -139,8 +138,10 @@ export function STPlayer({ code, name, setName, onExit }) {
         <div className="st-card" style={{ textAlign: 'center' }}>
           <h1 className="st-h st-logo" style={{ fontSize: 64 }}>See That<span className="q">?!</span></h1>
           <p className="st-sub">Game <b style={{ color: 'var(--st-gold)', letterSpacing: '.15em' }}>{code}</b> · {room.players.length} playing</p>
-          <input className="st-input" style={{ marginTop: 14 }} value={name} maxLength={16} placeholder="YOUR NAME" onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()} />
-          <button type="button" className="st-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy} onClick={join}>Join the hunt</button>
+          <p className="st-sub" style={{ marginTop: 14 }}>
+            Playing as <b style={{ color: 'var(--st-gold)' }}>{name || 'Loading TNG profile…'}</b>
+          </p>
+          <button type="button" className="st-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy || !identityReady} onClick={join}>Join the hunt</button>
           {err && <div className="st-err">{err}</div>}
           <button type="button" className="st-btn ghost small" style={{ marginTop: 12 }} onClick={onExit}>Back</button>
         </div>
