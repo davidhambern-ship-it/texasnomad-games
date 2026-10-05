@@ -33,13 +33,36 @@ const mime = {
   '.woff2': 'font/woff2',
 };
 
+function cacheControlForStaticFile(filePath) {
+  const normalized = String(filePath || '').replaceAll('\\', '/');
+  const extension = extname(normalized).toLowerCase();
+
+  if (extension === '.html') {
+    return 'no-store, no-cache, must-revalidate, max-age=0';
+  }
+
+  // Vite fingerprints production JS/CSS/assets with a content hash. Those
+  // filenames are safe to cache forever because a content change creates a
+  // different URL.
+  const isFingerprintedAsset =
+    normalized.includes('/assets/') &&
+    /-[A-Za-z0-9_-]{8,}\.[A-Za-z0-9]+$/.test(normalized);
+
+  if (isFingerprintedAsset) {
+    return 'public, max-age=31536000, immutable';
+  }
+
+  // Named artwork, dictionaries, JSON and other public files may be replaced
+  // without their URL changing. Always revalidate them so Safari/mobile never
+  // gets trapped on a year-old copy.
+  return 'public, max-age=0, must-revalidate';
+}
+
 async function sendFile(res, filePath) {
   const body = await readFile(filePath);
   res.writeHead(200, {
     'Content-Type': mime[extname(filePath).toLowerCase()] || 'application/octet-stream',
-    'Cache-Control': extname(filePath) === '.html'
-      ? 'no-store, no-cache, must-revalidate, max-age=0'
-      : 'public, max-age=31536000, immutable',
+    'Cache-Control': cacheControlForStaticFile(filePath),
   });
   res.end(body);
 }
