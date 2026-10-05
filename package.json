@@ -19,8 +19,6 @@
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.52",
-    "@base44/vite-plugin": "^1.0.44",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@neondatabase/auth": "^0.5.0-beta",
