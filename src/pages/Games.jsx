@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
-import { base44 } from '@/api/base44Client';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
@@ -652,63 +651,45 @@ const COMING_SOON = [
 
 export default function Games() {
   const navigate = useNavigate();
-  const [creating, setCreating] = useState(null);
+  const creating = null;
   const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
 
-  const generateRoomCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  };
+  const handleCreateRoom = (gameId) => {
+    // Standalone games own their room lifecycle and should launch directly into
+    // their dedicated Host flow instead of touching the retired Base44 room system.
+    const standaloneHostPaths = {
+      viral: '/games/viral?host=1',
+      'see-that': '/games/see-that?host=1',
+      'word-wrangler': '/games/word-wrangler?host=1',
+      sudoku: '/games/sudoku?host=1',
+      txd: '/games/dominoes/host',
+    };
 
-  const handleCreateRoom = async (gameId) => {
-    // VIRAL is a validated standalone build with its own host/join flow.
-    if (gameId === 'viral') {
-      navigate('/games/viral');
+    if (standaloneHostPaths[gameId]) {
+      navigate(standaloneHostPaths[gameId]);
       return;
     }
 
-    // See That?! owns its own live room flow on /st-api.
-    // Launch directly as Host from the main game-room selection.
-    if (gameId === 'see-that') {
-      navigate('/games/see-that?host=1');
+    // Core multiplayer games are created by the production Neon Host Controller.
+    // The Host Panel consumes ?game= and creates the room only after the Host
+    // session/display setup is ready.
+    const centralHostGames = new Set([
+      'bff',
+      'square-biz',
+      'hangman',
+      'spades',
+      'word-search',
+    ]);
+
+    if (centralHostGames.has(gameId)) {
+      navigate(`/host?game=${encodeURIComponent(gameId)}`);
       return;
     }
 
-    // BattleSudoku owns its live party rooms on /bs-api.
-    // Host mode creates the real five-letter BattleSudoku room code.
-    if (gameId === 'sudoku') {
-      navigate('/games/sudoku?host=1');
-      return;
-    }
-
-    // TXD Dominoes — goes to dedicated host panel
-    if (gameId === 'txd') {
-      navigate('/games/dominoes/host');
-      return;
-    }
-    setCreating(gameId);
-    try {
-      const code = generateRoomCode();
-      await base44.entities.GameRoom.create({
-        room_code: code,
-        game_id: gameId,
-        status: 'waiting',
-        host_connected: false,
-        screen_connected: false,
-        players_connected: 0,
-        created_from_host_panel: false,
-        game_state: {},
-      });
-      const game = GAMES.find(g => g.id === gameId);
-      navigate(`${game.path}?room=${code}&creator=1`);
-    } catch (e) {
-      console.error('Failed to create room', e);
-    } finally {
-      setCreating(null);
-    }
+    console.warn('[TNG Games] No live host route is configured for', gameId);
   };
 
   const handleJoinRoom = (gameId, code) => {
