@@ -33,7 +33,11 @@ jobs:
           curl -sS -D - --max-time 20 https://texasnomadgames.com/build-meta.json -o /tmp/build-meta.json || true
           echo "=== BUILD META ==="
           cat /tmp/build-meta.json || true
+          echo "=== WWW BUILD META INSECURE ==="
+          curl -skS --max-time 20 https://www.texasnomadgames.com/build-meta.json || true
 
 # diagnostic rerun 1791243033119
 
 # txt diagnostic 1791243075940
+
+# route diagnostic 1791243136931
