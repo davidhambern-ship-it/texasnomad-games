@@ -308,11 +308,16 @@ export function createWordWranglerApi({
         let me = findMe(room, token);
         let issued;
         if (body.action === 'join') {
+          const identity = await resolveIdentity(req);
+          if (!identity?.accountId || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
+          }
+
+          me = me || room.players.find(
+            p => !p.isAI && String(p.accountId || '') === String(identity.accountId),
+          ) || null;
+
           if (!me) {
-            const identity = await resolveIdentity(req);
-            if (!identity?.accountId || !identity?.publicName) {
-              throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
-            }
             const name = clean(identity.publicName);
             if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             const humans = room.players.filter(p => !p.isAI).length;
@@ -333,7 +338,14 @@ export function createWordWranglerApi({
             };
             room.players.push(me);
             issued = me.token;
+          } else if (!token || token !== me.token) {
+            // Same signed-in TNG account returning from another browser state:
+            // reclaim the same seat instead of creating a duplicate player.
+            me.name = clean(identity.publicName);
+            me.token = newToken();
+            issued = me.token;
           }
+
           me.lastSeen = t;
           room.updatedAt = t;
           await saveRoom(room, { force: true });
