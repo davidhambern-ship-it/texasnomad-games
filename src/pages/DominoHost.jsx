@@ -7,6 +7,7 @@ import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateRoomCode, getTeam, newRound, applyPlay, applyPass, chooseAIMove } from '@/lib/dominoEngine';
 import '@/components/domino/domino.css';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 
 const LIMITS = [100, 150, 200, 250];
 const HOST_KEY = 'dom_host_room';
@@ -45,6 +46,25 @@ export default function DominoHost() {
   const aiBusy = useRef(false);
   const [aiTick, setAiTick] = useState(0);
   useEffect(() => { gameRef.current = game; }, [game]);
+
+  useEffect(() => {
+    if (!game?.room_code) return undefined;
+
+    let alive = true;
+    const sync = async () => {
+      const result = await claimStandaloneDisplay('dominoes', game.room_code).catch(() => null);
+      if (!alive || !result?.ok) return;
+    };
+
+    sync();
+    const timer = window.setInterval(sync, 30000);
+
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+      releaseStandaloneDisplay().catch(() => {});
+    };
+  }, [game?.room_code]);
 
   const save = async (g) => {
     const saved = await base44.entities.DominoGame.update(
@@ -158,7 +178,11 @@ export default function DominoHost() {
   };
   const nextRound = async () => { const g = await fetchRoom(game.room_code) || game; if (g.phase === 'round_over') await save(newRound(g)); };
   const playAgain = async () => { const g = await fetchRoom(game.room_code) || game; await save(newRound({ ...g, roundWinner: null }, { first: true })); };
-  const endGame = async () => { if (!window.confirm('End this game for everyone?')) return; await save({ ...game, phase: 'game_over', status: 'finished' }); };
+  const endGame = async () => {
+    if (!window.confirm('End this game for everyone?')) return;
+    await save({ ...game, phase: 'game_over', status: 'finished' });
+    releaseStandaloneDisplay().catch(() => {});
+  };
 
   const hostPlay = async (id, side) => {
     const fresh = await fetchRoom(game.room_code);
