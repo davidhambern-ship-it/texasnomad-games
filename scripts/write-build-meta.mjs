@@ -1,12 +1,13 @@
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { buildFingerprint } from './build-fingerprint.mjs';
 
 const commit = String(
   process.env.CF_PAGES_COMMIT_SHA ||
   process.env.RAILWAY_GIT_COMMIT_SHA ||
   process.env.GITHUB_SHA ||
   process.env.VERCEL_GIT_COMMIT_SHA ||
-  'local',
+  '',
 ).trim();
 
 const branch = String(
@@ -14,13 +15,17 @@ const branch = String(
   process.env.RAILWAY_GIT_BRANCH ||
   process.env.GITHUB_REF_NAME ||
   process.env.VERCEL_GIT_COMMIT_REF ||
-  'local',
+  '',
 ).trim();
+
+const { fingerprint, files } = await buildFingerprint();
 
 const payload = {
   app: 'texasnomad-games',
-  commit,
-  branch,
+  fingerprint,
+  files,
+  commit: commit || null,
+  branch: branch || null,
   builtAt: new Date().toISOString(),
 };
 
@@ -30,4 +35,7 @@ await writeFile(
   'utf8',
 );
 
-console.log(`[TNG build] stamped ${commit} on ${branch}`);
+console.log(
+  `[TNG build] fingerprint ${fingerprint.slice(0, 12)} from ${files} files`
+  + (commit ? `; commit ${commit.slice(0, 12)}` : ''),
+);
