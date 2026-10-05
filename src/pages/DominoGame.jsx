@@ -7,6 +7,7 @@ import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/Domino
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { getTeam } from '@/lib/dominoEngine';
 import '@/components/domino/domino.css';
+import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 
 const BG = { background: 'radial-gradient(ellipse at 50% 0%,#1a0b33,#050505 70%)', minHeight: '100vh' };
 
@@ -31,7 +32,8 @@ export default function DominoGame() {
   const [game, setGame] = useState(null);
   const [loading, setLoading] = useState(!!roomCode);
   const [mySeat, setMySeat] = useState(null);
-  const [nameInput, setNameInput] = useState(() => { try { return localStorage.getItem('dom_player_name') || ''; } catch { return ''; } });
+  const identity = useTngGameIdentity();
+  const nameInput = identity.publicName;
   const [codeInput, setCodeInput] = useState('');
   const [msg, setMsg] = useState('');
 
@@ -81,7 +83,6 @@ export default function DominoGame() {
       const joined = await base44.entities.DominoGame.join(
         roomCode,
         seat,
-        nameInput.trim(),
       );
 
       if (!joined?.game || !joined?.playerId) {
@@ -96,7 +97,6 @@ export default function DominoGame() {
       try {
         localStorage.setItem(`dom_seat_${roomCode}`, String(seat));
         localStorage.setItem(`dom_pid_${roomCode}`, joined.playerId);
-        localStorage.setItem('dom_player_name', nameInput.trim());
       } catch { /* ignore */ }
     } catch (error) {
       setMsg(error?.message || 'Could not take that seat.');
@@ -162,15 +162,18 @@ export default function DominoGame() {
             <p className="tnd-sub">Room <b style={{ color: '#FFD700', letterSpacing: '.2em' }}>{roomCode}</b>{game.phase !== 'waiting' ? ' · game in progress' : ''}</p>
           </div>
           <div className="tnd-panel">
-            <h3>Your name</h3>
-            <input className="tnd-input" value={nameInput} maxLength={20} placeholder="YOUR NAME" onChange={e => setNameInput(e.target.value)} />
+            <h3>TNG player</h3>
+            <p className="tnd-sub" style={{ marginTop: 8 }}>
+              Playing as <b style={{ color: '#FFD700' }}>{nameInput || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+            </p>
+            {identity.error && <p className="tnd-sub" style={{ color: '#fca5a5', marginTop: 8 }}>{identity.error}</p>}
             <h3 style={{ marginTop: 16 }}>Pick a seat</h3>
             <div className="tnd-seats">
               {game.players.map((p, seat) => (
                 <div key={seat} className="tnd-seatbox" style={{ '--tc': TEAM_COLORS[getTeam(seat)] }}>
                   <SeatAvatar p={p} seat={seat} />
                   <div className="who"><b>{p.playerName || 'Open seat'}{p.isAI ? ' · CPU' : ''}</b><span>Seat {seat + 1} · {TEAM_NAMES[getTeam(seat)]}{seat === 0 ? ' · Host' : ''}</span></div>
-                  {open.includes(seat) && <button type="button" className="tnd-btn primary" onClick={() => takeSeat(seat)}>Sit here</button>}
+                  {open.includes(seat) && <button type="button" className="tnd-btn primary" disabled={identity.loading || !nameInput} onClick={() => takeSeat(seat)}>Sit here</button>}
                 </div>
               ))}
             </div>
