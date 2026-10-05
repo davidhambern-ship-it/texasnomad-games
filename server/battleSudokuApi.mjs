@@ -44,6 +44,9 @@ export function createBattleSudokuApi({
   store = null,
   resolveIdentity = async () => null,
   recordResults = async () => ({ recorded: 0 }),
+  claimRoomCode = async () => true,
+  touchRoomCode = async () => {},
+  releaseRoomCode = async () => {},
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
@@ -111,6 +114,7 @@ export function createBattleSudokuApi({
     if (!force && now - last < 3000) return;
 
     await store.save(room.code, room);
+    await touchRoomCode(room.code, { ttlMs: ROOM_TTL_MS });
     lastCheckpoint.set(room.code, now);
   }
 
@@ -133,15 +137,29 @@ export function createBattleSudokuApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async () => {
+  const newCode = async (hostAccountId) => {
     for (let i = 0; i < 50; i++) {
       const c = Array.from(
         { length: 5 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
-      if (!(await roomExists(c))) return c;
+
+      if (await roomExists(c)) continue;
+
+      const claimed = await claimRoomCode({
+        code: c,
+        gameId: 'sudoku',
+        service: 'battle-sudoku',
+        kind: 'standalone',
+        joinPath: '/games/sudoku?room=' + encodeURIComponent(c),
+        spectatePath: '/games/sudoku?display=' + encodeURIComponent(c),
+        hostAccountId,
+        ttlMs: ROOM_TTL_MS,
+      });
+
+      if (claimed) return c;
     }
-    throw err(503, 'NO_CODE', 'Try again.');
+    throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
 
   function view(room, me, now) {
@@ -233,7 +251,7 @@ export function createBattleSudokuApi({
           throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting BattleSudoku.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
-        const code = await newCode();
+        const code = await newCode(hostIdentity.accountId);
         const room = {
           code,
           hostToken: newToken(),
@@ -245,7 +263,12 @@ export function createBattleSudokuApi({
           createdAt: now,
           updatedAt: now,
         };
-        await saveRoom(room, { force: true });
+        try {
+          await saveRoom(room, { force: true });
+        } catch (error) {
+          await releaseRoomCode(room.code, 'battle-sudoku').catch(() => {});
+          throw error;
+        }
         const v = view(room, null, now); v.you = { isHost: true };
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
       }
