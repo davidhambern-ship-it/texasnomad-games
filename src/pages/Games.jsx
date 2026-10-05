@@ -197,11 +197,13 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {game.standalone
-              ? '🚀 LAUNCH GAME'
-              : creating === game.id
-                ? '⚙ CREATING…'
-                : '⚡ CREATE ROOM'}
+            {game.launchLabel
+              ? game.launchLabel
+              : game.standalone
+                ? '🚀 LAUNCH GAME'
+                : creating === game.id
+                  ? '⚙ CREATING…'
+                  : '⚡ CREATE ROOM'}
           </button>
 
           {(!game.standalone || game.supportsDirectJoin) && (
@@ -458,6 +460,7 @@ const GAMES = [
     path: '/games/see-that',
     standalone: true,
     supportsDirectJoin: true,
+    launchLabel: '⚡ HOST LIVE GAME',
     featured: false,
   },
   {
@@ -506,7 +509,7 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['sudoku', 'see-that', 'word-wrangler'];
+const IN_CONSTRUCTION_IDS = ['sudoku', 'word-wrangler'];
 
 const CONSTRUCTION_DETAILS = {
   sudoku: {
@@ -515,14 +518,6 @@ const CONSTRUCTION_DETAILS = {
       'Every player gets a valid Sudoku board built for the same round.',
       'Players race the clock while mistakes add pressure and penalties.',
       'The finished version will support clean solo play plus competitive live-room races.',
-    ],
-  },
-  'see-that': {
-    status: 'Scene production + hidden-object interaction',
-    how: [
-      'A detailed scene hides a fixed set of objects in known locations.',
-      'Players scan the image and tap what they find before the timer expires.',
-      'Future scenes can rotate themes, object lists, difficulty and score challenges.',
     ],
   },
   'word-wrangler': {
@@ -569,9 +564,10 @@ export default function Games() {
       return;
     }
 
-    // See That?! owns its own host/join room flow on /st-api.
+    // See That?! owns its own live room flow on /st-api.
+    // Launch directly as Host from the main game-room selection.
     if (gameId === 'see-that') {
-      navigate('/games/see-that');
+      navigate('/games/see-that?host=1');
       return;
     }
     // TXD Dominoes — goes to dedicated host panel
