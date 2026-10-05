@@ -79,6 +79,9 @@ export function createSeeThatApi({
   store = null,
   resolveIdentity = async () => null,
   recordResults = async () => ({ recorded: 0 }),
+  claimRoomCode = async () => true,
+  touchRoomCode = async () => {},
+  releaseRoomCode = async () => {},
 } = {}) {
   const rooms = new Map();
   const lastCheckpoint = new Map();
@@ -144,6 +147,7 @@ export function createSeeThatApi({
     if (!force && now - last < 3000) return;
 
     await store.save(room.code, room);
+    await touchRoomCode(room.code, { ttlMs: ROOM_TTL_MS });
     lastCheckpoint.set(room.code, now);
   }
 
@@ -166,15 +170,29 @@ export function createSeeThatApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async () => {
+  const newCode = async (hostAccountId) => {
     for (let i = 0; i < 50; i++) {
       const c = Array.from(
         { length: 5 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
-      if (!(await roomExists(c))) return c;
+
+      if (await roomExists(c)) continue;
+
+      const claimed = await claimRoomCode({
+        code: c,
+        gameId: 'see-that',
+        service: 'see-that',
+        kind: 'standalone',
+        joinPath: '/games/see-that?room=' + encodeURIComponent(c),
+        spectatePath: '/games/see-that?display=' + encodeURIComponent(c),
+        hostAccountId,
+        ttlMs: ROOM_TTL_MS,
+      });
+
+      if (claimed) return c;
     }
-    throw err(503, 'NO_CODE', 'Try again in a moment.');
+    throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
 
   function tick(room, now = Date.now()) {
@@ -322,12 +340,17 @@ export function createSeeThatApi({
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now — try again soon.');
         const S = scenes();
-        const code = await newCode();
+        const code = await newCode(hostIdentity.accountId);
         const room = {
           code, hostToken: newToken(), hostAccountId: hostIdentity.accountId, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
           settings: { sceneId: S.list[0]?.id || 'random', count: 10, seconds: 120, rounds: 3, difficulty: 'normal' }, createdAt: now, updatedAt: now,
         };
-        await saveRoom(room, { force: true });
+        try {
+          await saveRoom(room, { force: true });
+        } catch (error) {
+          await releaseRoomCode(room.code, 'see-that').catch(() => {});
+          throw error;
+        }
         const v = view(room, null, now);
         v.you = { isHost: true };
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
