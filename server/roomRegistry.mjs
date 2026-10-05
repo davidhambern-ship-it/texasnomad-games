@@ -238,6 +238,7 @@ export function createRoomRegistry(pool) {
           service,
           room_kind: 'standalone',
           join_path: `/games/word-wrangler?room=${encodeURIComponent(code)}`,
+          spectate_path: `/games/word-wrangler?display=${encodeURIComponent(code)}`,
           host_account_id: hostAccountId,
           expires_at: row.expires_at,
         });
@@ -297,6 +298,7 @@ export function createRoomRegistry(pool) {
           service: 'dominoes',
           room_kind: 'standalone',
           join_path: `/games/dominoes?room=${encodeURIComponent(code)}`,
+          spectate_path: `/games/dominoes?display=${encodeURIComponent(code)}`,
           host_account_id: dominoRow.host_account_id || null,
           expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000),
         });
