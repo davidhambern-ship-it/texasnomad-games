@@ -1,40 +1,8 @@
-import { base44 } from '@/api/base44Client';
 import { TngApiError, tngApi } from '@/api/tngApi';
-import { isNeonStaging } from '@/lib/neonAuth';
 
-function previewHost() {
-  if (typeof window === 'undefined') return false;
-
-  const candidates = [
-    window.location.href,
-    document.referrer,
-    window.localStorage.getItem('base44_from_url'),
-    window.localStorage.getItem('base44_app_base_url'),
-  ].filter(Boolean);
-
-  return candidates.some((value) => {
-    try {
-      const url = new URL(value, window.location.origin);
-      const host = url.hostname.toLowerCase();
-
-      if (
-        host.endsWith('.base44.app') &&
-        (host.startsWith('preview--') || host.startsWith('preview-sandbox--'))
-      ) return true;
-
-      return host === 'app.base44.com' && url.pathname.includes('/editor/preview');
-    } catch {
-      return false;
-    }
-  });
-}
-
-export const isBase44Preview = previewHost();
-
-async function getBase44Profile(user) {
-  const profiles = await base44.entities.PlayerProfile.filter({ user_id: user.id });
-  return profiles[0] || null;
-}
+// Legacy export kept for compatibility with callers that still branch on it.
+// TNG no longer uses Base44 preview/runtime profile storage.
+export const isBase44Preview = false;
 
 async function getNeonProfile() {
   try {
@@ -46,40 +14,9 @@ async function getNeonProfile() {
   }
 }
 
-async function mirrorToNeon(base44Profile) {
-  if (!base44Profile) return null;
-  const displayName = base44Profile.username || 'Nomad';
-  const handle = base44Profile.handle;
-  if (!handle) return null;
-
-  try {
-    const payload = await tngApi.profile.create({ displayName, handle });
-    return payload.profile || null;
-  } catch (error) {
-    if (error instanceof TngApiError && error.code === 'PROFILE_LOCKED') {
-      return getNeonProfile();
-    }
-    throw error;
-  }
-}
-
 export async function getPreviewTngProfile(user) {
   if (!user) return null;
-
-  const neon = await getNeonProfile();
-  if (neon || isNeonStaging) return neon;
-
-  const legacy = await getBase44Profile(user);
-  if (!legacy) return null;
-
-  // Profiles created before the permanent TNG ID system are not considered
-  // fully onboarded until the user chooses a unique handle once.
-  if (!legacy.handle || legacy.onboarding_complete !== true) {
-    return null;
-  }
-
-  const synced = await mirrorToNeon(legacy);
-  return synced || legacy;
+  return getNeonProfile();
 }
 
 export async function createPreviewTngProfile(user, { displayName, handle }) {
@@ -91,66 +28,18 @@ export async function createPreviewTngProfile(user, { displayName, handle }) {
   if (cleanDisplayName.length < 2 || cleanDisplayName.length > 50) {
     throw new Error('Display name must be between 2 and 50 characters.');
   }
+
   if (!/^[a-z0-9_]{3,24}$/.test(cleanHandle)) {
     throw new Error('Handle must be 3–24 characters using letters, numbers, or underscores.');
   }
 
-  if (isNeonStaging) {
-    let neonProfile = await getNeonProfile();
-    if (neonProfile) return neonProfile;
+  const existing = await getNeonProfile();
+  if (existing) return existing;
 
-    const payload = await tngApi.profile.create({
-      displayName: cleanDisplayName,
-      handle: cleanHandle,
-    });
-    return payload.profile;
-  }
+  const payload = await tngApi.profile.create({
+    displayName: cleanDisplayName,
+    handle: cleanHandle,
+  });
 
-  const existingProfile = await getBase44Profile(user);
-  const existingHandle = await base44.entities.PlayerProfile.filter({ handle: cleanHandle });
-  const conflictingHandle = existingHandle.find((profile) => profile.id !== existingProfile?.id);
-  if (conflictingHandle) throw new Error('That TNG handle is already taken.');
-
-  let neonProfile = await getNeonProfile();
-  if (!neonProfile) {
-    const payload = await tngApi.profile.create({
-      displayName: cleanDisplayName,
-      handle: cleanHandle,
-    });
-    neonProfile = payload.profile;
-  }
-
-  if (existingProfile) {
-    // Upgrade the legacy profile in place so existing stats, badges, referral
-    // history, themes, and host history are preserved.
-    await base44.entities.PlayerProfile.update(existingProfile.id, {
-      username: cleanDisplayName,
-      handle: cleanHandle,
-      onboarding_complete: true,
-      profile_locked: true,
-    });
-  } else {
-    await base44.entities.PlayerProfile.create({
-      user_id: user.id,
-      username: cleanDisplayName,
-      handle: cleanHandle,
-      onboarding_complete: true,
-      profile_locked: true,
-      total_games_played: 0,
-      total_play_time_minutes: 0,
-      game_stats: {},
-      badges: [],
-      favorite_games: [],
-      playstyle_tags: [],
-      ambassador_status: 'player',
-      ambassador_path: 'none',
-      has_seen_ambassador_reveal: false,
-      referral_count: 0,
-      subscription_status: 'free',
-      member_since: new Date().toISOString(),
-      host_stats: { total_sessions: 0, total_host_time_minutes: 0, last_hosted: null },
-    });
-  }
-
-  return neonProfile;
+  return payload.profile;
 }
