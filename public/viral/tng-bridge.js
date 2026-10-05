@@ -213,6 +213,42 @@
 
             return new Proxy(connection, {
               get(conn, key, connReceiver) {
+                if (key === 'emit') {
+                  const originalEmit = conn.emit.bind(conn);
+                  return function identityAwareEmit(topic, data) {
+                    if (
+                      topic === 'state' &&
+                      data &&
+                      typeof data === 'object' &&
+                      Array.isArray(data.ro)
+                    ) {
+                      const namesBySeat = new Map();
+                      try {
+                        conn.peers().forEach((peer) => {
+                          const seat = String(peer?.presence?.seat || '');
+                          const name = String(peer?.presence?.name || '');
+                          if (seat && name) namesBySeat.set(seat, name);
+                        });
+                      } catch {}
+
+                      if (namesBySeat.size) {
+                        const next = {
+                          ...data,
+                          ro: data.ro.map((row) => {
+                            if (!Array.isArray(row)) return row;
+                            const copy = [...row];
+                            const verifiedName = namesBySeat.get(String(copy[0] || ''));
+                            if (verifiedName) copy[1] = verifiedName;
+                            return copy;
+                          }),
+                        };
+                        return originalEmit(topic, next);
+                      }
+                    }
+                    return originalEmit(topic, data);
+                  };
+                }
+
                 if (key !== 'presence') {
                   const value = Reflect.get(conn, key, connReceiver);
                   return typeof value === 'function' ? value.bind(conn) : value;
@@ -225,6 +261,13 @@
                       : {};
 
                   if (payload.role !== 'host') {
+                    if (typeof payload.seat === 'string' && payload.seat) {
+                      const token = await getHostAuthToken().catch(() => '');
+                      if (!token) {
+                        throw new Error('Sign in to TNG before taking a VIRAL seat.');
+                      }
+                      payload._tngPlayerAuth = { token };
+                    }
                     return originalPresence(payload);
                   }
 
