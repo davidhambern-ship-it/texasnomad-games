@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { generateRoomCode, getDefaultGameState } from '@/lib/roomUtils';
 import { base44 } from '@/api/base44Client';
-
-const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
+import TXDDomino from '@/components/domino/TXDDomino';
 
 // This list is the single source of truth for ALL games on the platform.
 // When a new game is added, add it here and it automatically appears in the Host Panel.
@@ -52,28 +51,79 @@ export const ALL_GAMES = [
     title: 'VIRAL!',
     subtitle: 'CREATOR JOURNEY',
     color: '#BC13FE',
-    image: VIRAL_CABINET_IMAGE,
+    iconType: 'viral-stars',
     path: '/games/viral',
     hostPath: '/games/viral?host=1',
     standalone: true,
   },
   {
-    id: 'sudoku',
-    title: 'SUDOKU TN',
-    subtitle: 'RACE THE GRID',
-    color: '#22d3ee',
-    emoji: '🔢',
-    path: '/games/sudoku',
-  },
-  {
-    id: 'see-that',
-    title: 'SEE THAT!',
-    subtitle: 'HIDDEN OBJECT',
-    color: '#4ade80',
-    emoji: '👁',
-    path: '/games/see-that',
+    id: 'dominoes',
+    title: 'DOMINOES',
+    subtitle: 'TEXAS DOMINO SHOWDOWN',
+    color: '#FFD700',
+    iconType: 'domino-32',
+    path: '/games/dominoes',
+    hostPath: '/games/dominoes/host',
+    standalone: true,
   },
 ];
+
+export function HostGameIcon({ game, size = 'lg' }) {
+  const compact = size === 'sm';
+
+  if (game?.iconType === 'viral-stars') {
+    const box = compact ? 'h-8 w-12' : 'h-14 w-20';
+    const main = compact ? 'text-2xl' : 'text-4xl';
+    const side = compact ? 'text-xl' : 'text-3xl';
+
+    return (
+      <div className={`relative ${box}`} aria-label="VIRAL stars">
+        <span
+          className={`absolute left-0 top-3 ${side} leading-none`}
+          style={{ color: '#BC13FE', textShadow: '0 0 12px #BC13FE' }}
+        >
+          ★
+        </span>
+        <span
+          className={`absolute left-1/2 top-0 -translate-x-1/2 ${main} leading-none`}
+          style={{ color: '#FF5F1F', textShadow: '0 0 14px #FF5F1F' }}
+        >
+          ★
+        </span>
+        <span
+          className={`absolute right-0 top-3 ${side} leading-none`}
+          style={{ color: '#FF2FD1', textShadow: '0 0 12px #FF2FD1' }}
+        >
+          ★
+        </span>
+      </div>
+    );
+  }
+
+  if (game?.iconType === 'domino-32') {
+    return (
+      <div
+        className="flex items-center justify-center"
+        style={{ filter: 'drop-shadow(0 0 8px rgba(255,215,0,.35))' }}
+        aria-label="TNG 3-2 domino"
+      >
+        <TXDDomino
+          top={3}
+          bottom={2}
+          width={compact ? 18 : 26}
+          orientation="vertical"
+          style={{ pointerEvents: 'none' }}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <span className={compact ? 'text-xl' : 'text-5xl'}>
+      {game?.emoji || '🎮'}
+    </span>
+  );
+}
 
 const ADMIN_TOOLS = [
   { id: 'live-players', title: 'LIVE PLAYERS', subtitle: 'WHO\'S ON RIGHT NOW', color: '#4ade80', emoji: '📡' },
@@ -148,13 +198,9 @@ export default function HostGameSelect({ onSelect, currentGame, onAdminSelect })
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12">
         <div className="w-full max-w-sm space-y-6">
           <div className="text-center">
-            {pendingGame.image ? (
-              <div className="mb-3 overflow-hidden rounded-xl border" style={{ borderColor: `${pendingGame.color}55` }}>
-                <img src={pendingGame.image} alt={pendingGame.title} className="aspect-video w-full object-cover" />
-              </div>
-            ) : (
-              <div className="text-5xl mb-2">{pendingGame.emoji}</div>
-            )}
+            <div className="mb-3 flex justify-center">
+              <HostGameIcon game={pendingGame} />
+            </div>
             <h2 className="text-xl tracking-[0.15em] uppercase mb-1" style={{ color: pendingGame.color, fontFamily: "'Press Start 2P', monospace", textShadow: `0 0 15px ${pendingGame.color}` }}>
               {pendingGame.title}
             </h2>
@@ -252,13 +298,9 @@ export default function HostGameSelect({ onSelect, currentGame, onAdminSelect })
             onMouseEnter={(e) => { e.currentTarget.style.borderColor = game.color; e.currentTarget.style.boxShadow = `0 0 25px ${game.color}40`; }}
             onMouseLeave={(e) => { e.currentTarget.style.borderColor = `${game.color}40`; e.currentTarget.style.boxShadow = 'none'; }}
           >
-            {game.image ? (
-              <span className="mb-3 block w-full overflow-hidden rounded-lg border" style={{ borderColor: `${game.color}45` }}>
-                <img src={game.image} alt={game.title} className="aspect-video w-full object-cover" />
-              </span>
-            ) : (
-              <span className="text-5xl mb-3">{game.emoji}</span>
-            )}
+            <span className="mb-3 flex h-16 items-center justify-center">
+              <HostGameIcon game={game} />
+            </span>
             <span className="text-xl tracking-widest uppercase" style={{ fontFamily: "'Press Start 2P', monospace", color: game.color, textShadow: `0 0 15px ${game.color}60` }}>
               {game.title}
             </span>
