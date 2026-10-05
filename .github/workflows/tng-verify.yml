@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: tng-verify-${{ github.ref }}
@@ -35,57 +35,8 @@ jobs:
       - name: Verify TNG
         run: npm run ci:verify
 
-      - name: Capture production dependency audit
-        if: always()
-        run: npm audit --omit=dev --json > npm-audit-production.json || true
-
-      - name: Upload production dependency audit
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: npm-audit-production
-          path: npm-audit-production.json
-          retention-days: 1
-
-      - name: Generate safe dependency remediation preview
-        if: always()
-        run: |
-          npm audit fix --package-lock-only --omit=dev || true
-          npm audit --omit=dev --json > npm-audit-after-safe-fix.json || true
-          npx --yes depcheck@1.4.7 --json > depcheck.json || true
-
-      - name: Upload dependency remediation preview
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: dependency-remediation-preview
-          path: |
-            package-lock.json
-            npm-audit-after-safe-fix.json
-            depcheck.json
-          retention-days: 1
-
-      - name: Apply safe dependency cleanup
-        if: github.event_name == 'push' && contains(github.event.head_commit.message, 'run dependency cleanup')
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-          for (const name of ['react-quill', 'lodash', 'moment']) {
-            delete pkg.dependencies[name];
-          }
-          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          NODE
-          npm install --package-lock-only --legacy-peer-deps
-          npm audit fix --package-lock-only --omit=dev || true
-          npm ci --legacy-peer-deps
-          npm run ci:verify
-          npm audit --omit=dev --json > npm-audit-final.json || true
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "Phase 15: apply safe dependency cleanup"
-          git push
+      - name: Production dependency security gate
+        run: npm audit --omit=dev --audit-level=high
 
   production-smoke:
     name: Production release certification
