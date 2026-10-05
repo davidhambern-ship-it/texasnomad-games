@@ -3,10 +3,9 @@ import SpadesCardArea from '@/components/spades/SpadesCardArea';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import HostSeatSlot from './spades/HostSeatSlot';
 import HostHandBox from './spades/HostHandBox';
-import { getCardImage, getCardBack } from '@/lib/spadesCardImages';
-import { calculateCPUBid, selectCPUCard, CPU_ACTION_DELAY, fillEmptySeatsWithCPU, createCPUPlayer, fillEmptySeatsWithTNCharacters, assignTNCharacterToSeat, removeCPUPlayers } from '@/lib/spadesCPU';
+import { fillEmptySeatsWithTNCharacters, assignTNCharacterToSeat, removeCPUPlayers } from '@/lib/spadesCPU';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
-import { generateFullDeck, shuffleDeck as shuffleDeckRules, dealFromShuffledDeck, getSeatedPlayers, isValidPlay, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
+import { generateFullDeck, shuffleDeck as shuffleDeckRules, dealFromShuffledDeck, getSeatedPlayers, determineTrickWinner, getActiveSuit, getTeamFromSeat } from '@/lib/spadesRules';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 const HOST_PLAYER_ID = 'host_player_spades';
