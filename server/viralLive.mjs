@@ -231,7 +231,12 @@ export function createViralLive({
             from: 'tng',
           });
         }
-        broadcast(r, { t: 'peers', joined: [], left: [], peers: peerList(r) });
+        broadcast(r, {
+          t: 'peers',
+          joined: clean.seat && clean.accountId ? [{ id }] : [],
+          left: [],
+          peers: peerList(r),
+        });
         return;
       }
 
