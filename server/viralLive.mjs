@@ -292,7 +292,7 @@ export function createViralLive({
             service: 'viral-live',
             kind: 'standalone',
             joinPath: `/viral/index.html?join=${encodeURIComponent(publicCode)}`,
-            spectatePath: null,
+            spectatePath: `/viral/index.html?display=${encodeURIComponent(publicCode)}`,
             hostAccountId: accountId,
             ttlMs: KEEP_STATE_MS,
             allowExisting: true,
