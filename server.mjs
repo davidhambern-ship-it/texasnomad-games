@@ -1489,6 +1489,53 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
   ttlMs: 3 * 60 * 60 * 1000,
 });
 
+
+const ROOM_MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000;
+
+async function runRoomMaintenance() {
+  const jobs = [
+    ['registry', () => roomRegistry.cleanup()],
+    ['viral', () => viralRoomStore.cleanup()],
+    ['see-that', () => seeThatRoomStore.cleanup()],
+    ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
+    ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
+  ];
+
+  const results = await Promise.allSettled(
+    jobs.map(([, task]) => Promise.resolve().then(task)),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.warn(
+        `[TNG maintenance] ${jobs[index][0]} cleanup failed:`,
+        result.reason?.message || result.reason,
+      );
+    }
+  });
+
+  const cutoff = Date.now() - VIRAL_DISPLAY_TARGET_TTL_MS;
+  for (const targets of [viralDisplayTargets, seeThatDisplayTargets, standaloneDisplayTargets]) {
+    for (const [key, target] of targets.entries()) {
+      if (Number(target?.updatedAt || 0) < cutoff) targets.delete(key);
+    }
+  }
+}
+
+const roomMaintenanceKickoff = setTimeout(() => {
+  runRoomMaintenance().catch((error) => {
+    console.warn('[TNG maintenance] initial cleanup failed:', error?.message || error);
+  });
+}, 30_000);
+roomMaintenanceKickoff.unref?.();
+
+const roomMaintenanceTimer = setInterval(() => {
+  runRoomMaintenance().catch((error) => {
+    console.warn('[TNG maintenance] cleanup failed:', error?.message || error);
+  });
+}, ROOM_MAINTENANCE_INTERVAL_MS);
+roomMaintenanceTimer.unref?.();
+
 // See That?! party rooms (/st-api)
 const handleSeeThatApi = createSeeThatApi({
   store: seeThatRoomStore,
@@ -6168,6 +6215,26 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && (req.url || '').split('?')[0] === '/healthz') {
+    let database = 'ok';
+
+    try {
+      await bffPool.query('select 1');
+    } catch (error) {
+      database = 'degraded';
+      console.warn('[TNG health] database check failed:', error?.message || error);
+    }
+
+    sendJson(res, 200, {
+      ok: true,
+      service: 'tng-live',
+      database,
+      uptimeSeconds: Math.round(process.uptime()),
+      commit: process.env.RAILWAY_GIT_COMMIT_SHA || null,
+    });
+    return;
+  }
+
   try {
     if ((req.url || '').startsWith('/bernaverse-sso')) {
       await handleBernaverseSso(req, res);
@@ -6292,8 +6359,53 @@ const server = http.createServer(async (req, res) => {
     // React Router SPA fallback for /host, /join/:roomCode, /games/*, etc.
     await sendFile(res, join(root, 'index.html'));
   } catch (error) {
-    console.error('[TNG temp host] request failed', error);
-    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    const requestId = randomBytes(4).toString('hex');
+    const path = (req.url || '/').split('?')[0];
+
+    console.error('[TNG request failed]', {
+      requestId,
+      method: req.method || 'GET',
+      path,
+      message: error?.message || String(error),
+      stack: error?.stack || null,
+    });
+
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+
+    const apiPrefixes = [
+      '/bernaverse-sso',
+      '/neon-auth',
+      '/tng-',
+      '/viral-',
+      '/see-that-display',
+      '/standalone-display',
+      '/test-feedback',
+      '/bff-api',
+      '/bs-api',
+      '/st-api',
+      '/ww-api',
+      '/domino-api',
+    ];
+
+    if (apiPrefixes.some((prefix) => path.startsWith(prefix))) {
+      sendJson(res, 500, {
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: 'TNG hit an unexpected service error. Try again.',
+          requestId,
+        },
+      });
+      return;
+    }
+
+    res.writeHead(500, {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+      'X-TNG-Error-Id': requestId,
+    });
     res.end('TNG host error');
   }
 });
