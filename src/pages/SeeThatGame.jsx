@@ -11,13 +11,17 @@ import '@/components/seeThat/st.css';
 
 // /games/see-that              menu
 // /games/see-that?room=CODE    join on a phone
+// /games/see-that?host=1      host directly from the TNG Host Panel
 // /games/see-that?display=CODE read-only big screen (TNG Game Display / second TV)
 // /games/see-that?editor=1     scene editor
 export default function SeeThatGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
   const display = (params.get('display') || '').toUpperCase();
-  const [screen, setScreen] = useState(params.get('editor') ? 'editor' : room ? 'join' : 'menu');
+  const directHost = params.get('host') === '1';
+  const [screen, setScreen] = useState(
+    params.get('editor') ? 'editor' : room ? 'join' : directHost ? 'host' : 'menu',
+  );
   const [scenes, setScenes] = useState([]);
   const [code, setCode] = useState('');
   const [name, setName] = useState(() => { try { return localStorage.getItem('st_name') || ''; } catch { return ''; } });
