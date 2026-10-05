@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
-import BSSolo from '@/components/battleSudoku/BSSolo';
 import { BSDisplay, BSHost, BSPlayer } from '@/components/battleSudoku/BSOnline';
 import { sfx } from '@/components/battleSudoku/bsSfx';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
@@ -20,7 +19,6 @@ export default function SudokuGame() {
   const [code, setCode] = useState('');
   const identity = useTngGameIdentity();
   const name = identity.publicName;
-  const [solo, setSolo] = useState({ rivals: 2, level: 'normal', difficulty: 'normal' });
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
@@ -30,27 +28,7 @@ export default function SudokuGame() {
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
   else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <BSPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
-  else if (screen === 'solo') body = <BSSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} difficulty={solo.difficulty} onExit={toMenu} />;
-  else if (screen === 'solosetup') {
-    const Seg = ({ k, opts }) => <div className="bs-seg">{opts.map(([v, l]) => <button key={v} type="button" aria-pressed={solo[k] === v} onClick={() => setSolo(s => ({ ...s, [k]: v }))}>{l}</button>)}</div>;
-    body = (
-      <div className="bs-wrap" style={{ maxWidth: 620 }}>
-        <div className="bs-card bs-grid2">
-          <h2 className="bs-h" style={{ fontSize: 44, color: 'var(--bs-brass)' }}>Solo vs CPU</h2>
-          <div className="bs-card" style={{ padding: 12 }}>
-            <span className="bs-label">TNG player</span>
-            <p className="bs-sub" style={{ margin: '6px 0 0' }}>
-              Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
-            </p>
-          </div>
-          <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Rivals</span><Seg k="rivals" opts={[[1, '1 (duel)'], [2, '2'], [3, '3'], [5, '5']]} /></div>
-          <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>CPU skill</span><Seg k="level" opts={[['easy', 'Rookies'], ['normal', 'Sailors'], ['hard', 'Admirals']]} /></div>
-          <div className="bs-row"><span className="bs-label" style={{ width: 110 }}>Puzzle</span><Seg k="difficulty" opts={[['easy', 'Easy'], ['normal', 'Normal'], ['hard', 'Hard']]} /></div>
-          <div className="bs-row"><button type="button" className="bs-btn primary" disabled={identity.loading || !name} onClick={() => { sfx.unlock(); setScreen('solo'); }}>Set sail</button><button type="button" className="bs-btn ghost" onClick={toMenu}>Back</button></div>
-        </div>
-      </div>
-    );
-  } else {
+  else {
     const join = () => { const c = code.trim().toUpperCase(); if (!/^[A-Z]{5}$/.test(c)) { setErr('Battle codes are 5 letters.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
     body = (
       <div className="bs-wrap">
@@ -75,8 +53,7 @@ export default function SudokuGame() {
             {identity.error && <div className="bs-err">{identity.error}</div>}
           </div>
           <div className="bs-modes">
-            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}><div className="bs-h">Host a battle</div><p>Open this on the TV. Captains join on their phones (2–8, add CPU captains to fill out the fleet).</p></button>
-            <button type="button" className="bs-mode" onClick={() => setScreen('solosetup')}><div className="bs-h">Solo vs CPU</div><p>Duel one CPU captain or take on up to five — right here on this device.</p></button>
+            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}><div className="bs-h">Host a battle</div><p>Open the battle from the Host Panel. Captains join on their phones — 2 to 8 human players.</p></button>
           </div>
           <div className="bs-card">
             <div className="bs-label">How it plays</div>
@@ -94,7 +71,7 @@ export default function SudokuGame() {
       </div>
     );
   }
-  const full = screen === 'host' || screen === 'solo';
+  const full = screen === 'host';
   return (
     <div className="bs-root">
       {!full && <Header />}
