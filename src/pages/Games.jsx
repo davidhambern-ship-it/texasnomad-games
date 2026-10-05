@@ -446,6 +446,7 @@ const GAMES = [
     path: '/games/sudoku',
     standalone: true,
     supportsDirectJoin: true,
+    launchLabel: '⚡ HOST LIVE BATTLE',
     featured: false,
   },
   {
@@ -558,6 +559,14 @@ export default function Games() {
       navigate('/games/see-that?host=1');
       return;
     }
+
+    // BattleSudoku owns its live party rooms on /bs-api.
+    // Host mode creates the real five-letter BattleSudoku room code.
+    if (gameId === 'sudoku') {
+      navigate('/games/sudoku?host=1');
+      return;
+    }
+
     // TXD Dominoes — goes to dedicated host panel
     if (gameId === 'txd') {
       navigate('/games/dominoes/host');
@@ -684,7 +693,7 @@ export default function Games() {
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-10">
               <div className="text-xl tracking-[0.2em] uppercase text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive", textShadow: '0 0 12px #FFD700, 0 0 24px #FFD700, 0 0 48px #FFD700, 0 0 60px #FFD700' }}>
-                — ALL GAMES —
+                — ONLINE GAMES —
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 justify-items-center">
@@ -704,29 +713,33 @@ export default function Games() {
           </div>
         </section>
 
-        <div className="relative py-8 px-4 text-center overflow-hidden">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, #FFD70055, #FF5F1F55, transparent)' }} />
-          </div>
-          <div className="relative inline-flex items-center gap-4 px-6 py-2 bg-midnight-void">
-            <span className="text-[#FFD700] text-xl">🚧</span>
-            <span className="text-lg tracking-[0.22em] uppercase text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>IN CONSTRUCTION</span>
-            <span className="text-kinetic-orange text-xl">🛠️</span>
-          </div>
-          <p className="relative mt-2 text-[8px] tracking-widest uppercase text-white/30" style={{ fontFamily: "'Press Start 2P', monospace" }}>
-            THEY EXIST. THEY ARE JUST CURRENTLY COVERED IN DIGITAL SAWDUST.
-          </p>
-        </div>
-
-        <section className="px-4 pb-10">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 justify-items-center">
-              {constructionGames.map(game => (
-                <ConstructionCabinet key={game.id} game={game} onOpen={setConstructionGame} />
-              ))}
+        {constructionGames.length > 0 && (
+          <>
+            <div className="relative py-8 px-4 text-center overflow-hidden">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full h-px" style={{ background: 'linear-gradient(90deg, transparent, #FFD70055, #FF5F1F55, transparent)' }} />
+              </div>
+              <div className="relative inline-flex items-center gap-4 px-6 py-2 bg-midnight-void">
+                <span className="text-[#FFD700] text-xl">🚧</span>
+                <span className="text-lg tracking-[0.22em] uppercase text-outlaw-gold" style={{ fontFamily: "'Monoton', cursive" }}>IN CONSTRUCTION</span>
+                <span className="text-kinetic-orange text-xl">🛠️</span>
+              </div>
+              <p className="relative mt-2 text-[8px] tracking-widest uppercase text-white/30" style={{ fontFamily: "'Press Start 2P', monospace" }}>
+                THEY EXIST. THEY ARE JUST CURRENTLY COVERED IN DIGITAL SAWDUST.
+              </p>
             </div>
-          </div>
-        </section>
+
+            <section className="px-4 pb-10">
+              <div className="max-w-7xl mx-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 justify-items-center">
+                  {constructionGames.map(game => (
+                    <ConstructionCabinet key={game.id} game={game} onOpen={setConstructionGame} />
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
 
                 {/* ── Western Divider ── */}
         <div className="relative py-6 px-4 text-center overflow-hidden">
