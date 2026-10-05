@@ -6,7 +6,6 @@ import { useGameRoom } from '@/hooks/useGameRoom';
 import { usePlayerSeat } from '@/hooks/usePlayerSeat.js';
 import SeatNotification from '@/components/game/SeatNotification.jsx';
 import SeatBadge from '@/components/game/SeatBadge.jsx';
-import { base44 } from '@/api/base44Client';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { WORD_POOL, CATEGORY_MAP } from '@/data/wordSearchPool';
 import { runAITurn, validateAISubmission } from '@/lib/wordSearchAI';
