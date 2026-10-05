@@ -104,16 +104,24 @@ export function createRoomRegistry(pool) {
   async function loadCoreRoom(code) {
     const result = await pool.query(
       `select
-         room_code,
-         game_id,
-         status::text as status,
-         host_account_id,
-         created_at,
-         updated_at,
-         completed_at
-       from public.game_rooms
-       where room_code = $1
-       order by created_at desc
+         gr.room_code,
+         gr.game_id,
+         gr.status::text as status,
+         (
+           select rp.account_id
+           from public.room_participants rp
+           where rp.room_id = gr.id
+             and rp.left_at is null
+             and rp.role::text in ('host_player', 'host')
+           order by rp.joined_at asc
+           limit 1
+         ) as host_account_id,
+         gr.created_at,
+         gr.updated_at,
+         gr.completed_at
+       from public.game_rooms gr
+       where gr.room_code = $1
+       order by gr.created_at desc
        limit 1`,
       [code],
     ).catch(() => ({ rows: [] }));
