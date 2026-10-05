@@ -7,6 +7,7 @@ import STEditor from '@/components/seeThat/STEditor';
 import { STDisplay, STHost, STPlayer } from '@/components/seeThat/STOnline';
 import { sfx } from '@/components/seeThat/stSfx';
 import { loadScene, loadSceneList } from '@/api/seeThatApi';
+import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import '@/components/seeThat/st.css';
 
 // /games/see-that              menu
@@ -24,7 +25,8 @@ export default function SeeThatGame() {
   );
   const [scenes, setScenes] = useState([]);
   const [code, setCode] = useState('');
-  const [name, setName] = useState(() => { try { return localStorage.getItem('st_name') || ''; } catch { return ''; } });
+  const identity = useTngGameIdentity();
+  const name = identity.publicName;
   const [practice, setPractice] = useState(null);
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
@@ -43,7 +45,7 @@ export default function SeeThatGame() {
 
   let body;
   if (screen === 'host') body = <STHost scenes={scenes} onExit={leaveHost} />;
-  else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <STPlayer code={room} name={name} setName={setName} onExit={toMenu} />;
+  else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <STPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
   else if (screen === 'editor') body = <STEditor onExit={toMenu} />;
   else if (screen === 'practice' && practice) body = <STPractice key={practice.k} scene={practice.scene} imageUrl={practice.scene.__img} count={10} seconds={120} name={name || 'You'} onExit={toMenu} />;
   else if (screen === 'pickscene') {
@@ -80,6 +82,13 @@ export default function SeeThatGame() {
               <button type="button" className="st-btn primary" style={{ padding: '12px 22px', fontSize: 18 }} onClick={join}>Join</button>
             </div>
             {err && <div className="st-err">{err}</div>}
+          </div>
+          <div className="st-card">
+            <div className="st-label-sm">TNG player</div>
+            <p className="st-sub" style={{ marginTop: 8 }}>
+              Playing as <b style={{ color: 'var(--st-gold)' }}>{name || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+            </p>
+            {identity.error && <div className="st-err">{identity.error}</div>}
           </div>
           <div className="st-modes">
             <button type="button" className="st-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}>
