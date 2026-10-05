@@ -980,7 +980,13 @@ export default function PreviewHostPanel() {
                     className="border-2 rounded-xl p-6 bg-black/50"
                     style={{ borderColor: game.color + '55' }}
                   >
-                    <div className="text-5xl mb-3">{game.emoji}</div>
+                    {game.image ? (
+                      <div className="mb-3 w-full overflow-hidden rounded-lg border" style={{ borderColor: game.color + '55' }}>
+                        <img src={game.image} alt={game.title} className="aspect-video w-full object-cover" />
+                      </div>
+                    ) : (
+                      <div className="text-5xl mb-3">{game.emoji}</div>
+                    )}
                     <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
                       {game.title}
                     </div>
