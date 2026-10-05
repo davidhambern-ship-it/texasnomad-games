@@ -60,7 +60,7 @@ export function BSDisplay({ code }) {
   return <BSBigScreen data={data} isHost={false} act={() => {}} offset={offset} onExit={() => {}} joinUrl={joinUrlFor()} />;
 }
 
-export function BSPlayer({ code, name, setName, onExit }) {
+export function BSPlayer({ code, name, identityReady = false, onExit }) {
   const [seat, setSeat] = useState(() => bsSeat.get(code));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -68,11 +68,10 @@ export function BSPlayer({ code, name, setName, onExit }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 200); return () => clearInterval(t); }, []);
   const join = async () => {
-    if (!name.trim()) { setErr('Type your name first.'); return; }
+    if (!identityReady) { setErr('Loading your TNG player profile…'); return; }
     setBusy(true); setErr(''); sfx.unlock();
     try {
-      try { localStorage.setItem('bs_name', name.trim()); } catch { /* ignore */ }
-      const d = await bsApi.action(code, seat?.token, 'join', { name: name.trim() });
+      const d = await bsApi.action(code, seat?.token, 'join');
       const s = { token: d.token, playerId: d.playerId }; bsSeat.set(code, s); setSeat(s); apply(d);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -91,8 +90,10 @@ export function BSPlayer({ code, name, setName, onExit }) {
         <div className="bs-card" style={{ textAlign: 'center' }}>
           <h1 className="bs-h bs-logo" style={{ fontSize: 60 }}>Battle<b>Sudoku</b></h1>
           <p className="bs-sub">Battle <b style={{ color: 'var(--bs-brass)', letterSpacing: '.15em' }}>{code}</b> · {room.roster.length} captain{room.roster.length === 1 ? '' : 's'}</p>
-          <input className="bs-input" style={{ marginTop: 14 }} value={name} maxLength={14} placeholder="CAPTAIN NAME" onChange={e => setName(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()} />
-          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy} onClick={join}>Join the fleet</button>
+          <p className="bs-sub" style={{ marginTop: 14 }}>
+            Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || 'Loading TNG profile…'}</b>
+          </p>
+          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy || !identityReady} onClick={join}>Join the fleet</button>
           {err && <div className="bs-err">{err}</div>}
           <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={onExit}>Back</button>
         </div>
