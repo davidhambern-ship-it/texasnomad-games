@@ -470,11 +470,13 @@ const GAMES = [
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/37cb5bd26_generated_image.png',
     color: '#BC13FE',
     color2: '#FF5F1F',
-    marqueeText: 'CONNECT LETTERS • FORM WORDS • SCORE POINTS • BEAT OPPONENTS',
-    screenText: '🔤 WORD BUILDER',
-    description: 'Create words by connecting adjacent letters on the board. Longer words earn more points. Special tiles add bonuses and TexasNomad events!',
-    tags: ['1-4 Players', 'Word Game', 'Strategy'],
+    marqueeText: 'TRACE WORDS • DROP TILES • FIND GEMS • BEAT THE ROPE',
+    screenText: '🔤 WORD WRANGLER',
+    description: 'Trace real words through touching tiles while the burning rope counts down. Play Solo Rush, race a TexasNomad CPU rival, or host an online race for up to eight players on identical boards.',
+    tags: ['1–8 Players', 'Word Game', 'Online Race'],
     path: '/games/word-wrangler',
+    standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
@@ -509,7 +511,7 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['sudoku', 'word-wrangler'];
+const IN_CONSTRUCTION_IDS = ['sudoku'];
 
 const CONSTRUCTION_DETAILS = {
   sudoku: {
@@ -518,14 +520,6 @@ const CONSTRUCTION_DETAILS = {
       'Every player gets a valid Sudoku board built for the same round.',
       'Players race the clock while mistakes add pressure and penalties.',
       'The finished version will support clean solo play plus competitive live-room races.',
-    ],
-  },
-  'word-wrangler': {
-    status: 'Board generation + special-tile rules',
-    how: [
-      'Players connect adjacent letters to build valid words from the live grid.',
-      'Found words score by length while letters cascade and reshape the board.',
-      'Special tiles — including bonus and bomb-style pieces — turn each board into controlled chaos.',
     ],
   },
   txd: {
