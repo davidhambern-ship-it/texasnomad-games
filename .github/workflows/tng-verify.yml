@@ -34,3 +34,24 @@ jobs:
 
       - name: Verify TNG
         run: npm run ci:verify
+
+  production-smoke:
+    name: Production release certification
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Wait for exact commit and smoke production
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+        run: npm run smoke:production
