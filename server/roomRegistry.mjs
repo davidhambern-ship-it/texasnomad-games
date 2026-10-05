@@ -378,6 +378,21 @@ export function createRoomRegistry(pool) {
       if (core) return false;
 
       let existing = await loadRegistry(code);
+
+      // Core rooms do not use an expiry timestamp, so verify that a registered
+      // core room is still active before letting it block code reuse.
+      if (existing?.service === 'core') {
+        const activeCore = await loadCoreRoom(code);
+        if (!activeCore) {
+          await pool.query(
+            `delete from public.tng_room_registry
+             where room_code = $1 and service = 'core'`,
+            [code],
+          );
+          existing = null;
+        }
+      }
+
       if (!existing) {
         existing = await discoverLegacy(code);
       }
