@@ -1,0 +1,178 @@
+name: Live Word Wrangler simulation
+
+on:
+  push:
+    branches:
+      - test/word-wrangler-live-simulation
+
+permissions:
+  contents: read
+
+jobs:
+  simulate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run live multiplayer race simulation
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import * as E from './src/lib/wordWranglerEngine.js';
+
+          const BASE = 'https://tng-live-production.up.railway.app/ww-api';
+          const words = fs.readFileSync('./public/word-wrangler/words.txt', 'utf8').split('\n').map(s => s.trim()).filter(Boolean);
+          const common = new Set(fs.readFileSync('./public/word-wrangler/cpu.txt', 'utf8').split('\n').map(s => s.trim()).filter(Boolean));
+          const trie = E.buildTrie(words);
+
+          async function req(path, { method = 'GET', token = '', body, expect } = {}) {
+            const res = await fetch(BASE + path, {
+              method,
+              headers: {
+                Accept: 'application/json',
+                ...(token ? { 'X-WW-Token': token } : {}),
+                ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+              },
+              body: body === undefined ? undefined : JSON.stringify(body),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (expect !== undefined) {
+              const ok = Array.isArray(expect) ? expect.includes(res.status) : res.status === expect;
+              if (!ok) throw new Error(`${method} ${path}: expected ${expect}, got ${res.status}: ${JSON.stringify(json)}`);
+            } else if (!res.ok) {
+              throw new Error(`${method} ${path}: ${res.status}: ${JSON.stringify(json)}`);
+            }
+            return { status: res.status, json };
+          }
+
+          const log = (name, value) => console.log(`WW_SIM ${name} ${JSON.stringify(value)}`);
+          const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+          const health = await req('/health', { expect: 200 });
+          log('health', health.json);
+          if (!health.json.ok || health.json.service !== 'word-wrangler') throw new Error('Word Wrangler health failed');
+
+          const created = await req('/rooms', {
+            method: 'POST',
+            body: { name: 'HostSim' },
+            expect: 200,
+          });
+          const code = created.json.roomCode;
+          const hostToken = created.json.token;
+          if (!/^[A-Z]{5}$/.test(code) || !hostToken) throw new Error('Room creation did not issue expected code/token');
+          log('room_created', { code, phase: created.json.room?.phase, hostId: created.json.playerId });
+
+          const players = [{ name: 'HostSim', token: hostToken, id: created.json.playerId }];
+          for (let i = 1; i <= 3; i++) {
+            const joined = await req(`/rooms/${code}/action`, {
+              method: 'POST',
+              body: { action: 'join', name: `Player${i}` },
+              expect: 200,
+            });
+            if (!joined.json.token || !joined.json.playerId) throw new Error(`Player${i} did not get a seat`);
+            players.push({ name: `Player${i}`, token: joined.json.token, id: joined.json.playerId });
+          }
+          log('players_joined', players.map(p => ({ name: p.name, id: p.id })));
+
+          // Unauthenticated lookup proves the central TNG room-code resolver can discover the race.
+          const publicRoom = await req(`/rooms/${code}`, { expect: 200 });
+          log('public_code_resolution', {
+            code,
+            phase: publicRoom.json.room?.phase,
+            players: publicRoom.json.room?.players?.map(p => p.name),
+          });
+          if (publicRoom.json.room?.players?.length !== 4) throw new Error('Public room lookup did not return all players');
+
+          await req(`/rooms/${code}/action`, {
+            method: 'POST',
+            token: hostToken,
+            body: { action: 'setDuration', seconds: 90 },
+            expect: 200,
+          });
+
+          const started = await req(`/rooms/${code}/action`, {
+            method: 'POST',
+            token: hostToken,
+            body: { action: 'start' },
+            expect: 200,
+          });
+          log('race_started', {
+            phase: started.json.room?.phase,
+            round: started.json.room?.round,
+            seed: started.json.room?.seed,
+            duration: started.json.room?.duration,
+          });
+          if (started.json.room?.phase !== 'countdown' || !started.json.room?.seed) throw new Error('Race did not enter countdown with a seed');
+
+          await sleep(4300);
+
+          const hostFull = await req(`/rooms/${code}?full=1`, { token: hostToken, expect: 200 });
+          if (hostFull.json.room?.phase !== 'playing') throw new Error(`Expected playing, got ${hostFull.json.room?.phase}`);
+          if (!hostFull.json.mine?.state) throw new Error('Host full state missing');
+
+          const hostState = hostFull.json.mine.state;
+          const pick = E.cpuPickWord(hostState, trie, 9, { common });
+          if (!pick?.path?.length) throw new Error('Could not find a playable word on live board');
+
+          const move = await req(`/rooms/${code}/action`, {
+            method: 'POST',
+            token: hostToken,
+            body: { action: 'word', path: pick.path, move: hostState.moves },
+            expect: 200,
+          });
+          log('valid_word', {
+            picked: pick.word,
+            result: move.json.result,
+            hostScore: move.json.room?.players?.find(p => p.id === players[0].id)?.score,
+          });
+          if (!move.json.result?.ok || !move.json.result?.word || !(move.json.result?.points > 0)) {
+            throw new Error(`Live word move failed: ${JSON.stringify(move.json.result)}`);
+          }
+
+          // Another client must see the host's authoritative score/last-word state.
+          const observer = await req(`/rooms/${code}`, { token: players[1].token, expect: 200 });
+          const hostObserved = observer.json.room.players.find(p => p.id === players[0].id);
+          log('shared_leaderboard', hostObserved);
+          if (!(hostObserved?.score > 0) || hostObserved?.last?.w !== move.json.result.word) {
+            throw new Error('Second player did not see authoritative host move');
+          }
+
+          // Desync protection: deliberately submit wrong move number.
+          const desync = await req(`/rooms/${code}/action`, {
+            method: 'POST',
+            token: players[1].token,
+            body: { action: 'shuffle', move: 9999 },
+            expect: 200,
+          });
+          log('desync_protection', desync.json.result);
+          if (!desync.json.result?.desync) throw new Error('Bad move counter was not rejected as desync');
+
+          // Capacity: host + 7 humans accepted, 9th total human rejected.
+          const cap = await req('/rooms', {
+            method: 'POST',
+            body: { name: 'CapHost' },
+            expect: 200,
+          });
+          for (let i = 2; i <= 8; i++) {
+            await req(`/rooms/${cap.json.roomCode}/action`, {
+              method: 'POST',
+              body: { action: 'join', name: `Cap${i}` },
+              expect: 200,
+            });
+          }
+          const ninth = await req(`/rooms/${cap.json.roomCode}/action`, {
+            method: 'POST',
+            body: { action: 'join', name: 'Cap9' },
+            expect: 409,
+          });
+          log('capacity', {
+            code: cap.json.roomCode,
+            first8: 'accepted',
+            ninthStatus: ninth.status,
+            ninthError: ninth.json.error,
+          });
+          if (ninth.json.error?.code !== 'FULL') throw new Error('9th human was not rejected as FULL');
+
+          console.log('WW_SIM OVERALL {"passed":true,"tests":["health","room-create","4-player-join","public-code-resolution","countdown","playing","valid-word-server-replay","shared-leaderboard","desync-protection","8-player-capacity"]}');
+          NODE
