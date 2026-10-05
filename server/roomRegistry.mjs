@@ -327,6 +327,7 @@ export function createRoomRegistry(pool) {
       spectatePath = null,
       hostAccountId = null,
       ttlMs = 3 * 60 * 60 * 1000,
+      allowExisting = false,
     } = {}) {
       const code = cleanCode(value);
       if (!code) return false;
@@ -337,7 +338,11 @@ export function createRoomRegistry(pool) {
       const core = await loadCoreRoom(code);
       if (core) return false;
 
-      const existing = await loadRegistry(code);
+      let existing = await loadRegistry(code);
+      if (!existing) {
+        existing = await discoverLegacy(code);
+      }
+
       if (existing) {
         const sameOwner =
           String(existing.service || '') === String(service || '') &&
@@ -347,7 +352,7 @@ export function createRoomRegistry(pool) {
             String(existing.host_account_id) === String(hostAccountId)
           );
 
-        if (!sameOwner) return false;
+        if (!allowExisting || !sameOwner) return false;
 
         await pool.query(
           `update public.tng_room_registry
