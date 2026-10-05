@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
