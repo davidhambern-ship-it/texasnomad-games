@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { createHmac } from 'node:crypto';
+import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +9,7 @@ import { createViralLive } from './server/viralLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
+import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -4666,15 +4667,23 @@ let dominoSchemaReady = null;
 
 async function ensureDominoSchema() {
   if (!dominoSchemaReady) {
-    dominoSchemaReady = bffPool.query(`
+    dominoSchemaReady = bffPool.query(\`
       create table if not exists public.tng_domino_games (
         id text primary key,
         room_code text not null unique,
         game_state jsonb not null,
+        host_account_id uuid,
+        host_token_hash text,
+        seat_tokens jsonb not null default '{}'::jsonb,
         created_at timestamptz not null default now(),
         updated_at timestamptz not null default now()
-      )
-    `).catch((error) => {
+      );
+
+      alter table public.tng_domino_games
+        add column if not exists host_account_id uuid,
+        add column if not exists host_token_hash text,
+        add column if not exists seat_tokens jsonb not null default '{}'::jsonb;
+    \`).catch((error) => {
       dominoSchemaReady = null;
       throw error;
     });
@@ -4682,12 +4691,50 @@ async function ensureDominoSchema() {
   await dominoSchemaReady;
 }
 
-function serializeDominoRow(row) {
+function dominoToken() {
+  return randomBytes(32).toString('base64url');
+}
+
+function hashDominoToken(token) {
+  const clean = String(token || '');
+  return clean
+    ? createHash('sha256').update(clean).digest('hex')
+    : '';
+}
+
+function readDominoToken(req) {
+  return String(req.headers['x-domino-token'] || '').trim();
+}
+
+function cleanDominoGameState(data, roomCode) {
+  const source =
+    data && typeof data === 'object' && !Array.isArray(data)
+      ? data
+      : {};
+
+  const {
+    id,
+    room_code,
+    created_date,
+    updated_date,
+    createdAt,
+    updatedAt,
+    ...state
+  } = source;
+
+  return {
+    ...state,
+    room_code: String(roomCode || room_code || '').trim().toUpperCase(),
+  };
+}
+
+function serializeDominoRow(row, stateOverride = null) {
   if (!row) return null;
   const state =
-    row.game_state && typeof row.game_state === 'object'
+    stateOverride ||
+    (row.game_state && typeof row.game_state === 'object'
       ? row.game_state
-      : {};
+      : {});
 
   return {
     ...state,
@@ -4698,12 +4745,153 @@ function serializeDominoRow(row) {
   };
 }
 
+function dominoSeatAccess(row, token) {
+  const tokenHash = hashDominoToken(token);
+  if (!tokenHash) return null;
+
+  if (row.host_token_hash && row.host_token_hash === tokenHash) {
+    return { role: 'host', seat: 0, playerId: row.game_state?.players?.[0]?.playerId || null };
+  }
+
+  const seatTokens =
+    row.seat_tokens && typeof row.seat_tokens === 'object'
+      ? row.seat_tokens
+      : {};
+
+  for (const [seatKey, record] of Object.entries(seatTokens)) {
+    if (!record || typeof record !== 'object') continue;
+    if (String(record.hash || '') !== tokenHash) continue;
+
+    const seat = Number(seatKey);
+    if (!Number.isInteger(seat) || seat < 1 || seat > 3) continue;
+
+    const player = row.game_state?.players?.[seat];
+    if (!player || String(player.playerId || '') !== String(record.playerId || '')) continue;
+
+    return {
+      role: 'player',
+      seat,
+      playerId: String(record.playerId || ''),
+    };
+  }
+
+  return null;
+}
+
+function sanitizeDominoStateForViewer(state, access = null) {
+  const source =
+    state && typeof state === 'object'
+      ? state
+      : {};
+
+  const revealAll =
+    access?.role === 'host' ||
+    source.phase === 'round_over' ||
+    source.phase === 'game_over' ||
+    source.status === 'finished';
+
+  const players = Array.isArray(source.players)
+    ? source.players.map((player, seat) => {
+        const hand = Array.isArray(player?.hand) ? player.hand : [];
+        const canSeeHand =
+          revealAll ||
+          (access?.role === 'player' && access.seat === seat);
+
+        return {
+          ...player,
+          hand: canSeeHand
+            ? hand
+            : hand.map((_, index) => ({
+                id: \`hidden-\${seat}-\${index}\`,
+                hidden: true,
+              })),
+        };
+      })
+    : [];
+
+  return {
+    ...source,
+    players,
+  };
+}
+
+async function loadDominoRowByRoom(roomCode, client = bffPool, forUpdate = false) {
+  const result = await client.query(
+    \`
+      select
+        id,
+        room_code,
+        game_state,
+        host_account_id,
+        host_token_hash,
+        seat_tokens,
+        created_at,
+        updated_at
+      from public.tng_domino_games
+      where room_code = $1
+      limit 1
+      \${forUpdate ? 'for update' : ''}
+    \`,
+    [roomCode],
+  );
+  return result.rows[0] || null;
+}
+
+async function verifyDominoHostRequest(req, row = null) {
+  const auth = String(req.headers.authorization || '');
+  const token = auth.replace(/^Bearer\s+/i, '').trim();
+  const deviceId = String(req.headers['x-tng-device-id'] || '').trim();
+
+  const verified = await verifyViralHostAuthorization({
+    token,
+    deviceId,
+  }).catch(() => null);
+
+  if (!verified) return null;
+
+  if (
+    row?.host_account_id &&
+    String(row.host_account_id) !== String(verified.accountId)
+  ) {
+    return null;
+  }
+
+  return verified;
+}
+
+function reconcileDominoSeatTokens(state, seatTokens) {
+  const current =
+    seatTokens && typeof seatTokens === 'object'
+      ? { ...seatTokens }
+      : {};
+
+  for (const [seatKey, record] of Object.entries(current)) {
+    const seat = Number(seatKey);
+    const player = state?.players?.[seat];
+
+    if (
+      !Number.isInteger(seat) ||
+      seat < 1 ||
+      seat > 3 ||
+      !player ||
+      player.isAI ||
+      !player.playerId ||
+      String(player.playerId) !== String(record?.playerId || '')
+    ) {
+      delete current[seatKey];
+    }
+  }
+
+  return current;
+}
+
 async function handleDominoApi(req, res) {
   await ensureDominoSchema();
 
   const url = new URL(req.url || '/domino-api', 'http://localhost');
+  const pathname = url.pathname.replace(/\/+$/, '') || '/domino-api';
 
-  if (req.method === 'GET') {
+  if (req.method === 'GET' && pathname === '/domino-api') {
     const roomCode = String(url.searchParams.get('room') || '').trim().toUpperCase();
     if (!roomCode) {
       sendJson(res, 400, {
@@ -4712,50 +4900,73 @@ async function handleDominoApi(req, res) {
       return;
     }
 
-    const result = await bffPool.query(
-      `
-        select id, room_code, game_state, created_at, updated_at
-        from public.tng_domino_games
-        where room_code = $1
-        limit 1
-      `,
-      [roomCode],
-    );
+    const row = await loadDominoRowByRoom(roomCode);
+    if (!row) {
+      sendJson(res, 200, { games: [] });
+      return;
+    }
+
+    const access = dominoSeatAccess(row, readDominoToken(req));
+    const safeState = sanitizeDominoStateForViewer(row.game_state, access);
 
     sendJson(res, 200, {
-      games: result.rows.map(serializeDominoRow),
+      games: [serializeDominoRow(row, safeState)],
+      access: access
+        ? { role: access.role, seat: access.seat }
+        : { role: 'spectator', seat: null },
     });
     return;
   }
 
-  if (req.method === 'POST') {
-    const data = await readJsonBody(req).catch(() => null);
-    const roomCode = String(data?.room_code || '').trim().toUpperCase();
-
-    if (!data || !roomCode) {
-      sendJson(res, 400, {
-        error: { code: 'ROOM_REQUIRED', message: 'Domino room code is required.' },
+  if (req.method === 'POST' && pathname === '/domino-api') {
+    const verifiedHost = await verifyDominoHostRequest(req);
+    if (!verifiedHost) {
+      sendJson(res, 403, {
+        error: {
+          code: 'HOST_AUTH_REQUIRED',
+          message: 'Open Dominoes from the TNG Host Controller to create a live table.',
+        },
       });
       return;
     }
 
-    const id = `dom_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-    const gameState = {
-      ...data,
-      room_code: roomCode,
-    };
+    const data = await readJsonBody(req).catch(() => null);
+    const roomCode = String(data?.room_code || '').trim().toUpperCase();
+
+    if (!data || !/^[A-Z0-9]{5,8}$/.test(roomCode)) {
+      sendJson(res, 400, {
+        error: { code: 'ROOM_REQUIRED', message: 'A valid Domino room code is required.' },
+      });
+      return;
+    }
+
+    const id = \`dom_\${Date.now()}_\${randomBytes(5).toString('hex')}\`;
+    const hostToken = dominoToken();
+    const gameState = cleanDominoGameState(data, roomCode);
 
     try {
       const result = await bffPool.query(
-        `
-          insert into public.tng_domino_games (id, room_code, game_state)
-          values ($1, $2, $3::jsonb)
-          returning id, room_code, game_state, created_at, updated_at
-        `,
-        [id, roomCode, JSON.stringify(gameState)],
+        \`
+          insert into public.tng_domino_games
+            (id, room_code, game_state, host_account_id, host_token_hash, seat_tokens)
+          values ($1, $2, $3::jsonb, $4::uuid, $5, '{}'::jsonb)
+          returning
+            id, room_code, game_state, host_account_id, host_token_hash,
+            seat_tokens, created_at, updated_at
+        \`,
+        [
+          id,
+          roomCode,
+          JSON.stringify(gameState),
+          verifiedHost.accountId,
+          hashDominoToken(hostToken),
+        ],
       );
 
-      sendJson(res, 201, { game: serializeDominoRow(result.rows[0]) });
+      sendJson(res, 201, {
+        game: serializeDominoRow(result.rows[0]),
+        hostToken,
+      });
     } catch (error) {
       if (error?.code === '23505') {
         sendJson(res, 409, {
@@ -4771,7 +4982,227 @@ async function handleDominoApi(req, res) {
     return;
   }
 
-  if (req.method === 'PATCH') {
+  if (req.method === 'POST' && pathname === '/domino-api/join') {
+    const body = await readJsonBody(req).catch(() => null);
+    const roomCode = String(body?.roomCode || '').trim().toUpperCase();
+    const seat = Number(body?.seat);
+    const name = String(body?.name || '').trim().slice(0, 20);
+
+    if (
+      !roomCode ||
+      !Number.isInteger(seat) ||
+      seat < 1 ||
+      seat > 3 ||
+      !name
+    ) {
+      sendJson(res, 400, {
+        error: {
+          code: 'INVALID_JOIN',
+          message: 'Choose an open seat and enter your name.',
+        },
+      });
+      return;
+    }
+
+    const client = await bffPool.connect();
+    try {
+      await client.query('begin');
+      const row = await loadDominoRowByRoom(roomCode, client, true);
+
+      if (!row) {
+        await client.query('rollback');
+        sendJson(res, 404, {
+          error: { code: 'ROOM_NOT_FOUND', message: 'That Domino room was not found.' },
+        });
+        return;
+      }
+
+      const state = cleanDominoGameState(row.game_state, row.room_code);
+      if (state.phase !== 'waiting') {
+        await client.query('rollback');
+        sendJson(res, 409, {
+          error: {
+            code: 'GAME_STARTED',
+            message: 'That Domino game has already started. You can still watch.',
+          },
+        });
+        return;
+      }
+
+      const target = state.players?.[seat];
+      if (!target || target.playerId) {
+        await client.query('rollback');
+        sendJson(res, 409, {
+          error: {
+            code: 'SEAT_TAKEN',
+            message: 'Someone just took that seat. Pick another one.',
+          },
+        });
+        return;
+      }
+
+      const playerId = \`p_\${randomBytes(10).toString('base64url')}\`;
+      const seatToken = dominoToken();
+      const players = state.players.map((player, index) =>
+        index === seat
+          ? {
+              ...player,
+              playerId,
+              playerName: name,
+              isAI: false,
+              connected: true,
+              isHost: false,
+            }
+          : player,
+      );
+
+      const nextState = { ...state, players };
+      const nextSeatTokens = {
+        ...(row.seat_tokens || {}),
+        [String(seat)]: {
+          hash: hashDominoToken(seatToken),
+          playerId,
+        },
+      };
+
+      const updated = await client.query(
+        \`
+          update public.tng_domino_games
+          set game_state = $2::jsonb,
+              seat_tokens = $3::jsonb,
+              updated_at = now()
+          where id = $1
+          returning
+            id, room_code, game_state, host_account_id, host_token_hash,
+            seat_tokens, created_at, updated_at
+        \`,
+        [row.id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
+      );
+
+      await client.query('commit');
+
+      const access = { role: 'player', seat, playerId };
+      sendJson(res, 200, {
+        game: serializeDominoRow(
+          updated.rows[0],
+          sanitizeDominoStateForViewer(updated.rows[0].game_state, access),
+        ),
+        seat,
+        playerId,
+        seatToken,
+      });
+    } catch (error) {
+      await client.query('rollback').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && pathname === '/domino-api/action') {
+    const body = await readJsonBody(req).catch(() => null);
+    const roomCode = String(body?.roomCode || '').trim().toUpperCase();
+    const action = String(body?.action || '').trim().toLowerCase();
+
+    if (!roomCode || !['play', 'pass'].includes(action)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_ACTION', message: 'That Domino move is not valid.' },
+      });
+      return;
+    }
+
+    const client = await bffPool.connect();
+    try {
+      await client.query('begin');
+      const row = await loadDominoRowByRoom(roomCode, client, true);
+
+      if (!row) {
+        await client.query('rollback');
+        sendJson(res, 404, {
+          error: { code: 'ROOM_NOT_FOUND', message: 'That Domino room was not found.' },
+        });
+        return;
+      }
+
+      const access = dominoSeatAccess(row, readDominoToken(req));
+      if (!access || access.role !== 'player') {
+        await client.query('rollback');
+        sendJson(res, 403, {
+          error: {
+            code: 'PLAYER_AUTH_REQUIRED',
+            message: 'Your Domino seat is no longer authorized. Rejoin the table.',
+          },
+        });
+        return;
+      }
+
+      const state = cleanDominoGameState(row.game_state, row.room_code);
+      const player = state.players?.[access.seat];
+      if (
+        !player ||
+        player.isAI ||
+        String(player.playerId || '') !== String(access.playerId || '')
+      ) {
+        await client.query('rollback');
+        sendJson(res, 403, {
+          error: {
+            code: 'SEAT_CHANGED',
+            message: 'That seat is no longer yours.',
+          },
+        });
+        return;
+      }
+
+      const next =
+        action === 'play'
+          ? applyDominoPlay(
+              state,
+              access.seat,
+              String(body?.dominoId || ''),
+              String(body?.side || ''),
+            )
+          : applyDominoPass(state, access.seat);
+
+      if (next?.error) {
+        await client.query('rollback');
+        sendJson(res, 409, {
+          error: { code: 'ILLEGAL_MOVE', message: String(next.error) },
+        });
+        return;
+      }
+
+      const updated = await client.query(
+        \`
+          update public.tng_domino_games
+          set game_state = $2::jsonb,
+              updated_at = now()
+          where id = $1
+          returning
+            id, room_code, game_state, host_account_id, host_token_hash,
+            seat_tokens, created_at, updated_at
+        \`,
+        [row.id, JSON.stringify(cleanDominoGameState(next, row.room_code))],
+      );
+
+      await client.query('commit');
+
+      sendJson(res, 200, {
+        game: serializeDominoRow(
+          updated.rows[0],
+          sanitizeDominoStateForViewer(updated.rows[0].game_state, access),
+        ),
+      });
+    } catch (error) {
+      await client.query('rollback').catch(() => {});
+      throw error;
+    } finally {
+      client.release();
+    }
+    return;
+  }
+
+  if (req.method === 'PATCH' && pathname === '/domino-api') {
     const body = await readJsonBody(req).catch(() => null);
     const id = String(body?.id || '').trim();
     const data = body?.data;
@@ -4783,25 +5214,59 @@ async function handleDominoApi(req, res) {
       return;
     }
 
-    const result = await bffPool.query(
-      `
-        update public.tng_domino_games
-        set game_state = $2::jsonb,
-            updated_at = now()
+    const current = await bffPool.query(
+      \`
+        select
+          id, room_code, game_state, host_account_id, host_token_hash,
+          seat_tokens, created_at, updated_at
+        from public.tng_domino_games
         where id = $1
-        returning id, room_code, game_state, created_at, updated_at
-      `,
-      [id, JSON.stringify(data)],
+        limit 1
+      \`,
+      [id],
     );
+    const row = current.rows[0] || null;
 
-    if (!result.rowCount) {
+    if (!row) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This Domino room no longer exists.' },
       });
       return;
     }
 
-    sendJson(res, 200, { game: serializeDominoRow(result.rows[0]) });
+    const access = dominoSeatAccess(row, readDominoToken(req));
+    const verifiedHost = await verifyDominoHostRequest(req, row);
+
+    if (!access || access.role !== 'host' || !verifiedHost) {
+      sendJson(res, 403, {
+        error: {
+          code: 'HOST_AUTH_REQUIRED',
+          message: 'Only the active TNG Host can change the Domino table.',
+        },
+      });
+      return;
+    }
+
+    const nextState = cleanDominoGameState(data, row.room_code);
+    const nextSeatTokens = reconcileDominoSeatTokens(nextState, row.seat_tokens);
+
+    const result = await bffPool.query(
+      \`
+        update public.tng_domino_games
+        set game_state = $2::jsonb,
+            seat_tokens = $3::jsonb,
+            updated_at = now()
+        where id = $1
+        returning
+          id, room_code, game_state, host_account_id, host_token_hash,
+          seat_tokens, created_at, updated_at
+      \`,
+      [id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
+    );
+
+    sendJson(res, 200, {
+      game: serializeDominoRow(result.rows[0]),
+    });
     return;
   }
 
@@ -4892,7 +5357,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
