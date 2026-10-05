@@ -964,13 +964,15 @@ function recordSpectatorPresence(roomCode, profilePayload = {}) {
       profile.account_id ||
       profile.id ||
       null,
-    displayName:
-      profile.displayName ||
-      profile.display_name ||
-      profile.fullName ||
-      profile.full_name ||
-      handle ||
-      'Spectator',
+    displayName: handle
+      ? `@${handle}`
+      : (
+          profile.displayName ||
+          profile.display_name ||
+          profile.fullName ||
+          profile.full_name ||
+          'Spectator'
+        ),
     handle: handle || null,
     role: 'spectator',
     seatNumber: null,
@@ -1483,6 +1485,25 @@ hostLiveWss.on('connection', (ws) => {
 
 function isUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
+}
+
+function publicTngNameFromRecord(record, fallback = 'Player') {
+  const rawHandle = String(
+    record?.handle ||
+    record?.normalizedHandle ||
+    record?.normalized_handle ||
+    ''
+  ).trim().replace(/^@/, '');
+
+  if (rawHandle) return `@${rawHandle}`;
+
+  return String(
+    record?.displayName ||
+    record?.display_name ||
+    record?.playerName ||
+    record?.name ||
+    fallback
+  ).trim() || fallback;
 }
 
 async function resolveAuthenticatedTngAccount(req) {
@@ -2077,7 +2098,7 @@ function projectWordSearchDisplayState(rawState = {}, participants = []) {
         accountId: player.account_id,
         seatNumber: seat,
         role: player.role || 'player',
-        name: player.display_name || player.handle || (seat ? `Seat ${seat}` : 'Player'),
+        name: publicTngNameFromRecord(player, seat ? `Seat ${seat}` : 'Player'),
         handle: player.handle || null,
         color: WORD_SEARCH_DISPLAY_COLORS[seat] || '#FFFFFF',
         score: Number(scores[String(seat)] || 0),
@@ -2476,8 +2497,8 @@ async function loadBffParticipants(roomId, gameState = {}) {
     role: row.role || 'player',
     seatNumber: row.seat_number,
     familyTeam: teamMap[row.account_id] ?? null,
-    playerName: row.display_name || row.handle || row.email.split('@')[0],
-    name: row.display_name || row.handle || row.email.split('@')[0],
+    playerName: publicTngNameFromRecord(row, row.email.split('@')[0]),
+    name: publicTngNameFromRecord(row, row.email.split('@')[0]),
     handle: row.handle || null,
     connected: true,
     active: true,
@@ -2579,7 +2600,7 @@ function projectWordSearchSpectatorState(rawState = {}, participants = []) {
         accountId: player.account_id,
         seatNumber: seat,
         role: player.role || 'player',
-        name: player.display_name || player.handle || (seat ? `Seat ${seat}` : 'Player'),
+        name: publicTngNameFromRecord(player, seat ? `Seat ${seat}` : 'Player'),
         handle: player.handle || null,
         color: WORD_SEARCH_SPECTATOR_COLORS[seat] || '#FFFFFF',
         score: Number(scores[String(seat)] || 0),
@@ -2875,10 +2896,10 @@ async function handleTngHostRoster(req, res) {
 
   const players = participantRows.map((row) => ({
     accountId: row.account_id,
-    displayName:
-      row.display_name ||
-      row.handle ||
-      (row.role === 'host_player' ? 'Host' : 'Player'),
+    displayName: publicTngNameFromRecord(
+      row,
+      row.role === 'host_player' ? 'Host' : 'Player',
+    ),
     handle: row.handle || null,
     role: row.role === 'host_player' ? 'host' : 'player',
     seatNumber: row.seat_number == null ? null : Number(row.seat_number),
