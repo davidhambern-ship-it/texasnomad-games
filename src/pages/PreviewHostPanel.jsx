@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Expand, Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
 
-import { ALL_GAMES } from '@/components/host/HostGameSelect';
+import { ALL_GAMES, HostGameIcon } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
 import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
@@ -980,13 +980,9 @@ export default function PreviewHostPanel() {
                     className="border-2 rounded-xl p-6 bg-black/50"
                     style={{ borderColor: game.color + '55' }}
                   >
-                    {game.image ? (
-                      <div className="mb-3 w-full overflow-hidden rounded-lg border" style={{ borderColor: game.color + '55' }}>
-                        <img src={game.image} alt={game.title} className="aspect-video w-full object-cover" />
-                      </div>
-                    ) : (
-                      <div className="text-5xl mb-3">{game.emoji}</div>
-                    )}
+                    <div className="mb-3 flex h-16 items-center justify-center">
+                      <HostGameIcon game={game} />
+                    </div>
                     <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
                       {game.title}
                     </div>
@@ -1003,7 +999,9 @@ export default function PreviewHostPanel() {
               <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <span className="text-xl">{roomGame?.emoji || '🎮'}</span>
+                  <span className="flex h-7 w-10 items-center justify-center">
+                    <HostGameIcon game={roomGame} size="sm" />
+                  </span>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-sm font-black uppercase sm:text-base">
