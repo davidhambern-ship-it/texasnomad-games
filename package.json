@@ -1,5 +1,5 @@
 {
-  "name": "base44-app",
+  "name": "texasnomad-games",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -19,7 +19,6 @@
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.52",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
     "@neondatabase/auth": "^0.5.0-beta",
@@ -88,7 +87,6 @@
     "zod": "^3.24.2"
   },
   "devDependencies": {
-    "@base44/vite-plugin": "^1.0.44",
     "@eslint/js": "^9.19.0",
     "@types/node": "^22.13.5",
     "@types/react": "^18.2.66",
