@@ -1,5 +1,4 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
