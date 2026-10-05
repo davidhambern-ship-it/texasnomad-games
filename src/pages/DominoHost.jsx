@@ -6,6 +6,7 @@ import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/Domino
 import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { generateRoomCode, getTeam, newRound, applyPlay, applyPass, chooseAIMove } from '@/lib/dominoEngine';
 import '@/components/domino/domino.css';
+import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 
 const LIMITS = [100, 150, 200, 250];
 const HOST_KEY = 'dom_host_room';
@@ -30,7 +31,8 @@ function SeatAvatar({ p, seat }) {
 
 export default function DominoHost() {
   const [game, setGame] = useState(null);
-  const [hostName, setHostName] = useState(() => { try { return localStorage.getItem('dom_host_name') || ''; } catch { return ''; } });
+  const identity = useTngGameIdentity();
+  const hostName = identity.publicName;
   const [scoreLimit, setScoreLimit] = useState(150);
   const [loading, setLoading] = useState(false);
   const [hostError, setHostError] = useState('');
@@ -88,7 +90,6 @@ export default function DominoHost() {
     setLoading(true);
     setHostError('');
     try {
-      try { localStorage.setItem('dom_host_name', hostName.trim()); } catch { /* ignore */ }
       const players = [0, 1, 2, 3].map(i => (i === 0 ? { ...emptySeat(0), playerId: `host_${Date.now()}`, playerName: hostName.trim(), connected: true, isHost: true } : emptySeat(i)));
       const created = await base44.entities.DominoGame.create({
         room_code: generateRoomCode(), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
@@ -166,12 +167,15 @@ export default function DominoHost() {
             <p className="tnd-sub">Texas-style partners · double-six · All Fives scoring</p>
           </div>
           <div className="tnd-panel">
-            <h3>Your name (you sit in Seat 1)</h3>
-            <input className="tnd-input" value={hostName} maxLength={20} placeholder="ENTER YOUR NAME" onChange={e => setHostName(e.target.value)} onKeyDown={e => e.key === 'Enter' && createRoom()} />
+            <h3>TNG Host (Seat 1)</h3>
+            <p className="tnd-sub" style={{ marginTop: 8 }}>
+              Playing as <b style={{ color: '#FFD700' }}>{hostName || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+            </p>
+            {identity.error && <p className="tnd-sub" style={{ color: '#fca5a5', marginTop: 8 }}>{identity.error}</p>}
             <h3 style={{ marginTop: 16 }}>Play to</h3>
             <div className="tnd-seg">{LIMITS.map(v => <button key={v} type="button" aria-pressed={scoreLimit === v} onClick={() => setScoreLimit(v)}>{v}</button>)}</div>
             <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-              <button type="button" className="tnd-btn primary" style={{ flex: 1, padding: 16, fontSize: 18 }} disabled={loading || !hostName.trim()} onClick={createRoom}>{loading ? 'Opening…' : 'Create room & sit down'}</button>
+              <button type="button" className="tnd-btn primary" style={{ flex: 1, padding: 16, fontSize: 18 }} disabled={loading || identity.loading || !hostName.trim()} onClick={createRoom}>{loading ? 'Opening…' : 'Create room & sit down'}</button>
               {savedRoomAuthorized && <button type="button" className="tnd-btn" disabled={loading} onClick={resumeRoom}>Resume room {savedRoom}</button>}
             </div>
             {hostError && (
