@@ -5029,7 +5029,25 @@ async function handleDominoApi(req, res) {
 
     const id = `dom_${Date.now()}_${randomBytes(5).toString('hex')}`;
     const hostToken = dominoToken();
-    const gameState = cleanDominoGameState(data, roomCode);
+    const baseGameState = cleanDominoGameState(data, roomCode);
+    const hostPublicName = String(verifiedHost.publicName || 'Host').trim().slice(0, 20);
+    const gameState = {
+      ...baseGameState,
+      players: Array.isArray(baseGameState.players)
+        ? baseGameState.players.map((player, seat) =>
+            seat === 0
+              ? {
+                  ...player,
+                  accountId: verifiedHost.accountId,
+                  playerName: hostPublicName,
+                  isHost: true,
+                  isAI: false,
+                  connected: true,
+                }
+              : player
+          )
+        : baseGameState.players,
+    };
 
     try {
       const result = await bffPool.query(
@@ -5070,22 +5088,30 @@ async function handleDominoApi(req, res) {
   }
 
   if (req.method === 'POST' && pathname === '/domino-api/join') {
+    const identityResult = await resolveAuthenticatedTngIdentity(req);
+    if (!identityResult.ok || !identityResult.identity?.accountId) {
+      sendJson(res, identityResult.status || 401, identityResult.payload || {
+        error: { code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Dominoes.' },
+      });
+      return;
+    }
+
+    const identity = identityResult.identity;
     const body = await readJsonBody(req).catch(() => null);
     const roomCode = String(body?.roomCode || '').trim().toUpperCase();
-    const seat = Number(body?.seat);
-    const name = String(body?.name || '').trim().slice(0, 20);
+    const requestedSeat = Number(body?.seat);
+    const publicName = String(identity.publicName || 'Nomad').trim().slice(0, 20);
 
     if (
       !roomCode ||
-      !Number.isInteger(seat) ||
-      seat < 1 ||
-      seat > 3 ||
-      !name
+      !Number.isInteger(requestedSeat) ||
+      requestedSeat < 1 ||
+      requestedSeat > 3
     ) {
       sendJson(res, 400, {
         error: {
           code: 'INVALID_JOIN',
-          message: 'Choose an open seat and enter your name.',
+          message: 'Choose an open Domino seat.',
         },
       });
       return;
@@ -5104,7 +5130,84 @@ async function handleDominoApi(req, res) {
         return;
       }
 
+      if (String(row.host_account_id || '') === String(identity.accountId)) {
+        await client.query('rollback');
+        sendJson(res, 409, {
+          error: {
+            code: 'HOST_ALREADY_SEATED',
+            message: 'You are already the Host at Seat 1.',
+          },
+        });
+        return;
+      }
+
       const state = cleanDominoGameState(row.game_state, row.room_code);
+      const existingSeat = Array.isArray(state.players)
+        ? state.players.findIndex((player, index) =>
+            index > 0 &&
+            !player?.isAI &&
+            String(player?.accountId || '') === String(identity.accountId)
+          )
+        : -1;
+
+      // Same signed-in player returning without the old browser token:
+      // reclaim the same seat, including during an active game.
+      if (existingSeat >= 1) {
+        const seatToken = dominoToken();
+        const players = state.players.map((player, index) =>
+          index === existingSeat
+            ? {
+                ...player,
+                accountId: identity.accountId,
+                playerName: publicName,
+                connected: true,
+              }
+            : player
+        );
+        const nextState = { ...state, players };
+        const nextSeatTokens = {
+          ...(row.seat_tokens || {}),
+          [String(existingSeat)]: {
+            hash: hashDominoToken(seatToken),
+            playerId: players[existingSeat].playerId,
+            accountId: identity.accountId,
+          },
+        };
+
+        const updated = await client.query(
+          `
+            update public.tng_domino_games
+            set game_state = $2::jsonb,
+                seat_tokens = $3::jsonb,
+                updated_at = now()
+            where id = $1
+            returning
+              id, room_code, game_state, host_account_id, host_token_hash,
+              seat_tokens, created_at, updated_at
+          `,
+          [row.id, JSON.stringify(nextState), JSON.stringify(nextSeatTokens)],
+        );
+
+        await client.query('commit');
+
+        const access = {
+          role: 'player',
+          seat: existingSeat,
+          playerId: players[existingSeat].playerId,
+        };
+        sendJson(res, 200, {
+          game: serializeDominoRow(
+            updated.rows[0],
+            sanitizeDominoStateForViewer(updated.rows[0].game_state, access),
+          ),
+          seat: existingSeat,
+          playerId: players[existingSeat].playerId,
+          seatToken,
+          reclaimed: true,
+        });
+        return;
+      }
+
       if (state.phase !== 'waiting') {
         await client.query('rollback');
         sendJson(res, 409, {
@@ -5116,7 +5219,7 @@ async function handleDominoApi(req, res) {
         return;
       }
 
-      const target = state.players?.[seat];
+      const target = state.players?.[requestedSeat];
       if (!target || target.playerId) {
         await client.query('rollback');
         sendJson(res, 409, {
@@ -5131,11 +5234,12 @@ async function handleDominoApi(req, res) {
       const playerId = `p_${randomBytes(10).toString('base64url')}`;
       const seatToken = dominoToken();
       const players = state.players.map((player, index) =>
-        index === seat
+        index === requestedSeat
           ? {
               ...player,
+              accountId: identity.accountId,
               playerId,
-              playerName: name,
+              playerName: publicName,
               isAI: false,
               connected: true,
               isHost: false,
@@ -5146,9 +5250,10 @@ async function handleDominoApi(req, res) {
       const nextState = { ...state, players };
       const nextSeatTokens = {
         ...(row.seat_tokens || {}),
-        [String(seat)]: {
+        [String(requestedSeat)]: {
           hash: hashDominoToken(seatToken),
           playerId,
+          accountId: identity.accountId,
         },
       };
 
@@ -5168,13 +5273,13 @@ async function handleDominoApi(req, res) {
 
       await client.query('commit');
 
-      const access = { role: 'player', seat, playerId };
+      const access = { role: 'player', seat: requestedSeat, playerId };
       sendJson(res, 200, {
         game: serializeDominoRow(
           updated.rows[0],
           sanitizeDominoStateForViewer(updated.rows[0].game_state, access),
         ),
-        seat,
+        seat: requestedSeat,
         playerId,
         seatToken,
       });
