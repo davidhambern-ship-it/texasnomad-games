@@ -171,7 +171,7 @@ export function createWordWranglerApi({
         service: 'word-wrangler',
         kind: 'standalone',
         joinPath: '/games/word-wrangler?room=' + encodeURIComponent(c),
-        spectatePath: null,
+        spectatePath: '/games/word-wrangler?display=' + encodeURIComponent(c),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
       });
