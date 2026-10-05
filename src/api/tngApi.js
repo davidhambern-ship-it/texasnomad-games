@@ -507,6 +507,12 @@ export const tngApi = {
   },
   stats: {
     getProfile: () => request('/profile', { apiBase:STATS_API_BASE }),
+    recordLocalResult: ({ gameId, sessionKey, score = 0, won = false }) =>
+      request('/local-result', {
+        method:'POST',
+        body:{ gameId, sessionKey, score, won },
+        apiBase:STATS_API_BASE,
+      }),
     quitGame: (roomCode) => request('/quit', {
       method:'POST',
       roomCode,
