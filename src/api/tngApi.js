@@ -1,62 +1,14 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { tngServiceUrl, tngWebSocketUrl } from '@/lib/tngServiceOrigin';
 
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' &&
-  window.location.hostname.endsWith('.up.railway.app');
-
-const DIRECT_TNG_API_BASE =
-  'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech';
-
-const RAILWAY_TNG_API_FALLBACK =
-  'https://tng-live-production.up.railway.app/tng-api';
-
-const API_BASE =
-  import.meta.env.VITE_TNG_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-api'
-    : DIRECT_TNG_API_BASE);
-
-const BFF_API_BASE =
-  import.meta.env.VITE_BFF_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/bff-api'
-    : 'https://tng-live-production.up.railway.app/bff-api');
-
-const STATS_API_BASE =
-  import.meta.env.VITE_TNG_STATS_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-stats'
-    : 'https://tng-live-production.up.railway.app/tng-stats');
-
-const ACCOUNT_ROUTE_API_BASE =
-  import.meta.env.VITE_TNG_ACCOUNT_ROUTE_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-api'
-    : 'https://tng-live-production.up.railway.app/tng-api');
-
-const DISPLAY_STATE_API_BASE =
-  import.meta.env.VITE_TNG_DISPLAY_STATE_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-display'
-    : 'https://tng-live-production.up.railway.app/tng-display');
-
-const SPECTATOR_API_BASE =
-  import.meta.env.VITE_TNG_SPECTATOR_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-spectator'
-    : 'https://tng-live-production.up.railway.app/tng-spectator');
-
-const HOST_ROSTER_API_BASE =
-  import.meta.env.VITE_TNG_HOST_ROSTER_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-host-stage'
-    : 'https://tng-live-production.up.railway.app/tng-host-stage');
-
-const ROOM_REGISTRY_API_BASE =
-  import.meta.env.VITE_TNG_ROOM_REGISTRY_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? '/tng-rooms'
-    : 'https://tng-live-production.up.railway.app/tng-rooms');
+const API_BASE = tngServiceUrl('/tng-api');
+const BFF_API_BASE = tngServiceUrl('/bff-api');
+const STATS_API_BASE = tngServiceUrl('/tng-stats');
+const ACCOUNT_ROUTE_API_BASE = tngServiceUrl('/tng-api');
+const DISPLAY_STATE_API_BASE = tngServiceUrl('/tng-display');
+const SPECTATOR_API_BASE = tngServiceUrl('/tng-spectator');
+const HOST_ROSTER_API_BASE = tngServiceUrl('/tng-host-stage');
+const ROOM_REGISTRY_API_BASE = tngServiceUrl('/tng-rooms');
 
 export class TngApiError extends Error {
   constructor(message, { code = 'API_ERROR', status = 500, details = null } = {}) {
@@ -107,23 +59,13 @@ async function request(path, {
   let response;
 
   try {
-    // Fast path: talk directly to the Neon game API just like TNG did before.
-    // This keeps live-game actions off the extra Railway network hop.
     response = await fetch(url, fetchOptions);
   } catch (networkError) {
-    const canUseRailwayFallback =
-      !IS_RAILWAY_TEMP_HOST &&
-      apiBase === API_BASE &&
-      API_BASE === DIRECT_TNG_API_BASE;
-
-    if (!canUseRailwayFallback) throw networkError;
-
-    // Resilience path: if a browser/network cannot reach Neon directly
-    // ("Failed to fetch"), retry the exact request through TNG's Railway proxy.
-    const fallbackUrl =
-      `${RAILWAY_TNG_API_FALLBACK}${path.replace(/^\/api/, '')}`;
-
-    response = await fetch(fallbackUrl, fetchOptions);
+    throw new TngApiError('TNG could not reach the game service.', {
+      code: 'NETWORK',
+      status: 0,
+      details: networkError?.message || null,
+    });
   }
 
   // Neon Auth JWTs are intentionally short-lived. If a request happens on the
@@ -137,16 +79,11 @@ async function request(path, {
       try {
         response = await fetch(url, fetchOptions);
       } catch (networkError) {
-        const canUseRailwayFallback =
-          !IS_RAILWAY_TEMP_HOST &&
-          apiBase === API_BASE &&
-          API_BASE === DIRECT_TNG_API_BASE;
-
-        if (!canUseRailwayFallback) throw networkError;
-
-        const fallbackUrl =
-          `${RAILWAY_TNG_API_FALLBACK}${path.replace(/^\/api/, '')}`;
-        response = await fetch(fallbackUrl, fetchOptions);
+        throw new TngApiError('TNG could not reach the game service.', {
+          code: 'NETWORK',
+          status: 0,
+          details: networkError?.message || null,
+        });
       }
     }
   }
@@ -165,11 +102,7 @@ const BERNAVERSE_BRIDGE_URL =
   'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
 
 
-const HOST_LIVE_WS_URL =
-  import.meta.env.VITE_TNG_HOST_LIVE_WS_URL ||
-  (typeof window !== 'undefined' && window.location.hostname.endsWith('.up.railway.app')
-    ? `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/host-live`
-    : 'wss://tng-live-production.up.railway.app/host-live');
+const HOST_LIVE_WS_URL = tngWebSocketUrl('/host-live');
 
 const hostLive = {
   socket: null,
