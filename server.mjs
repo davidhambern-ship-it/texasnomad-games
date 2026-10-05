@@ -5044,7 +5044,7 @@ async function handleDominoApi(req, res) {
     const id = `dom_${Date.now()}_${randomBytes(5).toString('hex')}`;
     const hostToken = dominoToken();
     const baseGameState = cleanDominoGameState(data, roomCode);
-    const hostPublicName = String(verifiedHost.publicName || 'Host').trim().slice(0, 20);
+    const hostPublicName = String(verifiedHost.publicName || 'Host').trim().slice(0, 32);
     const gameState = {
       ...baseGameState,
       players: Array.isArray(baseGameState.players)
@@ -5114,7 +5114,7 @@ async function handleDominoApi(req, res) {
     const body = await readJsonBody(req).catch(() => null);
     const roomCode = String(body?.roomCode || '').trim().toUpperCase();
     const requestedSeat = Number(body?.seat);
-    const publicName = String(identity.publicName || 'Nomad').trim().slice(0, 20);
+    const publicName = String(identity.publicName || 'Nomad').trim().slice(0, 32);
 
     if (
       !roomCode ||
