@@ -33,8 +33,12 @@ export default function DominoHost() {
   const [hostName, setHostName] = useState(() => { try { return localStorage.getItem('dom_host_name') || ''; } catch { return ''; } });
   const [scoreLimit, setScoreLimit] = useState(150);
   const [loading, setLoading] = useState(false);
+  const [hostError, setHostError] = useState('');
   const [copied, setCopied] = useState(false);
   const [savedRoom] = useState(() => { try { return localStorage.getItem(HOST_KEY); } catch { return null; } });
+  const savedRoomAuthorized = Boolean(
+    savedRoom && base44.entities.DominoGame.hostToken(savedRoom),
+  );
   const gameRef = useRef(null);
   const aiBusy = useRef(false);
   const [aiTick, setAiTick] = useState(0);
@@ -82,6 +86,7 @@ export default function DominoHost() {
   const createRoom = async () => {
     if (!hostName.trim()) return;
     setLoading(true);
+    setHostError('');
     try {
       try { localStorage.setItem('dom_host_name', hostName.trim()); } catch { /* ignore */ }
       const players = [0, 1, 2, 3].map(i => (i === 0 ? { ...emptySeat(0), playerId: `host_${Date.now()}`, playerName: hostName.trim(), connected: true, isHost: true } : emptySeat(i)));
@@ -91,11 +96,28 @@ export default function DominoHost() {
       });
       try { localStorage.setItem(HOST_KEY, created.room_code); } catch { /* ignore */ }
       setGame(created);
-    } finally { setLoading(false); }
+    } catch (error) {
+      setHostError(
+        error?.message ||
+        'TNG could not create the Domino table. Open it from the Host Controller.',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
+
   const resumeRoom = async () => {
     setLoading(true);
-    try { const g = await fetchRoom(savedRoom); if (g) setGame(g); } finally { setLoading(false); }
+    setHostError('');
+    try {
+      const g = await fetchRoom(savedRoom);
+      if (g) setGame(g);
+      else setHostError('That saved Domino room is no longer available.');
+    } catch (error) {
+      setHostError(error?.message || 'That Domino room could not be resumed.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const usedChars = (g) => g.players.filter(p => p.aiCharacterId).map(p => p.aiCharacterId);
@@ -150,8 +172,13 @@ export default function DominoHost() {
             <div className="tnd-seg">{LIMITS.map(v => <button key={v} type="button" aria-pressed={scoreLimit === v} onClick={() => setScoreLimit(v)}>{v}</button>)}</div>
             <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
               <button type="button" className="tnd-btn primary" style={{ flex: 1, padding: 16, fontSize: 18 }} disabled={loading || !hostName.trim()} onClick={createRoom}>{loading ? 'Opening…' : 'Create room & sit down'}</button>
-              {savedRoom && <button type="button" className="tnd-btn" disabled={loading} onClick={resumeRoom}>Resume room {savedRoom}</button>}
+              {savedRoomAuthorized && <button type="button" className="tnd-btn" disabled={loading} onClick={resumeRoom}>Resume room {savedRoom}</button>}
             </div>
+            {hostError && (
+              <p className="tnd-sub" style={{ color: '#fca5a5', marginTop: 12 }}>
+                {hostError}
+              </p>
+            )}
           </div>
           <div className="tnd-panel">
             <h3>How it plays</h3>
