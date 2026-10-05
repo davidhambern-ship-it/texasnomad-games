@@ -305,7 +305,7 @@ export function createWordWranglerApi({
         const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode(hostIdentity.accountId);
+        const code = await newCode(identity.accountId);
         const host = {
           id: newId(),
           accountId: identity.accountId,
