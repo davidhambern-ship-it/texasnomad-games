@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
+import { resolveTngRoom } from '@/api/roomRegistry';
 import { getCardBack, getCardImage } from '@/lib/spadesCardImages';
 import SpadesShuffleAnimation from '@/components/spades/SpadesShuffleAnimation';
 import SpadesDealAnimation from '@/components/spades/SpadesDealAnimation';
@@ -1644,6 +1645,37 @@ function SeeThatDisplay({ room }) {
   );
 }
 
+function BattleSudokuDisplay({ room }) {
+  const roomCode = String(room?.roomCode || '').trim().toUpperCase();
+
+  if (!/^[A-Z]{5}$/.test(roomCode)) {
+    return (
+      <div className="flex h-full items-center justify-center bg-[#061018] px-6 text-center text-white">
+        <div>
+          <div className="text-8xl">⚓</div>
+          <div className="mt-6 text-[9px] uppercase tracking-[0.28em] text-[#FFD23F]" style={PS2}>
+            BATTLESUDOKU GAME DISPLAY
+          </div>
+          <h1 className="mt-4 text-5xl font-semibold">BattleSudoku is ready.</h1>
+          <p className="mt-4 text-lg text-white/45">
+            Waiting for the Host to launch the fleet…
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <iframe
+      key={roomCode}
+      title={`BattleSudoku room ${roomCode} display`}
+      src={`/games/sudoku?display=${encodeURIComponent(roomCode)}`}
+      className="h-full w-full border-0 bg-[#061018]"
+      allow="autoplay; fullscreen"
+    />
+  );
+}
+
 export default function GameDisplay({
   spectator = false,
   embedded = false,
@@ -1758,6 +1790,21 @@ export default function GameDisplay({
 
     async function refreshSpectator() {
       try {
+        const registeredRoom = await resolveTngRoom(spectatorRoomCode);
+        if (cancelled) return;
+
+        if (registeredRoom?.kind === 'standalone') {
+          if (registeredRoom.spectatePath) {
+            window.location.replace(registeredRoom.spectatePath);
+            return;
+          }
+
+          setRoom(null);
+          setStatus('ended');
+          setError('This game does not have a read-only spectator view yet.');
+          return;
+        }
+
         const payload = await tngApi.spectator.getState(spectatorRoomCode);
         if (cancelled) return;
 
@@ -1875,6 +1922,7 @@ export default function GameDisplay({
   const squareBizMode = room?.gameId === 'square-biz';
   const viralMode = room?.gameId === 'viral';
   const seeThatMode = room?.gameId === 'see-that';
+  const battleSudokuMode = room?.gameId === 'sudoku';
 
   return (
     <div
@@ -1882,8 +1930,8 @@ export default function GameDisplay({
         embedded ? 'h-full min-h-0' : 'h-[100dvh]'
       }`}
     >
-      {!squareBizMode && !viralMode && !seeThatMode && <AmbientBackdrop />}
-      {!squareBizMode && !viralMode && !seeThatMode && !embedded && (
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && <AmbientBackdrop />}
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !embedded && (
         <DisplayHud
           room={room}
           isFullscreen={isFullscreen}
@@ -1904,7 +1952,7 @@ export default function GameDisplay({
         className={`relative z-10 overflow-hidden ${
           embedded
             ? 'h-full'
-            : squareBizMode || viralMode || seeThatMode
+            : squareBizMode || viralMode || seeThatMode || battleSudokuMode
               ? 'h-[100dvh]'
               : 'h-[calc(100dvh-4rem)]'
         }`}
@@ -1949,8 +1997,9 @@ export default function GameDisplay({
         )}
         {room?.gameId === 'viral' && <ViralDisplay room={room} />}
         {room?.gameId === 'see-that' && <SeeThatDisplay room={room} />}
+          {room?.gameId === 'sudoku' && <BattleSudokuDisplay room={room} />}
 
-        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that', 'sudoku'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>
