@@ -258,7 +258,7 @@ export function createBattleSudokuApi({
           let issued;
 
           if (!me) {
-            const name = clean(identity.publicName);
+            const name = clean(identity.publicName, 32);
             if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
             if (room.players.filter(p => !p.cpu).length >= MAX_PLAYERS) throw err(409, 'FULL', 'This game is full.');
             if (room.players.length >= MAX_PLAYERS) {
@@ -277,7 +277,7 @@ export function createBattleSudokuApi({
             room.players.push(me);
             issued = me.token;
           } else if (!token || token !== me.token) {
-            me.name = clean(identity.publicName);
+            me.name = clean(identity.publicName, 32);
             me.token = newToken();
             issued = me.token;
           }
