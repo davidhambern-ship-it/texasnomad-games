@@ -25,6 +25,9 @@ const [
   app,
   games,
   hostPanel,
+  wordWrangler,
+  battleSudoku,
+  dominoHost,
   tngApi,
   main,
   display,
@@ -38,6 +41,9 @@ const [
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
   text('src/pages/PreviewHostPanel.jsx'),
+  text('src/pages/WordWranglerGame.jsx'),
+  text('src/pages/SudokuGame.jsx'),
+  text('src/pages/DominoHost.jsx'),
   text('src/api/tngApi.js'),
   text('src/main.jsx'),
   text('src/pages/GameDisplay.jsx'),
@@ -93,6 +99,21 @@ ok(
   'construction lineup',
   games.includes("const IN_CONSTRUCTION_IDS = ['uno', 'poker', 'bowling', 'snake', 'phase-10'];"),
   'UNO, Poker, Bowling, Snake and Phase 10 must remain the construction lineup',
+);
+
+ok(
+  'live TNG lineup stays multiplayer-only',
+  !wordWrangler.includes('Solo Rush') &&
+    !wordWrangler.includes('Vs CPU') &&
+    !battleSudoku.includes('Solo vs CPU') &&
+    !battleSudoku.includes('CPU skill') &&
+    !dominoHost.includes('chooseAIMove') &&
+    !dominoHost.includes('addAI(') &&
+    !dominoHost.includes('CPU fills empty seats') &&
+    games.includes("tags: ['2–8 Players', 'Word Game', 'Online Race']") &&
+    games.includes("tags: ['2–8 Players', 'Puzzle', 'Party Battle']") &&
+    games.includes("tags: ['4 Players', '2v2 Partners', 'Human Players']"),
+  'A live TNG game reintroduced public solo/CPU play or stale CPU arcade copy',
 );
 
 ok(
