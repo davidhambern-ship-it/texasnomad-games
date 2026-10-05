@@ -1,0 +1,30 @@
+name: Validate Host Panel live games
+
+on:
+  push:
+    branches:
+      - fix/host-panel-live-game-icons
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Production build
+        run: npm run build
+      - name: Verify Host Panel lineup
+        run: |
+          grep -q "iconType: 'viral-stars'" src/components/host/HostGameSelect.jsx
+          grep -q "iconType: 'domino-32'" src/components/host/HostGameSelect.jsx
+          grep -q "hostPath: '/games/dominoes/host'" src/components/host/HostGameSelect.jsx
+          ! grep -q "id: 'sudoku'" src/components/host/HostGameSelect.jsx
+          ! grep -q "id: 'see-that'" src/components/host/HostGameSelect.jsx
