@@ -446,16 +446,18 @@ const GAMES = [
   },
   {
     id: 'see-that',
-    title: 'See That?',
-    tagline: 'Hidden Object Challenge',
+    title: 'See That?!',
+    tagline: 'Hidden Object Party Game',
     image: 'https://media.base44.com/images/public/6a1faf9539e2c1e12925ead8/bdb921a37_generated_image.png',
     color: '#4ade80',
     color2: '#22c55e',
-    marqueeText: 'FIND THE OBJECTS • CLICK TO SCORE • BEAT THE CLOCK • CAN YOU SEE THAT?',
-    screenText: '👁 SPOT THE HIDDEN',
-    description: 'Race to find 5 hidden objects in a chaotic saloon scene. Click fast, don\'t miss, and beat the 60-second clock!',
-    tags: ['Single Player', 'Hidden Object', 'Fast'],
+    marqueeText: 'SPOT IT • TAP IT • CLAIM IT • CAN YOU SEE THAT?!',
+    screenText: '👁 SEE THAT?!',
+    description: 'The scene goes on the big screen and everyone races to spot the hidden objects on their phones. First tap claims it, combos pay big, and wild tapping gets you locked out.',
+    tags: ['1–12 Players', 'Hidden Object', 'Party'],
     path: '/games/see-that',
+    standalone: true,
+    supportsDirectJoin: true,
     featured: false,
   },
   {
@@ -567,7 +569,7 @@ export default function Games() {
       return;
     }
 
-    // See That! is single-player only — no room needed
+    // See That?! owns its own host/join room flow on /st-api.
     if (gameId === 'see-that') {
       navigate('/games/see-that');
       return;
