@@ -1,12 +1,6 @@
-const IS_RAILWAY_TEMP_HOST =
-  typeof window !== 'undefined' &&
-  window.location.hostname.endsWith('.up.railway.app');
+import { TNG_SERVICE_ORIGIN } from '@/lib/tngServiceOrigin';
 
-const VIRAL_API_BASE =
-  import.meta.env.VITE_VIRAL_API_BASE ||
-  (IS_RAILWAY_TEMP_HOST
-    ? ''
-    : 'https://tng-live-production.up.railway.app');
+const VIRAL_API_BASE = TNG_SERVICE_ORIGIN;
 
 export async function resolveViralRoom(roomCode) {
   const code = String(roomCode || '').trim().toUpperCase();
