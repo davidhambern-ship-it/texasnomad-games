@@ -87,7 +87,24 @@ const tngRelayHtml = sourceHtml.replace(
   legacyRelay,
   "return 'wss://auth.texasnomadgames.com';",
 );
-const deployedHtml = tngRelayHtml.replace('</body>', `${bridgeTag}</body>`);
+// Keep the vendor archive intact; patch the deployed copy with checked anchors.
+function replaceRequired(source, before, after) {
+  if (!source.includes(before)) throw new Error('VIRAL hosting patch anchor changed.');
+  return source.replace(before, after);
+}
+const oldHostSetup = "  ROOMCODE=code; $('roomTag').hidden=false; $('roomTag').textContent='ROOM '+code;\n  RNAME.presence({role:'host'}).catch(()=>{});";
+const verifiedHostSetup = `  try { await RNAME.presence({role:'host'}); }
+  catch(e) {
+    window.TNG_VIRAL_HOST_ERROR=e.message||'TNG Host authorization failed.';
+    try { RNAME.leave(); } catch {}
+    RNAME=null; ROOMCODE=null; $('roomTag').hidden=true;
+    alert(window.TNG_VIRAL_HOST_ERROR);
+    return false;
+  }
+  window.TNG_VIRAL_HOST_ERROR='';
+  ROOMCODE=code; $('roomTag').hidden=false; $('roomTag').textContent='ROOM '+code;`;
+const verifiedHtml = replaceRequired(tngRelayHtml, oldHostSetup, verifiedHostSetup);
+const deployedHtml = verifiedHtml.replace('</body>', `${bridgeTag}</body>`);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, deployedHtml);

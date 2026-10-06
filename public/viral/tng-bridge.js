@@ -1,6 +1,6 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
-  const requestedJoin = String(params.get('join') || '').trim().toUpperCase();
+  const requestedJoin = String(params.get('join') || params.get('room') || '').trim().toUpperCase();
   const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   const requestedHost = params.get('host') === '1';
   let hostModeActive = requestedHost;
@@ -273,7 +273,7 @@
 
                   window.TNG_VIRAL_HOST_AUTH = 'verifying';
 
-                  const token = await getHostAuthToken().catch(() => '');
+                  const token = await getHostAuthToken(true).catch(() => '');
                   let deviceId = '';
                   try {
                     deviceId = String(
@@ -288,6 +288,9 @@
                     );
                   }
 
+                  // The React launcher unloads before this standalone page takes over.
+                  // Restore device presence before asking the relay to verify ownership.
+                  await heartbeatController(token, deviceId);
                   payload._tngHostAuth = { token, deviceId };
 
                   return new Promise((resolve, reject) => {
@@ -326,7 +329,9 @@
                           return;
                         }
 
-                        finish(false, 'This browser is not authorized as the TNG Host.');
+                        finish(false, data.code === 'ROOM_CODE_TAKEN'
+                          ? 'That room code is already in use. Generate a new code and try again.'
+                          : 'Open the TNG Host Controller, then launch VIRAL again.');
                       });
                     } catch {
                       finish(false, 'TNG Host authorization could not start.');
@@ -870,9 +875,34 @@
     });
   }
 
+  async function heartbeatController(token, deviceId) {
+    const response = await fetch(`${API_BASE}/tng-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: 'heartbeat', deviceIds: [deviceId] }),
+    });
+    if (!response.ok) throw new Error('Could not restore the TNG Host Controller. Launch VIRAL from Host again.');
+  }
+
+  function startControllerHeartbeat() {
+    const heartbeat = async () => {
+      if (!detectHostMode()) return;
+      try {
+        const deviceId = window.localStorage.getItem('tng_device_id');
+        const token = await getHostAuthToken(true);
+        if (deviceId && token) await heartbeatController(token, deviceId);
+      } catch {}
+    };
+    const timer = window.setInterval(heartbeat, 60000);
+    window.addEventListener('pageshow', heartbeat);
+    window.addEventListener('online', heartbeat);
+    window.addEventListener('pagehide', () => window.clearInterval(timer), { once: true });
+  }
+
   function boot() {
     installClaudeCompatibilityBridge();
     installHostAuthorizationBridge();
+    startControllerHeartbeat();
 
     if (!requestedDisplay) {
       revealOnlineTabs();
