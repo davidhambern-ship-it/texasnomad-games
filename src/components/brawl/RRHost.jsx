@@ -62,6 +62,7 @@ export default function RRHost({ onExit }) {
               ready: message.ready,
               color: message.color,
               online: true,
+              isHost: message.isHost === true,
             },
           }));
           rrSfx.count();
@@ -171,10 +172,13 @@ export default function RRHost({ onExit }) {
       id: player.id,
       fighter: player.fighter || ROSTER[Math.floor(Math.random() * ROSTER.length)].id,
       name: player.name,
-      remote: true,
+      remote: !player.isHost,
+      you: player.isHost === true,
       slotColor: player.color,
     }));
-    for (const player of nextLineup) inputs.current[player.id] = { x: 0, y: 0, b: 0, latch: 0 };
+    for (const player of nextLineup) {
+      inputs.current[player.id] = { x: 0, y: 0, b: 0, latch: 0 };
+    }
     setLineup(nextLineup);
     setPhase('fight');
   };
@@ -271,8 +275,8 @@ export default function RRHost({ onExit }) {
                     <div key={player.id} className={`rr-pslot${player.online === false ? ' off' : ''}`} style={{ '--c': player.color }}>
                       {fighter ? <RRPortrait ch={fighter} size={110} animate={false} /> : <div className="q">?</div>}
                       <b>{player.name}</b>
-                      <small>{fighter ? fighter.name : 'picking…'}{player.ready ? ' ✓' : ''}{player.online === false ? ' · offline' : ''}</small>
-                      <button type="button" className="x" aria-label={`Remove ${player.name}`} onClick={() => sock.current?.send({ t: 'kick', id: player.id })}>✕</button>
+                      <small>{player.isHost ? 'HOST · ' : ''}{fighter ? fighter.name : 'picking…'}{player.ready ? ' ✓' : ''}{player.online === false ? ' · offline' : ''}</small>
+                      {!player.isHost && <button type="button" className="x" aria-label={`Remove ${player.name}`} onClick={() => sock.current?.send({ t: 'kick', id: player.id })}>✕</button>}
                     </div>
                   );
                 })}
@@ -288,7 +292,16 @@ export default function RRHost({ onExit }) {
                 ))}
               </div>
               <div className="rr-row"><span className="rr-label">Stocks</span><Seg value={stocks} set={setStocks} opts={[[2, '2'], [3, '3'], [4, '4'], [5, '5']]} /></div>
-              <p className="rr-sub" style={{ margin: 0 }}>Human-only multiplayer · 2–8 fighters · phones are the controllers.</p>
+              <div className="rr-label">Your fighter — Host plays too</div>
+              <div className="rr-roster small">
+                {ROSTER.map((fighter) => (
+                  <button key={fighter.id} type="button" className="rr-fcard" style={{ '--c': fighter.color }} aria-pressed={roster.find((player) => player.isHost)?.fighter === fighter.id} onClick={() => sock.current?.send({ t: 'host-pick', fighter: fighter.id })}>
+                    <RRPortrait ch={fighter} size={120} animate={false} />
+                    <b>{fighter.name}</b>
+                  </button>
+                ))}
+              </div>
+              <p className="rr-sub" style={{ margin: 0 }}>You play on this screen with keyboard, touch controls or a gamepad. Other players see the match on their own devices. 2–8 fighters total, including you.</p>
               <button type="button" className="rr-btn primary" style={{ fontSize: 22, padding: 14 }} disabled={!code || livePlayers.length < 2} onClick={start}>Start the rumble!</button>
               <div className="rr-row">
                 <button type="button" className="rr-btn ghost" onClick={closeRoom}>← Close room</button>

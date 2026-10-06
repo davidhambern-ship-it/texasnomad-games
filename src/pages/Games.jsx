@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import RodeoCabinetImage from '@/components/games/RodeoCabinetImage';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
@@ -496,7 +497,8 @@ const GAMES = [
     color2: '#ffc94a',
     marqueeText: 'UP TO 8 FIGHTERS • YOUR PHONE IS THE CONTROLLER • RACK UP DAMAGE • LAUNCH ’EM OFF THE STAGE',
     screenText: '🤠 RODEO RUMBLE',
-    description: 'A party platform fighter. Put the stage on the TV and up to eight friends join on their phones — every phone becomes a controller. Rack up damage, then launch rivals off the mesa. Nine fighters including the Bunnie Crew, four stages that stretch to fit the crowd.',
+    screenComponent: <RodeoCabinetImage />,
+    description: 'A party platform fighter for 2–8 people, including the host. Every player sees the full arena on their own device with their controls — no TV required. Rack up damage, then launch rivals off the mesa. Nine fighters including the Bunnie Crew, four stages that stretch to fit the crowd.',
     tags: ['2–8 Players', 'Fighting', 'Party'],
     path: '/games/rodeo-rumble',
     standalone: true,

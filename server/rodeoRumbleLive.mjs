@@ -32,7 +32,8 @@ export function createRodeoRumbleLive({
     fighter: player.fighter,
     ready: player.ready,
     color: player.color,
-    online: !!(player.ws && player.ws.readyState === WebSocket.OPEN),
+    isHost: player.isHost === true,
+    online: player.isHost ? !!(room.host && room.host.readyState === WebSocket.OPEN) : !!(player.ws && player.ws.readyState === WebSocket.OPEN),
   }));
   const toPlayers = (room, msg, dropIfBacklogged = false) => {
     const data = JSON.stringify(msg);
@@ -85,6 +86,13 @@ export function createRodeoRumbleLive({
         createdAt: Date.now(),
         updatedAt: Date.now(),
       };
+      const hostPlayer = {
+        id: newId(), token: newToken(), accountId: String(hostIdentity.accountId),
+        name: clean(hostIdentity.publicName || hostIdentity.handle || 'Host'),
+        fighter: null, ready: false, color: COLORS[0], isHost: true, ws: null,
+      };
+      room.hostPlayerId = hostPlayer.id;
+      room.players.set(hostPlayer.id, hostPlayer);
       rooms.set(code, room);
       return room;
     }
@@ -170,7 +178,7 @@ export function createRodeoRumbleLive({
           role = 'host';
           room.host = ws;
           touch(room);
-          send(ws, { t: 'room', code: room.code, token: room.hostToken, players: roster(room) });
+          send(ws, { t: 'room', code: room.code, token: room.hostToken, hostPlayerId: room.hostPlayerId, players: roster(room) });
           toPlayers(room, { t: 'host', online: true });
           toDisplays(room, { t: 'host', online: true });
           return;
@@ -197,6 +205,11 @@ export function createRodeoRumbleLive({
           const seatByAccount = [...room.players.values()].find(
             (player) => String(player.accountId || '') === String(identity.accountId),
           );
+          if (seatByAccount?.isHost) {
+            send(ws, { t: 'error', code: 'HOST_PLAYER_LOCAL', message: 'You are already playing from the Host screen. Pick your fighter there.' });
+            ws.close(4000, 'host plays locally');
+            return;
+          }
           me = seatByToken || seatByAccount || null;
           if (me && String(me.accountId || '') !== String(identity.accountId)) {
             send(ws, { t: 'error', code: 'IDENTITY_MISMATCH', message: 'That Rodeo Rumble seat belongs to another TNG account.' });
@@ -311,6 +324,15 @@ export function createRodeoRumbleLive({
       if (role === 'host') {
         if (room.host !== ws) return;
         touch(room);
+        if (msg.t === 'host-pick' && FIGHTERS.has(msg.fighter)) {
+          const hostPlayer = room.players.get(room.hostPlayerId);
+          if (!hostPlayer) return;
+          hostPlayer.fighter = msg.fighter;
+          hostPlayer.ready = true;
+          send(ws, { t: 'pick', id: hostPlayer.id, fighter: hostPlayer.fighter });
+          send(ws, { t: 'ready', id: hostPlayer.id, v: true });
+          return;
+        }
         if (msg.t === 'lobby') {
           const previousPhase = room.lobby?.phase || 'lobby';
           room.lobby = msg.lobby || null;
@@ -348,7 +370,7 @@ export function createRodeoRumbleLive({
         }
         if (msg.t === 'kick') {
           const player = room.players.get(String(msg.id));
-          if (player) {
+          if (player && !player.isHost) {
             send(player.ws, { t: 'error', code: 'KICKED', message: 'The host removed you from this rumble.' });
             try { player.ws?.close(); } catch { /* ignore */ }
             room.players.delete(player.id);
