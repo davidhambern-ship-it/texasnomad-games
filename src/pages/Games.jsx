@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import BowlingCabinetImage from '@/components/games/BowlingCabinetImage';
 import NCCard from '@/components/nomadCards/NCCard';
 import RodeoCabinetImage from '@/components/games/RodeoCabinetImage';
 
@@ -491,6 +492,13 @@ const GAMES = [
     featured: false,
   },
   {
+    id: 'nomadic-bowling', title: 'Nomadic Bowling', tagline: 'Roll Straight. Play Dirty.', color: '#32e6ff', color2: '#f2bd76',
+    marqueeText: 'TEN FRAMES • CYBER SALOONS • ADD SPIN • SABOTAGE & REVENGE • CLASSIC OR BERNA BRAWL',
+    screenComponent: <BowlingCabinetImage />,
+    description: 'Classic ten-frame bowling on neon frontier lanes. Aim, power up and hook your roll. Go clean in Classic mode or play BERNA Brawl: precision sabotage can deflect a rival’s ball, but a hit earns them a revenge pinshot. Solo CPU play, 2–8-player rooms and two-team matches. Everyone sees the lane, including the playable host.',
+    tags: ['2–8 Players', 'Bowling', 'Classic + Brawl'], path: '/games/nomadic-bowling', standalone: true, supportsDirectJoin: true, launchLabel: '🎳 OPEN THE LANES', featured: false,
+  },
+  {
     id: 'out', title: 'OUT!', tagline: 'Last Card. Loud Call.', color: '#f2c14e', color2: '#3ef08a',
     marqueeText: 'MATCH • SKIP • REVERSE • DRAW • CALL OUT!',
     screenComponent: <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: '100%', background: 'radial-gradient(ellipse, #17543a, #0d1f17)' }}>{['r','y','w','g','b'].map((c,i) => <NCCard key={c} card={{c,v: ['7','skip','w4','rev','d2'][i]}} w={55} style={{transform: `rotate(${(i-2)*12}deg)`}} />)}</div>,
@@ -678,7 +686,7 @@ const COMING_SOON = [
 export default function Games() {
   const navigate = useNavigate();
   const creating = null;
-  const [roomCodes, setRoomCodes] = useState({ out: '', 'rodeo-rumble': '', 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'nomadic-bowling': '', out: '', 'rodeo-rumble': '', 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
@@ -689,6 +697,7 @@ export default function Games() {
     // their own live service only after the authenticated Host session is ready.
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
     const hostableGames = new Set([
+      'nomadic-bowling',
       'out',
       'bff',
       'square-biz',

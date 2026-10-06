@@ -1693,6 +1693,12 @@ function BattleSudokuDisplay({ room }) {
   );
 }
 
+function BowlingDisplay({ room }) {
+  const code = String(room?.roomCode || '').trim().toUpperCase();
+  if (!/^[A-Z]{5}$/.test(code)) return <div className="p-8 text-white">Waiting for the bowling lanes…</div>;
+  return <iframe title={`Nomadic Bowling ${code}`} src={`/games/nomadic-bowling?display=${encodeURIComponent(code)}`} className="h-full w-full border-0" allow="autoplay; fullscreen" />;
+}
+
 function OutDisplay({ room }) {
   const code = String(room?.roomCode || '').trim().toUpperCase();
   if (!/^[A-Z]{5}$/.test(code)) return <div className="p-8 text-white">Waiting for the OUT! table…</div>;
@@ -2116,6 +2122,7 @@ export default function GameDisplay({
   const wordWranglerMode = room?.gameId === 'word-wrangler';
   const dominoMode = room?.gameId === 'dominoes';
   const outMode = room?.gameId === 'out';
+  const bowlingMode = room?.gameId === 'nomadic-bowling';
 
   return (
     <div
@@ -2123,8 +2130,8 @@ export default function GameDisplay({
         embedded ? 'h-full min-h-0' : 'h-[100dvh]'
       }`}
     >
-      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !rodeoRumbleMode && !wordWranglerMode && !dominoMode && !outMode && <AmbientBackdrop />}
-      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !wordWranglerMode && !dominoMode && !outMode && !embedded && (
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !rodeoRumbleMode && !wordWranglerMode && !dominoMode && !outMode && !bowlingMode && <AmbientBackdrop />}
+      {!squareBizMode && !viralMode && !seeThatMode && !battleSudokuMode && !wordWranglerMode && !dominoMode && !outMode && !bowlingMode && !embedded && (
         <DisplayHud
           room={room}
           isFullscreen={isFullscreen}
@@ -2145,7 +2152,7 @@ export default function GameDisplay({
         className={`relative z-10 overflow-hidden ${
           embedded
             ? 'h-full'
-            : squareBizMode || viralMode || seeThatMode || battleSudokuMode || rodeoRumbleMode || wordWranglerMode || dominoMode || outMode
+            : squareBizMode || viralMode || seeThatMode || battleSudokuMode || rodeoRumbleMode || wordWranglerMode || dominoMode || outMode || bowlingMode
               ? 'h-[100dvh]'
               : 'h-[calc(100dvh-4rem)]'
         }`}
@@ -2190,6 +2197,7 @@ export default function GameDisplay({
         {room?.gameId === 'bff' && (
           <BFFDisplay room={room} />
         )}
+        {bowlingMode && <BowlingDisplay room={room} />}
         {outMode && <OutDisplay room={room} />}
         {room?.gameId === 'viral' && <ViralDisplay room={room} />}
         {room?.gameId === 'see-that' && <SeeThatDisplay room={room} />}
@@ -2198,7 +2206,7 @@ export default function GameDisplay({
           {room?.gameId === 'word-wrangler' && <WordWranglerDisplay room={room} />}
           {room?.gameId === 'dominoes' && <DominoDisplay room={room} />}
 
-        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that', 'sudoku', 'rodeo-rumble', 'word-wrangler', 'dominoes', 'out'].includes(room.gameId) && (
+        {room && !['hangman', 'spades', 'square-biz', 'word-search', 'bff', 'viral', 'see-that', 'sudoku', 'rodeo-rumble', 'word-wrangler', 'dominoes', 'out', 'nomadic-bowling'].includes(room.gameId) && (
           <div className="flex h-full items-center justify-center px-6 text-center">
             <div>
               <div className="text-7xl">🎮</div>

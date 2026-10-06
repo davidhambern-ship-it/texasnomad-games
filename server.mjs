@@ -11,6 +11,7 @@ import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
 import { createNomadCardsApi } from './server/nomadCardsApi.mjs';
+import { createNomadicBowlingApi } from './server/nomadicBowlingApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
@@ -1513,6 +1514,8 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
 
 const outRoomStore = createLiveRoomStore(bffPool, { service: 'out', ttlMs: 3 * 60 * 60 * 1000 });
 
+const bowlingRoomStore = createLiveRoomStore(bffPool, { service: 'nomadic-bowling', ttlMs: 3 * 60 * 60 * 1000 });
+
 const ROOM_MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000;
 
 async function runRoomMaintenance() {
@@ -1523,6 +1526,7 @@ async function runRoomMaintenance() {
     ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
     ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
     ['out', () => outRoomStore.cleanup()],
+    ['nomadic-bowling', () => bowlingRoomStore.cleanup()],
   ];
 
   const results = await Promise.allSettled(
@@ -1592,6 +1596,15 @@ const handleBattleSudokuApi = createBattleSudokuApi({
 
 const handleOutApi = createNomadCardsApi({
   store: outRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+});
+
+const handleBowlingApi = createNomadicBowlingApi({
+  store: bowlingRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
   claimRoomCode: (options) => roomRegistry.claim(options),
@@ -6233,7 +6246,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-nc-token, x-domino-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-nc-token, x-nb-token, x-domino-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
@@ -6355,6 +6368,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/bff-api')) {
       await handleBffApi(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/nb-api')) {
+      await handleBowlingApi(req, res);
       return;
     }
 
