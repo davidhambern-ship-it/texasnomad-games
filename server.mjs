@@ -10,6 +10,7 @@ import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
+import { createNomadCardsApi } from './server/nomadCardsApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
@@ -1510,6 +1511,8 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
 });
 
 
+const outRoomStore = createLiveRoomStore(bffPool, { service: 'out', ttlMs: 3 * 60 * 60 * 1000 });
+
 const ROOM_MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000;
 
 async function runRoomMaintenance() {
@@ -1519,6 +1522,7 @@ async function runRoomMaintenance() {
     ['see-that', () => seeThatRoomStore.cleanup()],
     ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
     ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
+    ['out', () => outRoomStore.cleanup()],
   ];
 
   const results = await Promise.allSettled(
@@ -1579,6 +1583,15 @@ const handleWordWranglerApi = createWordWranglerApi({
 // BattleSudoku party rooms (/bs-api)
 const handleBattleSudokuApi = createBattleSudokuApi({
   store: battleSudokuRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+});
+
+const handleOutApi = createNomadCardsApi({
+  store: outRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
   claimRoomCode: (options) => roomRegistry.claim(options),
@@ -6220,7 +6233,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-nc-token, x-domino-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
@@ -6342,6 +6355,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/bff-api')) {
       await handleBffApi(req, res);
+      return;
+    }
+
+    if ((req.url || '').startsWith('/nc-api')) {
+      await handleOutApi(req, res);
       return;
     }
 

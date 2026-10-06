@@ -4,6 +4,7 @@ import TXDDomino from '@/components/domino/TXDDomino';
 // This list is the single source of truth for ALL games on the platform.
 // When a new game is added, add it here and it automatically appears in the Host Panel.
 export const ALL_GAMES = [
+  { id: 'out', title: 'OUT!', subtitle: 'LAST CARD · LOUD CALL', color: '#f2c14e', emoji: '🃏', path: '/games/out', hostPath: '/games/out?host=1', standalone: true },
   {
     id: 'bff',
     title: 'BFF',

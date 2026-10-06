@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import NCCard from '@/components/nomadCards/NCCard';
 import RodeoCabinetImage from '@/components/games/RodeoCabinetImage';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
@@ -490,6 +491,13 @@ const GAMES = [
     featured: false,
   },
   {
+    id: 'out', title: 'OUT!', tagline: 'Last Card. Loud Call.', color: '#f2c14e', color2: '#3ef08a',
+    marqueeText: 'MATCH • SKIP • REVERSE • DRAW • CALL OUT!',
+    screenComponent: <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: '100%', background: 'radial-gradient(ellipse, #17543a, #0d1f17)' }}>{['r','y','w','g','b'].map((c,i) => <NCCard key={c} card={{c,v: ['7','skip','w4','rev','d2'][i]}} w={55} style={{transform: `rotate(${(i-2)*12}deg)`}} />)}</div>,
+    description: 'Race to empty your hand. Match colors or numbers, skip rivals, reverse play, and make them draw. Call OUT! on your last card. Everyone sees the table and their own private hand — including the host. Play solo or bring up to 10 players, with CPUs to fill seats.',
+    tags: ['2–10 Players', 'Card Game', 'Solo + Party'], path: '/games/out', standalone: true, supportsDirectJoin: true, launchLabel: '🃏 PLAY OUT!', featured: false,
+  },
+  {
     id: 'rodeo-rumble',
     title: 'Rodeo Rumble',
     tagline: 'Knock ’Em Off the Mesa',
@@ -670,7 +678,7 @@ const COMING_SOON = [
 export default function Games() {
   const navigate = useNavigate();
   const creating = null;
-  const [roomCodes, setRoomCodes] = useState({ 'rodeo-rumble': '', 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
+  const [roomCodes, setRoomCodes] = useState({ out: '', 'rodeo-rumble': '', 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
@@ -681,6 +689,7 @@ export default function Games() {
     // their own live service only after the authenticated Host session is ready.
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
     const hostableGames = new Set([
+      'out',
       'bff',
       'square-biz',
       'hangman',

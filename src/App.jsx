@@ -25,6 +25,7 @@ const Contact = lazy(() => import('@/pages/Contact'));
 const WordSearchGame = lazy(() => import('@/pages/WordSearchGame'));
 const ViralGame = lazy(() => import('@/pages/ViralGame'));
 const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
+const NomadCardsGame = lazy(() => import('@/pages/NomadCardsGame'));
 const RodeoRumbleGame = lazy(() => import('@/pages/RodeoRumbleGame'));
 const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
@@ -140,7 +141,8 @@ const AuthenticatedApp = () => {
     '/display',
   ]);
 
-  if (!isAuthenticated && !publicUnauthenticatedPaths.has(location.pathname)) {
+  const publicOutDisplay = location.pathname === '/games/out' && /^[A-Z]{5}$/.test(new URLSearchParams(location.search).get('display') || '');
+  if (!isAuthenticated && !publicOutDisplay && !publicUnauthenticatedPaths.has(location.pathname)) {
     return <Navigate to="/login" replace />;
   }
 
@@ -201,6 +203,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/games/sudoku" element={<SudokuGame />} />
+      <Route path="/games/out" element={<NomadCardsGame />} />
       <Route path="/games/rodeo-rumble" element={<RodeoRumbleGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
