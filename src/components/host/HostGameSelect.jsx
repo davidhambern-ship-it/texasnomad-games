@@ -94,6 +94,16 @@ export const ALL_GAMES = [
     hostPath: '/games/sudoku?host=1',
     standalone: true,
   },
+  {
+    id: 'rodeo-rumble',
+    title: 'RODEO RUMBLE',
+    subtitle: 'PARTY BRAWLER · 8 PLAYERS',
+    color: '#ff7a3d',
+    emoji: '🤠',
+    path: '/games/rodeo-rumble',
+    hostPath: '/games/rodeo-rumble?host=1',
+    standalone: true,
+  },
 ];
 
 export function HostGameIcon({ game, size = 'lg' }) {
