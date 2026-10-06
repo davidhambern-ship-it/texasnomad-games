@@ -181,6 +181,12 @@ async function main() {
     return 'relay responding';
   });
 
+  await check('Rodeo Rumble relay health', async () => {
+    const { response, payload } = await json(`${SERVICE_ORIGIN}/rr-api/health`);
+    if (!response.ok || payload?.ok !== true) throw new Error(`status ${response.status}`);
+    return 'relay responding';
+  });
+
   const publicRoutes = [
     '/',
     '/welcome',
@@ -197,6 +203,7 @@ async function main() {
     '/games/word-search',
     '/games/viral',
     '/games/sudoku',
+    '/games/rodeo-rumble',
     '/games/see-that',
     '/games/word-wrangler',
     '/games/dominoes',
