@@ -5,6 +5,7 @@ import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import DominoTable, { TEAM_COLORS, TEAM_NAMES } from '@/components/domino/DominoTable';
 import { generateRoomCode, getTeam, newRound, applyPlay, applyPass } from '@/lib/dominoEngine';
 import '@/components/domino/domino.css';
+import { TEXASNOMAD_CHARACTERS } from '@/data/texasNomadCharacters';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 
