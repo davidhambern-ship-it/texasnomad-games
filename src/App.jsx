@@ -25,6 +25,7 @@ const Contact = lazy(() => import('@/pages/Contact'));
 const WordSearchGame = lazy(() => import('@/pages/WordSearchGame'));
 const ViralGame = lazy(() => import('@/pages/ViralGame'));
 const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
+const RodeoRumbleGame = lazy(() => import('@/pages/RodeoRumbleGame'));
 const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
 const DominoHost = lazy(() => import('@/pages/DominoHost'));
@@ -200,6 +201,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-search" element={<WordSearchGame />} />
       <Route path="/games/viral" element={<ViralGame />} />
       <Route path="/games/sudoku" element={<SudokuGame />} />
+      <Route path="/games/rodeo-rumble" element={<RodeoRumbleGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
       <Route path="/games/dominoes/host" element={<DominoHost />} />
