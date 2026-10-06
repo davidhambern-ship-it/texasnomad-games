@@ -27,6 +27,7 @@ const [
   hostPanel,
   wordWrangler,
   battleSudoku,
+  rodeoRumble,
   dominoHost,
   dominoGame,
   dominoStore,
@@ -46,6 +47,7 @@ const [
   text('src/pages/PreviewHostPanel.jsx'),
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
+  text('src/pages/RodeoRumbleGame.jsx'),
   text('src/pages/DominoHost.jsx'),
   text('src/pages/DominoGame.jsx'),
   text('src/api/dominoStore.js'),
@@ -71,6 +73,7 @@ const liveRoutes = [
   '/games/word-search',
   '/games/viral',
   '/games/sudoku',
+  '/games/rodeo-rumble',
   '/games/see-that',
   '/games/word-wrangler',
   '/games/dominoes',
@@ -88,6 +91,7 @@ const liveGameIds = [
   'word-search',
   'viral',
   'sudoku',
+  'rodeo-rumble',
   'see-that',
   'word-wrangler',
   'dominoes',
@@ -113,11 +117,14 @@ ok(
     !wordWrangler.includes('Vs CPU') &&
     !battleSudoku.includes('Solo vs CPU') &&
     !battleSudoku.includes('CPU skill') &&
+    !rodeoRumble.includes('Practice') &&
+    !rodeoRumble.includes('CPU Fill') &&
     !dominoHost.includes('chooseAIMove') &&
     !dominoHost.includes('addAI(') &&
     !dominoHost.includes('CPU fills empty seats') &&
     games.includes("tags: ['2–8 Players', 'Word Game', 'Online Race']") &&
     games.includes("tags: ['2–8 Players', 'Puzzle', 'Party Battle']") &&
+    games.includes("tags: ['2–8 Players', 'Fighting', 'Party']") &&
     games.includes("tags: ['4 Players', '2v2 Partners', 'Human Players']"),
   'A live TNG game reintroduced public solo/CPU play or stale CPU arcade copy',
 );

@@ -489,6 +489,22 @@ const GAMES = [
     featured: false,
   },
   {
+    id: 'rodeo-rumble',
+    title: 'Rodeo Rumble',
+    tagline: 'Knock ’Em Off the Mesa',
+    color: '#ff7a3d',
+    color2: '#ffc94a',
+    marqueeText: 'UP TO 8 FIGHTERS • YOUR PHONE IS THE CONTROLLER • RACK UP DAMAGE • LAUNCH ’EM OFF THE STAGE',
+    screenText: '🤠 RODEO RUMBLE',
+    description: 'A party platform fighter. Put the stage on the TV and up to eight friends join on their phones — every phone becomes a controller. Rack up damage, then launch rivals off the mesa. Nine fighters including the Bunnie Crew, four stages that stretch to fit the crowd.',
+    tags: ['2–8 Players', 'Fighting', 'Party'],
+    path: '/games/rodeo-rumble',
+    standalone: true,
+    supportsDirectJoin: true,
+    launchLabel: '⚡ HOST A RUMBLE',
+    featured: false,
+  },
+  {
     id: 'viral',
     title: 'VIRAL!',
     tagline: 'Creator Journey',
@@ -652,7 +668,7 @@ const COMING_SOON = [
 export default function Games() {
   const navigate = useNavigate();
   const creating = null;
-  const [roomCodes, setRoomCodes] = useState({ 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
+  const [roomCodes, setRoomCodes] = useState({ 'rodeo-rumble': '', 'square-biz': '', bff: '', hangman: '', spades: '', 'word-search': '', viral: '', 'name-that-track': '', sudoku: '', 'see-that': '', 'word-wrangler': '', txd: '' });
   const [muted, setMuted] = useState(true);
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
@@ -672,6 +688,7 @@ export default function Games() {
       'see-that',
       'word-wrangler',
       'sudoku',
+      'rodeo-rumble',
       'dominoes',
     ]);
 

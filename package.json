@@ -15,10 +15,12 @@
     "sim:dominoes": "node scripts/domino-sim.mjs",
     "sim:word-wrangler": "node scripts/word-wrangler-sim.mjs",
     "sim:battle-sudoku": "node scripts/battle-sudoku-sim.mjs",
-    "test:games": "npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku",
+    "test:games": "npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku && npm run sim:rodeo-rumble",
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games && npm run test:release",
     "test:release": "node scripts/release-audit.mjs",
-    "smoke:production": "node scripts/production-smoke.mjs"
+    "smoke:production": "node scripts/production-smoke.mjs",
+    "start:web": "node scripts/static-web.mjs",
+    "sim:rodeo-rumble": "node scripts/brawl-sim.mjs 40 && SIZE=8 node scripts/brawl-sim.mjs 40"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",

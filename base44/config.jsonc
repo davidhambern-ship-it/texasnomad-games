@@ -1,9 +1,0 @@
-{
-  "name": "TexasNomad Games",
-  "site": {
-    "installCommand": "npm install",
-    "buildCommand": "npm run build",
-    "serveCommand": "npm run dev",
-    "outputDirectory": "./dist"
-  }
-}
