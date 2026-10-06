@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
+import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
@@ -1223,6 +1224,17 @@ const viralLive = createViralLive({
   touchRoomCode: (code, options) => roomRegistry.touch(code, options),
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
   store: viralRoomStore,
+});
+
+// Rodeo Rumble — human-only phone-controller party brawler (/rr-live + /rr-api)
+const rodeoRumbleLive = createRodeoRumbleLive({
+  isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
+  verifyHostAuthorization: verifyViralHostAuthorization,
+  resolvePlayerIdentity: resolveViralPlayerIdentity,
+  recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
@@ -6338,6 +6350,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/rr-api')) {
+      rodeoRumbleLive.handleHttp(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/st-api')) {
       await handleSeeThatApi(req, res);
       return;
@@ -6393,6 +6410,7 @@ const server = http.createServer(async (req, res) => {
       '/test-feedback',
       '/bff-api',
       '/bs-api',
+      '/rr-api',
       '/st-api',
       '/ww-api',
       '/domino-api',
@@ -6423,6 +6441,7 @@ server.on('upgrade', async (request, socket, head) => {
     const url = new URL(request.url || '/', 'http://localhost');
 
     if (viralLive.handleUpgrade(request, socket, head)) return;
+    if (rodeoRumbleLive.handleUpgrade(request, socket, head)) return;
 
     if (url.pathname === '/host-live') {
       const origin = String(request.headers.origin || '');
