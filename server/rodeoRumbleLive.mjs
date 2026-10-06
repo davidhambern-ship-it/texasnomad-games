@@ -34,10 +34,10 @@ export function createRodeoRumbleLive({
     color: player.color,
     online: !!(player.ws && player.ws.readyState === WebSocket.OPEN),
   }));
-  const toPlayers = (room, msg) => {
+  const toPlayers = (room, msg, dropIfBacklogged = false) => {
     const data = JSON.stringify(msg);
     for (const player of room.players.values()) {
-      if (player.ws && player.ws.readyState === WebSocket.OPEN) player.ws.send(data);
+      if (player.ws && player.ws.readyState === WebSocket.OPEN && (!dropIfBacklogged || player.ws.bufferedAmount < 128 * 1024)) player.ws.send(data);
     }
   };
   const toDisplays = (room, msg) => {
@@ -240,6 +240,8 @@ export function createRodeoRumbleLive({
             fighter: me.fighter,
             host: !!room.host,
             lobby: room.lobby,
+            frame: room.latestFrame,
+            result: room.latestResult,
           });
           send(room.host, { t: 'pjoin', id: me.id, name: me.name, fighter: me.fighter, ready: me.ready, color: me.color });
           return;
@@ -326,6 +328,7 @@ export function createRodeoRumbleLive({
         }
         if (msg.t === 'frame') {
           room.latestFrame = msg.frame || null;
+          toPlayers(room, { t: 'frame', frame: room.latestFrame }, true);
           toDisplays(room, { t: 'frame', frame: room.latestFrame });
           return;
         }
@@ -339,6 +342,7 @@ export function createRodeoRumbleLive({
         if (msg.t === 'reset') {
           room.latestFrame = null;
           room.latestResult = null;
+          toPlayers(room, { t: 'frame', frame: null });
           toDisplays(room, { t: 'lobby', lobby: room.lobby });
           return;
         }

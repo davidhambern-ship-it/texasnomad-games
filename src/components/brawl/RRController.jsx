@@ -4,12 +4,13 @@ import { STAGES } from '@/lib/brawl/engine';
 import { rrConnect, rrSeat, packInput } from '@/api/rodeoRumbleLive';
 import TouchPad from './TouchPad';
 import RRPortrait from './RRPortrait';
+import RRPlayerArena from './RRPlayerArena';
 import { createKeyboard, readGamepad, merge, touchState } from './input';
 import { pctColor } from './draw';
 
 const FATAL = new Set(['ROOM_NOT_FOUND', 'FULL', 'KICKED', 'CLOSED']);
 
-/** A phone in a party room: join → pick a fighter → become a controller. */
+/** A player device: join → pick a fighter → watch the full match and control it. */
 export default function RRController({ code, onExit, identityName = '', identityLoading = false }) {
   const [name, setName] = useState(() => { try { return identityName || localStorage.getItem('rr_name') || ''; } catch { return identityName || ''; } });
   const [seat, setSeat] = useState(() => rrSeat.get(code));
@@ -24,6 +25,8 @@ export default function RRController({ code, onExit, identityName = '', identity
   const [fighter, setFighter] = useState(null);
   const [ready, setReady] = useState(false);
   const sock = useRef(null);
+  const frameRef = useRef(null);
+  const [hasFrame, setHasFrame] = useState(false);
   const touch = useRef(touchState());
   const lastDmg = useRef(0);
   const nameRef = useRef(name); nameRef.current = name;
@@ -42,7 +45,10 @@ export default function RRController({ code, onExit, identityName = '', identity
           const st = { token: m.token, id: m.id }; rrSeat.set(code, st); setSeat(st);
           setMe({ id: m.id, name: m.name, color: m.color }); setFighter(m.fighter || null); setHostOnline(m.host); setError('');
           if (m.lobby) setLobby(m.lobby);
-        } else if (m.t === 'lobby') { setLobby(m.lobby); if (m.lobby && m.lobby.phase === 'lobby') { setResult(null); setStatus(null); } }
+          frameRef.current = m.frame || null; setHasFrame(!!m.frame?.game);
+          setResult(m.result || null);
+        } else if (m.t === 'frame') { frameRef.current = m.frame || null; setHasFrame(!!m.frame?.game); }
+        else if (m.t === 'lobby') { setLobby(m.lobby); if (m.lobby && m.lobby.phase === 'lobby') { setResult(null); setStatus(null); frameRef.current = null; setHasFrame(false); } }
         else if (m.t === 'status') { setStatus(m.status); if (m.status && m.status.phase === 'countdown') setResult(null); }
         else if (m.t === 'result') setResult(m.result);
         else if (m.t === 'host') setHostOnline(!!m.online);
@@ -110,23 +116,24 @@ export default function RRController({ code, onExit, identityName = '', identity
       </div></div></div>
     );
   }
-  if (!me) return <div className="rr-root"><div className="rr-center">{conn === 'open' ? 'Joining…' : 'Connecting to the TV…'}</div></div>;
+  if (!me) return <div className="rr-root"><div className="rr-center">{conn === 'open' ? 'Joining…' : 'Connecting to the rumble…'}</div></div>;
 
   // ── controller ──
   if (playing) {
     const ch = mine ? fighterById(mine.ch) : fighter ? fighterById(fighter) : null;
     return (
-      <div className="rr-root rr-pad">
+      <div className="rr-root rr-pad rr-player-view">
         <div className="rr-padhud" style={{ '--c': me.color }}>
           <span className="rr-dot" style={{ background: me.color }} />
           <b>{me.name}</b>{ch && <span className="sub">{ch.name}</span>}
           {mine && <span className="pct" style={{ color: pctColor(mine.dmg) }}>{mine.dmg}%</span>}
           {mine && <span className="stocks">{Array.from({ length: mine.stocks }, (_, i) => <i key={i} />)}</span>}
-          {mine && mine.stocks <= 0 && <span className="sub">KO’d — watch the TV</span>}
+          {mine && mine.stocks <= 0 && <span className="sub">KO’d — spectating</span>}
           <button type="button" className="rr-icon small" onClick={goFull} aria-label="Fullscreen">⛶</button>
         </div>
-        {ch && <div className="rr-padbg" style={{ '--c': me.color }}><RRPortrait ch={ch} size={260} animate={false} /></div>}
-        {!hostOnline && <div className="rr-rotate" style={{ bottom: 'auto', top: 60 }}>TV disconnected — waiting…</div>}
+        <RRPlayerArena frameRef={frameRef} />
+        {!hasFrame && <div className="rr-player-wait">Waiting for the live arena…</div>}
+        {!hostOnline && <div className="rr-rotate" style={{ bottom: 'auto', top: 60 }}>Host disconnected — waiting…</div>}
         <TouchPad state={touch.current} />
       </div>
     );
@@ -138,7 +145,7 @@ export default function RRController({ code, onExit, identityName = '', identity
     <div className="rr-root"><div className="rr-scroll"><div className="rr-wrap" style={{ maxWidth: 720 }}>
       <div className="rr-card" style={{ textAlign: 'center' }}>
         <div className="rr-row" style={{ justifyContent: 'center' }}><span className="rr-chip" style={{ '--c': me.color }}><span className="rr-dot" style={{ background: me.color }} />{me.name}</span><span className="rr-sub" style={{ margin: 0 }}>Room {code}{stageName ? ` · ${stageName}` : ''}</span></div>
-        {!hostOnline && <p className="rr-sub" style={{ color: '#ffb36b' }}>The TV is reconnecting…</p>}
+        {!hostOnline && <p className="rr-sub" style={{ color: '#ffb36b' }}>The host is reconnecting…</p>}
         {result ? (
           <>
             <h2 className="rr-h" style={{ fontSize: 48, color: result.winner === me.id ? '#3ef08a' : 'var(--rr-gold)', marginTop: 8 }}>{result.winner === me.id ? 'You win!' : `${(result.ranked.find(r => r.id === result.winner) || {}).name || 'Someone'} wins`}</h2>
@@ -148,7 +155,7 @@ export default function RRController({ code, onExit, identityName = '', identity
         ) : lobby && lobby.phase !== 'lobby' && !inMatch ? (
           <p className="rr-sub" style={{ fontSize: 18, marginTop: 14 }}>A match is on right now — you’re in the next one. Pick your fighter below while you wait!</p>
         ) : (
-          <p className="rr-sub">Pick your fighter, hit Ready, and watch the TV.</p>
+          <p className="rr-sub">Pick your fighter and hit Ready. The full match and controls appear right here — no TV needed.</p>
         )}
       </div>
       {!result && (

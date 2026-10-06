@@ -132,3 +132,15 @@
 .rr-pad .rr-stickzone { height: 86%; }
 .rr-padbg { position: absolute; left: 50%; top: 54%; transform: translate(-50%, -50%); opacity: .28; pointer-events: none; filter: drop-shadow(0 0 30px var(--c)); }
 .rr-padbg canvas { width: min(46vh, 260px); height: min(46vh, 260px); }
+
+/* Player arena has its own space above the touch controls on every device. */
+.rr-player-view { --rr-control-height: min(30vh, 170px); }
+.rr-player-arena { position: absolute; top: 44px; left: 0; width: 100%; height: calc(100% - 44px - var(--rr-control-height)); pointer-events: none; }
+.rr-player-wait { position: absolute; top: 45%; left: 0; right: 0; text-align: center; color: var(--rr-dim); pointer-events: none; }
+.rr-player-view .rr-stickzone { height: var(--rr-control-height); }
+.rr-player-view .rr-buttons { width: min(46vmin, var(--rr-control-height)); height: min(46vmin, var(--rr-control-height)); bottom: 0; }
+@media (orientation: portrait) {
+  .rr-player-view { --rr-control-height: min(34vh, 280px); }
+  .rr-player-view .rr-padhud { gap: 5px; font-size: 12px; }
+  .rr-player-view .rr-padhud .sub { font-size: 11px; }
+}
