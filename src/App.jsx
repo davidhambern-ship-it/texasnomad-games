@@ -26,6 +26,7 @@ const WordSearchGame = lazy(() => import('@/pages/WordSearchGame'));
 const ViralGame = lazy(() => import('@/pages/ViralGame'));
 const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
 const RodeoRumbleGame = lazy(() => import('@/pages/RodeoRumbleGame'));
+const EmergencyArcade = lazy(() => import('@/pages/EmergencyArcade'));
 const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
 const DominoHost = lazy(() => import('@/pages/DominoHost'));
@@ -47,6 +48,9 @@ function RouteFallback() {
 }
 
 function HomeGate() {
+  const { isAuthenticated } = useAuth();
+  // Public emergency access never exposes private TNG data or host actions.
+  if (!isAuthenticated) return <Navigate to="/emergency" replace />;
   let welcomeComplete = false;
   try {
     welcomeComplete = sessionStorage.getItem('tng_welcome_complete') === '1';
@@ -133,6 +137,8 @@ const AuthenticatedApp = () => {
   ]);
 
   const publicUnauthenticatedPaths = new Set([
+    '/',
+    '/emergency',
     '/login',
     '/register',
     '/forgot-password',
@@ -183,6 +189,7 @@ const AuthenticatedApp = () => {
         <Route path="/welcome" element={<Welcome />} />
       <Route path="/register" element={<Register />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/emergency" element={<EmergencyArcade />} />
       <Route path="/onboarding" element={<TngOnboarding />} />
       <Route path="/display" element={<GameDisplay />} />
       <Route path="/spectate/:roomCode" element={<GameDisplay spectator />} />
