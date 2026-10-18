@@ -4,7 +4,7 @@ import { tngServiceUrl, tngWebSocketUrl } from '@/lib/tngServiceOrigin';
 
 const WS_URL = () => (import.meta.env && import.meta.env.VITE_RR_LIVE_URL) || tngWebSocketUrl('/rr-live');
 
-export function rrConnect({ hello, onMessage, onStatus }) {
+export function rrConnect({ hello, onMessage, onStatus, guest = false }) {
   let ws = null;
   let closed = false;
   let retry = 0;
@@ -19,12 +19,12 @@ export function rrConnect({ hello, onMessage, onStatus }) {
   const open = () => {
     if (closed) return;
     onStatus?.('connecting');
-    try { ws = new WebSocket(WS_URL()); } catch { schedule(); return; }
+    try { ws = new WebSocket(guest ? tngWebSocketUrl('/rr-guest') : WS_URL()); } catch { schedule(); return; }
     ws.onopen = async () => {
       retry = 0;
       onStatus?.('open');
       try {
-        const authToken = await getNeonAuthToken().catch(() => '');
+        const authToken = guest ? '' : await getNeonAuthToken().catch(() => '');
         const first = await hello?.({ authToken });
         if (first && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(first));
       } catch {
