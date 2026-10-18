@@ -40,3 +40,11 @@ Status: audit started 2026-10-18. NO production cutover authorized by this docum
 - At present, **none** needed for safe audit and branch-based code preparation.
 - Do NOT delete Neon projects/branches, pay for an upgrade, rotate secrets, or reset players without agreeing a specific migration step first.
 - Later: the user will be asked to test sign-in on tablet and Safari when the staging path is genuinely functional, not before.
+
+## Phase 1 follow-up: dependency audit (2026-10-18)
+- Supabase `bernaverse.identities` currently has **26 TNG links, all 26 marked verified**. This means BERNAverse has existing identity-link records; the external UUID mappings MUST be preserved, not recreated from account emails on first login. Other current verified links: BERNAverse 15, TacTalk 8, CREAPD 2. These numbers are not total source-app account counts.
+- Client `src/lib/AuthContext.jsx` exclusively reads Neon Auth browser sessions and sends its opaque token for device heartbeats; `src/api/tngApi.js` sends a Neon Bearer token in authenticated gameplay calls. Therefore **the frontend auth provider, TNG API proxy/backend verification, device lifecycle and Host/Display/Player must all move together**, not just the SSO callback.
+- Backend `server.mjs` delegates identity resolution to Neon TNG API `/profile`, then reads TNG `public.accounts` and `public.player_profiles`. This is a database AND identity API migration, not a simple Supabase login redirect.
+- `server/roomRegistry.mjs` and `server/liveRoomStore.mjs` create/maintain `public.tng_room_registry` and `public.tng_live_room_state`; rollback/rehearsal must include active rooms. Ensure a room-drain or coherent state transfer on cutover.
+- Added **`scripts/audit-tng-db.mjs` on the isolated work branch**, a read-only PostgreSQL catalog audit that prints table metadata, column definitions, constraints, approximate rows and size; optional `--exact-counts`. It outputs no account contents and is NOT an independent data backup. **Cannot run it successfully until Neon HTTP 402 quota blockage clears**.
+- Next gate: extract full source schema/table totals (including `neon_auth`) when access is restored, back up off-provider, and verify preservation of existing IDs. Do not provision new production tables or switch the API before that gate.
