@@ -10,10 +10,11 @@ import { pctColor } from './draw';
 const FATAL = new Set(['ROOM_NOT_FOUND', 'FULL', 'KICKED', 'CLOSED']);
 
 /** A phone in a party room: join → pick a fighter → become a controller. */
-export default function RRController({ code, onExit, identityName = '', identityLoading = false }) {
+export default function RRController({ code, onExit, identityName = '', identityLoading = false, guest = false }) {
+  const seatKey = guest ? `guest_${code}` : code;
   const [name, setName] = useState(() => { try { return identityName || localStorage.getItem('rr_name') || ''; } catch { return identityName || ''; } });
-  const [seat, setSeat] = useState(() => rrSeat.get(code));
-  const [joining, setJoining] = useState(!!rrSeat.get(code));
+  const [seat, setSeat] = useState(() => rrSeat.get(seatKey));
+  const [joining, setJoining] = useState(!!rrSeat.get(seatKey));
   const [me, setMe] = useState(null);
   const [lobby, setLobby] = useState(null);
   const [status, setStatus] = useState(null);
@@ -35,11 +36,12 @@ export default function RRController({ code, onExit, identityName = '', identity
   useEffect(() => {
     if (!joining) return undefined;
     const s = rrConnect({
+      guest,
       hello: ({ authToken }) => ({ t: 'join', code, name: nameRef.current, token: seatRef.current?.token, authToken }),
       onStatus: setConn,
       onMessage: (m) => {
         if (m.t === 'joined') {
-          const st = { token: m.token, id: m.id }; rrSeat.set(code, st); setSeat(st);
+          const st = { token: m.token, id: m.id }; rrSeat.set(seatKey, st); setSeat(st);
           setMe({ id: m.id, name: m.name, color: m.color }); setFighter(m.fighter || null); setHostOnline(m.host); setError('');
           if (m.lobby) setLobby(m.lobby);
         } else if (m.t === 'lobby') { setLobby(m.lobby); if (m.lobby && m.lobby.phase === 'lobby') { setResult(null); setStatus(null); } }
@@ -48,13 +50,13 @@ export default function RRController({ code, onExit, identityName = '', identity
         else if (m.t === 'host') setHostOnline(!!m.online);
         else if (m.t === 'error') {
           setError(m.message || 'Something went wrong.');
-          if (FATAL.has(m.code)) { rrSeat.clear(code); s.close(); setJoining(false); setMe(null); }
+          if (FATAL.has(m.code)) { rrSeat.clear(seatKey); s.close(); setJoining(false); setMe(null); }
         }
       },
     });
     sock.current = s;
     return () => s.close();
-  }, [joining, code]);
+  }, [joining, code, guest, seatKey]);
 
   const inMatch = !!(me && lobby && lobby.phase !== 'lobby' && (lobby.inMatch || []).includes(me.id));
   const playing = inMatch && !result;
@@ -91,7 +93,7 @@ export default function RRController({ code, onExit, identityName = '', identity
 
   const pick = (id) => { setFighter(id); setReady(false); sock.current && sock.current.send({ t: 'pick', fighter: id }); };
   const toggleReady = () => { const v = !ready; setReady(v); sock.current && sock.current.send({ t: 'ready', v }); };
-  const leave = () => { if (sock.current) sock.current.send({ t: 'leave' }); rrSeat.clear(code); onExit(); };
+  const leave = () => { if (sock.current) sock.current.send({ t: 'leave' }); rrSeat.clear(seatKey); onExit(); };
   const goFull = () => { try { const el = document.documentElement; (el.requestFullscreen || el.webkitRequestFullscreen).call(el); setTimeout(() => { try { screen.orientation && screen.orientation.lock && screen.orientation.lock('landscape').catch(() => {}); } catch { /* ignore */ } }, 200); } catch { /* ignore */ } };
 
   // ── name entry ──
@@ -101,9 +103,10 @@ export default function RRController({ code, onExit, identityName = '', identity
         <div className="rr-card" style={{ textAlign: 'center', marginTop: 20 }}>
           <h1 className="rr-h rr-logo" style={{ fontSize: 58 }}>Rodeo<b>Rumble</b></h1>
           <p className="rr-sub">Room <b style={{ color: 'var(--rr-gold)', letterSpacing: '.15em' }}>{code}</b></p>
-          {identityLoading ? <p className="rr-sub">Loading your TNG profile…</p> : identityName ? <p className="rr-sub">Playing as <b style={{ color: 'var(--rr-gold)' }}>{identityName}</b></p> : null}
-          {!identityName && !identityLoading && <p className="rr-sub" style={{ color: '#ff8a8a' }}>Sign in to TNG and finish your player profile before joining.</p>}
-          <button type="button" className="rr-btn primary" style={{ width: '100%', marginTop: 12, fontSize: 20, padding: 14 }} disabled={identityLoading || !identityName} onClick={() => { try { localStorage.setItem('rr_name', name.trim()); } catch { /* ignore */ } setError(''); setJoining(true); }}>Join the rumble</button>
+          {!guest && (identityLoading ? <p className="rr-sub">Loading your TNG profile…</p> : identityName ? <p className="rr-sub">Playing as <b style={{ color: 'var(--rr-gold)' }}>{identityName}</b></p> : null)}
+          {guest && <input className="rr-input" aria-label="Guest nickname" maxLength={32} value={name} placeholder="Your nickname" onChange={(event) => setName(event.target.value.replace(/[<>]/g, '').slice(0, 32))} />}
+          {!guest && !identityName && !identityLoading && <p className="rr-sub" style={{ color: '#ff8a8a' }}>Sign in to TNG and finish your player profile before joining.</p>}
+          <button type="button" className="rr-btn primary" style={{ width: '100%', marginTop: 12, fontSize: 20, padding: 14 }} disabled={guest ? !name.trim() : (identityLoading || !identityName)} onClick={() => { try { localStorage.setItem('rr_name', name.trim()); } catch { /* ignore */ } setError(''); setJoining(true); }}>Join the rumble</button>
           {error && <p className="rr-sub" style={{ color: '#ff8a8a' }}>{error}</p>}
           <button type="button" className="rr-btn ghost" style={{ marginTop: 10 }} onClick={onExit}>Back</button>
         </div>
