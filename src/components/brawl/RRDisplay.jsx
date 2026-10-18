@@ -5,7 +5,7 @@ import RRPortrait from './RRPortrait';
 import { fighterById } from '@/lib/brawl/fighters';
 
 /** Read-only Rodeo Rumble renderer for the paired TNG Game Display / spectator route. */
-export default function RRDisplay({ code }) {
+export default function RRDisplay({ code, guest = false }) {
   const canvasRef = useRef(null);
   const frameRef = useRef(null);
   const rendererRef = useRef(createRenderer());
@@ -18,6 +18,7 @@ export default function RRDisplay({ code }) {
 
   useEffect(() => {
     const socket = rrConnect({
+      guest,
       hello: () => ({ t: 'display', code }),
       onMessage: (message) => {
         if (message.t === 'displayed') {
@@ -56,7 +57,7 @@ export default function RRDisplay({ code }) {
       },
     });
     return () => socket.close();
-  }, [code]);
+  }, [code, guest]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
