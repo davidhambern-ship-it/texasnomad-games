@@ -19,6 +19,7 @@ const readHost = (guest = false) => { try { return JSON.parse(localStorage.getIt
 
 /** Authenticated Host + local fight engine. Players use signed-in phones as controllers. */
 export default function RRHost({ onExit, guest = false }) {
+  const guestJoinHost = typeof window !== 'undefined' ? window.location.host : JOIN_HOST;
   const [conn, setConn] = useState('connecting');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -260,7 +261,7 @@ export default function RRHost({ onExit, guest = false }) {
           <div className="rr-hostgrid">
             <div className="rr-card" style={{ textAlign: 'center' }}>
               <h1 className="rr-h rr-logo" style={{ fontSize: 'clamp(48px, 6vw, 92px)' }}>Rodeo<b>Rumble</b></h1>
-              <p className="rr-sub">On each phone go to <b style={{ color: '#fff' }}>{guest ? `${JOIN_HOST}/emergency` : `${JOIN_HOST}/join`}</b> and enter</p>
+              <p className="rr-sub">On each phone go to <b style={{ color: '#fff' }}>{guest ? `${guestJoinHost}/emergency` : `${JOIN_HOST}/join`}</b> and enter</p>
               <div className="rr-joincode">{code || '·····'}</div>
               {conn !== 'open' && <p className="rr-sub">{conn === 'connecting' ? 'Connecting to TNG…' : 'Reconnecting…'}</p>}
               {error && <p className="rr-sub" style={{ color: '#ff8a8a' }}>{error}</p>}
