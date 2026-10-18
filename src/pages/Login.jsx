@@ -192,6 +192,13 @@ export default function Login() {
         </>
       }
     >
+      <div style={{ marginBottom: 16, padding: '12px 14px', borderRadius: 9, background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.35)', color: '#FFE88A', fontSize: 13, lineHeight: 1.6 }}>
+        <strong>NEON DATABASE SERVICE INTERRUPTION.</strong> Regular account sign-in and saved multiplayer rooms are temporarily unavailable.
+        <a href="/emergency" style={{ display: 'block', marginTop: 8, fontWeight: 700, color: '#fff', textDecoration: 'underline' }}>
+          ENTER THE TEMPORARY TNG GUEST ARCADE →
+        </a>
+        Your existing profile, scores and BERNAverse membership are not changed by guest play.
+      </div>
       {error && (
         <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#ef4444', fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
           {error}
