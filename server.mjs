@@ -1237,6 +1237,19 @@ const rodeoRumbleLive = createRodeoRumbleLive({
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
+// Emergency no-database multiplayer relay. It never receives real account
+// credentials and never writes player scores, rooms, or data to Neon.
+const rodeoGuestLive = createRodeoRumbleLive({
+  guest: true,
+  wsPath: '/rr-guest',
+  apiPrefix: '/rr-guest-api',
+  isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
+  recordResults: async () => ({ recorded: 0 }),
+  claimRoomCode: async () => true,
+  touchRoomCode: async () => {},
+  releaseRoomCode: async () => {},
+});
+
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
 const viralDisplayTargets = new Map();
 const seeThatDisplayTargets = new Map();
@@ -6352,6 +6365,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/rr-guest-api')) {
+      rodeoGuestLive.handleHttp(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/rr-api')) {
       rodeoRumbleLive.handleHttp(req, res);
       return;
@@ -6413,6 +6431,7 @@ const server = http.createServer(async (req, res) => {
       '/bff-api',
       '/bs-api',
       '/rr-api',
+      '/rr-guest-api',
       '/st-api',
       '/ww-api',
       '/domino-api',
@@ -6444,6 +6463,7 @@ server.on('upgrade', async (request, socket, head) => {
 
     if (viralLive.handleUpgrade(request, socket, head)) return;
     if (rodeoRumbleLive.handleUpgrade(request, socket, head)) return;
+    if (rodeoGuestLive.handleUpgrade(request, socket, head)) return;
 
     if (url.pathname === '/host-live') {
       const origin = String(request.headers.origin || '');
