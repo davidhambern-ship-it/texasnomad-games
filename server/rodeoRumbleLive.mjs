@@ -19,6 +19,10 @@ export function createRodeoRumbleLive({
   claimRoomCode = async () => true,
   touchRoomCode = async () => {},
   releaseRoomCode = async () => {},
+  guest = false,
+  wsPath = '/rr-live',
+  apiPrefix = '/rr-api',
+  maxRooms = 250,
 } = {}) {
   const rooms = new Map();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
@@ -53,6 +57,7 @@ export function createRodeoRumbleLive({
   };
 
   async function createRoom(hostIdentity) {
+    if (rooms.size >= maxRooms) return null;
     for (let attempt = 0; attempt < 50; attempt += 1) {
       const code = Array.from(
         { length: 5 },
@@ -138,10 +143,16 @@ export function createRodeoRumbleLive({
 
       if (!role) {
         if (msg.t === 'host') {
-          const hostIdentity = await verifyHostAuthorization({
-            token: msg.authToken,
-            deviceId: msg.deviceId,
-          }).catch(() => null);
+          const requestedCode = String(msg.code || '').toUpperCase();
+          const resumed = requestedCode ? rooms.get(requestedCode) : null;
+          // Guest credentials are scoped ONLY to the dedicated guest relay.
+          const hostIdentity = guest
+            ? { accountId: (resumed && resumed.hostToken === msg.token)
+              ? resumed.hostAccountId : newToken(), publicName: 'Guest Host' }
+            : await verifyHostAuthorization({
+                token: msg.authToken,
+                deviceId: msg.deviceId,
+              }).catch(() => null);
           if (!hostIdentity?.accountId) {
             send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Open Rodeo Rumble from the signed-in TNG Host Controller.' });
             ws.close(4000, 'auth required');
@@ -184,16 +195,19 @@ export function createRodeoRumbleLive({
             ws.close();
             return;
           }
-          const identity = await resolvePlayerIdentity({ token: msg.authToken }).catch(() => null);
+          const seatByToken = msg.token
+            ? [...room.players.values()].find((player) => player.token === msg.token)
+            : null;
+          const guestName = clean(msg.name, 32);
+          const identity = guest
+            ? { accountId: seatByToken?.accountId || newToken(), publicName: guestName }
+            : await resolvePlayerIdentity({ token: msg.authToken }).catch(() => null);
           if (!identity?.accountId || !identity?.publicName) {
             send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Rodeo Rumble.' });
             ws.close(4000, 'auth required');
             return;
           }
 
-          const seatByToken = msg.token
-            ? [...room.players.values()].find((player) => player.token === msg.token)
-            : null;
           const seatByAccount = [...room.players.values()].find(
             (player) => String(player.accountId || '') === String(identity.accountId),
           );
@@ -407,7 +421,7 @@ export function createRodeoRumbleLive({
   return {
     handleUpgrade(request, socket, head) {
       const url = new URL(request.url || '/', 'http://localhost');
-      if (url.pathname !== '/rr-live') return false;
+      if (url.pathname !== wsPath) return false;
       const origin = String(request.headers.origin || '');
       let sameHost = false;
       try { sameHost = !!origin && new URL(origin).host === request.headers.host; } catch { /* bad origin */ }
@@ -425,8 +439,8 @@ export function createRodeoRumbleLive({
         res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
         res.end(JSON.stringify(body));
       };
-      if (url.pathname === '/rr-api/health') return json(200, { ok: true, service: 'rodeo-rumble', ...this.stats() });
-      if (url.pathname === '/rr-api/resolve') {
+      if (url.pathname === `${apiPrefix}/health`) return json(200, { ok: true, service: 'rodeo-rumble', ...this.stats() });
+      if (url.pathname === `${apiPrefix}/resolve`) {
         const code = String(url.searchParams.get('code') || '').toUpperCase();
         const liveRoom = rooms.get(code);
         return json(200, {
