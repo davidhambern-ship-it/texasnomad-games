@@ -1513,7 +1513,9 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
 
 const outRoomStore = createLiveRoomStore(bffPool, { service: 'out', ttlMs: 3 * 60 * 60 * 1000 });
 
-const ROOM_MAINTENANCE_INTERVAL_MS = 5 * 60 * 1000;
+// A longer cleanup cadence avoids waking the free-tier database constantly.
+// Room expiry is enforced by each game store; this is stale-record cleanup.
+const ROOM_MAINTENANCE_INTERVAL_MS = 30 * 60 * 1000;
 
 async function runRoomMaintenance() {
   const jobs = [
