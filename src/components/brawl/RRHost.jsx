@@ -15,10 +15,10 @@ const STAGE_LOOKS = {
   lounge: 'linear-gradient(160deg,#1a0c2a,#5a1a4a 60%,#ff4fb0)',
   random: 'linear-gradient(160deg,#2a1a4d,#4a2d86)',
 };
-const readHost = () => { try { return JSON.parse(localStorage.getItem('rr_host') || 'null'); } catch { return null; } };
+const readHost = (guest = false) => { try { return JSON.parse(localStorage.getItem(guest ? 'rr_guest_host' : 'rr_host') || 'null'); } catch { return null; } };
 
 /** Authenticated Host + local fight engine. Players use signed-in phones as controllers. */
-export default function RRHost({ onExit }) {
+export default function RRHost({ onExit, guest = false }) {
   const [conn, setConn] = useState('connecting');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -34,8 +34,9 @@ export default function RRHost({ onExit }) {
 
   useEffect(() => {
     const socket = rrConnect({
+      guest,
       hello: ({ authToken }) => {
-        const saved = readHost();
+        const saved = readHost(guest);
         return {
           t: 'host',
           code: saved?.code,
@@ -49,7 +50,7 @@ export default function RRHost({ onExit }) {
         if (message.t === 'room') {
           setCode(message.code);
           setError('');
-          try { localStorage.setItem('rr_host', JSON.stringify({ code: message.code, token: message.token })); } catch { /* ignore */ }
+          try { localStorage.setItem(guest ? 'rr_guest_host' : 'rr_host', JSON.stringify({ code: message.code, token: message.token })); } catch { /* ignore */ }
           setPlayers(Object.fromEntries((message.players || []).map((player) => [player.id, player])));
         } else if (message.t === 'pjoin') {
           setPlayers((current) => ({
@@ -94,7 +95,7 @@ export default function RRHost({ onExit }) {
     });
     sock.current = socket;
     return () => socket.close();
-  }, []);
+  }, [guest]);
 
   const roster = useMemo(() => Object.values(players), [players]);
   const livePlayers = useMemo(() => roster.filter((player) => player.online !== false).slice(0, 8), [roster]);
@@ -125,6 +126,7 @@ export default function RRHost({ onExit }) {
     let cancelled = false;
     const attach = async () => {
       try {
+        if (guest) return;
         const result = await setRodeoDisplayTarget(code);
         if (!cancelled) setDisplayAttached(Boolean(result?.displayAttached));
       } catch (attachError) {
@@ -136,9 +138,9 @@ export default function RRHost({ onExit }) {
     return () => {
       cancelled = true;
       window.clearInterval(timer);
-      clearRodeoDisplayTarget();
+      if (!guest) clearRodeoDisplayTarget();
     };
-  }, [code]);
+  }, [code, guest]);
 
   const remote = useMemo(() => ({
     read(id) {
@@ -216,8 +218,8 @@ export default function RRHost({ onExit }) {
 
   const closeRoom = () => {
     sock.current?.send({ t: 'close' });
-    clearRodeoDisplayTarget();
-    try { localStorage.removeItem('rr_host'); } catch { /* ignore */ }
+    if (!guest) clearRodeoDisplayTarget();
+    try { localStorage.removeItem(guest ? 'rr_guest_host' : 'rr_host'); } catch { /* ignore */ }
     onExit();
   };
 
@@ -258,7 +260,7 @@ export default function RRHost({ onExit }) {
           <div className="rr-hostgrid">
             <div className="rr-card" style={{ textAlign: 'center' }}>
               <h1 className="rr-h rr-logo" style={{ fontSize: 'clamp(48px, 6vw, 92px)' }}>Rodeo<b>Rumble</b></h1>
-              <p className="rr-sub">On each phone go to <b style={{ color: '#fff' }}>{JOIN_HOST}/join</b> and enter</p>
+              <p className="rr-sub">On each phone go to <b style={{ color: '#fff' }}>{guest ? `${JOIN_HOST}/emergency` : `${JOIN_HOST}/join`}</b> and enter</p>
               <div className="rr-joincode">{code || '·····'}</div>
               {conn !== 'open' && <p className="rr-sub">{conn === 'connecting' ? 'Connecting to TNG…' : 'Reconnecting…'}</p>}
               {error && <p className="rr-sub" style={{ color: '#ff8a8a' }}>{error}</p>}
