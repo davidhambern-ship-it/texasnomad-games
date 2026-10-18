@@ -75,6 +75,14 @@ export const AuthProvider = ({ children }) => {
     setIsLoadingAuth(true);
     setAuthError(null);
 
+    // Guest lobby is intentionally independent of Neon and must open even
+    // when the production database has exhausted its quota.
+    if (window.location.pathname === '/emergency') {
+      setSignedOutState();
+      setIsLoadingAuth(false);
+      return;
+    }
+
     try {
       // Neon Auth is the source of truth for whether this browser is signed in.
       // Do not invent a second short-lived TNG login on top of the valid Neon
