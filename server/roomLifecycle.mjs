@@ -172,6 +172,7 @@ export function leaveRoomMember(room, member, now = Date.now()) {
   if (!room || !member) return { transferredTo: null, closed: false };
 
   const wasHost = member.id === room.hostId;
+  const wasLobby = room.phase === 'lobby';
   revokeRoomPlayer(member, now);
   let transferredTo = null;
 
@@ -194,7 +195,7 @@ export function leaveRoomMember(room, member, now = Date.now()) {
     }
   }
 
-  if (room.phase === 'lobby') {
+  if (wasLobby) {
     room.players = room.players.filter((candidate) => candidate.id !== member.id);
   }
 
