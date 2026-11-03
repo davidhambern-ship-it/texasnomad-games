@@ -228,6 +228,37 @@ export function createWordWranglerApi({
     if (me && me.st) out.mine = full ? { moves: me.st.moves, score: me.st.score, state: me.st } : { moves: me.st.moves, score: me.st.score };
     return out;
   }
+
+  function tick(room, now) {
+    if (room.phase === 'countdown' && now >= Number(room.startsAt || 0)) {
+      room.phase = 'playing';
+    }
+    if (room.phase !== 'playing') return;
+
+    if (now >= Number(room.endsAt || 0)) {
+      room.phase = 'over';
+      return;
+    }
+
+    const { dict, common, trie } = dictionary();
+    for (const player of room.players) {
+      if (!player.isAI || !player.st || now < Number(player.nextAt || 0)) continue;
+      const pick = E.cpuPickWord(player.st, trie, player.level || 5, { common });
+      if (pick) {
+        const result = E.applyWord(player.st, pick.path, dict);
+        if (result.ok) {
+          player.st = result.state;
+          player.last = { w: result.word, p: result.points, at: now };
+        } else {
+          player.st = E.shuffleBoard(player.st);
+        }
+      } else {
+        player.st = E.shuffleBoard(player.st);
+      }
+      player.nextAt = now + E.cpuDelayMs(player.level || 5);
+    }
+  }
+
   const findMe = (room, token) => findRoomPlayer(room, token);
 
   function act(room, me, body, now, hostAuthorized = false) {
