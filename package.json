@@ -26,8 +26,8 @@
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
-    "@hookform/resolvers": "^4.1.2",
-    "@neondatabase/auth": "^0.5.0-beta",
+    "@hookform/resolvers": "^5.5.7",
+    "@neondatabase/auth": "0.7.0-beta",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -74,19 +74,19 @@
     "react": "^18.2.0",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.2.0",
-    "react-hook-form": "^7.54.2",
+    "react-hook-form": "^7.71.2",
     "react-hot-toast": "^2.6.0",
     "react-leaflet": "^4.2.1",
     "react-markdown": "^9.0.1",
     "react-resizable-panels": "^2.1.7",
-    "react-router-dom": "^6.26.0",
+    "react-router-dom": "^7.18.5",
     "recharts": "^2.15.4",
     "sonner": "^2.0.1",
     "tailwind-merge": "^3.0.2",
     "three": "^0.171.0",
     "vaul": "^1.1.2",
     "ws": "^8.18.0",
-    "zod": "^3.24.2"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
@@ -107,5 +107,21 @@
     "typescript": "^5.8.2",
     "vite": "^6.1.0",
     "tailwindcss-animate": "^1.0.7"
+  },
+  "overrides": {
+    "better-auth": "1.7.7",
+    "@better-auth/core": "1.7.7",
+    "@better-auth/drizzle-adapter": "1.7.7",
+    "@better-auth/kysely-adapter": "1.7.7",
+    "@better-auth/memory-adapter": "1.7.7",
+    "@better-auth/mongo-adapter": "1.7.7",
+    "@better-auth/prisma-adapter": "1.7.7",
+    "@better-auth/telemetry": "1.7.7",
+    "@better-auth/passkey": "1.7.7",
+    "@better-auth/oauth-provider": "1.7.7",
+    "zod": "4.6.7",
+    "@react-email/render": "2.2.0",
+    "dompurify": "3.4.17",
+    "fast-uri": "3.1.9"
   }
 }
