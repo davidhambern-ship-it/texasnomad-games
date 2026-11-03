@@ -16,7 +16,7 @@
     "sim:dominoes": "node scripts/domino-sim.mjs",
     "sim:word-wrangler": "node scripts/word-wrangler-sim.mjs",
     "sim:battle-sudoku": "node scripts/battle-sudoku-sim.mjs",
-    "test:lifecycle": "node --test scripts/room-lifecycle.test.mjs",
+    "test:lifecycle": "node --test scripts/room-lifecycle.test.mjs scripts/word-wrangler-room-api.test.mjs",
     "test:games": "npm run test:lifecycle && npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku && npm run sim:rodeo-rumble && npm run sim:out",
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games && npm run test:release",
     "test:release": "node scripts/release-audit.mjs",
