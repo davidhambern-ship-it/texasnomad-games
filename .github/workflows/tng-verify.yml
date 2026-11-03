@@ -2,7 +2,7 @@ name: TNG Verify
 
 on:
   push:
-    branches: [main, codex/guest-room-lifecycle]
+    branches: [main]
   pull_request:
     branches: [main]
 
