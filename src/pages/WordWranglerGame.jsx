@@ -64,7 +64,7 @@ export default function WordWranglerGame() {
       </div></div>
     );
   } else if (screen === 'online') {
-    body = <WWOnline dict={dict} code={validRoom} name={name} identityReady={!identity.loading && Boolean(name)} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
+    body = <WWOnline dict={dict} code={validRoom} name={name} onCode={setRoom} onExit={toMenu} muted={muted} setMuted={setMuted} autoHost={launchedFromHost} />;
   } else {
     body = (
       <div className="ww-menu">
@@ -73,11 +73,12 @@ export default function WordWranglerGame() {
           <p className="ww-sub">Drag through touching letters to rope in real words. Long words and rare letters pay big.</p>
         </div>
         <div className="ww-card">
-          <div className="ww-label" style={{ marginBottom: 6 }}>TNG player</div>
+          <div className="ww-label" style={{ marginBottom: 6 }}>Player identity</div>
           <div className="ww-sub">
-            Playing as <b style={{ color: 'var(--ww-gold)' }}>{name || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+            {name
+              ? <>TNG profile: <b style={{ color: 'var(--ww-gold)' }}>{name}</b>. You can also play as a guest.</>
+              : 'No sign-in required. Choose a nickname when you host or join a race.'}
           </div>
-          {identity.error && <div className="ww-err">{identity.error}</div>}
         </div>
         <div className="ww-modes">
           <button type="button" className="ww-mode" onClick={() => setScreen('online')}>

@@ -7,10 +7,11 @@ export class WWApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'WWApiError'; this.status = status; this.code = code; }
 }
 
-async function call(path, { method = 'GET', body, token, forceRefresh = false } = {}) {
+async function call(path, { method = 'GET', body, token, hostCapability, forceRefresh = false } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['X-WW-Token'] = token;
+  if (hostCapability) headers['X-TNG-Host-Capability'] = hostCapability;
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
@@ -23,7 +24,7 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
   }
 
   if (res.status === 401 && authToken && !forceRefresh) {
-    return call(path, { method, body, token, forceRefresh: true });
+    return call(path, { method, body, token, hostCapability, forceRefresh: true });
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new WWApiError(data?.error?.message || 'Something went wrong.', res.status, data?.error?.code || 'ERROR');
@@ -31,9 +32,9 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 }
 
 export const wwApi = {
-  createRoom: (name) => call('/rooms', { method: 'POST', body: { name } }),
-  getRoom: (code, token, full = false) => call(`/rooms/${encodeURIComponent(code)}${full ? '?full=1' : ''}`, { token }),
-  action: (code, token, action, payload = {}) => call(`/rooms/${encodeURIComponent(code)}/action`, { method: 'POST', token, body: { action, ...payload } }),
+  createRoom: (nickname) => call('/rooms', { method: 'POST', body: { nickname } }),
+  getRoom: (code, token, full = false, hostCapability) => call(`/rooms/${encodeURIComponent(code)}${full ? '?full=1' : ''}`, { token, hostCapability }),
+  action: (code, token, action, payload = {}, hostCapability) => call(`/rooms/${encodeURIComponent(code)}/action`, { method: 'POST', token, hostCapability, body: { action, ...payload } }),
 };
 
 export const wwSeat = {

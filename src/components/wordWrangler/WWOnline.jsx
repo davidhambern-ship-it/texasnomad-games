@@ -16,13 +16,17 @@ const TNG_PUBLIC_ORIGIN = String(
  * Online race. Everyone gets the same seed, plays on their own copy of the board,
  * and the server replays every word to keep the leaderboard honest.
  */
-export default function WWOnline({ dict, code: initialCode, name, identityReady = false, onExit, onCode, muted, setMuted, autoHost = false }) {
+export default function WWOnline({ dict, code: initialCode, name, onExit, onCode, muted, setMuted, autoHost = false }) {
   const [code, setCode] = useState(initialCode || '');
   const [seat, setSeat] = useState(() => (initialCode ? wwSeat.get(initialCode) : null));
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [joinCode, setJoinCode] = useState('');
+  const [nickname, setNickname] = useState(() => {
+    try { return localStorage.getItem('tng_guest_nickname') || name || ''; }
+    catch { return name || ''; }
+  });
   const [st, setSt] = useState(null);
   const [round, setRound] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -36,12 +40,28 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
   seatRef.current = seat;
   stRef.current = st;
 
+  useEffect(() => {
+    if (!nickname && name) setNickname(name);
+  }, [name, nickname]);
+
+  const rememberNickname = useCallback((value) => {
+    const next = String(value || '').slice(0, 32);
+    setNickname(next);
+    try { localStorage.setItem('tng_guest_nickname', next); } catch { /* private mode */ }
+  }, []);
+
   const room = data?.room;
   const you = data?.you;
   const serverNow = now + offset;
 
   const apply = useCallback((d) => {
     if (!d?.room) return;
+    if (d.hostCapability && seatRef.current) {
+      const nextSeat = { ...seatRef.current, hostCapability: d.hostCapability };
+      seatRef.current = nextSeat;
+      setSeat(nextSeat);
+      wwSeat.set(d.room.code, nextSeat);
+    }
     setData(d);
     setOffset(d.room.now - Date.now());
   }, []);
@@ -52,7 +72,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     let alive = true, timer = null;
     const tick = async () => {
       try {
-        const d = await wwApi.getRoom(code, seatRef.current?.token);
+        const d = await wwApi.getRoom(code, seatRef.current?.token, false, seatRef.current?.hostCapability);
         if (!alive) return;
         apply(d); setError('');
       } catch (e) {
@@ -87,7 +107,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
   // re-sync if the server's copy of my board doesn't match
   const resync = useCallback(async () => {
     try {
-      const d = await wwApi.getRoom(code, seatRef.current?.token, true);
+      const d = await wwApi.getRoom(code, seatRef.current?.token, true, seatRef.current?.hostCapability);
       apply(d);
       if (d.mine?.state) setSt(d.mine.state);
     } catch { /* next poll will retry */ }
@@ -99,7 +119,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     const move = prev.moves;
     queue.current = queue.current.then(async () => {
       try {
-        const d = await wwApi.action(code, seatRef.current?.token, kind === 'word' ? 'word' : 'shuffle', kind === 'word' ? { path, move } : { move });
+        const d = await wwApi.action(code, seatRef.current?.token, kind === 'word' ? 'word' : 'shuffle', kind === 'word' ? { path, move } : { move }, seatRef.current?.hostCapability);
         apply(d);
         if (d.result?.desync) await resync();
       } catch (e) {
@@ -111,18 +131,21 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
 
   const act = async (action, payload = {}) => {
     setBusy(true); setError('');
-    try { const d = await wwApi.action(code, seat?.token, action, payload); apply(d); return d; }
+    try { const d = await wwApi.action(code, seat?.token, action, payload, seat?.hostCapability); apply(d); return d; }
     catch (e) { setError(e.message); return null; }
     finally { setBusy(false); }
   };
 
   const host = async () => {
-    if (!identityReady) { setError('Loading your TNG player profile…'); return; }
+    const playerName = nickname.trim();
+    if (!playerName) { setError('Choose a nickname before hosting.'); return; }
     setBusy(true); setError('');
     try {
-      const d = await wwApi.createRoom();
-      const s = { token: d.token, playerId: d.playerId };
+      const d = await wwApi.createRoom(playerName);
+      rememberNickname(playerName);
+      const s = { token: d.token, playerId: d.playerId, hostCapability: d.hostCapability };
       wwSeat.set(d.roomCode, s);
+      seatRef.current = s;
       setSeat(s); setCode(d.roomCode); onCode && onCode(d.roomCode); apply(d);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
@@ -130,7 +153,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     if (
       !autoHost ||
       autoHostStarted.current ||
-      !identityReady ||
+      !nickname.trim() ||
       code ||
       seat ||
       data ||
@@ -139,7 +162,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
 
     autoHostStarted.current = true;
     host();
-  }, [autoHost, identityReady, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [autoHost, nickname, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const ownsRoom = Boolean(data?.you?.isHost);
   useEffect(() => {
@@ -164,17 +187,25 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
     if (!/^[A-Z]{5}$/.test(cc)) { setError('Room codes are 5 letters.'); return; }
-    if (!identityReady) { setError('Loading your TNG player profile…'); return; }
+    const playerName = nickname.trim();
+    if (!playerName) { setError('Choose a nickname before joining.'); return; }
     setBusy(true); setError('');
     try {
-      const d = await wwApi.action(cc, wwSeat.get(cc)?.token, 'join');
-      const s = { token: d.token, playerId: d.playerId };
+      const savedSeat = wwSeat.get(cc);
+      const d = await wwApi.action(cc, savedSeat?.token, 'join', { nickname: playerName }, savedSeat?.hostCapability);
+      const s = {
+        token: d.token || savedSeat?.token,
+        playerId: d.playerId,
+        hostCapability: d.hostCapability || savedSeat?.hostCapability || null,
+      };
+      rememberNickname(playerName);
       wwSeat.set(cc, s);
+      seatRef.current = s;
       setSeat(s); setCode(cc); onCode && onCode(cc); apply(d);
     } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
   const leave = async () => {
-    if (code && seat?.token) { try { await wwApi.action(code, seat.token, 'leave'); } catch { /* ignore */ } }
+    if (code && seat?.token) { try { await wwApi.action(code, seat.token, 'leave', {}, seat.hostCapability); } catch { /* ignore */ } }
     if (code) wwSeat.clear(code);
     onExit();
   };
@@ -189,14 +220,20 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
         <div className="ww-card">
           <h2 className="ww-h" style={{ fontSize: 44, color: 'var(--ww-gold)' }}>Online race</h2>
           <p className="ww-sub">Everyone gets the same tiles. Most points when the clock hits zero wins.</p>
-          <div className="ww-sub" style={{ marginTop: 14 }}>
-            Playing as <b style={{ color: 'var(--ww-gold)' }}>{name || 'Loading TNG profile…'}</b>
-          </div>
+          <div className="ww-sub" style={{ marginTop: 14 }}>Choose the name other players will see.</div>
+          <input
+            className="ww-input"
+            style={{ width: 'min(100%, 320px)', marginTop: 8 }}
+            maxLength={32}
+            placeholder="Your nickname"
+            value={nickname}
+            onChange={e => rememberNickname(e.target.value)}
+          />
           <div className="ww-row" style={{ marginTop: 14 }}>
-            <button type="button" className="ww-btn primary" disabled={busy || !identityReady} onClick={host}>Host a race</button>
+            <button type="button" className="ww-btn primary" disabled={busy || !nickname.trim()} onClick={host}>Host a race</button>
             <span style={{ color: 'var(--ww-dim)' }}>or</span>
             <input className="ww-input" style={{ width: 150, textTransform: 'uppercase', letterSpacing: '.2em' }} maxLength={5} placeholder="CODE" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join(joinCode)} />
-            <button type="button" className="ww-btn" disabled={busy || !identityReady} onClick={() => join(joinCode)}>Join</button>
+            <button type="button" className="ww-btn" disabled={busy || !nickname.trim()} onClick={() => join(joinCode)}>Join</button>
           </div>
           {error && <div className="ww-err">{error}</div>}
           <div className="ww-row" style={{ marginTop: 14 }}><button type="button" className="ww-btn ghost small" onClick={onExit}>← Back</button></div>
@@ -205,7 +242,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     );
   }
 
-  // ── have a code but no seat: authenticated TNG identity + join ──
+  // ── have a code but no seat: choose a nickname and join as a guest ──
   if (!you && room) {
     return (
       <div className="ww-menu">
@@ -213,11 +250,17 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
           <div className="ww-label">Word Wrangler race</div>
           <div className="ww-roomcode">{code}</div>
           <p className="ww-sub">{room.players.length} in the room{room.phase === 'playing' || room.phase === 'countdown' ? ' · a race is running — you’ll join the next one' : ''}</p>
-          <p className="ww-sub" style={{ marginTop: 14 }}>
-            Playing as <b style={{ color: 'var(--ww-gold)' }}>{name || 'Loading TNG profile…'}</b>
-          </p>
+          <p className="ww-sub" style={{ marginTop: 14 }}>Choose the name other players will see.</p>
+          <input
+            className="ww-input"
+            style={{ width: 'min(100%, 320px)', margin: '8px auto 0' }}
+            maxLength={32}
+            placeholder="Your nickname"
+            value={nickname}
+            onChange={e => rememberNickname(e.target.value)}
+          />
           <div className="ww-row" style={{ marginTop: 14, justifyContent: 'center' }}>
-            <button type="button" className="ww-btn primary" disabled={busy || !identityReady} onClick={() => join(code)}>Join the race</button>
+            <button type="button" className="ww-btn primary" disabled={busy || !nickname.trim()} onClick={() => join(code)}>Join the race</button>
             <button type="button" className="ww-btn ghost" onClick={onExit}>Back</button>
           </div>
           {error && <div className="ww-err">{error}</div>}

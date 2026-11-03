@@ -9,9 +9,9 @@
 // Rooms live in memory (a race lasts a few minutes); idle rooms are forgotten
 // after 2 hours.
 //
-// Routes (JSON; seat token in the X-WW-Token header):
+// Routes (JSON; player capability in X-WW-Token, host capability in X-TNG-Host-Capability):
 //   GET  /ww-api/health
-//   POST /ww-api/rooms                     { name }            → { roomCode, token, playerId, room }
+//   POST /ww-api/rooms                     { nickname }        → { roomCode, token, hostCapability, playerId, room }
 //   GET  /ww-api/rooms/:code[?full=1]                          → { room, you, mine? }
 //   POST /ww-api/rooms/:code/action        { action, ... }
 //        join{name} · addCpu{level,char} · remove{playerId} · setDuration{seconds}
@@ -20,6 +20,19 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import * as E from '../src/lib/wordWranglerEngine.js';
+import {
+  authorizeRoomHost,
+  createRoomHostMember,
+  createRoomMember,
+  ensureRoomLifecycle,
+  findRoomPlayer,
+  isRoomLifecycleClosed,
+  issueRoomHostCapability,
+  issueRoomPlayerCapability,
+  leaveRoomMember,
+  revokeRoomPlayer,
+  takePendingHostCapability,
+} from './roomLifecycle.mjs';
 
 const MAX_PLAYERS = 8;
 const DURATIONS = [90, 150, 240];
@@ -44,7 +57,6 @@ function dictionary() {
   return DICT;
 }
 
-const newToken = () => randomBytes(18).toString('base64url');
 const newId = () => randomBytes(6).toString('base64url');
 const clean = (s, n = 18) => String(s || '').replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, n);
 function err(status, code, message) { const e = new Error(message); e.status = status; e.code = code; return e; }
@@ -77,9 +89,14 @@ export function createWordWranglerApi({
 
   async function loadRoom(code) {
     let room = rooms.get(code) || null;
-    if (!room && store) {
-      room = await store.load(code);
-      if (room) rooms.set(code, room);
+    if (!room && store) room = await store.load(code);
+    if (room) {
+      const migrated = ensureRoomLifecycle(room);
+      rooms.set(code, room);
+      if (migrated) {
+        room.updatedAt = Date.now();
+        if (store) await store.save(code, room);
+      }
     }
     return room;
   }
@@ -124,6 +141,12 @@ export function createWordWranglerApi({
     rooms.set(room.code, room);
 
     await maybeRecordResults(room);
+
+    if (isRoomLifecycleClosed(room)) {
+      if (store) await store.save(room.code, room);
+      await releaseRoomCode(room.code, 'word-wrangler').catch(() => {});
+      return;
+    }
 
     if (!store) return;
 
@@ -185,13 +208,13 @@ export function createWordWranglerApi({
     const st = p.st;
     return {
       id: p.id, name: p.name, isAI: !!p.isAI, level: p.level || null, char: p.char || null,
-      isHost: p.id === room.hostId, online: p.isAI || now - (p.lastSeen || 0) < 12000,
+      isHost: p.id === room.hostId, online: p.isAI || (!p.leftAt && now - (p.lastSeen || 0) < 12000),
       score: st ? st.score : 0, words: st ? st.words.length : 0, best: st?.best || null,
       last: p.last ? { w: p.last.w, p: p.last.p } : null, caught: st?.caught || 0, escaped: st?.escaped || 0,
       list: reveal && st ? st.words.map(w => ({ w: w.w, p: w.p })) : undefined,
     };
   }
-  function view(room, me, now = Date.now(), full = false) {
+  function view(room, me, now = Date.now(), full = false, isHost = false) {
     const reveal = room.phase === 'over';
     const out = {
       room: {
@@ -200,16 +223,47 @@ export function createWordWranglerApi({
         seed: room.phase === 'lobby' ? null : room.seed, hostId: room.hostId,
         players: room.players.map(p => pubPlayer(room, p, now, reveal)),
       },
-      you: me ? { id: me.id, name: me.name, isHost: me.id === room.hostId } : null,
+      you: me ? { id: me.id, name: me.name, isHost: Boolean(isHost) } : null,
     };
     if (me && me.st) out.mine = full ? { moves: me.st.moves, score: me.st.score, state: me.st } : { moves: me.st.moves, score: me.st.score };
     return out;
   }
-  const findMe = (room, token) => (token ? room.players.find(p => p.token === token) || null : null);
 
-  function act(room, me, body, now) {
+  function tick(room, now) {
+    if (room.phase === 'countdown' && now >= Number(room.startsAt || 0)) {
+      room.phase = 'playing';
+    }
+    if (room.phase !== 'playing') return;
+
+    if (now >= Number(room.endsAt || 0)) {
+      room.phase = 'over';
+      return;
+    }
+
+    const { dict, common, trie } = dictionary();
+    for (const player of room.players) {
+      if (!player.isAI || !player.st || now < Number(player.nextAt || 0)) continue;
+      const pick = E.cpuPickWord(player.st, trie, player.level || 5, { common });
+      if (pick) {
+        const result = E.applyWord(player.st, pick.path, dict);
+        if (result.ok) {
+          player.st = result.state;
+          player.last = { w: result.word, p: result.points, at: now };
+        } else {
+          player.st = E.shuffleBoard(player.st);
+        }
+      } else {
+        player.st = E.shuffleBoard(player.st);
+      }
+      player.nextAt = now + E.cpuDelayMs(player.level || 5);
+    }
+  }
+
+  const findMe = (room, token) => findRoomPlayer(room, token);
+
+  function act(room, me, body, now, hostAuthorized = false) {
     const a = String(body.action || '');
-    const isHost = me && me.id === room.hostId;
+    const isHost = Boolean(me && hostAuthorized && me.id === room.hostId);
     const need = (c, m, code = 'NOT_ALLOWED', status = 403) => { if (!c) throw err(status, code, m); };
     switch (a) {
       case 'addCpu': {
@@ -219,13 +273,14 @@ export function createWordWranglerApi({
         const used = new Set(room.players.map(p => p.char).filter(Boolean));
         const c = CPU_CREW.find(x => x.id === body.char && !used.has(x.id)) || CPU_CREW.find(x => !used.has(x.id)) || CPU_CREW[0];
         const level = Math.max(1, Math.min(10, Math.round(Number(body.level) || 5)));
-        room.players.push({ id: newId(), name: c.name, isAI: true, level, char: c.id, token: null, st: null });
+        room.players.push({ id: newId(), name: c.name, isAI: true, level, char: c.id, st: null });
         return {};
       }
       case 'remove': {
         need(isHost, 'Only the host can remove players.');
         const i = room.players.findIndex(p => p.id === body.playerId);
         need(i >= 0 && room.players[i].id !== room.hostId, 'Can’t remove that player.', 'BAD_PLAYER', 400);
+        revokeRoomPlayer(room.players[i], now);
         room.players.splice(i, 1);
         return {};
       }
@@ -265,13 +320,8 @@ export function createWordWranglerApi({
       }
       case 'leave': {
         if (!me) return {};
-        if (me.id === room.hostId) {
-          const next = room.players.find(p => !p.isAI && p.id !== me.id);
-          room.hostId = next ? next.id : room.hostId;
-        }
-        if (room.phase === 'lobby') room.players = room.players.filter(p => p.id !== me.id);
-        else me.token = null;
-        return {};
+        const outcome = leaveRoomMember(room, me, now);
+        return { closed: outcome.closed, hostTransferred: Boolean(outcome.transferredTo) };
       }
       default: throw err(400, 'UNKNOWN_ACTION', 'Unknown action.');
     }
@@ -281,6 +331,7 @@ export function createWordWranglerApi({
     const url = new URL(req.url || '/', 'http://localhost');
     const path = url.pathname.replace(/^\/ww-api/, '') || '/';
     const token = String(req.headers['x-ww-token'] || '');
+    const hostCapability = String(req.headers['x-tng-host-capability'] || '');
     const now = Date.now();
     try {
       if (now - lastSweep > 10 * 60 * 1000) {
@@ -297,51 +348,79 @@ export function createWordWranglerApi({
       }
 
       if (req.method === 'POST' && path === '/rooms') {
-        await readBody(req);
-        const identity = await resolveIdentity(req);
-        if (!identity?.accountId || !identity?.publicName) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting Word Wrangler.');
-        }
-        const name = clean(identity.publicName, 32);
-        if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
+        const body = await readBody(req);
+        const identity = await resolveIdentity(req).catch(() => null);
+        const name = clean(body.nickname || body.name || identity?.publicName, 32);
+        if (!name) throw err(400, 'NAME_REQUIRED', 'Choose a nickname before hosting.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode(identity.accountId);
-        const host = {
+        const code = await newCode(identity?.accountId || null);
+        const host = createRoomHostMember({
           id: newId(),
-          accountId: identity.accountId,
+          accountId: identity?.accountId || null,
           name,
-          token: newToken(),
-          isAI: false,
-          st: null,
-          lastSeen: now,
+          now,
+          fields: { st: null, lastSeen: now },
+        });
+        const room = {
+          code,
+          authVersion: 2,
+          legacyHostAuthUntil: null,
+          status: 'live',
+          phase: 'lobby',
+          round: 0,
+          duration: 150,
+          seed: null,
+          startsAt: 0,
+          endsAt: 0,
+          hostId: host.member.id,
+          players: [host.member],
+          createdAt: now,
+          updatedAt: now,
         };
-        const room = { code, phase: 'lobby', round: 0, duration: 150, seed: null, startsAt: 0, endsAt: 0, hostId: host.id, players: [host], createdAt: now, updatedAt: now };
         try {
           await saveRoom(room, { force: true });
         } catch (error) {
           await releaseRoomCode(room.code, 'word-wrangler').catch(() => {});
           throw error;
         }
-        return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
+        return send(res, 200, {
+          roomCode: code,
+          token: host.playerCapability,
+          hostCapability: host.hostCapability,
+          playerId: host.member.id,
+          ...view(room, host.member, now, false, true),
+        });
       }
 
       const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
-      if (!room) return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found.` } });
+      if (!room || isRoomLifecycleClosed(room)) {
+        return send(res, 404, { error: { code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found.` } });
+      }
 
       if (req.method === 'GET' && !m[2]) {
         tick(room, now);
         const me = findMe(room, token);
+        const pendingHostCapability = me ? takePendingHostCapability(room, me) : null;
+        const isHost = Boolean(
+          me && (
+            pendingHostCapability ||
+            authorizeRoomHost(room, me, hostCapability, now)
+          )
+        );
         if (me) me.lastSeen = now;
 
-        if (token || room.phase === 'countdown' || room.phase === 'playing') {
+        if (token || hostCapability || pendingHostCapability || room.phase === 'countdown' || room.phase === 'playing') {
           room.updatedAt = now;
-          await saveRoom(room);
+          await saveRoom(room, { force: Boolean(pendingHostCapability) });
         }
 
-        return send(res, 200, view(room, me, now, url.searchParams.get('full') === '1'));
+        return send(res, 200, {
+          ...view(room, me, now, url.searchParams.get('full') === '1', isHost),
+          ...(pendingHostCapability ? { hostCapability: pendingHostCapability } : {}),
+        });
       }
 
       if (req.method === 'POST' && m[2]) {
@@ -350,55 +429,79 @@ export function createWordWranglerApi({
         tick(room, t);
         let me = findMe(room, token);
         let issued;
+        let issuedHostCapability;
         if (body.action === 'join') {
-          const identity = await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
+          const identity = await resolveIdentity(req).catch(() => null);
+          const nickname = clean(body.nickname || body.name || identity?.publicName || me?.name, 32);
+          if (!nickname) throw err(400, 'NAME_REQUIRED', 'Choose a nickname before joining.');
+
+          if (!me && identity?.accountId) {
+            me = room.players.find(
+              player => !player.isAI &&
+                !player.leftAt &&
+                String(player.accountId || '') === String(identity.accountId),
+            ) || null;
+            if (me) {
+              issued = issueRoomPlayerCapability(me);
+              if (me.id === room.hostId) issuedHostCapability = issueRoomHostCapability(me);
+            }
           }
 
-          me = me || room.players.find(
-            p => !p.isAI && String(p.accountId || '') === String(identity.accountId),
-          ) || null;
-
           if (!me) {
-            const name = clean(identity.publicName, 32);
-            if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
-            const humans = room.players.filter(p => !p.isAI).length;
+            const humans = room.players.filter(player => !player.isAI && !player.leftAt).length;
             if (room.players.length >= MAX_PLAYERS) {
-              // bump a CPU to make room for a human
-              const cpu = room.phase === 'lobby' || room.phase === 'over' ? room.players.findIndex(p => p.isAI) : -1;
+              // Keep the existing CPU-replacement behavior for a full lobby.
+              const cpu = room.phase === 'lobby' || room.phase === 'over'
+                ? room.players.findIndex(player => player.isAI)
+                : -1;
               if (cpu < 0 || humans >= MAX_PLAYERS) throw err(409, 'FULL', 'This room is full.');
               room.players.splice(cpu, 1);
             }
-            me = {
+            const created = createRoomMember({
               id: newId(),
-              accountId: identity.accountId,
-              name,
-              token: newToken(),
-              isAI: false,
-              st: null,
-              lastSeen: t,
-            };
+              accountId: identity?.accountId || null,
+              name: nickname,
+              now: t,
+              fields: { st: null, lastSeen: t },
+            });
+            me = created.member;
+            issued = created.playerCapability;
             room.players.push(me);
-            issued = me.token;
-          } else if (!token || token !== me.token) {
-            // Same signed-in TNG account returning from another browser state:
-            // reclaim the same seat instead of creating a duplicate player.
-            me.name = clean(identity.publicName, 32);
-            me.token = newToken();
-            issued = me.token;
+          } else {
+            me.name = nickname;
           }
 
           me.lastSeen = t;
           room.updatedAt = t;
           await saveRoom(room, { force: true });
-          return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
+          const isHost = Boolean(
+            me.id === room.hostId &&
+            (
+              issuedHostCapability ||
+              authorizeRoomHost(room, me, hostCapability, t)
+            )
+          );
+          return send(res, 200, {
+            token: issued || token,
+            ...(issuedHostCapability ? { hostCapability: issuedHostCapability } : {}),
+            playerId: me.id,
+            ...view(room, me, t, false, isHost),
+          });
         }
-        const result = act(room, me, body, t);
+        const hostAuthorized = authorizeRoomHost(room, me, hostCapability, t);
+        const result = act(room, me, body, t, hostAuthorized);
         if (me) me.lastSeen = t;
         room.updatedAt = t;
         await saveRoom(room, { force: true });
-        const out = { result, ...view(room, me, t, !!result.desync) };
+        const isHost = Boolean(
+          me &&
+          me.id === room.hostId &&
+          (
+            hostAuthorized ||
+            authorizeRoomHost(room, me, hostCapability, t)
+          )
+        );
+        const out = { result, ...view(room, me, t, !!result.desync, isHost) };
         return send(res, 200, out);
       }
       return send(res, 405, { error: { code: 'METHOD', message: 'Method not allowed.' } });
