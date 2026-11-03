@@ -22,7 +22,8 @@
     "test:release": "node scripts/release-audit.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
     "start:web": "node scripts/static-web.mjs",
-    "sim:rodeo-rumble": "node scripts/brawl-sim.mjs 40 && SIZE=8 node scripts/brawl-sim.mjs 40"
+    "sim:rodeo-rumble": "node scripts/brawl-sim.mjs 40 && SIZE=8 node scripts/brawl-sim.mjs 40",
+    "audit:production": "npm audit --omit=dev --audit-level=low"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
