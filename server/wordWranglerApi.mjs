@@ -9,9 +9,9 @@
 // Rooms live in memory (a race lasts a few minutes); idle rooms are forgotten
 // after 2 hours.
 //
-// Routes (JSON; seat token in the X-WW-Token header):
+// Routes (JSON; player capability in X-WW-Token, host capability in X-TNG-Host-Capability):
 //   GET  /ww-api/health
-//   POST /ww-api/rooms                     { name }            → { roomCode, token, playerId, room }
+//   POST /ww-api/rooms                     { nickname }        → { roomCode, token, hostCapability, playerId, room }
 //   GET  /ww-api/rooms/:code[?full=1]                          → { room, you, mine? }
 //   POST /ww-api/rooms/:code/action        { action, ... }
 //        join{name} · addCpu{level,char} · remove{playerId} · setDuration{seconds}
@@ -208,7 +208,7 @@ export function createWordWranglerApi({
     const st = p.st;
     return {
       id: p.id, name: p.name, isAI: !!p.isAI, level: p.level || null, char: p.char || null,
-      isHost: p.id === room.hostId, online: p.isAI || now - (p.lastSeen || 0) < 12000,
+      isHost: p.id === room.hostId, online: p.isAI || (!p.leftAt && now - (p.lastSeen || 0) < 12000),
       score: st ? st.score : 0, words: st ? st.words.length : 0, best: st?.best || null,
       last: p.last ? { w: p.last.w, p: p.last.p } : null, caught: st?.caught || 0, escaped: st?.escaped || 0,
       list: reveal && st ? st.words.map(w => ({ w: w.w, p: w.p })) : undefined,
