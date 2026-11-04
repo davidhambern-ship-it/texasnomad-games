@@ -1,4 +1,5 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 // Client for Word Wrangler online races (server.mjs → server/wordWranglerApi.mjs)
 export const WW_API_BASE = tngServiceUrl('/ww-api');
@@ -14,6 +15,10 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  else {
+    const guest = getStoredGuestIdentity();
+    if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
+  }
 
   let res;
   try {
