@@ -1,4 +1,4 @@
-const LIVE_TNG_SERVICE_ORIGIN = 'https://auth.texasnomadgames.com';
+const LOCAL_TNG_SERVICE_ORIGIN = 'http://localhost:3000';
 
 function normalizeOrigin(value = '') {
   return String(value || '').trim().replace(/\/+$/, '');
@@ -17,12 +17,11 @@ function isVercelOrTngHost() {
   );
 }
 
-// The Vercel deployment serves both the frontend and the TNG API/WebSocket
-// function. Use same-origin paths there so browser traffic no longer depends
-// on the legacy auth subdomain. Local dev can still target that service.
+// Production and preview use same-origin API routes. Local development targets
+// the local Node API server; no Railway or Neon service is used.
 export const TNG_SERVICE_ORIGIN =
   normalizeOrigin(import.meta.env.VITE_TNG_SERVICE_ORIGIN) ||
-  (isVercelOrTngHost() ? '' : LIVE_TNG_SERVICE_ORIGIN);
+  (isVercelOrTngHost() ? '' : LOCAL_TNG_SERVICE_ORIGIN);
 
 export function tngServiceUrl(path = '') {
   const suffix = String(path || '').startsWith('/') ? String(path || '') : `/${path}`;
