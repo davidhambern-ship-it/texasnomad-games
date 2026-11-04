@@ -4,7 +4,7 @@ const VIRAL_API_BASE = TNG_SERVICE_ORIGIN;
 
 export async function resolveViralRoom(roomCode) {
   const code = String(roomCode || '').trim().toUpperCase();
-  if (!/^[A-Z]{4}$/.test(code)) {
+  if (!/^TN[A-Z0-9]{4}$/.test(code)) {
     return { live: false, roomCode: code };
   }
 
