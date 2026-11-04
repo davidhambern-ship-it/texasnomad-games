@@ -86,7 +86,7 @@ test('wrong selections apply the penalty and advance turn mode', () => {
   });
   const result = submitWordSearchSelection(started, {
     actorSeat: 1,
-    cells: ['0-0', '0-1'],
+    cells: ['999-999', '999-1000'],
     activeSeats: [1, 2],
   });
 
