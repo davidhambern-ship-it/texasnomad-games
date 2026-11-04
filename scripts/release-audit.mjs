@@ -58,6 +58,12 @@ const [
   seeThatServer,
   wordWranglerServer,
   battleSudokuServer,
+  tngDispatcher,
+  functionsTngApi,
+  guestAuth,
+  guestAccount,
+  dbSchema,
+  pairing,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -95,6 +101,12 @@ const [
   text('server/seeThatApi.mjs'),
   text('server/wordWranglerApi.mjs'),
   text('server/battleSudokuApi.mjs'),
+  text('server/tngApi.mjs'),
+  text('functions/tngapi.js'),
+  text('server/auth/require-user.js'),
+  text('server/auth/require-account.js'),
+  text('server/db/schema.js'),
+  text('server/pairing.js'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -308,8 +320,55 @@ ok(
 
 ok(
   'first-party service origin',
-  serviceOrigin.includes("https://auth.texasnomadgames.com"),
-  'browser service origin is not the first-party auth.texasnomadgames.com host',
+  serviceOrigin.includes("http://localhost:3000") && !serviceOrigin.includes('auth.texasnomadgames.com'),
+  'local development must target the local API server, never the retired auth subdomain',
+);
+
+ok(
+  'Neon and Railway runtime dependencies removed',
+  !server.includes('TNG_API_ORIGIN') &&
+    !server.includes('.neon.tech') &&
+    !server.includes('neon_auth.') &&
+    !server.includes('NEON_AUTH_ORIGIN') &&
+    !serviceOrigin.includes('auth.texasnomadgames.com'),
+  'Runtime code still calls Neon or the retired auth service',
+);
+
+ok(
+  'guest-only core TNG API is local',
+  tngDispatcher.includes("import tngApi from '../functions/tngapi.js'") &&
+    tngDispatcher.includes('dispatchTngApi') &&
+    functionsTngApi.includes('../server/tng-api/') &&
+    guestAuth.includes('verifyGuestIdentity') &&
+    guestAuth.includes('public.tng_guest_sessions') &&
+    guestAccount.includes("provider !== 'guest'") &&
+    guestAccount.includes('guest_'),
+  'Core TNG API handlers are not routed locally through verified guest identity',
+);
+
+ok(
+  'guest session persistence and API signing',
+  server.includes('insert into public.tng_guest_sessions') &&
+    server.includes('token_hash') &&
+    pairing.includes('process.env.TNG_GUEST_TOKEN_SECRET'),
+  'Guest tokens are not persisted or room pairing lacks a guest-safe signing secret',
+);
+
+ok(
+  'Neon Auth schema removed',
+  !dbSchema.includes('neon_auth') &&
+    !dbSchema.includes('neonAuthSchema'),
+  'Database schema still defines Neon Auth tables',
+);
+
+ok(
+  'Vercel Hobby function count kept under limit',
+  !(await exists('api/health.js')) &&
+    !(await exists('api/host/session.js')) &&
+    !(await exists('api/spades/host.js')) &&
+    await exists('server/tng-api/health.js') &&
+    await exists('server/tng-api/host/session.js'),
+  'TNG API routes must stay under server/ behind the single api/[...path].mjs entry point',
 );
 
 ok(
