@@ -9,6 +9,7 @@ import RRPortrait from '@/components/brawl/RRPortrait';
 import { ROSTER } from '@/lib/brawl/fighters';
 import { rrSfx } from '@/components/brawl/rrSfx';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/brawl/rr.css';
 
 // Rodeo Rumble — multiplayer-only TNG platform fighter
@@ -31,7 +32,7 @@ export default function RodeoRumbleGame() {
   }
 
   if (isHost) {
-    return <RRHost onExit={() => window.location.assign('/host')} />;
+    return <RRHost onExit={() => window.location.assign(getStoredGuestIdentity() ? '/games' : '/host')} />;
   }
 
   if (/^[A-Z]{5}$/.test(room)) {
@@ -94,10 +95,10 @@ export default function RodeoRumbleGame() {
             <button
               type="button"
               className="rr-mode"
-              onClick={() => window.location.assign('/host?game=rodeo-rumble')}
+              onClick={() => window.location.assign(getStoredGuestIdentity() ? '/games/rodeo-rumble?host=1' : '/host?game=rodeo-rumble')}
             >
               <b>Host a rumble</b>
-              <span>Launch from the TNG Host Controller, then 2–8 signed-in players join on their phones. Every phone becomes a controller.</span>
+              <span>Launch a live room, then 2–8 players join on their phones with a guest name or TNG account.</span>
             </button>
           </div>
         </div>
