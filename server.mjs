@@ -1908,87 +1908,9 @@ async function handleTngAccountRoute(req, res) {
     return;
   }
 
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
-    sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
-    });
-    return;
-  }
-
-  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
-  });
-
-  if (!profileResponse.ok) {
-    const payload = await profileResponse.json().catch(() => ({}));
-    sendJson(res, profileResponse.status, payload?.error
-      ? payload
-      : {
-          error: {
-            code: 'PROFILE_LOOKUP_FAILED',
-            message: 'TNG could not identify this signed-in account.',
-          },
-        });
-    return;
-  }
-
-  const payload = await profileResponse.json().catch(() => ({}));
-  const profile = payload?.profile || {};
-  let accountId =
-    profile.accountId ||
-    profile.account_id ||
-    payload.accountId ||
-    payload.account_id ||
-    null;
-
-  if (!accountId) {
-    const handle = String(
-      profile.handle ||
-      profile.normalizedHandle ||
-      profile.normalized_handle ||
-      ''
-    ).replace(/^@/, '').trim().toLowerCase();
-
-    if (handle) {
-      const { rows } = await bffPool.query(`
-        select account_id
-        from public.player_profiles
-        where normalized_handle = $1
-           or lower(handle) = $1
-        limit 1
-      `, [handle]);
-      accountId = rows[0]?.account_id || null;
-    }
-  }
-
-  if (!accountId) {
-    const email = String(
-      profile.email ||
-      payload.email ||
-      ''
-    ).trim().toLowerCase();
-
-    if (email) {
-      const { rows } = await bffPool.query(`
-        select id
-        from public.accounts
-        where lower(email) = $1
-        limit 1
-      `, [email]);
-      accountId = rows[0]?.id || null;
-    }
-  }
-
-  if (!accountId || !isUuid(accountId)) {
-    sendJson(res, 200, {
-      route: 'default',
-      activeHost: false,
-    });
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
     return;
   }
 
@@ -2012,7 +1934,7 @@ async function handleTngAccountRoute(req, res) {
       and (ds.expires_at is null or ds.expires_at > now())
     order by hs.updated_at desc
     limit 1
-  `, [accountId]);
+  `, [resolved.account.id]);
 
   const session = rows[0] || null;
   if (!session) {
