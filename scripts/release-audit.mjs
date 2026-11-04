@@ -50,6 +50,13 @@ const [
   rodeoLiveModule,
   vercelApi,
   vercelConfig,
+  welcome,
+  seeThatClient,
+  wordWranglerClient,
+  battleSudokuClient,
+  seeThatServer,
+  wordWranglerServer,
+  battleSudokuServer,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -79,6 +86,13 @@ const [
   text('server/rodeoRumbleLive.mjs'),
   text('api/[...path].mjs'),
   text('vercel.json'),
+  text('src/pages/Welcome.jsx'),
+  text('src/api/seeThatApi.js'),
+  text('src/api/wordWranglerApi.js'),
+  text('src/api/battleSudokuApi.js'),
+  text('server/seeThatApi.mjs'),
+  text('server/wordWranglerApi.mjs'),
+  text('server/battleSudokuApi.mjs'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -180,6 +194,27 @@ ok(
     viralLiveModule.includes('if (!accountId || roomOwnedByAnotherAccount)') &&
     rodeoLiveModule.includes('if (!hostIdentity?.accountId)'),
   'A guest player identity can reach a host authorization path',
+);
+
+ok(
+  'public guest onboarding',
+  welcome.includes('createGuestIdentity(guestName)') &&
+    app.includes("'/welcome'") &&
+    app.includes("location.pathname.startsWith('/games/') && hasGuestIdentity"),
+  'Guests must be able to create a temporary identity before opening game pages',
+);
+
+ok(
+  'guest tokens reach See That, Word Wrangler, and Battle Sudoku',
+  seeThatClient.includes("headers['X-TNG-Guest-Token']") &&
+    wordWranglerClient.includes("headers['X-TNG-Guest-Token']") &&
+    battleSudokuClient.includes("headers['X-TNG-Guest-Token']") &&
+    seeThatServer.includes('hostGuestId') &&
+    seeThatServer.includes('identity.guestId') &&
+    wordWranglerServer.includes('identity.guestId') &&
+    battleSudokuServer.includes('hostGuestId') &&
+    battleSudokuServer.includes('identity.guestId'),
+  'Standalone guest identities are not accepted consistently by all room APIs',
 );
 
 ok(
