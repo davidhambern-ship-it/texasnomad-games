@@ -72,7 +72,7 @@ function sharedOptions() {
 
 test('See That allows a signed guest to host and protects host controls', async () => {
   const api = createSeeThatApi(sharedOptions());
-  const created = await call(api, 'POST', '/st-api/rooms', {});
+  const created = await call(api, 'POST', '/st-api/rooms', {}, { 'x-tng-guest-token': 'signed-host' });
   assert.equal(created.status, 200);
   assert.ok(created.payload.roomCode);
   assert.ok(created.payload.token);
