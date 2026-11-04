@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import NCTable from './NCTable';
 import NCHand from './NCHand';
 import { ncApi, ncSeat } from '@/api/nomadCardsApi';
-import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 import { ncSfx } from './ncSfx';
 
 function useRoom(code, token, onGone) {
@@ -41,19 +40,12 @@ export function NCHost({ onExit }) {
     catch (e) { setErr(e.message); } finally { setCreating(false); }
   }, [apply]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
-  // pair with a TNG Game Display when one is linked to this host
-  useEffect(() => {
-    if (!seat?.code) return undefined;
-    let alive = true;
-    const sync = async () => { const r = await claimStandaloneDisplay('out', seat.code).catch(() => null); if (!alive || !r?.ok) return; };
-    sync(); const timer = window.setInterval(sync, 30000);
-    return () => { alive = false; window.clearInterval(timer); releaseStandaloneDisplay().catch(() => {}); };
-  }, [seat?.code]);
+
   const act = useCallback(async (action, payload = {}) => {
     try { const d = await ncApi.action(seat.code, seat.token, action, payload); apply(d); return d.result; }
     catch (e) { setErr(e.message); setTimeout(() => setErr(''), 3000); return null; }
   }, [seat, apply]);
-  const exit = () => { releaseStandaloneDisplay().catch(() => {}); try { localStorage.removeItem('nc_host'); } catch { /* ignore */ } onExit(); };
+  const exit = () => { try { localStorage.removeItem('nc_host'); } catch { /* ignore */ } onExit(); };
   if (!data) return <div className="nc-wrap"><div className="nc-panel" style={{ textAlign: 'center' }}>{err || error ? <><p>{err || error}</p><button type="button" className="nc-btn" onClick={() => { setErr(''); create(); }}>Try again</button> <button type="button" className="nc-btn ghost" onClick={onExit}>Back</button></> : 'Shuffling the deck…'}</div></div>;
   return (
     <>
