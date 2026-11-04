@@ -140,7 +140,20 @@ const AuthenticatedApp = () => {
     '/display',
   ]);
 
-  if (!isAuthenticated && !publicUnauthenticatedPaths.has(location.pathname)) {
+  let hasGuestIdentity = false;
+  try {
+    hasGuestIdentity = Boolean(localStorage.getItem('tng_guest_token'));
+  } catch {}
+
+  const isGuestEntryRoute =
+    location.pathname.startsWith('/join/') ||
+    (location.pathname.startsWith('/games/') && hasGuestIdentity);
+
+  if (
+    !isAuthenticated &&
+    !publicUnauthenticatedPaths.has(location.pathname) &&
+    !isGuestEntryRoute
+  ) {
     return <Navigate to="/login" replace />;
   }
 
