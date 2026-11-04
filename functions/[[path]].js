@@ -10,7 +10,9 @@ export async function onRequest(context) {
     path === "/tng-guest" ||
     path.startsWith("/tng-guest/") ||
     path === "/tng-api" ||
-    path.startsWith("/tng-api/");
+    path.startsWith("/tng-api/") ||
+    path === "/nc-api" ||
+    path.startsWith("/nc-api/");
 
   if (!isApi) return next();
 
