@@ -17,7 +17,7 @@
 
     function createRoomConnection(roomName) {
       const normalized = String(roomName || '').trim().toLowerCase();
-      if (!/^viral-[a-z]{4}$/.test(normalized)) {
+      if (!/^viral-tn[a-z0-9]{4}$/.test(normalized)) {
         return Promise.reject(new Error('Invalid VIRAL room name.'));
       }
 
