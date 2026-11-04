@@ -108,13 +108,18 @@
     "vite": "^6.1.0"
   },
   "overrides": {
-    "better-auth": "1.7.15",
-    "@better-auth/core": "1.7.15",
-    "@better-auth/oauth-provider": "1.7.15",
+    "better-auth": "1.7.16",
+    "@better-auth/core": "1.7.16",
+    "@better-auth/oauth-provider": "1.7.16",
     "@better-auth/drizzle-adapter": "1.7.16",
-    "@better-auth/kysely-adapter": "1.7.0",
+    "@better-auth/kysely-adapter": "1.7.16",
     "zod": "$zod",
     "dompurify": "3.4.17",
-    "fast-uri": "3.1.9"
+    "fast-uri": "3.1.9",
+    "@better-auth/passkey": "1.7.16",
+    "@better-auth/stripe": "1.7.16",
+    "@better-auth/api-key": "1.7.16",
+    "@better-auth/sso": "1.7.16",
+    "@better-auth/cimd": "1.7.16"
   }
 }
