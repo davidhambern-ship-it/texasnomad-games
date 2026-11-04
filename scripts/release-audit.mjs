@@ -24,6 +24,7 @@ async function exists(path) {
 const [
   app,
   games,
+  outGame,
   hostPanel,
   wordWrangler,
   battleSudoku,
@@ -60,6 +61,7 @@ const [
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
+  text('src/pages/OutGame.jsx'),
   text('src/pages/PreviewHostPanel.jsx'),
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
@@ -109,6 +111,7 @@ const liveRoutes = [
   '/games/see-that',
   '/games/word-wrangler',
   '/games/dominoes',
+  '/games/out',
 ];
 
 for (const route of liveRoutes) {
@@ -139,8 +142,18 @@ for (const gameId of liveGameIds) {
 
 ok(
   'construction lineup',
-  games.includes("const IN_CONSTRUCTION_IDS = ['uno', 'poker', 'bowling', 'snake', 'phase-10'];"),
-  'UNO, Poker, Bowling, Snake and Phase 10 must remain the construction lineup',
+  games.includes("const IN_CONSTRUCTION_IDS = ['poker', 'bowling', 'snake', 'phase-10'];"),
+  'Poker, Bowling, Snake and Phase 10 must remain the construction lineup',
+);
+
+ok(
+  'OUT! is the 12th playable game',
+  games.includes("id: 'out'") &&
+    games.includes("title: 'OUT!'") &&
+    games.includes("path: '/games/out'") &&
+    app.includes('path="/games/out"') &&
+    outGame.includes('export default function OutGame'),
+  'OUT! must be listed as available, routed, and implemented',
 );
 
 ok(
