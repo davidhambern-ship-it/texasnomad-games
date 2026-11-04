@@ -286,10 +286,10 @@ export default function NeonSpadesPlayer({ roomCode }) {
               TRY PLAYER JOIN AGAIN
             </Link>
             <Link
-              to="/login"
+              to={`/join/${roomCode}`}
               className="rounded-lg border border-[#BC13FE]/60 px-4 py-2 text-[#BC13FE]"
             >
-              SIGN IN WITH ANOTHER ACCOUNT
+              CHOOSE A DIFFERENT PLAYER NAME
             </Link>
           </div>
         </div>
