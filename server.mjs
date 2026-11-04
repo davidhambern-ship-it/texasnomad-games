@@ -2383,7 +2383,7 @@ async function verifyBffHostWithTngApi(req, controllerId) {
   return { ok: response.ok, status: response.status, payload };
 }
 
-async function loadRailwayBffHostRoom(controllerId) {
+async function loadBffHostRoom(controllerId) {
   const { rows } = await bffPool.query(`
     select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
            gr.created_at, gr.updated_at, hs.id as host_session_id
@@ -4080,7 +4080,7 @@ async function verifyBffPlayerWithTngApi(req, deviceId, roomCode) {
   return { ok: response.ok, status: response.status, payload };
 }
 
-async function loadRailwayBffPlayerRoom(roomCode) {
+async function loadBffPlayerRoom(roomCode) {
   const { rows } = await bffPool.query(`
     select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
            gr.created_at, gr.updated_at
@@ -4484,7 +4484,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffPlayerRoom(roomCode);
+    let room = await loadBffPlayerRoom(roomCode);
     if (!room) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
@@ -4534,7 +4534,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffPlayerRoom(roomCode);
+    let room = await loadBffPlayerRoom(roomCode);
     if (!room) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
@@ -4604,7 +4604,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffPlayerRoom(roomCode);
+    let room = await loadBffPlayerRoom(roomCode);
     if (!room) {
       sendJson(res, 404, {
         error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
@@ -4679,7 +4679,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffHostRoom(controllerId);
+    let room = await loadBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
@@ -4733,7 +4733,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffHostRoom(controllerId);
+    let room = await loadBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
@@ -5739,7 +5739,7 @@ const server = http.createServer(async (req, res) => {
       service: 'tng-live',
       database,
       uptimeSeconds: Math.round(process.uptime()),
-      commit: process.env.RAILWAY_GIT_COMMIT_SHA || null,
+      commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || null,
     });
     return;
   }
