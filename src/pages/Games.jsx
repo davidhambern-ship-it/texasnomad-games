@@ -685,6 +685,7 @@ export default function Games() {
         'see-that': '/games/see-that?host=1',
         'word-wrangler': '/games/word-wrangler?host=1',
         sudoku: '/games/sudoku?host=1',
+        dominoes: '/games/dominoes/host',
       };
       const guestPath = guestHostPaths[hostGameId];
       if (guestPath) {
