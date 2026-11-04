@@ -8,6 +8,7 @@ import { STDisplay, STHost, STPlayer } from '@/components/seeThat/STOnline';
 import { sfx } from '@/components/seeThat/stSfx';
 import { loadScene, loadSceneList } from '@/api/seeThatApi';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/seeThat/st.css';
 
 // /games/see-that              menu
@@ -35,7 +36,7 @@ export default function SeeThatGame() {
   const toMenu = () => { setScreen('menu'); setPractice(null); setParams({}, { replace: true }); };
   const leaveHost = () => {
     if (directHost) {
-      window.location.replace('/host');
+      window.location.replace(getStoredGuestIdentity() ? '/games' : '/host');
       return;
     }
     toMenu();
