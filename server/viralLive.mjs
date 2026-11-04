@@ -205,7 +205,7 @@ export function createViralLive({
             identity = null;
           }
 
-          if (!identity?.accountId || !identity?.publicName) {
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
             me.presence = {};
             send(ws, {
               t: 'msg',
@@ -217,23 +217,23 @@ export function createViralLive({
             return;
           }
 
-          // One signed-in TNG account owns at most one online VIRAL seat.
+          // One identity (account or temporary guest) owns at most one online seat.
           for (const [peerId, peer] of r.peers) {
-            if (
-              peerId !== id &&
-              String(peer.presence?.accountId || '') === String(identity.accountId)
-            ) {
-              peer.presence = {};
-            }
+            const sameIdentity = identity.accountId
+              ? String(peer.presence?.accountId || '') === String(identity.accountId)
+              : String(peer.presence?.guestId || '') === String(identity.guestId);
+            if (peerId !== id && sameIdentity) peer.presence = {};
           }
 
           clean.seat = p.seat;
           clean.name = String(identity.publicName).slice(0, 24);
-          clean.accountId = String(identity.accountId);
+          if (identity.accountId) clean.accountId = String(identity.accountId);
+          if (identity.guestId) clean.guestId = String(identity.guestId);
 
           r.playerAccounts = r.playerAccounts || {};
           r.playerAccounts[clean.seat] = {
-            accountId: clean.accountId,
+            accountId: clean.accountId || null,
+            guestId: clean.guestId || null,
             name: clean.name,
           };
           r.updatedAt = now;
