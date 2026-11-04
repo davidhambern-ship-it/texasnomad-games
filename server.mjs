@@ -86,7 +86,15 @@ const LIVE_BROWSER_ORIGINS = new Set(
 );
 
 function isAllowedBrowserOrigin(origin) {
-  return Boolean(origin && LIVE_BROWSER_ORIGINS.has(origin));
+  if (!origin) return false;
+  if (LIVE_BROWSER_ORIGINS.has(origin)) return true;
+
+  let host = '';
+  try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
+  const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+    .map((value) => String(value || '').replace(/^https?:\\/\\//i, '').split('/')[0].toLowerCase())
+    .filter(Boolean);
+  return vercelHosts.includes(host);
 }
 
 async function readRawBody(req) {
@@ -95,7 +103,7 @@ async function readRawBody(req) {
   return chunks.length ? Buffer.concat(chunks) : null;
 }
 
-function rewriteAuthCookie(cookie) {
+function rewriteAuthCookie(cookie, requestHost = '') {
   const raw = String(cookie || '');
   if (!raw) return raw;
 
@@ -115,7 +123,12 @@ function rewriteAuthCookie(cookie) {
   // texasnomadgames.com to auth.texasnomadgames.com remain first-party.
   // __Host- cookies are not allowed to carry Domain=, so preserve their
   // host-only semantics if Neon ever emits one.
-  if (!cookieName.startsWith('__Host-')) {
+  const host = String(requestHost || '').split(':')[0].toLowerCase();
+  const isTngParentHost =
+    host === 'texasnomadgames.com' ||
+    host === 'www.texasnomadgames.com' ||
+    host.endsWith('.texasnomadgames.com');
+  if (!cookieName.startsWith('__Host-') && isTngParentHost) {
     next += '; Domain=texasnomadgames.com';
   }
 
@@ -242,7 +255,7 @@ async function proxyNeonAuth(req, res) {
       : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
 
   if (setCookies.length) {
-    const rewrittenCookies = setCookies.map(rewriteAuthCookie);
+    const rewrittenCookies = setCookies.map((cookie) => rewriteAuthCookie(cookie, req.headers.host));
     res.setHeader('Set-Cookie', rewrittenCookies);
 
     console.info('[TNG auth proxy] upstream set-cookie', {
