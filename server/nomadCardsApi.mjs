@@ -252,15 +252,16 @@ export function createNomadCardsApi({
       }
       if (req.method === 'POST' && path === '/rooms') {
         const hostIdentity = await resolveIdentity(req);
-        if (!hostIdentity?.accountId) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting OUT!.');
+        if (!hostIdentity?.accountId && !hostIdentity?.guestId) {
+          throw err(401, 'GUEST_REQUIRED', 'Choose a player name before hosting OUT!.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
         const code = await newCode(hostIdentity.accountId);
         const room = {
           code,
           hostToken: newToken(),
-          hostAccountId: hostIdentity.accountId,
+          hostAccountId: hostIdentity.accountId || null,
+          hostGuestId: hostIdentity.guestId || null,
           hostName: hostIdentity.publicName || 'Host',
           hostPlayerId: newId(),
           players: [],
@@ -269,7 +270,7 @@ export function createNomadCardsApi({
           createdAt: now,
           updatedAt: now,
         };
-        room.players.push({ id: room.hostPlayerId, accountId: hostIdentity.accountId, name: clean(room.hostName, 32), color: COLORS[0], isHost: true, lastSeen: now });
+        room.players.push({ id: room.hostPlayerId, accountId: hostIdentity.accountId || null, guestId: hostIdentity.guestId || null, name: clean(room.hostName, 32), color: COLORS[0], isHost: true, lastSeen: now });
         try {
           await saveRoom(room, { force: true });
         } catch (error) {
@@ -290,16 +291,18 @@ export function createNomadCardsApi({
 
       const isHost = Boolean(
         tokenClaimsHost &&
-        requestIdentity?.accountId &&
-        (!room.hostAccountId || String(room.hostAccountId) === String(requestIdentity.accountId))
+        requestIdentity &&
+        ((room.hostAccountId && String(room.hostAccountId) === String(requestIdentity.accountId || '')) ||
+         (room.hostGuestId && String(room.hostGuestId) === String(requestIdentity.guestId || '')))
       );
 
       const tokenSeat = tokenClaimsHost
         ? room.players.find(p => p.id === room.hostPlayerId)
         : room.players.find(p => token && p.token === token);
-      if (token && !requestIdentity?.accountId) throw err(401, 'AUTH_REQUIRED', 'Sign in to use your seat.');
+      if (token && !requestIdentity?.accountId && !requestIdentity?.guestId) throw err(401, 'GUEST_REQUIRED', 'Choose a player name to use your seat.');
       if (tokenClaimsHost && !isHost) throw err(403, 'IDENTITY_MISMATCH', 'That host seat belongs to another account.');
-      if (tokenSeat && String(tokenSeat.accountId) !== String(requestIdentity?.accountId)) throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another TNG account.');
+      if (tokenSeat?.accountId && String(tokenSeat.accountId) !== String(requestIdentity?.accountId || '')) throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another player.');
+      if (tokenSeat?.guestId && String(tokenSeat.guestId) !== String(requestIdentity?.guestId || '')) throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another player.');
       const findMe = () => tokenSeat || null;
 
       if (room.game) G.tick(room.game, now);
@@ -324,13 +327,13 @@ export function createNomadCardsApi({
         room.updatedAt = t;
         if (body.action === 'join') {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining OUT!.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'GUEST_REQUIRED', 'Choose a player name before joining OUT!.');
           }
 
-          if (String(identity.accountId) === String(room.hostAccountId) && !isHost) throw err(409, 'HOST_SEAT', 'Return to Host a table to use your reserved host seat.');
+          if (((identity.accountId && String(identity.accountId) === String(room.hostAccountId)) || (identity.guestId && String(identity.guestId) === String(room.hostGuestId))) && !isHost) throw err(409, 'HOST_SEAT', 'Return to Host a table to use your reserved host seat.');
           let me = findMe() || room.players.find(
-            p => String(p.accountId || '') === String(identity.accountId),
+            p => (identity.accountId && String(p.accountId || '') === String(identity.accountId)) || (identity.guestId && String(p.guestId || '') === String(identity.guestId)),
           ) || null;
           let issued;
 
@@ -345,7 +348,8 @@ export function createNomadCardsApi({
             }
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               color: nextColor(room),
@@ -363,10 +367,12 @@ export function createNomadCardsApi({
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const me = findMe();
-        if (me?.accountId) {
+        if (me?.accountId || me?.guestId) {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || String(identity.accountId) !== String(me.accountId)) {
-            throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another TNG account.');
+          const matchesAccount = me.accountId && identity?.accountId && String(identity.accountId) === String(me.accountId);
+          const matchesGuest = me.guestId && identity?.guestId && String(identity.guestId) === String(me.guestId);
+          if (!matchesAccount && !matchesGuest) {
+            throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another player.');
           }
         }
         const result = act(room, isHost ? 'host' : me, body, t);
