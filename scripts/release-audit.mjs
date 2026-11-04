@@ -278,6 +278,7 @@ const browserFiles = [
 const forbiddenBrowserOrigins = [
   'https://tng-live-production.up.railway.app',
   'wss://tng-live-production.up.railway.app',
+  'https://tng-live-production.up.railway.app',
   'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech',
 ];
 
