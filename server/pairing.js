@@ -1,7 +1,7 @@
 import { createHash, createHmac, randomBytes, randomInt } from 'node:crypto';
 
 function pairingSecret() {
-  const secret = process.env.TNG_PAIRING_SECRET;
+  const secret = process.env.TNG_PAIRING_SECRET || process.env.TNG_GUEST_TOKEN_SECRET;
   if (!secret || secret.length < 32) {
     const error = new Error('Display pairing is not configured.');
     error.statusCode = 503;
