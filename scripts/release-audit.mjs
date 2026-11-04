@@ -330,7 +330,7 @@ ok(
 
 ok(
   'VIRAL first-party websocket relay',
-  viralHtml.includes("wss://auth.texasnomadgames.com"),
+  viralHtml.includes('location.host') && !viralHtml.includes('wss://auth.texasnomadgames.com'),
   'VIRAL deployed HTML does not point at the first-party websocket relay',
 );
 
