@@ -155,7 +155,9 @@ ok(
     outGame.includes('export default function NomadCardsGame') &&
     outGame.includes('NCSolo') &&
     outGame.includes('NCHost') &&
-    outGame.includes('NCPlayer'),
+    outGame.includes('NCPlayer') &&
+    server.includes('createNomadCardsApi') &&
+    server.includes("startsWith('/nc-api')"),
   'OUT! must be listed as available, routed, and implemented',
 );
 
