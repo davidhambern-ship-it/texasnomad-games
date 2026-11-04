@@ -44,12 +44,7 @@ function RouteFallback() {
 }
 
 function HomeGate() {
-  let welcomeComplete = false;
-  try {
-    welcomeComplete = sessionStorage.getItem('tng_welcome_complete') === '1';
-  } catch {}
-
-  if (!welcomeComplete) return <Navigate to="/welcome" replace />;
+  // The public home page must never require a welcome flag or player session.
   return <Home />;
 }
 
@@ -145,6 +140,8 @@ const AuthenticatedApp = () => {
   } catch {}
 
   const isGuestEntryRoute =
+    location.pathname === '/games' ||
+    location.pathname.startsWith('/games/') ||
     location.pathname.startsWith('/join/') ||
     (hasGuestIdentity && (
       location.pathname === '/' ||
