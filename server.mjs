@@ -1320,7 +1320,7 @@ function publicTngNameFromRecord(record, fallback = 'Player') {
 
 async function resolveAuthenticatedTngAccount(req) {
   const authorization = String(req.headers.authorization || '').trim();
-  const token = authorization.replace(/^Bearer\\s+/i, '').trim();
+  const token = authorization.replace(/^Bearer\s+/i, '').trim();
   if (!token) {
     return {
       ok: false,
