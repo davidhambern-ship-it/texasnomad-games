@@ -96,12 +96,24 @@ const roomCodePatches = [
     "const newCode=()=> 'TN'+Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rand(32)]).join('');",
   ],
   [
+    "return /^[A-Z]{4}$/.test(c)?c:'';",
+    "return /^TN[A-Z0-9]{4}$/.test(c)?c:'';",
+  ],
+  [
     'maxlength="4" placeholder="ABCD"',
     'maxlength="6" placeholder="TNXXXX"',
   ],
   [
     "if(!/^[A-Z]{4}$/.test(c))",
     "if(!/^TN[A-Z0-9]{4}$/.test(c))",
+  ],
+  [
+    "Codes are 4 letters.",
+    "Codes must be TN plus four characters.",
+  ],
+  [
+    "Enter the 4-letter code from the host’s screen.",
+    "Enter the TN room code from the host’s screen.",
   ],
 ];
 
