@@ -83,9 +83,12 @@ if (!sourceHtml.includes(legacyRelay)) {
   throw new Error('VIRAL HTML relay bootstrap changed; refusing to apply an unverified TNG relay patch.');
 }
 
+// The restored vendor ZIP is immutable and hash-verified above. Patch only its
+// known relay bootstrap so Vercel preview/production and custom domains use
+// their own same-origin WebSocket endpoint instead of Railway or a fixed host.
 const tngRelayHtml = sourceHtml.replace(
   legacyRelay,
-  "return 'wss://auth.texasnomadgames.com';",
+  "return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;",
 );
 const deployedHtml = tngRelayHtml.replace('</body>', `${bridgeTag}</body>`);
 
