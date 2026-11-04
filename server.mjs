@@ -4910,8 +4910,11 @@ function sanitizeDominoStateForViewer(state, access = null) {
           revealAll ||
           (access?.role === 'player' && access.seat === seat);
 
+        const safePlayer = { ...player };
+        if (access?.role !== 'host') delete safePlayer.guestId;
+
         return {
-          ...player,
+          ...safePlayer,
           hand: canSeeHand
             ? hand
             : hand.map((_, index) => ({
