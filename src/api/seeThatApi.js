@@ -1,5 +1,6 @@
 // Client for See That?! party rooms (server.mjs → server/seeThatApi.mjs)
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { TNG_SERVICE_ORIGIN, tngServiceUrl } from '@/lib/tngServiceOrigin';
 
 const ST_SERVICE_ORIGIN = TNG_SERVICE_ORIGIN;
@@ -16,6 +17,10 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  else {
+    const guest = getStoredGuestIdentity();
+    if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
+  }
 
   let res;
   try {
