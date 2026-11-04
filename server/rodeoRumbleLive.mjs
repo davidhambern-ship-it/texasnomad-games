@@ -164,8 +164,8 @@ export function createRodeoRumbleLive({
 
   async function createRoom(hostIdentity) {
     for (let attempt = 0; attempt < 50; attempt += 1) {
-      const code = Array.from(
-        { length: 5 },
+      const code = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
       if (rooms.has(code)) continue;
