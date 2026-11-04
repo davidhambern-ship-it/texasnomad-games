@@ -41,6 +41,13 @@ const [
   lockRaw,
   viralBridge,
   viralHtml,
+  login,
+  register,
+  guestIdentity,
+  joinRoom,
+  rodeoClient,
+  viralLiveModule,
+  rodeoLiveModule,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -61,6 +68,13 @@ const [
   text('package-lock.json'),
   text('public/viral/tng-bridge.js'),
   text('public/viral/index.html'),
+  text('src/pages/Login.jsx'),
+  text('src/pages/Register.jsx'),
+  text('src/lib/guestIdentity.js'),
+  text('src/pages/JoinRoom.jsx'),
+  text('src/api/rodeoRumbleLive.js'),
+  text('server/viralLive.mjs'),
+  text('server/rodeoRumbleLive.mjs'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -134,6 +148,34 @@ ok(
   !Object.keys(pkg.dependencies || {}).some((name) => name.startsWith('@base44/')) &&
     !Object.keys(pkg.devDependencies || {}).some((name) => name.startsWith('@base44/')),
   'Base44 packages were reintroduced',
+);
+
+ok(
+  'BERNAverse integration removed',
+  !server.toLowerCase().includes('bernaverse') &&
+    !tngApi.toLowerCase().includes('bernaverse') &&
+    !login.toLowerCase().includes('bernaverse') &&
+    !register.toLowerCase().includes('bernaverse'),
+  'TNG server or authentication pages still depend on BERNAverse',
+);
+
+ok(
+  'guest identity entry and token transport',
+  guestIdentity.includes('tng_guest_token') &&
+    joinRoom.includes('createGuestIdentity') &&
+    tngApi.includes("X-TNG-Guest-Token") &&
+    viralBridge.includes("tng_guest_token") &&
+    rodeoClient.includes('getStoredGuestIdentity'),
+  'Guest names/tokens are not connected across room entry and standalone games',
+);
+
+ok(
+  'guest player cannot claim host privileges',
+  server.includes('async function verifyViralHostAuthorization') &&
+    server.includes('if (!resolved.ok) return null;') &&
+    viralLiveModule.includes('if (!accountId || roomOwnedByAnotherAccount)') &&
+    rodeoLiveModule.includes('if (!hostIdentity?.accountId)'),
+  'A guest player identity can reach a host authorization path',
 );
 
 ok(
