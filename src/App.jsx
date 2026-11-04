@@ -32,11 +32,6 @@ const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
 const DominoHost = lazy(() => import('@/pages/DominoHost'));
 const DominoGame = lazy(() => import('@/pages/DominoGame'));
 const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
-const Register = lazy(() => import('@/pages/Register'));
-const Login = lazy(() => import('@/pages/Login'));
-const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
-const TngOnboarding = lazy(() => import('@/pages/TngOnboarding'));
 const GameDisplay = lazy(() => import('@/pages/GameDisplay'));
 
 function RouteFallback() {
@@ -201,13 +196,13 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/welcome" element={<Welcome />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/onboarding" element={<TngOnboarding />} />
+      <Route path="/register" element={<Navigate to="/welcome" replace />} />
+      <Route path="/login" element={<Navigate to="/welcome" replace />} />
+      <Route path="/onboarding" element={<Navigate to="/welcome" replace />} />
       <Route path="/display" element={<GameDisplay />} />
       <Route path="/spectate/:roomCode" element={<GameDisplay spectator />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/forgot-password" element={<Navigate to="/welcome" replace />} />
+      <Route path="/reset-password" element={<Navigate to="/welcome" replace />} />
       <Route path="/" element={<HomeGate />} />
       <Route path="/games" element={<Games />} />
       <Route path="/games/bff" element={<BFFGame />} />
