@@ -18,7 +18,7 @@ import * as G from '../src/lib/battleSudoku/game.js';
 
 const MAX_PLAYERS = 8;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLORS = ['#ffd23f', '#ff5f6d', '#3ec5ff', '#3ef08a', '#c77dff', '#ff9f1c', '#f15bb5', '#e5e7eb'];
 const CPU_NAMES = [['Tank', 3], ['Carlos', 5], ['Lemonade', 6], ['Violet', 7], ['Dexter', 8], ['Berna', 9]];
 const SOLVE = [30, 40, 60], BATTLE = [10, 15, 20], VOLLEYS = [6, 8, 10];
