@@ -4,7 +4,6 @@ import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
-import { toNodeHandler } from 'better-auth/node';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
 import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
@@ -16,9 +15,6 @@ import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
 import { createRoomBridge } from './server/roomCoordinator.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
-import { auth } from './server/auth.mjs';
-
-const betterAuthHandler = toNodeHandler(auth.handler);
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
 const port = Number(process.env.PORT || 3000);
@@ -5541,11 +5537,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if ((req.url || '').startsWith('/neon-auth')) {
-      betterAuthHandler(req, res);
-      return;
-    }
-
     if ((req.url || '').startsWith('/tng-session')) {
       await handleTngSessionLifecycle(req, res);
       return;
@@ -5687,7 +5678,6 @@ const server = http.createServer(async (req, res) => {
 
     const apiPrefixes = [
       '/tng-guest',
-      '/neon-auth',
       '/tng-',
       '/viral-',
       '/see-that-display',
