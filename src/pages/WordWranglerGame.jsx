@@ -7,6 +7,7 @@ import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { SPECIALS } from '@/lib/wordWranglerEngine';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/wordWrangler/ww.css';
 
 export default function WordWranglerGame() {
@@ -32,7 +33,7 @@ export default function WordWranglerGame() {
 
   const toMenu = () => {
     if (launchedFromHost) {
-      window.location.replace('/host');
+      window.location.replace(getStoredGuestIdentity() ? '/games' : '/host');
       return;
     }
     setScreen('menu');
