@@ -78,7 +78,7 @@ export default function Register() {
     <AuthLayout
       icon={UserPlus}
       title="Create a TNG Account"
-      subtitle="Create your TexasNomad Games account directly. No BERNAverse account is required."
+      subtitle="Create your TexasNomad Games account directly."
       footer={
         <>
           Already have a TNG account?{' '}
