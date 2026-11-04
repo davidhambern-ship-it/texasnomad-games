@@ -24,7 +24,7 @@ function useRoom(code, token, onGone) {
   }, [code, apply]); // eslint-disable-line react-hooks/exhaustive-deps
   return { data, offset, error, apply };
 }
-const TNG_PUBLIC_ORIGIN = String((import.meta.env && import.meta.env.VITE_TNG_PUBLIC_ORIGIN) || 'https://texasnomadgames.com').replace(/\/+$/, '');
+const TNG_PUBLIC_ORIGIN = String((import.meta.env && import.meta.env.VITE_TNG_PUBLIC_ORIGIN) || 'https://www.texasnomadgames.com').replace(/\/+$/, '');
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, '')}/join`;
 
 export function NCHost({ onExit }) {
