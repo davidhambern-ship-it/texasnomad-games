@@ -14,6 +14,9 @@ import { createNomadCardsApi } from './server/nomadCardsApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
+import { handleTngApi, dispatchTngApi } from './server/tngApi.mjs';
+import { requireUser } from './server/auth/require-user.js';
+import { findAccountForIdentity } from './server/auth/require-account.js';
 import { createRoomBridge } from './server/roomCoordinator.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
@@ -70,10 +73,6 @@ async function sendFile(res, filePath) {
   });
   res.end(body);
 }
-
-const TNG_API_ORIGIN =
-  process.env.TNG_API_ORIGIN ||
-  'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech';
 
 
 const LIVE_BROWSER_ORIGINS = new Set(
@@ -217,10 +216,9 @@ function getLiveSpectators(roomCode) {
 async function verifyRodeoHostAuthorization({ token, deviceId }) {
   const accountHost = await verifyViralHostAuthorization({ token, deviceId }).catch(() => null);
   if (accountHost?.accountId) return accountHost;
-
-  return verifyGuestIdentity(String(token || '').trim(), {
-    secret: process.env.TNG_GUEST_TOKEN_SECRET,
-  });
+  return resolveStandaloneGameIdentity({
+    headers: { 'x-tng-guest-token': String(token || '').trim() },
+  }).catch(() => null);
 }
 
 const hostLiveWss = new WebSocketServer({ noServer: true });
@@ -228,25 +226,17 @@ const hostLiveWss = new WebSocketServer({ noServer: true });
 async function verifyViralHostAuthorization({ token, deviceId }) {
   const cleanToken = String(token || '').trim();
   const cleanDeviceId = String(deviceId || '').trim();
-
   if (!cleanToken || !isUuid(cleanDeviceId)) return null;
 
   const resolved = await resolveAuthenticatedTngIdentity({
-    headers: {
-      authorization: `Bearer ${cleanToken}`,
-    },
+    headers: { authorization: `Bearer ${cleanToken}` },
   });
-
   if (!resolved.ok) return null;
 
   const { rows } = await bffPool.query(
-    `select
-       hs.id,
-       hs.host_account_id,
-       hs.controller_device_id
+    `select hs.id, hs.host_account_id, hs.controller_device_id
      from public.host_sessions hs
-     join public.device_sessions ds
-       on ds.id = hs.controller_device_id
+     join public.device_sessions ds on ds.id = hs.controller_device_id
      where hs.host_account_id = $1::uuid
        and hs.controller_device_id = $2::uuid
        and hs.ended_at is null
@@ -258,12 +248,12 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
      limit 1`,
     [resolved.account.id, cleanDeviceId],
   );
-
   const session = rows[0] || null;
   if (!session) return null;
-
   return {
     accountId: String(resolved.account.id),
+    guestId: resolved.identity?.guestId || null,
+    isGuest: true,
     publicName: resolved.identity?.publicName || null,
     handle: resolved.identity?.handle || null,
     hostSessionId: String(session.id),
@@ -272,30 +262,10 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 }
 
 async function resolveViralPlayerIdentity({ token }) {
-  const cleanToken = String(token || '').trim();
-  if (!cleanToken) return null;
-
   const resolved = await resolveAuthenticatedTngIdentity({
-    headers: {
-      authorization: `Bearer ${cleanToken}`,
-    },
+    headers: { authorization: `Bearer ${String(token || '').trim()}` },
   }).catch(() => null);
-
-  if (resolved?.ok) return resolved.identity;
-
-  // Guests may occupy player seats, but this identity does not grant host
-  // permissions. Host authorization continues through the Neon/device check.
-  const guest = verifyGuestIdentity(cleanToken, {
-    secret: process.env.TNG_GUEST_TOKEN_SECRET,
-  });
-  if (!guest) return null;
-
-  return {
-    guestId: guest.guestId,
-    publicName: guest.publicName,
-    isGuest: true,
-    accountId: null,
-  };
+  return resolved?.ok ? resolved.identity : null;
 }
 
 // One public room-code namespace across every TNG game. Standalone games
@@ -820,47 +790,31 @@ const HOST_LIVE_GAME_PATHS = {
   'square-biz': '/square-biz/host',
 };
 
-async function fetchHostLiveJson(url, token, controllerId) {
-  const response = await fetch(url, {
+async function fetchHostLiveJson(path, token, controllerId) {
+  const response = await dispatchTngApi({
+    path,
     method: 'GET',
     headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      'X-TNG-Device-Id': controllerId,
+      authorization: `Bearer ${token}`,
+      'x-tng-device-id': controllerId,
     },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
 }
 
 async function loadHostLiveRoom(token, controllerId) {
-  return fetchHostLiveJson(
-    `${TNG_API_ORIGIN}/host/room-state`,
-    token,
-    controllerId,
-  );
+  return fetchHostLiveJson('/host/room-state', token, controllerId);
 }
 
 async function loadHostLiveGame(token, controllerId, gameId) {
   if (!gameId) return null;
-
   if (gameId === 'bff') {
-    return fetchHostLiveJson(
-      `http://127.0.0.1:${port}/bff-api/host`,
-      token,
-      controllerId,
-    );
+    return fetchHostLiveJson('/bff-api/host', token, controllerId);
   }
-
   const path = HOST_LIVE_GAME_PATHS[gameId];
   if (!path) return null;
-
-  return fetchHostLiveJson(
-    `${TNG_API_ORIGIN}${path}`,
-    token,
-    controllerId,
-  );
+  return fetchHostLiveJson(path, token, controllerId);
 }
 
 function hostLiveSend(ws, payload) {
@@ -1054,67 +1008,49 @@ function publicTngNameFromRecord(record, fallback = 'Player') {
 }
 
 async function resolveAuthenticatedTngAccount(req) {
-  const authorization = String(req.headers.authorization || '').trim();
-  const token = authorization.replace(/^Bearer\s+/i, '').trim();
-  if (!token) {
+  try {
+    const identity = await requireUser(req);
+    const account = await findAccountForIdentity(identity);
+    if (!account || account.status !== 'active') {
+      const error = new Error('Your guest profile is unavailable. Choose a player name again.');
+      error.statusCode = 401;
+      error.code = 'GUEST_PROFILE_UNAVAILABLE';
+      throw error;
+    }
+
+    const profileResult = await bffPool.query(
+      `select display_name, handle, normalized_handle
+       from public.player_profiles
+       where account_id = $1::uuid
+       limit 1`,
+      [account.id],
+    );
+    const stored = profileResult.rows[0] || {};
+    const profile = {
+      id: account.id,
+      accountId: account.id,
+      account_id: account.id,
+      email: account.email,
+      name: stored.display_name || identity.displayName || 'Guest',
+      displayName: stored.display_name || identity.displayName || 'Guest',
+      display_name: stored.display_name || null,
+      handle: stored.handle || '',
+      normalizedHandle: stored.normalized_handle || '',
+      normalized_handle: stored.normalized_handle || '',
+    };
+    return { ok: true, account, profile, guestIdentity: identity };
+  } catch (error) {
     return {
       ok: false,
-      status: 401,
-      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
+      status: Number(error?.statusCode) || 401,
+      payload: {
+        error: {
+          code: error?.code || 'GUEST_REQUIRED',
+          message: error?.message || 'Choose a player name to continue.',
+        },
+      },
     };
   }
-
-  // Validate the opaque Better Auth session locally in Supabase. This replaces
-  // the old remote Neon /profile lookup while preserving the existing TNG
-  // account UUIDs and their player-profile relationships.
-  const { rows } = await bffPool.query(
-    `
-      select
-        a.id,
-        lower(a.email) as email,
-        a.auth_subject,
-        u.name as auth_name
-      from neon_auth.session s
-      join neon_auth."user" u on u.id = s."userId"
-      join public.accounts a on a.auth_subject = u.id::text
-      where s.token = $1
-        and s."expiresAt" > now()
-      limit 1
-    `,
-    [token],
-  );
-
-  const account = rows[0] || null;
-  if (!account) {
-    return {
-      ok: false,
-      status: 401,
-      payload: { error: { code: 'AUTH_REQUIRED', message: 'Your session has expired. Sign in again.' } },
-    };
-  }
-
-  const profileResult = await bffPool.query(
-    `select display_name, handle, normalized_handle
-     from public.player_profiles
-     where account_id = $1::uuid
-     limit 1`,
-    [account.id],
-  );
-  const stored = profileResult.rows[0] || {};
-  const profile = {
-    id: account.id,
-    accountId: account.id,
-    account_id: account.id,
-    email: account.email,
-    name: account.auth_name || account.email.split('@')[0],
-    displayName: stored.display_name || account.auth_name || account.email.split('@')[0],
-    display_name: stored.display_name || null,
-    handle: stored.handle || '',
-    normalizedHandle: stored.normalized_handle || '',
-    normalized_handle: stored.normalized_handle || '',
-  };
-
-  return { ok: true, account, profile };
 }
 
 const TNG_IDENTITY_CACHE_TTL_MS = 30 * 1000;
@@ -1128,7 +1064,7 @@ function pruneTngIdentityCache(now = Date.now()) {
 }
 
 async function resolveAuthenticatedTngIdentity(req) {
-  const authKey = String(req?.headers?.authorization || '').trim();
+  const authKey = String(req?.headers?.['x-tng-guest-token'] || req?.headers?.authorization || '').trim();
   const now = Date.now();
 
   if (authKey) {
@@ -1179,6 +1115,8 @@ async function resolveAuthenticatedTngIdentity(req) {
     profile: mergedProfile,
     identity: {
       accountId: String(resolved.account.id),
+      guestId: resolved.guestIdentity?.guestId || null,
+      isGuest: true,
       handle: rawHandle ? `@${rawHandle}` : '',
       publicName,
     },
@@ -1197,20 +1135,7 @@ async function resolveAuthenticatedTngIdentity(req) {
 
 async function resolveStandaloneGameIdentity(req) {
   const resolved = await resolveAuthenticatedTngIdentity(req);
-  if (resolved.ok) return resolved.identity;
-
-  const guestToken = String(req?.headers?.['x-tng-guest-token'] || '').trim();
-  const guest = verifyGuestIdentity(guestToken, {
-    secret: process.env.TNG_GUEST_TOKEN_SECRET,
-  });
-  if (!guest) return null;
-
-  return {
-    guestId: guest.guestId,
-    publicName: guest.publicName,
-    isGuest: true,
-    accountId: null,
-  };
+  return resolved.ok ? resolved.identity : null;
 }
 
 async function claimLegacyPlayerStats(accountId, email) {
@@ -1813,12 +1738,12 @@ async function handleTngDisplayState(req, res) {
   const displayId = String(req.headers['x-tng-display-id'] || '');
   const displayToken = String(req.headers['x-tng-display-token'] || '');
 
-  const upstream = await fetch(`${TNG_API_ORIGIN}/display/state`, {
+  const upstream = await dispatchTngApi({
+    path: '/display/state',
     method: 'GET',
     headers: {
-      Accept: 'application/json',
-      ...(displayId ? { 'X-TNG-Display-Id': displayId } : {}),
-      ...(displayToken ? { 'X-TNG-Display-Token': displayToken } : {}),
+      ...(displayId ? { 'x-tng-display-id': displayId } : {}),
+      ...(displayToken ? { 'x-tng-display-token': displayToken } : {}),
     },
   });
 
@@ -2075,41 +2000,7 @@ async function handleTngProfile(req, res) {
 }
 
 async function proxyTngApi(req, res) {
-  const sourceUrl = new URL(req.url || '/', 'http://localhost');
-  const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
-  const targetUrl = `${TNG_API_ORIGIN}${targetPath}${sourceUrl.search}`;
-
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (
-      value !== undefined &&
-      !['host', 'connection', 'content-length'].includes(key.toLowerCase())
-    ) {
-      headers.set(key, Array.isArray(value) ? value.join(', ') : value);
-    }
-  }
-
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const body = chunks.length ? Buffer.concat(chunks) : undefined;
-
-  const response = await fetch(targetUrl, {
-    method: req.method,
-    headers,
-    body: ['GET', 'HEAD'].includes(req.method || 'GET') ? undefined : body,
-    redirect: 'manual',
-  });
-
-  const responseHeaders = {};
-  response.headers.forEach((value, key) => {
-    if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
-      responseHeaders[key] = value;
-    }
-  });
-
-  const responseBody = Buffer.from(await response.arrayBuffer());
-  res.writeHead(response.status, responseHeaders);
-  res.end(responseBody);
+  await handleTngApi(req, res);
 }
 
 async function readJsonBody(req) {
@@ -2129,18 +2020,11 @@ function sendJson(res, status, payload) {
 }
 
 async function verifyBffHostWithTngApi(req, controllerId) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) return { ok: false, status: 401, payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } } };
-
-  const response = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+  const response = await dispatchTngApi({
+    path: '/host/room-state',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': controllerId,
-    },
+    headers: { ...req.headers, 'x-tng-device-id': controllerId },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, payload };
 }
@@ -2413,20 +2297,19 @@ async function handleTngSpectator(req, res) {
     return;
   }
 
+  const guestToken = String(req.headers['x-tng-guest-token'] || '').trim();
   const auth = String(req.headers.authorization || '');
-  if (!auth) {
+  if (!guestToken && !auth) {
     sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in to spectate.' },
+      error: { code: 'GUEST_REQUIRED', message: 'Choose a player name to spectate.' },
     });
     return;
   }
 
-  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
+  const profileResponse = await dispatchTngApi({
+    path: '/profile',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
+    headers: req.headers,
   });
 
   if (!profileResponse.ok) {
@@ -2544,22 +2427,19 @@ async function handleTngHostRoster(req, res) {
     return;
   }
 
+  const guestToken = String(req.headers['x-tng-guest-token'] || '').trim();
   const auth = String(req.headers.authorization || '');
-  if (!auth) {
+  if (!guestToken && !auth) {
     sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+      error: { code: 'GUEST_REQUIRED', message: 'Choose a player name to continue.' },
     });
     return;
   }
 
-  // Let the authoritative TNG API verify this signed-in Host/controller pair.
-  const verified = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+  const verified = await dispatchTngApi({
+    path: '/host/room-state',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': controllerId,
-    },
+    headers: { ...req.headers, 'x-tng-device-id': controllerId },
   });
 
   if (!verified.ok) {
@@ -3819,25 +3699,15 @@ async function applyBffHostAction(room, body = {}, players = []) {
 
 
 async function verifyBffPlayerWithTngApi(req, deviceId, roomCode) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
-    return {
-      ok: false,
-      status: 401,
-      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
-    };
-  }
-
-  const response = await fetch(`${TNG_API_ORIGIN}/player/room`, {
+  const response = await dispatchTngApi({
+    path: '/player/room',
     method: 'GET',
     headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': deviceId,
-      'X-TNG-Room-Code': roomCode,
+      ...req.headers,
+      'x-tng-device-id': deviceId,
+      'x-tng-room-code': roomCode,
     },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, payload };
 }
@@ -5534,6 +5404,19 @@ const server = http.createServer(async (req, res) => {
           name: body?.name,
           secret: process.env.TNG_GUEST_TOKEN_SECRET,
         });
+        const tokenHash = createHash('sha256').update(issued.token).digest('hex');
+        await bffPool.query(
+          `insert into public.tng_guest_sessions
+            (guest_id, token_hash, display_name, expires_at, last_seen_at, revoked_at)
+           values ($1, $2, $3, to_timestamp($4), now(), null)
+           on conflict (guest_id) do update set
+             token_hash = excluded.token_hash,
+             display_name = excluded.display_name,
+             expires_at = excluded.expires_at,
+             last_seen_at = now(),
+             revoked_at = null`,
+          [issued.identity.sub, tokenHash, issued.identity.name, issued.identity.exp],
+        );
         sendJson(res, 200, {
           token: issued.token,
           guest: {
