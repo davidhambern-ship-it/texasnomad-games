@@ -13,6 +13,7 @@ import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
+import { createRoomBridge } from './server/roomCoordinator.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -701,9 +702,14 @@ const viralLive = createViralLive({
   touchRoomCode: (code, options) => roomRegistry.touch(code, options),
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
   store: viralRoomStore,
+  createRoomBridge,
 });
 
 // Rodeo Rumble — human-only phone-controller party brawler (/rr-live + /rr-api)
+const rodeoRoomStore = createLiveRoomStore(bffPool, {
+  service: 'rodeo-rumble',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
 const rodeoRumbleLive = createRodeoRumbleLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
   verifyHostAuthorization: verifyViralHostAuthorization,
@@ -712,6 +718,8 @@ const rodeoRumbleLive = createRodeoRumbleLive({
   claimRoomCode: (options) => roomRegistry.claim(options),
   touchRoomCode: (code, options) => roomRegistry.touch(code, options),
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+  store: rodeoRoomStore,
+  createRoomBridge,
 });
 
 const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
@@ -995,6 +1003,7 @@ async function runRoomMaintenance() {
   const jobs = [
     ['registry', () => roomRegistry.cleanup()],
     ['viral', () => viralRoomStore.cleanup()],
+    ['rodeo-rumble', () => rodeoRoomStore.cleanup()],
     ['see-that', () => seeThatRoomStore.cleanup()],
     ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
     ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
@@ -5891,7 +5900,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if ((req.url || '').startsWith('/rr-api')) {
-      rodeoRumbleLive.handleHttp(req, res);
+      await rodeoRumbleLive.handleHttp(req, res);
       return;
     }
 
