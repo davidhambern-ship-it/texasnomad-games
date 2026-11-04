@@ -1,4 +1,4 @@
-import tngApi from '../functions/tngapi.js';
+import tngApi from './tngApiDispatcher.mjs';
 
 function makeHeaders(input = {}) {
   const headers = new Headers();
