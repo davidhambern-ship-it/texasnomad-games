@@ -37,11 +37,21 @@ export function createViralLive({
   touchRoomCode = async () => {},
   releaseRoomCode = async () => {},
   store = null,
+  createRoomBridge = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
   const rooms = new Map(); // name → { peers, lastState, lastStateAt, hostId, hostAccountId }
   const lastCheckpoint = new Map();
   const recordedSessions = new Set();
+
+  function attachRoomBridge(name, room) {
+    if (!createRoomBridge || room.bridge) return;
+    room.bridge = createRoomBridge({
+      game: 'viral',
+      roomCode: name.slice(6).toUpperCase(),
+      onEvent: (event) => broadcastLocal(room, event),
+    });
+  }
 
   async function getRoom(name) {
     let r = rooms.get(name);
@@ -66,6 +76,7 @@ export function createViralLive({
       updatedAt: Number(saved?.updatedAt || saved?.lastStateAt || Date.now()),
     };
     rooms.set(name, r);
+    attachRoomBridge(name, r);
     return r;
   }
 
@@ -157,8 +168,19 @@ export function createViralLive({
     const { accountId, guestId, ...publicPresence } = presence;
     return { id, presence: publicPresence };
   });
-  const send = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
-  const broadcast = (r, obj, exceptId) => { const s = JSON.stringify(obj); for (const [id, p] of r.peers) if (id !== exceptId && p.ws.readyState === 1) { try { p.ws.send(s); } catch { /* closed */ } } };
+  const send = (ws, obj) => { if (ws?.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
+  function broadcastLocal(r, obj, exceptId) {
+    const payload = JSON.stringify(obj);
+    for (const [id, peer] of r.peers) {
+      if (id !== exceptId && peer.ws.readyState === 1) {
+        try { peer.ws.send(payload); } catch { /* closed */ }
+      }
+    }
+  }
+  function broadcast(r, obj, exceptId) {
+    broadcastLocal(r, obj, exceptId);
+    r.bridge?.publish(obj);
+  }
 
   wss.on('connection', async (ws, req, roomName) => {
     const r = await getRoom(roomName);
@@ -373,6 +395,7 @@ export function createViralLive({
       broadcast(r, { t: 'peers', joined: [], left: [{ id }], peers: peerList(r) });
       if (!r.peers.size && !r.lastState) {
         rooms.delete(roomName);
+        r.bridge?.close();
         lastCheckpoint.delete(roomName);
         if (store) store.remove(roomName).catch(() => {});
         releaseRoomCode(roomName.slice(6).toUpperCase(), 'viral-live').catch(() => {});
@@ -392,6 +415,7 @@ export function createViralLive({
     for (const [name, r] of rooms) {
       if (!r.peers.size && r.lastStateAt < cutoff) {
         rooms.delete(name);
+        r.bridge?.close();
         lastCheckpoint.delete(name);
         if (store) await store.remove(name).catch(() => {});
         await releaseRoomCode(name.slice(6).toUpperCase(), 'viral-live').catch(() => {});
@@ -443,6 +467,7 @@ export function createViralLive({
             updatedAt: Number(saved.updatedAt || saved.lastStateAt || Date.now()),
           };
           rooms.set(roomName, room);
+          attachRoomBridge(roomName, room);
         }
       }
 
