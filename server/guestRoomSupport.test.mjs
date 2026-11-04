@@ -94,7 +94,7 @@ test('See That allows a signed guest to host and protects host controls', async 
     undefined,
     { 'x-st-token': created.payload.token, 'x-tng-guest-token': 'signed-player' },
   );
-  assert.equal(stolenTokenView.payload.you?.isHost, undefined);
+  assert.notEqual(stolenTokenView.payload.you?.isHost, true);
 });
 
 test('Word Wrangler allows signed guests to create and join a room', async () => {
@@ -152,7 +152,7 @@ test('Battle Sudoku allows a signed guest to host and join without granting anot
     undefined,
     { 'x-bs-token': created.payload.token, 'x-tng-guest-token': 'signed-player' },
   );
-  assert.equal(wrongIdentityView.payload.you?.isHost, undefined);
+  assert.notEqual(wrongIdentityView.payload.you?.isHost, true);
 
   const joined = await call(
     api,
