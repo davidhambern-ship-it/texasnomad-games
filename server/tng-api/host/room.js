@@ -10,8 +10,8 @@ const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
-function createRoomCode(length = 6) {
-  return Array.from({ length }, () => ROOM_ALPHABET[randomInt(0, ROOM_ALPHABET.length)]).join('');
+function createRoomCode() {
+  return 'TN' + Array.from({ length: 4 }, () => ROOM_ALPHABET[randomInt(0, ROOM_ALPHABET.length)]).join('');
 }
 
 export default async function handler(request, response) {
