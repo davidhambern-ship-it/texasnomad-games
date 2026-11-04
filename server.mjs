@@ -3,7 +3,6 @@ import { createHash, randomBytes } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
 import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
@@ -15,6 +14,7 @@ import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
 import { handleTngApi, dispatchTngApi } from './server/tngApi.mjs';
+import { pool as bffPool } from './server/db/client.js';
 import { requireUser } from './server/auth/require-user.js';
 import { findAccountForIdentity } from './server/auth/require-account.js';
 import { createRoomBridge } from './server/roomCoordinator.mjs';
@@ -100,36 +100,6 @@ async function readRawBody(req) {
   for await (const chunk of req) chunks.push(chunk);
   return chunks.length ? Buffer.concat(chunks) : null;
 }
-
-const { Pool } = pg;
-
-
-
-function normalizePgConnectionString(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return raw;
-
-  try {
-    const url = new URL(raw);
-    const sslMode = String(url.searchParams.get('sslmode') || '').toLowerCase();
-
-    // pg 8 currently treats these modes as verify-full, but pg 9 will adopt
-    // weaker libpq semantics. Make the existing secure behavior explicit now.
-    if (['prefer', 'require', 'verify-ca'].includes(sslMode)) {
-      url.searchParams.set('sslmode', 'verify-full');
-    }
-
-    return url.toString();
-  } catch {
-    return raw;
-  }
-}
-
-const bffPool = new Pool({
-  connectionString: normalizePgConnectionString(process.env.DATABASE_URL),
-  max: 5,
-  idleTimeoutMillis: 30000,
-});
 
 // Spectators intentionally do not take a room_participants seat. Track their
 // authenticated read-only presence separately so the Host can still see who
