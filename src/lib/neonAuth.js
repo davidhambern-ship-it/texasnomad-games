@@ -9,8 +9,7 @@ function currentAuthOrigin() {
   const sameOrigin =
     host.endsWith('.vercel.app') ||
     host === 'texasnomadgames.com' ||
-    host === 'www.texasnomadgames.com' ||
-    host.endsWith('.up.railway.app');
+    host === 'www.texasnomadgames.com';
   return sameOrigin ? window.location.origin : 'https://auth.texasnomadgames.com';
 }
 
