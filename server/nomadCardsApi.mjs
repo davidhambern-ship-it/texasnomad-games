@@ -19,7 +19,7 @@ import * as G from '../src/lib/nomadCards/game.js';
 
 const MAX_PLAYERS = 10;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLORS = ['#ffd23f', '#ff5f6d', '#3ec5ff', '#3ef08a', '#c77dff', '#ff9f1c', '#f15bb5', '#e5e7eb', '#7ae0d6', '#ffb4a2'];
 const CPU_NAMES = [['Tank', 3], ['Carlos', 5], ['Lemonade', 6], ['Violet', 7], ['Dexter', 8], ['Berna', 9], ['Rio', 4], ['Duke', 6], ['Mabel', 7]];
 const TARGETS = [0, 100, 250, 500], TURNS = [20, 30, 45, 60];
@@ -144,8 +144,8 @@ export function createNomadCardsApi({
 
   const newCode = async (hostAccountId) => {
     for (let i = 0; i < 50; i++) {
-      const c = Array.from(
-        { length: 5 },
+      const c = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
 
