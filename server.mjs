@@ -1319,8 +1319,9 @@ function publicTngNameFromRecord(record, fallback = 'Player') {
 }
 
 async function resolveAuthenticatedTngAccount(req) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
+  const authorization = String(req.headers.authorization || '').trim();
+  const token = authorization.replace(/^Bearer\\s+/i, '').trim();
+  if (!token) {
     return {
       ok: false,
       status: 401,
@@ -1328,77 +1329,56 @@ async function resolveAuthenticatedTngAccount(req) {
     };
   }
 
-  const response = await fetch(`${TNG_API_ORIGIN}/profile`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status,
-      payload: payload?.error
-        ? payload
-        : { error: { code: 'PROFILE_LOOKUP_FAILED', message: 'TNG could not identify this signed-in account.' } },
-    };
-  }
-
-  const profile = payload?.profile || {};
-  let accountId =
-    profile.id ||
-    profile.accountId ||
-    profile.account_id ||
-    payload.accountId ||
-    payload.account_id ||
-    null;
-
-  if (!accountId) {
-    const handle = String(
-      profile.handle ||
-      profile.normalizedHandle ||
-      profile.normalized_handle ||
-      ''
-    ).replace(/^@/, '').trim().toLowerCase();
-
-    if (handle) {
-      const { rows } = await bffPool.query(
-        `select account_id from public.player_profiles
-         where normalized_handle = $1 or lower(handle) = $1
-         limit 1`,
-        [handle],
-      );
-      accountId = rows[0]?.account_id || null;
-    }
-  }
-
-  if (!accountId || !isUuid(accountId)) {
-    return {
-      ok: false,
-      status: 404,
-      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'Create your TNG profile first.' } },
-    };
-  }
-
+  // Validate the opaque Better Auth session locally in Supabase. This replaces
+  // the old remote Neon /profile lookup while preserving the existing TNG
+  // account UUIDs and their player-profile relationships.
   const { rows } = await bffPool.query(
-    `select id, lower(email) as email
-     from public.accounts
-     where id = $1::uuid
-     limit 1`,
-    [accountId],
+    `
+      select
+        a.id,
+        lower(a.email) as email,
+        a.auth_subject,
+        u.name as auth_name,
+        u.email_verified
+      from neon_auth.session s
+      join neon_auth."user" u on u.id = s."userId"
+      join public.accounts a on a.auth_subject = u.id::text
+      where s.token = $1
+        and s."expiresAt" > now()
+      limit 1
+    `,
+    [token],
   );
 
   const account = rows[0] || null;
   if (!account) {
     return {
       ok: false,
-      status: 404,
-      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'TNG account record was not found.' } },
+      status: 401,
+      payload: { error: { code: 'AUTH_REQUIRED', message: 'Your session has expired. Sign in again.' } },
     };
   }
+
+  const profileResult = await bffPool.query(
+    `select display_name, handle, normalized_handle
+     from public.player_profiles
+     where account_id = $1::uuid
+     limit 1`,
+    [account.id],
+  );
+  const stored = profileResult.rows[0] || {};
+  const profile = {
+    id: account.id,
+    accountId: account.id,
+    account_id: account.id,
+    email: account.email,
+    name: account.auth_name || account.email.split('@')[0],
+    displayName: stored.display_name || account.auth_name || account.email.split('@')[0],
+    display_name: stored.display_name || null,
+    handle: stored.handle || '',
+    normalizedHandle: stored.normalized_handle || '',
+    normalized_handle: stored.normalized_handle || '',
+  };
 
   return { ok: true, account, profile };
 }
