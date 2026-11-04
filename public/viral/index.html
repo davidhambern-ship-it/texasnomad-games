@@ -1984,7 +1984,7 @@ function openSetup(){
       setupTab='host'; draw();};
     $('tJoin').onclick=()=>{sync(); setupTab='join'; draw();};
     if(setupTab==='join'){
-      $('jGo').onclick=async()=>{const c=($('jCode').value||'').trim().toUpperCase(); if(!/^[A-Z]{4}$/.test(c)){$('jMsg').textContent='Codes start with TN and have 4 more characters.';return;}
+      $('jGo').onclick=async()=>{const c=($('jCode').value||'').trim().toUpperCase(); if(!/^TN[A-Z0-9]{4}$/.test(c)){$('jMsg').textContent='Codes start with TN and have 4 more characters.';return;}
         $('jMsg').textContent='Joining…'; const err=await joinRoom(c); if(err){$('jMsg').textContent=err;return;} try{history.replaceState(null,'',location.pathname+'?room='+c);}catch(e){}
         el.innerHTML=`<div class="setup"><h1>Room ${esc(c)}</h1><div class="info">Waiting for the host’s game… pick your seat when it appears.</div><div id="seatPick"></div></div>`;};
       return;
