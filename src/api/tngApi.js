@@ -1,4 +1,3 @@
-import { getNeonAuthToken } from '@/lib/neonAuth';
 import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl, tngWebSocketUrl } from '@/lib/tngServiceOrigin';
 
@@ -80,19 +79,14 @@ async function request(path, {
 } = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
-    const token = await getNeonAuthToken().catch(() => null);
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    } else {
-      const guest = getStoredGuestIdentity();
-      if (!guest?.token) {
-        throw new TngApiError('Choose a player name to continue as a guest, or sign in to TNG.', {
-          code: 'AUTH_REQUIRED',
-          status: 401,
-        });
-      }
-      headers['X-TNG-Guest-Token'] = guest.token;
+    const guest = getStoredGuestIdentity();
+    if (!guest?.token) {
+      throw new TngApiError('Choose a player name to continue.', {
+        code: 'GUEST_REQUIRED',
+        status: 401,
+      });
     }
+    headers['X-TNG-Guest-Token'] = guest.token;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (displayId) headers['X-TNG-Display-Id'] = displayId;
@@ -111,18 +105,6 @@ async function request(path, {
 
   const allowRetry = method === 'GET' || method === 'HEAD';
   let response = await fetchWithRecovery(url, fetchOptions, { allowRetry });
-
-  // Better Auth session tokens are opaque. If a session expires between the
-  // initial lookup and API request, fetch the current session once before
-  // treating the user as signed out.
-  if (authenticated && headers.Authorization && response.status === 401) {
-    const freshToken = await getNeonAuthToken({ forceRefresh: true }).catch(() => null);
-    if (freshToken) {
-      headers.Authorization = `Bearer ${freshToken}`;
-
-      response = await fetchWithRecovery(url, fetchOptions, { allowRetry });
-    }
-  }
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
