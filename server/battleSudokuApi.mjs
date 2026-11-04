@@ -247,15 +247,16 @@ export function createBattleSudokuApi({
       }
       if (req.method === 'POST' && path === '/rooms') {
         const hostIdentity = await resolveIdentity(req);
-        if (!hostIdentity?.accountId) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting BattleSudoku.');
+        if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting BattleSudoku.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
-        const code = await newCode(hostIdentity.accountId);
+        const code = await newCode(hostIdentity.accountId || null);
         const room = {
           code,
           hostToken: newToken(),
-          hostAccountId: hostIdentity.accountId,
+          hostAccountId: hostIdentity.accountId || null,
+          hostGuestId: hostIdentity.guestId || null,
           hostName: hostIdentity.publicName || 'Host',
           players: [],
           game: null,
@@ -283,8 +284,8 @@ export function createBattleSudokuApi({
 
       const isHost = Boolean(
         tokenClaimsHost &&
-        requestIdentity?.accountId &&
-        (!room.hostAccountId || String(room.hostAccountId) === String(requestIdentity.accountId))
+        ((requestIdentity?.accountId && String(room.hostAccountId || '') === String(requestIdentity.accountId)) ||
+          (requestIdentity?.guestId && String(room.hostGuestId || '') === String(requestIdentity.guestId)))
       );
 
       const findMe = () => (
@@ -315,12 +316,13 @@ export function createBattleSudokuApi({
         room.updatedAt = t;
         if (body.action === 'join') {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining BattleSudoku.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining BattleSudoku.');
           }
 
           let me = findMe() || room.players.find(
-            p => String(p.accountId || '') === String(identity.accountId),
+            p => (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId)),)
           ) || null;
           let issued;
 
@@ -335,7 +337,8 @@ export function createBattleSudokuApi({
             }
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               color: nextColor(room),
@@ -353,10 +356,12 @@ export function createBattleSudokuApi({
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const me = findMe();
-        if (me?.accountId) {
+        if (me?.accountId || me?.guestId) {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || String(identity.accountId) !== String(me.accountId)) {
-            throw err(403, 'IDENTITY_MISMATCH', 'That BattleSudoku seat belongs to another TNG account.');
+          const sameAccount = me.accountId && String(identity?.accountId || '') === String(me.accountId);
+          const sameGuest = me.guestId && String(identity?.guestId || '') === String(me.guestId);
+          if (!sameAccount && !sameGuest) {
+            throw err(403, 'IDENTITY_MISMATCH', 'That BattleSudoku seat belongs to another player identity.');
           }
         }
         const result = act(room, isHost ? 'host' : me, body, t);
