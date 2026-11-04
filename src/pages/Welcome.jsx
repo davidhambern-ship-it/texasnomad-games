@@ -67,8 +67,8 @@ const KNOW_CARDS = [
   },
   {
     icon: <UserCircle2 className="w-5 h-5" />,
-    title: 'One TNG Profile',
-    text: 'Your TNG profile follows your games and keeps your play history and stats together.',
+    title: 'Play As A Guest',
+    text: 'Choose a display name and jump in. No account, password, or sign-in is needed.',
     color: '#FFD700',
   },
   {
