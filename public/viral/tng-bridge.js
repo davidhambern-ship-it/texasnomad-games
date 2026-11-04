@@ -262,11 +262,18 @@
 
                   if (payload.role !== 'host') {
                     if (typeof payload.seat === 'string' && payload.seat) {
-                      const token = await getHostAuthToken().catch(() => '');
+                      let guestToken = '';
+                      try {
+                        guestToken = String(
+                          window.localStorage.getItem('tng_guest_token') || '',
+                        ).trim();
+                      } catch {}
+
+                      const token = guestToken || await getHostAuthToken().catch(() => '');
                       if (!token) {
-                        throw new Error('Sign in to TNG before taking a VIRAL seat.');
+                        throw new Error('Choose a player name to join as a guest, or sign in to TNG.');
                       }
-                      payload._tngPlayerAuth = { token };
+                      payload._tngPlayerAuth = { token, guest: Boolean(guestToken) };
                     }
                     return originalPresence(payload);
                   }
