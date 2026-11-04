@@ -1,4 +1,5 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl, tngWebSocketUrl } from '@/lib/tngServiceOrigin';
 
 const API_BASE = tngServiceUrl('/tng-api');
@@ -80,13 +81,18 @@ async function request(path, {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
     const token = await getNeonAuthToken();
-    if (!token) {
-      throw new TngApiError('Your TNG session is missing.', {
-        code: 'AUTH_REQUIRED',
-        status: 401,
-      });
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    } else {
+      const guest = getStoredGuestIdentity();
+      if (!guest?.token) {
+        throw new TngApiError('Choose a player name to continue as a guest, or sign in to TNG.', {
+          code: 'AUTH_REQUIRED',
+          status: 401,
+        });
+      }
+      headers['X-TNG-Guest-Token'] = guest.token;
     }
-    headers.Authorization = `Bearer ${token}`;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
   if (displayId) headers['X-TNG-Display-Id'] = displayId;
@@ -109,7 +115,7 @@ async function request(path, {
   // Neon Auth JWTs are intentionally short-lived. If a request happens on the
   // edge of a token refresh, fetch one fresh token and retry once before
   // treating the user as signed out.
-  if (authenticated && response.status === 401) {
+  if (authenticated && headers.Authorization && response.status === 401) {
     const freshToken = await getNeonAuthToken({ forceRefresh: true }).catch(() => null);
     if (freshToken) {
       headers.Authorization = `Bearer ${freshToken}`;
