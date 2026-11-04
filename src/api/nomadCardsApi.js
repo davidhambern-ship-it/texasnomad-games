@@ -6,7 +6,7 @@ export const NC_API_BASE = tngServiceUrl('/nc-api');
 export class NCApiError extends Error {
   constructor(message, status = 0, code = 'ERROR') { super(message); this.name = 'NCApiError'; this.status = status; this.code = code; }
 }
-async function call(path, { method = 'GET', body, token, forceRefresh = false } = {}) {
+async function call(path, { method = 'GET', body, token } = {}) {
   const headers = { Accept: 'application/json' };
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (token) headers['X-NC-Token'] = token;
