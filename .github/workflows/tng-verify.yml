@@ -34,14 +34,6 @@ jobs:
       - name: Install locked dependencies
         run: npm ci --legacy-peer-deps
 
-      - name: Apply compatible dependency security updates on migration PR
-        if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
-        run: timeout 90s npm audit fix --package-lock-only || true
-
-      - name: Reinstall updated lockfile
-        if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
-        run: npm ci --legacy-peer-deps
-
       - name: Refresh browser compatibility data
         if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
         run: npx --yes update-browserslist-db@latest
