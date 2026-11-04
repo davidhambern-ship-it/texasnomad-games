@@ -58,7 +58,7 @@ The token goes in `X-NC-Token`.
 | Route | Purpose |
 |---|---|
 | `GET /nc-api/health` | Health check |
-| `POST /nc-api/rooms` | Host creates a room (signed-in) |
+| `POST /nc-api/rooms` | Host creates a room (guest display name; no account) |
 | `GET /nc-api/rooms/:code` | Room view for the token holder |
 | `POST /nc-api/rooms/:code/action` | Host and player actions (below) |
 
