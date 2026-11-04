@@ -80,7 +80,7 @@ export function NCPlayer({ code, name, identityReady = false, onExit }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 250); return () => clearInterval(t); }, []);
   const join = async () => {
-    if (!identityReady) { setErr('Loading your TNG player profile…'); return; }
+    if (!identityReady) { setErr('Loading your player name…'); return; }
     setBusy(true); setErr(''); ncSfx.unlock();
     try { const d = await ncApi.action(code, seat?.token, 'join'); const s = { token: d.token, playerId: d.playerId }; ncSeat.set(code, s); setSeat(s); apply(d); }
     catch (e) { setErr(e.message); } finally { setBusy(false); }
