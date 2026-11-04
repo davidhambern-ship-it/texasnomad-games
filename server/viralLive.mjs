@@ -25,7 +25,7 @@ const MAX_FRAME = 16 * 1024;         // VIRAL snapshots are kept under ~4 KB
 const MAX_PEERS = 40;                // 12 seats + watchers
 const MAX_MSGS_PER_10S = 120;        // per connection
 const KEEP_STATE_MS = 6 * 60 * 60 * 1000; // remember the last snapshot of an empty room for 6 hours
-const ROOM_RE = /^viral-[a-z]{4}$/;
+const ROOM_RE = /^viral-tn[a-z0-9]{4}$/;
 const TOPICS = new Set(['state', 'act']);
 
 export function createViralLive({
