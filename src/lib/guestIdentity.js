@@ -20,7 +20,7 @@ export function getStoredGuestIdentity() {
 }
 
 export async function createGuestIdentity(name) {
-  const cleanName = String(name || '').replace(/[\\u0000-\\u001f<>]/g, '').trim().slice(0, 32);
+  const cleanName = String(name || '').replace(/[\\u0000-\u001f<>]/g, '').trim().slice(0, 32);
   if (!cleanName) throw new Error('Enter a player name to continue.');
 
   const response = await fetch(tngServiceUrl('/tng-guest/identity'), {
