@@ -64,6 +64,7 @@ const [
   guestAccount,
   dbSchema,
   pairing,
+  dbClient,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -107,6 +108,7 @@ const [
   text('server/auth/require-account.js'),
   text('server/db/schema.js'),
   text('server/pairing.js'),
+  text('server/db/client.js'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -306,8 +308,8 @@ ok(
 
 ok(
   'Postgres SSL behavior pinned securely',
-  server.includes("url.searchParams.set('sslmode', 'verify-full')") &&
-    server.includes('normalizePgConnectionString(process.env.DATABASE_URL)'),
+  dbClient.includes("url.searchParams.set('sslmode', 'verify-full')") &&
+    dbClient.includes('connectionString: normalizePgConnectionString(process.env.DATABASE_URL)'),
   'Postgres connection string is not explicitly pinned to verify-full SSL',
 );
 
