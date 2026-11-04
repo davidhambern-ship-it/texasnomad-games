@@ -1,4 +1,5 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 // Client for BattleSudoku party rooms (server.mjs → server/battleSudokuApi.mjs)
 export const BS_API_BASE = tngServiceUrl('/bs-api');
@@ -13,6 +14,10 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  else {
+    const guest = getStoredGuestIdentity();
+    if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
+  }
 
   let res;
   try { res = await fetch(`${BS_API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }
