@@ -192,7 +192,8 @@ ok(
   server.includes('async function verifyViralHostAuthorization') &&
     server.includes('if (!resolved.ok) return null;') &&
     viralLiveModule.includes('if (!accountId || roomOwnedByAnotherAccount)') &&
-    rodeoLiveModule.includes('if (!hostIdentity?.accountId)'),
+    rodeoLiveModule.includes('if (!hostIdentity?.accountId && !hostIdentity?.guestId)') &&
+    rodeoLiveModule.includes('savedRoom.hostGuestId'),
   'A guest player identity can reach a host authorization path',
 );
 
