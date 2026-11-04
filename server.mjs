@@ -1095,7 +1095,21 @@ async function resolveViralPlayerIdentity({ token }) {
     },
   }).catch(() => null);
 
-  return resolved?.ok ? resolved.identity : null;
+  if (resolved?.ok) return resolved.identity;
+
+  // Guests may occupy player seats, but this identity does not grant host
+  // permissions. Host authorization continues through the Neon/device check.
+  const guest = verifyGuestIdentity(cleanToken, {
+    secret: process.env.TNG_GUEST_TOKEN_SECRET,
+  });
+  if (!guest) return null;
+
+  return {
+    guestId: guest.guestId,
+    publicName: guest.publicName,
+    isGuest: true,
+    accountId: null,
+  };
 }
 
 // One public room-code namespace across every TNG game. Standalone games
