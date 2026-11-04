@@ -24,10 +24,11 @@ export async function onRequest(context) {
   headers.delete("host");
   headers.delete("content-length");
 
+  const requestBody = ["GET", "HEAD"].includes(request.method) ? undefined : await request.arrayBuffer();
   const upstreamRequest = new Request(upstreamUrl, {
     method: request.method,
     headers,
-    body: ["GET", "HEAD"].includes(request.method) ? undefined : request.body,
+    body: requestBody,
     redirect: "manual",
   });
 
