@@ -63,6 +63,7 @@ export default function OutGame() {
   const [awaitingPass, setAwaitingPass] = useState(false);
   const [drawnThisTurn, setDrawnThisTurn] = useState(false);
   const [winner, setWinner] = useState(null);
+  const [pendingOut, setPendingOut] = useState(null);
   const [wildChoice, setWildChoice] = useState(null);
   const [unoCalled, setUnoCalled] = useState([]);
   const current = hands[turn] || [];
@@ -76,7 +77,7 @@ export default function OutGame() {
     while (first.color === 'wild') { pile.unshift(first); first = pile.pop(); }
     setDeck(pile); setHands(dealt); setDiscard([first]); setActiveColor(first.color);
     setTurn(0); setDirection(1); setWinner(null); setDrawnThisTurn(false);
-    setUnoCalled([]); setMessage('Player 1 starts. Match the color or number.'); setStarted(true); setAwaitingPass(true);
+    setUnoCalled([]); setPendingOut(null); setMessage('Player 1 starts. Match the color or number.'); setStarted(true); setAwaitingPass(true);
   };
   const nextPlayer = (steps = 1, nextHands = hands, nextUno = unoCalled) => {
     const next = (turn + direction * steps + playerCount * 10) % playerCount;
@@ -85,10 +86,21 @@ export default function OutGame() {
     setUnoCalled(nextUno);
   };
   const callOut = () => {
-    if (current.length === 1) {
+    if (current.length === 1 && pendingOut === turn) {
       setUnoCalled(prev => prev.includes(turn) ? prev : [...prev, turn]);
+      setPendingOut(null);
       setMessage(`${names[turn]} called OUT! Nice save.`);
+      nextPlayer();
     }
+  };
+  const continueWithoutCalling = () => {
+    if (pendingOut !== turn) return;
+    const penalty = drawFrom(deck, discard, 2);
+    setDeck(penalty.deck); setDiscard(penalty.discard);
+    setHands(prev => prev.map((hand, i) => i === turn ? [...hand, ...penalty.drawn] : hand));
+    setPendingOut(null);
+    setMessage(`${names[turn]} missed the OUT! call and drew two cards.`);
+    nextPlayer();
   };
   const drawCard = () => {
     const result = drawFrom(deck, discard);
@@ -109,11 +121,10 @@ export default function OutGame() {
     setActiveColor(card.color === 'wild' ? activeColor : card.color);
     if (remaining.length === 0) { setWinner(turn); setMessage(`${names[turn]} is OUT! You win!`); return; }
     if (remaining.length === 1 && !unoCalled.includes(turn)) {
-      const penalty = drawFrom(deck, [...discard, card], 2);
-      setDeck(penalty.deck); setDiscard(penalty.discard);
-      newHands[turn] = [...remaining, ...penalty.drawn];
-      setHands([...newHands]);
-      setMessage(`${names[turn]} forgot to call OUT! Two-card penalty.`);
+      setPendingOut(turn);
+      setMessage(`${names[turn]} has one card left. Call OUT! now!`);
+      if (card.color === 'wild') setWildChoice(card.value);
+      return;
     }
     if (card.color === 'wild') { setWildChoice(card.value); return; }
     let steps = card.value === 'Skip' || card.value === 'Draw Two' ? 2 : 1;
@@ -128,6 +139,7 @@ export default function OutGame() {
   };
   const chooseWildColor = (color) => {
     setActiveColor(color); setWildChoice(null);
+    if (pendingOut === turn) return;
     const steps = topCard?.value === 'Wild Draw Four' ? 2 : 1;
     if (steps === 2) {
       const target = (turn + direction + playerCount) % playerCount;
@@ -155,9 +167,9 @@ export default function OutGame() {
       </section> : <section>
         <div className="mb-5 grid grid-cols-2 gap-3 sm:grid-cols-4">{names.slice(0,playerCount).map((name,i) => <div key={i} className={`rounded-xl border p-3 ${i===turn?'border-orange-400 bg-orange-400/15':'border-white/10 bg-white/5'}`}><div className="font-bold">{name || `Player ${i+1}`}</div><div className="text-xs text-white/50">{hands[i]?.length || 0} cards {i===turn?'· CURRENT TURN':''}</div></div>)}</div>
         <div className="mb-5 rounded-2xl border border-white/10 bg-[#111827] p-5 text-center"><div className="mb-2 text-xs uppercase tracking-widest text-white/50">Table · Active color <span style={{color:COLOR_HEX[activeColor]}}>{activeColor}</span></div><div className="flex items-center justify-center gap-6"><div className="rounded-xl border-4 border-white bg-white px-6 py-8 text-3xl font-black" style={{color:topCard?.color==='wild'?'#111':COLOR_HEX[topCard?.color]}}>{topCard?.value}</div><div className="text-left text-sm text-white/60">Draw pile<br/><button onClick={drawCard} disabled={awaitingPass || drawnThisTurn || !!winner} className="mt-2 rounded-lg bg-blue-600 px-4 py-2 font-bold text-white disabled:opacity-40">DRAW 1</button></div></div></div>
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="text-lg font-bold">{names[turn] || `Player ${turn+1}`}'s hand</div><button onClick={callOut} disabled={current.length!==1 || awaitingPass} className="rounded-lg bg-orange-500 px-4 py-2 font-black text-black disabled:opacity-40">CALL OUT!</button></div>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3"><div className="text-lg font-bold">{names[turn] || `Player ${turn+1}`}'s hand</div>{pendingOut === turn && <div className="flex gap-2"><button onClick={callOut} className="rounded-lg bg-orange-500 px-4 py-2 font-black text-black">CALL OUT!</button><button onClick={continueWithoutCalling} className="rounded-lg border border-white/30 px-4 py-2">I FORGOT</button></div>}</div>
         {awaitingPass ? <div className="rounded-xl border border-orange-400/40 bg-orange-400/10 p-5 text-center"><p className="mb-3 text-lg font-bold">Pass the device to {names[turn] || `Player ${turn+1}`}</p><button onClick={() => setAwaitingPass(false)} className="rounded-lg bg-orange-500 px-6 py-3 font-black text-black">I'M READY</button></div> : <div className="flex flex-wrap justify-center gap-2">{current.map(card => <Card key={card.id} card={card} disabled={!!winner || !(card.color==='wild'||card.color===activeColor||card.value===topCard?.value)} onClick={() => playCard(card)} />)}</div>}
-        {drawnThisTurn && !awaitingPass && <button onClick={finishTurn} className="mt-4 w-full rounded-lg border border-white/20 p-3">PASS TURN</button>}
+        {drawnThisTurn && !awaitingPass && !pendingOut && <button onClick={finishTurn} className="mt-4 w-full rounded-lg border border-white/20 p-3">PASS TURN</button>}
         {wildChoice && <div className="mt-4 rounded-xl bg-white/10 p-4 text-center"><p className="mb-3 font-bold">Choose the next color</p><div className="flex justify-center gap-3">{COLORS.map(color => <button key={color} onClick={() => chooseWildColor(color)} className="h-12 w-12 rounded-full border-2 border-white" style={{background:COLOR_HEX[color]}} aria-label={color}/>)}</div></div>}
         <p className="mt-5 rounded-lg bg-white/5 p-3 text-center text-sm text-white/65">{message}</p>
         {winner !== null && <div className="mt-5 rounded-2xl border-2 border-orange-400 bg-orange-400/10 p-6 text-center"><div className="text-4xl font-black text-orange-400">{names[winner]} IS OUT!</div><p className="mt-2 text-white/60">The table has a winner.</p><button onClick={reset} className="mt-4 rounded-lg bg-orange-500 px-6 py-3 font-black text-black">PLAY AGAIN</button></div>}
