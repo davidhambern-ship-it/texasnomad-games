@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import { getTngProfile } from '@/lib/tngProfile';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { isNeonStaging } from '@/lib/neonAuth';
 
 const Home = lazy(() => import('@/pages/Home'));
@@ -143,7 +144,7 @@ const AuthenticatedApp = () => {
 
   let hasGuestIdentity = false;
   try {
-    hasGuestIdentity = Boolean(localStorage.getItem('tng_guest_token'));
+    hasGuestIdentity = Boolean(getStoredGuestIdentity());
   } catch {}
 
   const isGuestEntryRoute =
