@@ -112,8 +112,8 @@ async function request(path, {
   const allowRetry = method === 'GET' || method === 'HEAD';
   let response = await fetchWithRecovery(url, fetchOptions, { allowRetry });
 
-  // Neon Auth JWTs are intentionally short-lived. If a request happens on the
-  // edge of a token refresh, fetch one fresh token and retry once before
+  // Better Auth session tokens are opaque. If a session expires between the
+  // initial lookup and API request, fetch the current session once before
   // treating the user as signed out.
   if (authenticated && headers.Authorization && response.status === 401) {
     const freshToken = await getNeonAuthToken({ forceRefresh: true }).catch(() => null);
