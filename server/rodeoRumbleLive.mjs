@@ -185,24 +185,36 @@ export function createRodeoRumbleLive({
             return;
           }
           const identity = await resolvePlayerIdentity({ token: msg.authToken }).catch(() => null);
-          if (!identity?.accountId || !identity?.publicName) {
-            send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Rodeo Rumble.' });
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Choose a guest name or sign in to TNG before joining Rodeo Rumble.' });
             ws.close(4000, 'auth required');
             return;
           }
 
+          const identityKey = identity.accountId
+            ? `account:${identity.accountId}`
+            : `guest:${identity.guestId}`;
           const seatByToken = msg.token
             ? [...room.players.values()].find((player) => player.token === msg.token)
             : null;
-          const seatByAccount = [...room.players.values()].find(
-            (player) => String(player.accountId || '') === String(identity.accountId),
+          const seatByIdentity = [...room.players.values()].find((player) =>
+            player.identityKey === identityKey ||
+            (identity.accountId && String(player.accountId || '') === String(identity.accountId)) ||
+            (identity.guestId && String(player.guestId || '') === String(identity.guestId)),
           );
-          me = seatByToken || seatByAccount || null;
-          if (me && String(me.accountId || '') !== String(identity.accountId)) {
-            send(ws, { t: 'error', code: 'IDENTITY_MISMATCH', message: 'That Rodeo Rumble seat belongs to another TNG account.' });
+          me = seatByToken || seatByIdentity || null;
+
+          const identityMatchesSeat = !me || (
+            identity.accountId
+              ? String(me.accountId || '') === String(identity.accountId)
+              : String(me.guestId || '') === String(identity.guestId)
+          );
+          if (!identityMatchesSeat) {
+            send(ws, { t: 'error', code: 'IDENTITY_MISMATCH', message: 'That Rodeo Rumble seat belongs to another player identity.' });
             ws.close(4000, 'identity mismatch');
             return;
           }
+
           if (!me) {
             if (room.players.size >= MAX_PLAYERS) {
               send(ws, { t: 'error', code: 'FULL', message: 'This rumble is full (8 players).' });
@@ -212,7 +224,9 @@ export function createRodeoRumbleLive({
             me = {
               id: newId(),
               token: newToken(),
-              accountId: String(identity.accountId),
+              identityKey,
+              accountId: identity.accountId ? String(identity.accountId) : null,
+              guestId: identity.guestId ? String(identity.guestId) : null,
               name: clean(identity.publicName),
               fighter: null,
               ready: false,
@@ -221,6 +235,7 @@ export function createRodeoRumbleLive({
             };
             room.players.set(me.id, me);
           } else {
+            me.identityKey = identityKey;
             me.name = clean(identity.publicName);
             if (!msg.token || msg.token !== me.token) me.token = newToken();
           }
