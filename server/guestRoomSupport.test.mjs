@@ -74,7 +74,7 @@ test('See That allows a signed guest to host and protects host controls', async 
   const api = createSeeThatApi(sharedOptions());
   const created = await call(api, 'POST', '/st-api/rooms', {}, { 'x-tng-guest-token': 'signed-host' });
   assert.equal(created.status, 200);
-  assert.ok(created.payload.roomCode);
+  assert.match(created.payload.roomCode, /^TN[A-Z0-9]{4}$/);
   assert.ok(created.payload.token);
 
   const hostView = await call(
@@ -107,7 +107,7 @@ test('Word Wrangler allows signed guests to create and join a room', async () =>
     { 'x-tng-guest-token': 'signed-host' },
   );
   assert.equal(created.status, 200);
-  assert.ok(created.payload.roomCode);
+  assert.match(created.payload.roomCode, /^TN[A-Z0-9]{4}$/);
   assert.ok(created.payload.token);
 
   const joined = await call(
@@ -132,7 +132,7 @@ test('Battle Sudoku allows a signed guest to host and join without granting anot
     { 'x-tng-guest-token': 'signed-host' },
   );
   assert.equal(created.status, 200);
-  assert.ok(created.payload.roomCode);
+  assert.match(created.payload.roomCode, /^TN[A-Z0-9]{4}$/);
   assert.ok(created.payload.token);
 
   const hostView = await call(
