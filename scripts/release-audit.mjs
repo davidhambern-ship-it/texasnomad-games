@@ -200,7 +200,7 @@ ok(
   'public guest onboarding',
   welcome.includes('createGuestIdentity(guestName)') &&
     app.includes("'/welcome'") &&
-    app.includes("location.pathname.startsWith('/games/') && hasGuestIdentity"),
+    app.includes("location.pathname === '/games'") && app.includes("location.pathname.startsWith('/games/')") && app.includes('hasGuestIdentity'),
   'Guests must be able to create a temporary identity before opening game pages',
 );
 
