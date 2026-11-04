@@ -92,7 +92,7 @@ function isAllowedBrowserOrigin(origin) {
   let host = '';
   try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
   const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
-    .map((value) => String(value || '').replace(/^https?:\\/\\//i, '').split('/')[0].toLowerCase())
+    .map((value) => String(value || '').replace('https://', '').replace('http://', '').split('/')[0].toLowerCase())
     .filter(Boolean);
   return vercelHosts.includes(host);
 }
