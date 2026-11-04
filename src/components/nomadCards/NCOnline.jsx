@@ -25,7 +25,7 @@ function useRoom(code, token, onGone) {
   return { data, offset, error, apply };
 }
 const TNG_PUBLIC_ORIGIN = String((import.meta.env && import.meta.env.VITE_TNG_PUBLIC_ORIGIN) || 'https://www.texasnomadgames.com').replace(/\/+$/, '');
-const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, '')}/join`;
+const joinUrlFor = (roomCode) => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, "")}/join/${encodeURIComponent(roomCode)}`;
 
 export function NCHost({ onExit }) {
   const [seat, setSeat] = useState(() => { try { return JSON.parse(localStorage.getItem('nc_host') || 'null'); } catch { return null; } });
@@ -52,7 +52,7 @@ export function NCHost({ onExit }) {
       {data.room.game ? <>
         <div className="nc-host-controls"><span>OUT! · Table {seat.code}</span><button type="button" className="nc-btn ghost small" onClick={() => { if (window.confirm('End this game?')) act('lobby'); }}>Back to lobby</button></div>
         <NCHand v={data.room.game} act={act} now={now + offset} onExit={exit} isHost onNewGame={() => act('start')} onLobby={() => act('lobby')} />
-      </> : <NCTable data={data} isHost act={act} offset={offset} onExit={exit} joinUrl={joinUrlFor()} />}
+      </> : <NCTable data={data} isHost act={act} offset={offset} onExit={exit} joinUrl={joinUrlFor(seat.code)} />}
       {err && <div className="nc-toast bad">{err}</div>}
     </>
   );
@@ -61,7 +61,7 @@ export function NCHost({ onExit }) {
 export function NCDisplay({ code }) {
   const { data, offset, error } = useRoom(code, null);
   if (!data) return <div className="nc-wrap"><div className="nc-panel" style={{ textAlign: 'center' }}>{error || `Connecting to table ${code}…`}</div></div>;
-  return <NCTable data={data} isHost={false} act={() => {}} offset={offset} onExit={() => {}} joinUrl={joinUrlFor()} />;
+  return <NCTable data={data} isHost={false} act={() => {}} offset={offset} onExit={() => {}} joinUrl={joinUrlFor(code)} />;
 }
 
 export function NCPlayer({ code, name, identityReady = false, onExit }) {
