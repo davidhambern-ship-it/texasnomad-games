@@ -299,16 +299,17 @@ export function createWordWranglerApi({
       if (req.method === 'POST' && path === '/rooms') {
         await readBody(req);
         const identity = await resolveIdentity(req);
-        if (!identity?.accountId || !identity?.publicName) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting Word Wrangler.');
+        if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting Word Wrangler.');
         }
         const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode(identity.accountId);
+        const code = await newCode(identity.accountId || null);
         const host = {
           id: newId(),
-          accountId: identity.accountId,
+          accountId: identity.accountId || null,
+          guestId: identity.guestId || null,
           name,
           token: newToken(),
           isAI: false,
@@ -352,12 +353,15 @@ export function createWordWranglerApi({
         let issued;
         if (body.action === 'join') {
           const identity = await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining Word Wrangler.');
           }
 
           me = me || room.players.find(
-            p => !p.isAI && String(p.accountId || '') === String(identity.accountId),
+            p => !p.isAI && (
+              (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId))
+            ),
           ) || null;
 
           if (!me) {
@@ -372,7 +376,8 @@ export function createWordWranglerApi({
             }
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               isAI: false,
