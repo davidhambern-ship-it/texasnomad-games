@@ -4960,16 +4960,21 @@ async function verifyDominoHostRequest(req, row = null) {
     deviceId,
   }).catch(() => null);
 
-  if (!verified) return null;
-
-  if (
-    row?.host_account_id &&
-    String(row.host_account_id) !== String(verified.accountId)
-  ) {
-    return null;
+  if (verified?.accountId) {
+    if (
+      row?.host_account_id &&
+      String(row.host_account_id) !== String(verified.accountId)
+    ) return null;
+    return verified;
   }
 
-  return verified;
+  const guest = await resolveStandaloneGameIdentity(req).catch(() => null);
+  if (!guest?.guestId) return null;
+
+  const storedGuestId = String(row?.game_state?.players?.[0]?.guestId || '');
+  if (row && (!storedGuestId || storedGuestId !== String(guest.guestId))) return null;
+
+  return guest;
 }
 
 const DOMINO_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -5132,7 +5137,7 @@ async function handleDominoApi(req, res) {
       kind: 'standalone',
       joinPath: `/games/dominoes?room=${encodeURIComponent(roomCode)}`,
       spectatePath: `/games/dominoes?display=${encodeURIComponent(roomCode)}`,
-      hostAccountId: verifiedHost.accountId,
+      hostAccountId: verifiedHost.accountId || null,
       ttlMs: DOMINO_ROOM_TTL_MS,
     });
 
@@ -5157,7 +5162,8 @@ async function handleDominoApi(req, res) {
             seat === 0
               ? {
                   ...player,
-                  accountId: verifiedHost.accountId,
+                  accountId: verifiedHost.accountId || null,
+                  guestId: verifiedHost.guestId || null,
                   playerName: hostPublicName,
                   isHost: true,
                   isAI: false,
@@ -5182,7 +5188,7 @@ async function handleDominoApi(req, res) {
           id,
           roomCode,
           JSON.stringify(gameState),
-          verifiedHost.accountId,
+          verifiedHost.accountId || null,
           hashDominoToken(hostToken),
         ],
       );
@@ -5208,15 +5214,13 @@ async function handleDominoApi(req, res) {
   }
 
   if (req.method === 'POST' && pathname === '/domino-api/join') {
-    const identityResult = await resolveAuthenticatedTngIdentity(req);
-    if (!identityResult.ok || !identityResult.identity?.accountId) {
-      sendJson(res, identityResult.status || 401, identityResult.payload || {
-        error: { code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Dominoes.' },
+    const identity = await resolveStandaloneGameIdentity(req).catch(() => null);
+    if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+      sendJson(res, 401, {
+        error: { code: 'AUTH_REQUIRED', message: 'Choose a guest name or sign in to TNG before joining Dominoes.' },
       });
       return;
     }
-
-    const identity = identityResult.identity;
     const body = await readJsonBody(req).catch(() => null);
     const roomCode = String(body?.roomCode || '').trim().toUpperCase();
     const requestedSeat = Number(body?.seat);
@@ -5250,7 +5254,11 @@ async function handleDominoApi(req, res) {
         return;
       }
 
-      if (String(row.host_account_id || '') === String(identity.accountId)) {
+      const state = cleanDominoGameState(row.game_state, row.room_code);
+      if (
+        (identity.accountId && String(row.host_account_id || '') === String(identity.accountId)) ||
+        (identity.guestId && String(state.players?.[0]?.guestId || '') === String(identity.guestId))
+      ) {
         await client.query('rollback');
         sendJson(res, 409, {
           error: {
@@ -5260,13 +5268,12 @@ async function handleDominoApi(req, res) {
         });
         return;
       }
-
-      const state = cleanDominoGameState(row.game_state, row.room_code);
       const existingSeat = Array.isArray(state.players)
         ? state.players.findIndex((player, index) =>
             index > 0 &&
             !player?.isAI &&
-            String(player?.accountId || '') === String(identity.accountId)
+            (identity.accountId && String(player?.accountId || '') === String(identity.accountId)) ||
+            (identity.guestId && String(player?.guestId || '') === String(identity.guestId))
           )
         : -1;
 
@@ -5278,7 +5285,8 @@ async function handleDominoApi(req, res) {
           index === existingSeat
             ? {
                 ...player,
-                accountId: identity.accountId,
+                accountId: identity.accountId || null,
+                guestId: identity.guestId || null,
                 playerName: publicName,
                 connected: true,
               }
@@ -5290,7 +5298,8 @@ async function handleDominoApi(req, res) {
           [String(existingSeat)]: {
             hash: hashDominoToken(seatToken),
             playerId: players[existingSeat].playerId,
-            accountId: identity.accountId,
+            accountId: identity.accountId || null,
+            guestId: identity.guestId || null,
           },
         };
 
@@ -5357,7 +5366,8 @@ async function handleDominoApi(req, res) {
         index === requestedSeat
           ? {
               ...player,
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               playerId,
               playerName: publicName,
               isAI: false,
@@ -5373,7 +5383,8 @@ async function handleDominoApi(req, res) {
         [String(requestedSeat)]: {
           hash: hashDominoToken(seatToken),
           playerId,
-          accountId: identity.accountId,
+          accountId: identity.accountId || null,
+          guestId: identity.guestId || null,
         },
       };
 
