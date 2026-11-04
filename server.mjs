@@ -490,6 +490,15 @@ function getLiveSpectators(roomCode) {
   return live;
 }
 
+async function verifyRodeoHostAuthorization({ token, deviceId }) {
+  const accountHost = await verifyViralHostAuthorization({ token, deviceId }).catch(() => null);
+  if (accountHost?.accountId) return accountHost;
+
+  return verifyGuestIdentity(String(token || '').trim(), {
+    secret: process.env.TNG_GUEST_TOKEN_SECRET,
+  });
+}
+
 const hostLiveWss = new WebSocketServer({ noServer: true });
 
 async function verifyViralHostAuthorization({ token, deviceId }) {
@@ -685,7 +694,7 @@ const viralRoomStore = createLiveRoomStore(bffPool, {
 });
 const viralLive = createViralLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
-  verifyHostAuthorization: verifyViralHostAuthorization,
+  verifyHostAuthorization: verifyRodeoHostAuthorization,
   resolvePlayerIdentity: resolveViralPlayerIdentity,
   recordResults: recordStandaloneGameResults,
   claimRoomCode: (options) => roomRegistry.claim(options),
