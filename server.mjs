@@ -2035,6 +2035,110 @@ async function handleTngAccountRoute(req, res) {
   });
 }
 
+async function handleTngProfile(req, res) {
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  if (req.method === 'GET') {
+    const { rows } = await bffPool.query(
+      `select display_name, handle, normalized_handle, onboarding_completed_at,
+              created_at, updated_at
+       from public.player_profiles
+       where account_id = $1::uuid
+       limit 1`,
+      [resolved.account.id],
+    );
+    const row = rows[0] || null;
+    if (!row) {
+      sendJson(res, 404, {
+        error: { code: 'PROFILE_NOT_FOUND', message: 'Create your TNG profile first.' },
+      });
+      return;
+    }
+
+    sendJson(res, 200, {
+      profile: {
+        id: resolved.account.id,
+        accountId: resolved.account.id,
+        account_id: resolved.account.id,
+        email: resolved.account.email,
+        displayName: row.display_name,
+        display_name: row.display_name,
+        handle: row.handle,
+        normalizedHandle: row.normalized_handle,
+        normalized_handle: row.normalized_handle,
+        onboardingCompletedAt: row.onboarding_completed_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      },
+    });
+    return;
+  }
+
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req).catch(() => ({}));
+    const displayName = String(body?.displayName || body?.display_name || '').trim().slice(0, 50);
+    const handle = String(body?.handle || '').trim().replace(/^@/, '').toLowerCase();
+
+    if (displayName.length < 2 || !/^[a-z0-9_]{3,24}$/.test(handle)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_PROFILE', message: 'Enter a display name and a 3–24 character handle using letters, numbers, or underscores.' },
+      });
+      return;
+    }
+
+    try {
+      const { rows } = await bffPool.query(
+        `insert into public.player_profiles
+           (account_id, display_name, handle, normalized_handle)
+         values ($1::uuid, $2, $3, $4)
+         returning display_name, handle, normalized_handle,
+                   onboarding_completed_at, created_at, updated_at`,
+        [resolved.account.id, displayName, handle, handle],
+      );
+      const row = rows[0];
+      sendJson(res, 201, {
+        profile: {
+          id: resolved.account.id,
+          accountId: resolved.account.id,
+          account_id: resolved.account.id,
+          email: resolved.account.email,
+          displayName: row.display_name,
+          display_name: row.display_name,
+          handle: row.handle,
+          normalizedHandle: row.normalized_handle,
+          normalized_handle: row.normalized_handle,
+          onboardingCompletedAt: row.onboarding_completed_at,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      });
+    } catch (error) {
+      if (error?.code === '23505') {
+        sendJson(res, 409, {
+          error: { code: 'HANDLE_TAKEN', message: 'That TNG handle is already in use. Choose another one.' },
+        });
+        return;
+      }
+      if (error?.code === '23503') {
+        sendJson(res, 404, {
+          error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'Your TNG account record was not found.' },
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
+  sendJson(res, 405, {
+    error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
+  });
+}
+
 async function proxyTngApi(req, res) {
   const sourceUrl = new URL(req.url || '/', 'http://localhost');
   const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
@@ -5542,6 +5646,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/tng-api/account-route')) {
       await handleTngAccountRoute(req, res);
+      return;
+    }
+
+    if ((req.url || '').split('?')[0] === '/tng-api/profile') {
+      await handleTngProfile(req, res);
       return;
     }
 
