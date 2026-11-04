@@ -107,7 +107,7 @@ const GAMES = [
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || '');
+  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || 'Guest');
   const [guestError, setGuestError] = useState('');
   const [guestLoading, setGuestLoading] = useState(false);
 
@@ -121,7 +121,7 @@ export default function Welcome() {
         sessionStorage.setItem('tng_welcome_complete', '1');
         sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
       } catch {}
-      navigate('/games', { replace: true });
+      window.location.replace('/games');
     } catch (error) {
       setGuestError(error?.message || 'Guest play is not available right now.');
     } finally {
@@ -135,7 +135,7 @@ export default function Welcome() {
       sessionStorage.setItem('tng_welcome_complete', '1');
       sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
     } catch {}
-    navigate('/', { replace: true });
+    window.location.replace('/');
   };
 
   return (
