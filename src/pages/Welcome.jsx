@@ -130,6 +130,7 @@ export default function Welcome() {
   };
 
   const enterTng = () => {
+    if (!getStoredGuestIdentity()) { enterAsGuest(); return; }
     try {
       sessionStorage.setItem('tng_welcome_complete', '1');
       sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
@@ -375,9 +376,7 @@ export default function Welcome() {
               </button>
             </div>
             {guestError && <p role="alert" className="mt-3 text-xs text-red-400">{guestError}</p>}
-            <p className="mt-3 text-[10px] text-white/30">
-              Already have a TNG account? <button type="button" onClick={() => navigate('/login')} className="text-[#FFD700] underline">Sign in</button>
-            </p>
+
           </div>
 
         </div>
