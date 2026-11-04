@@ -86,6 +86,7 @@ export function createRodeoRumbleLive({
           }
           send(room.host, message);
         } else if (event.kind === 'to-players') {
+          if (event.message?.t === 'host') room.hostOnline = Boolean(event.message.online);
           sendPlayersLocal(room, event.message || {});
         } else if (event.kind === 'to-displays') {
           sendDisplaysLocal(room, event.message || {});
