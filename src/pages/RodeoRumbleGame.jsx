@@ -13,7 +13,7 @@ import '@/components/brawl/rr.css';
 
 // Rodeo Rumble — multiplayer-only TNG platform fighter
 //   /games/rodeo-rumble            join / learn-more landing
-//   /games/rodeo-rumble?host=1     authenticated Host + live fight screen
+//   /games/rodeo-rumble?host=1     guest or authenticated Host + live fight screen
 //   /games/rodeo-rumble?room=CODE  signed-in phone controller
 //   /games/rodeo-rumble?display=CODE read-only paired Game Display / spectator
 export default function RodeoRumbleGame() {
