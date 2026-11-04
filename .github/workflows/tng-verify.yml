@@ -36,7 +36,7 @@ jobs:
 
       - name: Apply compatible dependency security updates on migration PR
         if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
-        run: npm audit fix --package-lock-only || true
+        run: timeout 90s npm audit fix --package-lock-only || true
 
       - name: Reinstall updated lockfile
         if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
