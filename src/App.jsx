@@ -31,6 +31,7 @@ const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
 const DominoHost = lazy(() => import('@/pages/DominoHost'));
 const DominoGame = lazy(() => import('@/pages/DominoGame'));
+const OutGame = lazy(() => import('@/pages/OutGame'));
 const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
 const GameDisplay = lazy(() => import('@/pages/GameDisplay'));
 
@@ -221,6 +222,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
       <Route path="/games/dominoes/host" element={<DominoHost />} />
       <Route path="/games/dominoes" element={<DominoGame />} />
+      <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
       <Route path="/host" element={<HostPanel />} />
         <Route path="*" element={<PageNotFound />} />
