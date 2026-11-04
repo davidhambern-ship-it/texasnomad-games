@@ -49,8 +49,7 @@ const [
   rodeoClient,
   viralLiveModule,
   rodeoLiveModule,
-  vercelApi,
-  vercelConfig,
+  pagesProxy,
   welcome,
   seeThatClient,
   wordWranglerClient,
@@ -93,8 +92,7 @@ const [
   text('src/api/rodeoRumbleLive.js'),
   text('server/viralLive.mjs'),
   text('server/rodeoRumbleLive.mjs'),
-  text('api/[...path].mjs'),
-  text('vercel.json'),
+  text('functions/[[path]].js'),
   text('src/pages/Welcome.jsx'),
   text('src/api/seeThatApi.js'),
   text('src/api/wordWranglerApi.js'),
@@ -103,7 +101,7 @@ const [
   text('server/wordWranglerApi.mjs'),
   text('server/battleSudokuApi.mjs'),
   text('server/tngApi.mjs'),
-  text('functions/tngapi.js'),
+  text('functions/[[path]].js'),
   text('server/auth/require-user.js'),
   text('server/auth/require-account.js'),
   text('server/db/schema.js'),
@@ -337,15 +335,17 @@ ok(
 );
 
 ok(
-  'guest-only core TNG API is local',
-  tngDispatcher.includes("import tngApi from '../functions/tngapi.js'") &&
-    tngDispatcher.includes('dispatchTngApi') &&
-    functionsTngApi.includes('../server/tng-api/') &&
+  'guest-only core TNG API is routed through the Supabase Edge gateway',
+  tngDispatcher.includes("['/word-search/host', wordSearchHost]") &&
+    tngDispatcher.includes("['/word-search/player', wordSearchPlayer]") &&
+    pagesProxy.includes('EDGE_API') &&
+    pagesProxy.includes('tng-api') &&
+    pagesProxy.includes('tng-guest') &&
     guestAuth.includes('verifyGuestIdentity') &&
     guestAuth.includes('public.tng_guest_sessions') &&
     guestAccount.includes("provider !== 'guest'") &&
     guestAccount.includes('guest_'),
-  'Core TNG API handlers are not routed locally through verified guest identity',
+  'Core game routes must use the Cloudflare Pages proxy and verified guest identity',
 );
 
 ok(
@@ -364,24 +364,21 @@ ok(
 );
 
 ok(
-  'Vercel Hobby function count kept under limit',
-  !(await exists('api/health.js')) &&
-    !(await exists('api/host/session.js')) &&
-    !(await exists('api/spades/host.js')) &&
-    await exists('server/tng-api/health.js') &&
-    await exists('server/tng-api/host/session.js'),
-  'TNG API routes must stay under server/ behind the single api/[...path].mjs entry point',
+  'Cloudflare Pages single API proxy',
+  await exists('functions/[[path]].js') &&
+    pagesProxy.includes('path === "/tng-api"') &&
+    pagesProxy.includes('path.startsWith("/tng-api/")') &&
+    pagesProxy.includes('path.startsWith("/tng-rooms/")') &&
+    pagesProxy.includes('path.startsWith("/tng-guest/")'),
+  'Cloudflare Pages must proxy guest, room-registry, and game API requests to the TNG Edge gateway',
 );
 
 ok(
-  'Vercel HTTP and WebSocket server adapter',
-  vercelApi.includes("import server from '../server.mjs'") &&
-    vercelApi.includes('export default server') &&
-    server.includes('http.createServer') &&
-    server.includes("server.on('upgrade'") &&
-    server.includes('if (!process.env.VERCEL)') &&
-    vercelConfig.includes('"/api/tng/$1$2"'),
-  'Vercel must export the shared Node HTTP server with its WebSocket upgrade handler',
+  'Cloudflare Pages request-body forwarding',
+  pagesProxy.includes('await request.arrayBuffer()') &&
+    pagesProxy.includes('new Request(upstreamUrl') &&
+    pagesProxy.includes('redirect: "manual"'),
+  'The Pages proxy must preserve request bodies and avoid unsafe upstream redirects',
 );
 
 const browserFiles = [
