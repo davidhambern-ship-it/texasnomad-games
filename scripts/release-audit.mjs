@@ -334,7 +334,7 @@ ok(
   'server health endpoint',
   server.includes("=== '/healthz'") &&
     server.includes("database = 'degraded'") &&
-    server.includes('VERCEL_GIT_COMMIT_SHA') && !server.includes('RAILWAY_'),
+    server.includes('VERCEL_GIT_COMMIT_SHA') && !server.toLowerCase().includes('railway'),
   '/healthz production health reporting is missing',
 );
 
