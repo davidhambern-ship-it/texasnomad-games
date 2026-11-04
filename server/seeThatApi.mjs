@@ -172,8 +172,8 @@ export function createSeeThatApi({
 
   const newCode = async (hostAccountId) => {
     for (let i = 0; i < 50; i++) {
-      const c = Array.from(
-        { length: 5 },
+      const c = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
 
