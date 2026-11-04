@@ -55,12 +55,16 @@ export function createNomadCardsApi({
   let lastSweep = Date.now();
 
   async function loadRoom(code) {
-    let room = rooms.get(code) || null;
-    if (!room && store) {
-      room = await store.load(code);
+    // Edge isolates do not share memory. Always refresh from Postgres when a
+    // persistent store is configured so one request never acts on a stale
+    // room snapshot loaded by a different isolate.
+    if (store) {
+      const room = await store.load(code);
       if (room) rooms.set(code, room);
+      else rooms.delete(code);
+      return room;
     }
-    return room;
+    return rooms.get(code) || null;
   }
 
   async function maybeRecordResults(room) {
