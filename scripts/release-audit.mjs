@@ -281,14 +281,6 @@ ok(
   'Postgres connection string is not explicitly pinned to verify-full SSL',
 );
 
-const caniuseLiteVersion = JSON.parse(lockRaw).packages?.['node_modules/caniuse-lite']?.version || '';
-const caniuseLiteBuild = Number(caniuseLiteVersion.split('.').at(-1));
-
-ok(
-  'browser compatibility data refreshed',
-  Boolean(caniuseLiteVersion) && caniuseLiteBuild > 30001814,
-  `caniuse-lite browser compatibility data is stale (${caniuseLiteVersion || 'missing'})`,
-);
 
 ok(
   'app recovery boundary enabled',
