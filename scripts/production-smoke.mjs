@@ -9,7 +9,7 @@ const WWW_ORIGIN = String(
 ).replace(/\/$/, '');
 
 const SERVICE_ORIGIN = String(
-  process.env.TNG_SERVICE_ORIGIN || 'https://auth.texasnomadgames.com',
+  process.env.TNG_SERVICE_ORIGIN || PUBLIC_ORIGIN,
 ).replace(/\/$/, '');
 
 const EXPECTED_COMMIT = String(process.env.EXPECTED_COMMIT || '').trim();
@@ -261,7 +261,7 @@ async function main() {
     const body = await response.text();
     if (!response.ok) throw new Error(`status ${response.status}`);
     if (!body.includes('/viral/tng-bridge.js')) throw new Error('TNG bridge injection missing');
-    if (!body.includes('wss://auth.texasnomadgames.com')) throw new Error('first-party WebSocket relay missing');
+    if (!body.includes('location.host')) throw new Error('same-origin WebSocket relay missing');
     if (body.includes('wss://tng-live-production.up.railway.app')) {
       throw new Error('legacy Railway WebSocket origin present');
     }
