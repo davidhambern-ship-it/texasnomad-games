@@ -76,10 +76,9 @@ export const AuthProvider = ({ children }) => {
     setAuthError(null);
 
     try {
-      // Neon Auth is the source of truth for whether this browser is signed in.
-      // Do not invent a second short-lived TNG login on top of the valid Neon
-      // cookie: Host controllers may sit untouched or backgrounded for long
-      // stretches while a game is running.
+      // The first-party Better Auth session is the source of truth for sign-in.
+      // Keep its HTTP-only cookie valid while Host controllers sit idle or
+      // backgrounded for long stretches during a game.
       const isAuthHandoff =
         window.location.pathname.startsWith('/onboarding') ||
         window.location.pathname.startsWith('/login') ||
