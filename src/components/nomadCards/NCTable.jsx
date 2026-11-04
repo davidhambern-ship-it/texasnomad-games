@@ -37,7 +37,7 @@ export default function NCTable({ data, isHost, act, offset = 0, onExit, joinUrl
         <div className="nc-lobby">
           <div className="nc-panel" style={{ textAlign: 'center' }}>
             <h1 className="nc-h nc-logo" style={{ fontSize: 'clamp(44px, 5vw, 84px)' }}>OUT!</h1>
-            <p className="nc-sub">On your phone go to <b style={{ color: '#fff' }}>{joinUrl}</b> and enter</p>
+            <p className="nc-sub">On your phone open <b style={{ color: '#fff' }}>{joinUrl}</b></p>
             <div className="nc-joincode">{room.code}</div>
             <div className="nc-row" style={{ justifyContent: 'center', marginTop: 10 }}>
               {room.roster.length ? room.roster.map(p => <span key={p.id} className="nc-chip" style={{ '--c': p.color }}><span className="nc-dot" style={{ background: p.color }} />{p.name}{p.cpu ? ' · CPU' : ''}{isHost && !p.isHost && <button type="button" className="nc-x" onClick={() => act('kick', { playerId: p.id })} aria-label={`Remove ${p.name}`}>✕</button>}</span>) : <span className="nc-sub">Waiting for players to join…</span>}
