@@ -66,14 +66,15 @@ export function createRodeoRumbleLive({
         kind: 'standalone',
         joinPath: `/games/rodeo-rumble?room=${encodeURIComponent(code)}`,
         spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(code)}`,
-        hostAccountId: hostIdentity.accountId,
+        hostAccountId: hostIdentity.accountId || null,
         ttlMs: ROOM_TTL_MS,
       }).catch(() => false);
       if (!ok) continue;
       const room = {
         code,
         hostToken: newToken(),
-        hostAccountId: String(hostIdentity.accountId),
+        hostAccountId: hostIdentity.accountId ? String(hostIdentity.accountId) : null,
+        hostGuestId: hostIdentity.guestId ? String(hostIdentity.guestId) : null,
         host: null,
         players: new Map(),
         displays: new Set(),
@@ -142,7 +143,7 @@ export function createRodeoRumbleLive({
             token: msg.authToken,
             deviceId: msg.deviceId,
           }).catch(() => null);
-          if (!hostIdentity?.accountId) {
+          if (!hostIdentity?.accountId && !hostIdentity?.guestId) {
             send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Open Rodeo Rumble from the signed-in TNG Host Controller.' });
             ws.close(4000, 'auth required');
             return;
@@ -153,7 +154,9 @@ export function createRodeoRumbleLive({
           if (
             savedRoom &&
             savedRoom.hostToken === msg.token &&
-            String(savedRoom.hostAccountId) === String(hostIdentity.accountId)
+            (hostIdentity.accountId
+              ? String(savedRoom.hostAccountId || '') === String(hostIdentity.accountId)
+              : String(savedRoom.hostGuestId || '') === String(hostIdentity.guestId))
           ) {
             room = savedRoom;
           } else {
