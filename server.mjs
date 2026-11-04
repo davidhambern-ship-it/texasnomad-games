@@ -285,7 +285,7 @@ async function proxyNeonAuth(req, res) {
     }
 
     const rewrittenSetCookies = setCookies.length
-      ? setCookies.map(rewriteAuthCookie)
+      ? setCookies.map((cookie) => rewriteAuthCookie(cookie, req.headers.host))
       : [];
 
     authSessionProxyCache.set(cacheKey, {
