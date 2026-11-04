@@ -26,7 +26,7 @@
   "dependencies": {
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
-    "@neondatabase/auth": "^0.5.0-beta",
+    "@neondatabase/auth": "0.7.0-beta",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -85,7 +85,7 @@
     "three": "^0.171.0",
     "vaul": "^1.1.2",
     "ws": "^8.18.0",
-    "zod": "^3.24.2"
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
@@ -106,5 +106,15 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.8.2",
     "vite": "^6.1.0"
+  },
+  "overrides": {
+    "better-auth": "1.7.15",
+    "@better-auth/core": "1.7.15",
+    "@better-auth/oauth-provider": "1.7.15",
+    "@better-auth/drizzle-adapter": "1.7.16",
+    "@better-auth/kysely-adapter": "1.7.0",
+    "zod": "$zod",
+    "dompurify": "3.4.17",
+    "fast-uri": "3.1.9"
   }
 }
