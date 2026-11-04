@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import NCCard from '@/components/nomadCards/NCCard';
 import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
@@ -524,16 +525,16 @@ const GAMES = [
   {
     id: 'out',
     title: 'OUT!',
-    tagline: 'Match · Flip · Draw · Get OUT!',
-    color: '#f97316',
-    color2: '#e11d48',
-    marqueeText: 'MATCH THE COLOR • DROP ACTION CARDS • CALL OUT! • EMPTY YOUR HAND',
-    screenText: 'OUT!',
-    description: 'A fast color-and-number card showdown. Play smart, reverse the turn, skip rivals, stack the pressure, and be the first player to get every card OUT!',
-    tags: ['2–4 Players', 'Card Game', 'Pass & Play'],
+    tagline: 'Last Card. Loud Call.',
+    color: '#f2c14e',
+    color2: '#3ef08a',
+    marqueeText: 'MATCH • SKIP • REVERSE • DRAW • CALL OUT!',
+    screenComponent: <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: '100%', background: 'radial-gradient(ellipse, #17543a, #0d1f17)' }}>{['r','y','w','g','b'].map((c,i) => <NCCard key={c} card={{c,v: ['7','skip','w4','rev','d2'][i]}} w={55} style={{transform: `rotate(${(i-2)*12}deg)`}} />)}</div>,
+    description: 'Race to empty your hand. Match colors or numbers, skip rivals, reverse play, and make them draw. Call OUT! on your last card. Everyone sees the table and their own private hand — including the host. Play solo or bring up to 10 players, with CPUs to fill seats.',
+    tags: ['2–10 Players', 'Card Game', 'Solo + Party'],
     path: '/games/out',
     standalone: true,
-    supportsDirectJoin: false,
+    supportsDirectJoin: true,
     launchLabel: 'PLAY OUT!',
     featured: false,
   },
