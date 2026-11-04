@@ -7,9 +7,7 @@
   let viralPeerCount = 0;
   let viralDisplayAttached = false;
 
-  const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
-    ? window.location.origin
-    : 'https://auth.texasnomadgames.com';
+  const RELAY_ORIGIN = window.location.origin;
 
   const API_BASE = RELAY_ORIGIN === window.location.origin ? '' : RELAY_ORIGIN;
   const WS_BASE = RELAY_ORIGIN.replace(/^http/i, 'ws');
