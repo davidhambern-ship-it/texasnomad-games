@@ -25,6 +25,19 @@ const [
   app,
   games,
   outGame,
+  wordSearchHostPanel,
+  wordSearchPlayerPage,
+  wordSearchEngine,
+  wordSearchHostApi,
+  wordSearchPlayerApi,
+  wordSearchTests,
+  roomUtils,
+  coreRoomGenerator,
+  outRoomGenerator,
+  battleSudokuGenerator,
+  seeThatGenerator,
+  wordWranglerGenerator,
+  rodeoGenerator,
   hostPanel,
   wordWrangler,
   battleSudoku,
@@ -67,6 +80,19 @@ const [
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
   text('src/pages/OutGame.jsx'),
+  text('src/components/host/panels/NeonWordSearchHostPanel.jsx'),
+  text('src/pages/NeonWordSearchPlayer.jsx'),
+  text('server/games/word-search.js'),
+  text('server/tng-api/word-search/host.js'),
+  text('server/tng-api/word-search/player.js'),
+  text('server/games/word-search.test.mjs'),
+  text('src/lib/roomUtils.js'),
+  text('server/tng-api/host/room.js'),
+  text('server/nomadCardsApi.mjs'),
+  text('server/battleSudokuApi.mjs'),
+  text('server/seeThatApi.mjs'),
+  text('server/wordWranglerApi.mjs'),
+  text('server/rodeoRumbleLive.mjs'),
   text('src/pages/PreviewHostPanel.jsx'),
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
@@ -169,6 +195,39 @@ ok(
     server.includes('createNomadCardsApi') &&
     server.includes("startsWith('/nc-api')"),
   'OUT! must be listed as available, routed, and implemented',
+);
+
+ok(
+  'TNXXXX room-code standard',
+  roomUtils.includes("generateRoomCode(prefix = 'TN')") &&
+    roomUtils.includes('i < 4') &&
+    coreRoomGenerator.includes("return 'TN' + Array.from({ length: 4 }") &&
+    outRoomGenerator.includes("const c = 'TN' + Array.from(") &&
+    battleSudokuGenerator.includes("const c = 'TN' + Array.from(") &&
+    seeThatGenerator.includes("const c = 'TN' + Array.from(") &&
+    wordWranglerGenerator.includes("const c = 'TN' + Array.from(") &&
+    rodeoGenerator.includes("const code = 'TN' + Array.from(") &&
+    viralHtml.includes("const newCode=()=> 'TN'+Array.from({length:4}") &&
+    viralBridge.includes('viral-tn[a-z0-9]{4}') &&
+    viralLiveModule.includes('viral-tn[a-z0-9]{4}'),
+  'Every core and standalone room generator must create TN plus four characters',
+);
+
+ok(
+  'Word Search guest multiplayer and regression coverage',
+  wordSearchHostPanel.includes('tngApi.wordSearch.getHostState') &&
+    wordSearchPlayerPage.includes('tngApi.wordSearch.getPlayerState') &&
+    wordSearchEngine.includes('buildWordSearchPuzzle') &&
+    wordSearchHostApi.includes('requireController') &&
+    wordSearchHostApi.includes("'start_game'") &&
+    wordSearchPlayerApi.includes('requireAccount') &&
+    wordSearchPlayerApi.includes('ensurePlayerSeat') &&
+    joinRoom.includes("'word-search': '/games/word-search'") &&
+    joinRoom.includes('createGuestIdentity') &&
+    tngApi.includes("X-TNG-Guest-Token") &&
+    wordSearchTests.includes('correct reverse-direction selection') &&
+    pkg.scripts['test:word-search'] === 'node --test server/games/word-search.test.mjs',
+  'Word Search must support guest host/player sessions and run its game-engine regression tests',
 );
 
 ok(
