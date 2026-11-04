@@ -6228,6 +6228,12 @@ async function handleTestFeedback(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Vercel mounts the shared Node server under /api/tng; restore the original
+  // first-party service path before dispatching HTTP and WebSocket requests.
+  if (process.env.VERCEL && typeof req.url === 'string' && req.url.startsWith('/api/tng')) {
+    req.url = req.url.slice('/api/tng'.length) || '/';
+  }
+
   const origin = String(req.headers.origin || '');
   if (isAllowedBrowserOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -6514,6 +6520,10 @@ server.on('upgrade', async (request, socket, head) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
-  console.log(`TNG frontend listening on port ${port}`);
-});
+if (!process.env.VERCEL) {
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`TNG frontend listening on port ${port}`);
+  });
+}
+
+export default server;
