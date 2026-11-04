@@ -259,193 +259,28 @@ function closeHostLiveConnection() {
   }));
 }
 
-async function ensureHostLiveConnection(deviceId) {
-  if (!deviceId) {
-    throw new TngApiError('The Host Controller device is missing.', {
-      code: 'CONTROLLER_REQUIRED',
-      status: 400,
-    });
-  }
-
-  if (
-    hostLive.controllerId === deviceId &&
-    hostLive.socket?.readyState === WebSocket.OPEN &&
-    !hostLive.connecting
-  ) {
-    return;
-  }
-
-  if (hostLive.controllerId === deviceId && hostLive.connecting) {
-    return hostLive.connecting;
-  }
-
-  if (hostLive.controllerId && hostLive.controllerId !== deviceId) {
-    closeHostLiveConnection();
-  }
-
-  hostLive.controllerId = deviceId;
-  hostLive.intentionallyClosed = false;
-
-  hostLive.connecting = (async () => {
-    const token = getStoredGuestIdentity()?.token || null;
-    if (!token) {
-      throw new TngApiError('Choose a player name to continue.', {
-        code: 'GUEST_REQUIRED',
-        status: 401,
-      });
-    }
-
-    await new Promise((resolve, reject) => {
-      const socket = new WebSocket(HOST_LIVE_WS_URL);
-      hostLive.socket = socket;
-
-      let settled = false;
-
-      const fail = (error) => {
-        if (settled) return;
-        settled = true;
-        reject(error);
-      };
-
-      socket.addEventListener('open', () => {
-        socket.send(JSON.stringify({
-          type: 'auth',
-          token,
-          controllerId: deviceId,
-        }));
-      });
-
-      socket.addEventListener('message', async (event) => {
-        let message;
-        try {
-          message = JSON.parse(event.data);
-        } catch {
-          return;
-        }
-
-        if (message?.type === 'host-live-ready') {
-          hostLive.reconnectAttempts = 0;
-          hostLive.roomReceived = true;
-          hostLive.room = message.room ?? null;
-          resolveHostLiveWaiters(hostLiveKey('room'), { room: hostLive.room });
-
-          if (!settled) {
-            settled = true;
-            resolve();
-          }
-          return;
-        }
-
-        if (message?.type === 'room-state') {
-          hostLive.roomReceived = true;
-          hostLive.room = message.room ?? null;
-          resolveHostLiveWaiters(hostLiveKey('room'), { room: hostLive.room });
-          return;
-        }
-
-        if (message?.type === 'game-state' && message.gameId) {
-          hostLive.games.set(message.gameId, message.payload);
-          resolveHostLiveWaiters(
-            hostLiveKey('game', message.gameId),
-            message.payload,
-          );
-          return;
-        }
-
-        if (message?.type === 'reauth-required') {
-          try {
-            const freshToken = getStoredGuestIdentity()?.token || null;
-            if (freshToken && socket.readyState === WebSocket.OPEN) {
-              socket.send(JSON.stringify({
-                type: 'auth',
-                token: freshToken,
-                controllerId: deviceId,
-              }));
-            }
-          } catch (error) {
-            console.warn('[TNG Host Live] silent re-auth failed:', error);
-          }
-          return;
-        }
-
-        if (message?.type === 'auth-failed') {
-          const authError = new TngApiError('The Host live connection could not authenticate.', {
-            code: 'AUTH_REQUIRED',
-            status: message.status || 401,
-          });
-
-          if (!settled) {
-            fail(authError);
-          } else {
-            try { socket.close(4001, 'Host auth refresh failed'); } catch {}
-          }
-        }
-      });
-
-      socket.addEventListener('error', () => {
-        fail(new TngApiError('The Host live connection could not start.', {
-          code: 'HOST_LIVE_UNAVAILABLE',
-          status: 503,
-        }));
-      });
-
-      socket.addEventListener('close', () => {
-        if (hostLive.socket === socket) {
-          hostLive.socket = null;
-        }
-
-        if (!settled) {
-          fail(new TngApiError('The Host live connection closed while starting.', {
-            code: 'HOST_LIVE_UNAVAILABLE',
-            status: 503,
-          }));
-        }
-
-        if (
-          !hostLive.intentionallyClosed &&
-          hostLive.controllerId === deviceId
-        ) {
-          scheduleHostLiveReconnect(deviceId);
-        }
-      });
-    });
-  })();
-
-  try {
-    await hostLive.connecting;
-  } finally {
-    hostLive.connecting = null;
-  }
+// Vercel serverless functions do not accept persistent WebSocket upgrades.
+// Host state is fetched on demand through the same-origin REST API instead.
+async function ensureHostLiveConnection() {
+  return;
 }
 
 async function getHostLiveRoomState(deviceId) {
-  if (hostLive.controllerId === deviceId && hostLive.roomReceived) {
-    ensureHostLiveConnection(deviceId).catch(() => {});
-    return { room: hostLive.room };
-  }
-
-  await ensureHostLiveConnection(deviceId);
-
-  if (hostLive.roomReceived) {
-    return { room: hostLive.room };
-  }
-
-  return waitForHostLiveValue(hostLiveKey('room'));
+  return request('/api/host/room-state', { deviceId });
 }
 
 async function getHostLiveGameState(deviceId, gameId) {
-  if (hostLive.controllerId === deviceId && hostLive.games.has(gameId)) {
-    ensureHostLiveConnection(deviceId).catch(() => {});
-    return hostLive.games.get(gameId);
+  if (gameId === 'bff') {
+    return request('/host', { deviceId, apiBase: BFF_API_BASE });
   }
-
-  await ensureHostLiveConnection(deviceId);
-
-  if (hostLive.games.has(gameId)) {
-    return hostLive.games.get(gameId);
-  }
-
-  return waitForHostLiveValue(hostLiveKey('game', gameId));
+  const paths = {
+    spades: '/api/spades/host',
+    hangman: '/api/hangman/host',
+    'word-search': '/api/word-search/host',
+    'square-biz': '/api/square-biz/host',
+  };
+  const path = paths[gameId];
+  return path ? request(path, { deviceId }) : null;
 }
 
 async function hostActionAndRefresh(path, deviceId, action, payload = {}, options = {}) {
