@@ -207,7 +207,7 @@ async function proxyNeonAuth(req, res) {
     if (value == null) continue;
     const lower = key.toLowerCase();
 
-    // Neon Auth validates the hostname it is serving. Never forward Railway or
+    // Neon Auth validates the hostname it is serving. Never forward deployment-host
     // TexasNomadGames proxy host metadata upstream; fetch() must present Neon's
     // own hostname while the browser Origin remains texasnomadgames.com for
     // Better Auth trusted-origin validation.
@@ -961,7 +961,7 @@ async function handleSeeThatDisplayTarget(req, res) {
   });
 }
 
-// Standalone live-room snapshots survive Railway container replacement.
+// Standalone live-room snapshots survive serverless instance replacement.
 // The game modules still keep a hot in-process cache; Postgres is the recovery
 // source when a new container receives the next request for an active room.
 const seeThatRoomStore = createLiveRoomStore(bffPool, {
@@ -4471,7 +4471,7 @@ async function handleBffApi(req, res) {
   const path = sourceUrl.pathname.replace(/^\/bff-api/, '') || '/';
 
   if (req.method === 'GET' && path === '/health') {
-    sendJson(res, 200, { ok: true, service: 'railway-bff-api' });
+    sendJson(res, 200, { ok: true, service: 'tng-bff-api' });
     return;
   }
 
