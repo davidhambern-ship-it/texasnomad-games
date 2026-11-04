@@ -360,7 +360,7 @@ export function createWordWranglerApi({
         return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
       }
 
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
