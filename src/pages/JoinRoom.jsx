@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { resolveTngRoom } from '@/api/roomRegistry';
 import { useAuth } from '@/lib/AuthContext';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -133,6 +134,7 @@ export default function JoinRoom() {
   const [roomInfo, setRoomInfo] = useState(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || '');
 
   useEffect(() => {
     if (roomCode === 'UNKNOWN') {
@@ -149,12 +151,6 @@ export default function JoinRoom() {
       setError(null);
 
       try {
-        if (!isAuthenticated) {
-          const next = encodeURIComponent(`/join/${roomCode}`);
-          window.location.replace(`/login?next=${next}`);
-          return;
-        }
-
         const registeredRoom = await resolveTngRoom(roomCode);
         if (cancelled) return;
 
@@ -164,15 +160,26 @@ export default function JoinRoom() {
           return;
         }
 
-        // Standalone games own their own join/seat screens. The registry gives
-        // us the destination directly, so /join/CODE no longer probes every
-        // game service one by one.
+        // Standalone games have their own player-seat screens and can accept a
+        // short-lived guest identity without creating a TNG account/device.
         if (registeredRoom.kind === 'standalone') {
-          window.location.replace(registeredRoom.joinPath);
+          if (isAuthenticated || getStoredGuestIdentity()) {
+            window.location.replace(registeredRoom.joinPath);
+            return;
+          }
+          setRoomInfo(registeredRoom);
+          setLoadingRoom(false);
           return;
         }
 
-        // Core TNG rooms still use the central player/spectator lifecycle.
+        // Core TNG rooms still use the account-backed central participant
+        // lifecycle until its guest participant schema is migrated.
+        if (!isAuthenticated) {
+          const next = encodeURIComponent(`/join/${roomCode}`);
+          window.location.replace(`/login?next=${next}`);
+          return;
+        }
+
         const payload = await tngApi.spectator.getState(roomCode);
         if (cancelled) return;
 
@@ -208,6 +215,14 @@ export default function JoinRoom() {
     setError(null);
 
     try {
+      if (roomInfo.kind === 'standalone') {
+        if (!isAuthenticated) {
+          await createGuestIdentity(guestName);
+        }
+        window.location.replace(roomInfo.joinPath);
+        return;
+      }
+
       let deviceId = await ensurePlayerDevice(user?.id);
       let payload;
 
@@ -257,7 +272,7 @@ export default function JoinRoom() {
 
   function spectate() {
     if (!roomInfo) return;
-    window.location.replace(`/spectate/${roomCode}`);
+    window.location.replace(roomInfo.spectatePath || `/spectate/${roomCode}`);
   }
 
   return (
@@ -296,11 +311,28 @@ export default function JoinRoom() {
             Join takes a player seat. Spectate opens a read-only live view and does not take a seat or let you make game moves.
           </p>
 
+          {roomInfo.kind === 'standalone' && !isAuthenticated && (
+            <label className="mt-6 block text-left text-xs font-semibold uppercase tracking-widest text-white/60">
+              Your player name
+              <input
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                maxLength={32}
+                autoComplete="nickname"
+                placeholder="Enter a name"
+                className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-base text-white outline-none focus:border-[#BC13FE]"
+              />
+              <span className="mt-2 block text-[11px] font-normal normal-case tracking-normal text-white/40">
+                Guest sessions expire automatically. No account is created.
+              </span>
+            </label>
+          )}
+
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={joinGame}
-              disabled={joining}
+              disabled={joining || (roomInfo.kind === 'standalone' && !isAuthenticated && !guestName.trim())}
               className="rounded-xl border-2 border-[#BC13FE] bg-[#BC13FE]/15 px-5 py-4 font-heading text-lg tracking-wider text-[#BC13FE] transition hover:bg-[#BC13FE]/25 disabled:opacity-40"
             >
               {joining ? 'JOINING…' : 'JOIN GAME'}
