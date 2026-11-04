@@ -27,10 +27,11 @@ export default function NomadCardsGame() {
   const [solo, setSolo] = useState({ rivals: 3, level: 'normal', target: 250, stacking: false, sevenZero: false });
   const [muted, setMuted] = useState(ncSfx.muted);
   const [guestName, setGuestName] = useState('');
+  const [createdGuest, setCreatedGuest] = useState(null);
   const [guestBusy, setGuestBusy] = useState(false);
   const [guestError, setGuestError] = useState('');
   const identity = useTngGameIdentity();
-  const name = identity.publicName;
+  const name = createdGuest?.name || identity.publicName;
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
   const continueAsGuest = async (event) => {
     event.preventDefault();
@@ -38,17 +39,18 @@ export default function NomadCardsGame() {
     setGuestBusy(true);
     setGuestError('');
     try {
-      await createGuestIdentity(guestName);
-      window.location.reload();
+      const guest = await createGuestIdentity(guestName);
+      setCreatedGuest(guest);
     } catch (error) {
       setGuestError(error?.message || 'Could not create your guest player name.');
+    } finally {
       setGuestBusy(false);
     }
   };
 
   if (display) return <div className="nc-root full"><NCDisplay code={display} /></div>;
-  if (identity.loading) return <div className="nc-root full"><Header /><div className="nc-wrap"><div className="nc-panel" style={{ textAlign: 'center' }}>Loading your player name…</div></div></div>;
-  if (!identity.publicName) return (
+  if (identity.loading && !createdGuest) return <div className="nc-root full"><Header /><div className="nc-wrap"><div className="nc-panel" style={{ textAlign: 'center' }}>Loading your player name…</div></div></div>;
+  if (!name) return (
     <div className="nc-root">
       <Header />
       <div className="nc-wrap" style={{ maxWidth: 620 }}>
