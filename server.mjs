@@ -6516,18 +6516,4 @@ server.on('upgrade', async (request, socket, head) => {
 
 server.listen(port, '0.0.0.0', () => {
   console.log(`TNG frontend listening on port ${port}`);
-
-  // Idempotent production backfill: every existing TNG account gets a
-  // BERNAverse FREE membership. Future sign-ins also call ensure_free.
-  windowlessTimeout(syncTngAccountsToBernaverseFree, 1500);
 });
-
-function windowlessTimeout(task, delayMs) {
-  setTimeout(() => {
-    Promise.resolve()
-      .then(task)
-      .catch((error) => {
-        console.error('[BERNAverse sync] TNG FREE membership pass failed', error);
-      });
-  }, delayMs);
-}
