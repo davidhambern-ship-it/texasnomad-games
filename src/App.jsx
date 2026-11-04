@@ -126,6 +126,7 @@ const AuthenticatedApp = () => {
   ]);
 
   const publicUnauthenticatedPaths = new Set([
+    '/',
     '/welcome',
     '/login',
     '/register',
