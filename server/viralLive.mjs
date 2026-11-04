@@ -154,7 +154,7 @@ export function createViralLive({
 
   const peerList = (r) => [...r.peers].map(([id, p]) => {
     const presence = p.presence || {};
-    const { accountId, ...publicPresence } = presence;
+    const { accountId, guestId, ...publicPresence } = presence;
     return { id, presence: publicPresence };
   });
   const send = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
