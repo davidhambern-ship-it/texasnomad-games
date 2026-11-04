@@ -152,7 +152,10 @@ ok(
     games.includes("title: 'OUT!'") &&
     games.includes("path: '/games/out'") &&
     app.includes('path="/games/out"') &&
-    outGame.includes('export default function OutGame'),
+    outGame.includes('export default function NomadCardsGame') &&
+    outGame.includes('NCSolo') &&
+    outGame.includes('NCHost') &&
+    outGame.includes('NCPlayer'),
   'OUT! must be listed as available, routed, and implemented',
 );
 
