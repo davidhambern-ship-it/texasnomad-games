@@ -522,17 +522,19 @@ const GAMES = [
     featured: false,
   },
   {
-    id: 'uno',
-    title: 'UNO',
-    tagline: 'Match · Reverse · Draw · Shout UNO',
-    color: '#ef4444',
-    color2: '#facc15',
-    marqueeText: 'MATCH THE COLOR • MATCH THE NUMBER • HIT THEM WITH ACTION CARDS • GET TO ONE',
-    screenText: 'UNO',
-    constructionIcon: '🟥',
-    description: 'The fast card-shedding game where you match by color or number, use action cards to flip the momentum, and try to empty your hand before everybody else.',
-    tags: ['Card Game', 'Party', 'Fast Play'],
-    path: '/games/uno',
+    id: 'out',
+    title: 'OUT!',
+    tagline: 'Match · Flip · Draw · Get OUT!',
+    color: '#f97316',
+    color2: '#e11d48',
+    marqueeText: 'MATCH THE COLOR • DROP ACTION CARDS • CALL OUT! • EMPTY YOUR HAND',
+    screenText: 'OUT!',
+    description: 'A fast color-and-number card showdown. Play smart, reverse the turn, skip rivals, stack the pressure, and be the first player to get every card OUT!',
+    tags: ['2–4 Players', 'Card Game', 'Pass & Play'],
+    path: '/games/out',
+    standalone: true,
+    supportsDirectJoin: false,
+    launchLabel: 'PLAY OUT!',
     featured: false,
   },
   {
@@ -607,7 +609,7 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['uno', 'poker', 'bowling', 'snake', 'phase-10'];
+const IN_CONSTRUCTION_IDS = ['poker', 'bowling', 'snake', 'phase-10'];
 
 const CONSTRUCTION_DETAILS = {
   uno: {
@@ -682,6 +684,7 @@ export default function Games() {
       // host screens. Other Host Controller games still require a signed-in
       // account/device session.
       const guestHostPaths = {
+        out: '/games/out',
         'see-that': '/games/see-that?host=1',
         'word-wrangler': '/games/word-wrangler?host=1',
         sudoku: '/games/sudoku?host=1',
@@ -700,6 +703,8 @@ export default function Games() {
     // Signed-in multiplayer Host launches use the TNG Host Controller.
     // Core games create a Neon room there; other standalone games hand off
     // to their own live service after the authenticated Host session is ready.
+    if (hostGameId === 'out') { navigate('/games/out'); return; }
+
     const hostableGames = new Set([
       'bff',
       'square-biz',
