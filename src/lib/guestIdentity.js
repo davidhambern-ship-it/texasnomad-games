@@ -2,12 +2,18 @@ import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
 const TOKEN_KEY = 'tng_guest_token';
 const NAME_KEY = 'tng_guest_name';
+const EXPIRES_KEY = 'tng_guest_expires_at';
 
 export function getStoredGuestIdentity() {
   try {
     const token = String(localStorage.getItem(TOKEN_KEY) || '').trim();
     const name = String(localStorage.getItem(NAME_KEY) || '').trim();
-    return token && name ? { token, name, isGuest: true } : null;
+    const expiresAt = Number(localStorage.getItem(EXPIRES_KEY) || 0);
+    if (expiresAt && Date.now() >= expiresAt * 1000) {
+      clearGuestIdentity();
+      return null;
+    }
+    return token && name ? { token, name, expiresAt: expiresAt || null, isGuest: true } : null;
   } catch {
     return null;
   }
@@ -35,6 +41,7 @@ export async function createGuestIdentity(name) {
   try {
     localStorage.setItem(TOKEN_KEY, payload.token);
     localStorage.setItem(NAME_KEY, payload.guest?.name || cleanName);
+    if (payload.guest?.expiresAt) localStorage.setItem(EXPIRES_KEY, String(payload.guest.expiresAt));
   } catch {
     throw new Error('This browser could not save your guest session. Check its privacy settings.');
   }
@@ -42,6 +49,7 @@ export async function createGuestIdentity(name) {
   return {
     token: payload.token,
     name: payload.guest?.name || cleanName,
+    expiresAt: payload.guest?.expiresAt || null,
     isGuest: true,
   };
 }
@@ -50,5 +58,6 @@ export function clearGuestIdentity() {
   try {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(NAME_KEY);
+    localStorage.removeItem(EXPIRES_KEY);
   } catch {}
 }
