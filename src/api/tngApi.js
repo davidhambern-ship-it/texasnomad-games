@@ -80,7 +80,7 @@ async function request(path, {
 } = {}) {
   const headers = { Accept: 'application/json' };
   if (authenticated) {
-    const token = await getNeonAuthToken();
+    const token = await getNeonAuthToken().catch(() => null);
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     } else {
