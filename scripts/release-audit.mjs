@@ -32,6 +32,7 @@ const [
   wordSearchPlayerApi,
   wordSearchTests,
   roomUtils,
+  joinGameInput,
   coreRoomGenerator,
   outRoomGenerator,
   battleSudokuGenerator,
@@ -87,6 +88,7 @@ const [
   text('server/tng-api/word-search/player.js'),
   text('server/games/word-search.test.mjs'),
   text('src/lib/roomUtils.js'),
+  text('src/components/home/JoinGame.jsx'),
   text('server/tng-api/host/room.js'),
   text('server/nomadCardsApi.mjs'),
   text('server/battleSudokuApi.mjs'),
@@ -201,6 +203,8 @@ ok(
   'TNXXXX room-code standard',
   roomUtils.includes("generateRoomCode(prefix = 'TN')") &&
     roomUtils.includes('i < 4') &&
+    joinGameInput.includes('placeholder="TN7K4P"') &&
+    joinGameInput.includes('maxLength={6}') &&
     coreRoomGenerator.includes("return 'TN' + Array.from({ length: 4 }") &&
     outRoomGenerator.includes("const c = 'TN' + Array.from(") &&
     battleSudokuGenerator.includes("const c = 'TN' + Array.from(") &&
