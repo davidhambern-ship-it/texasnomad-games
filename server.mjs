@@ -780,7 +780,8 @@ async function loadHostLiveRoom(token, controllerId) {
 async function loadHostLiveGame(token, controllerId, gameId) {
   if (!gameId) return null;
   if (gameId === 'bff') {
-    return fetchHostLiveJson('/bff-api/host', token, controllerId);
+    // BFF state is served by its dedicated same-origin REST endpoint.
+    return null;
   }
   const path = HOST_LIVE_GAME_PATHS[gameId];
   if (!path) return null;
