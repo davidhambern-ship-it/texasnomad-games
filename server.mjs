@@ -5272,8 +5272,10 @@ async function handleDominoApi(req, res) {
         ? state.players.findIndex((player, index) =>
             index > 0 &&
             !player?.isAI &&
-            (identity.accountId && String(player?.accountId || '') === String(identity.accountId)) ||
-            (identity.guestId && String(player?.guestId || '') === String(identity.guestId))
+            (
+              (identity.accountId && String(player?.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(player?.guestId || '') === String(identity.guestId))
+            )
           )
         : -1;
 
