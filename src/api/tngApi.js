@@ -287,10 +287,10 @@ async function ensureHostLiveConnection(deviceId) {
   hostLive.intentionallyClosed = false;
 
   hostLive.connecting = (async () => {
-    const token = await getNeonAuthToken();
+    const token = getStoredGuestIdentity()?.token || null;
     if (!token) {
-      throw new TngApiError('Your TNG session is missing.', {
-        code: 'AUTH_REQUIRED',
+      throw new TngApiError('Choose a player name to continue.', {
+        code: 'GUEST_REQUIRED',
         status: 401,
       });
     }
@@ -354,7 +354,7 @@ async function ensureHostLiveConnection(deviceId) {
 
         if (message?.type === 'reauth-required') {
           try {
-            const freshToken = await getNeonAuthToken({ forceRefresh: true });
+            const freshToken = getStoredGuestIdentity()?.token || null;
             if (freshToken && socket.readyState === WebSocket.OPEN) {
               socket.send(JSON.stringify({
                 type: 'auth',
