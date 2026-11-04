@@ -59,6 +59,29 @@ export const auth = betterAuth({
     minPasswordLength: 8,
   },
   ...(Object.keys(socialProviders).length ? { socialProviders } : {}),
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          // Create the corresponding TNG account as soon as Better Auth
+          // creates a new identity. The account UUID then anchors profiles,
+          // rooms, stats, and all existing game relationships.
+          await authPool.query(
+            `
+              insert into public.accounts
+                (auth_subject, email, email_verified, status)
+              values ($1, lower($2), $3, 'active')
+              on conflict (auth_subject) do update set
+                email = excluded.email,
+                email_verified = excluded.email_verified,
+                updated_at = now()
+            `,
+            [user.id, user.email, user.emailVerified === true],
+          );
+        },
+      },
+    },
+  },
   advanced: {
     database: {
       generateId: "uuid",
