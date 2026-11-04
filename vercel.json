@@ -178,6 +178,10 @@
       "destination": "/viral/index.html"
     },
     {
+      "source": "/(healthz|tng-guest|bernaverse-sso|neon-auth|tng-session|tng-display|tng-spectator|tng-host-stage|tng-api|tng-stats|tng-rooms|viral-live|viral-display|see-that-display|standalone-display|test-feedback|bff-api|bs-api|rr-api|st-api|ww-api|domino-api|host-live)(.*)",
+      "destination": "/api/tng/$1$2"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }
