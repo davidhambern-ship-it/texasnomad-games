@@ -6,6 +6,7 @@ import NCSolo from '@/components/nomadCards/NCSolo';
 import NCCard from '@/components/nomadCards/NCCard';
 import { NCDisplay, NCHost, NCPlayer } from '@/components/nomadCards/NCOnline';
 import { ncSfx } from '@/components/nomadCards/ncSfx';
+import { createGuestIdentity } from '@/lib/guestIdentity';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import '@/components/nomadCards/nc.css';
 
@@ -25,11 +26,44 @@ export default function NomadCardsGame() {
   const [err, setErr] = useState('');
   const [solo, setSolo] = useState({ rivals: 3, level: 'normal', target: 250, stacking: false, sevenZero: false });
   const [muted, setMuted] = useState(ncSfx.muted);
+  const [guestName, setGuestName] = useState('');
+  const [guestBusy, setGuestBusy] = useState(false);
+  const [guestError, setGuestError] = useState('');
   const identity = useTngGameIdentity();
   const name = identity.publicName;
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
+  const continueAsGuest = async (event) => {
+    event.preventDefault();
+    if (guestBusy) return;
+    setGuestBusy(true);
+    setGuestError('');
+    try {
+      await createGuestIdentity(guestName);
+      window.location.reload();
+    } catch (error) {
+      setGuestError(error?.message || 'Could not create your guest player name.');
+      setGuestBusy(false);
+    }
+  };
 
   if (display) return <div className="nc-root full"><NCDisplay code={display} /></div>;
+  if (identity.loading) return <div className="nc-root full"><Header /><div className="nc-wrap"><div className="nc-panel" style={{ textAlign: 'center' }}>Loading your player name…</div></div></div>;
+  if (!identity.publicName) return (
+    <div className="nc-root">
+      <Header />
+      <div className="nc-wrap" style={{ maxWidth: 620 }}>
+        <div className="nc-panel" style={{ textAlign: 'center' }}>
+          <h1 className="nc-h nc-logo">OUT!</h1>
+          <p className="nc-sub">Choose the name other players will see. No account or sign-in required.</p>
+          <form onSubmit={continueAsGuest}>
+            <input className="nc-input" value={guestName} maxLength={32} autoComplete="nickname" placeholder="Your player name" onChange={event => setGuestName(event.target.value)} />
+            <button type="submit" className="nc-btn primary" disabled={guestBusy || !guestName.trim()}>{guestBusy ? 'Saving…' : 'Continue as guest'}</button>
+          </form>
+          {guestError && <div className="nc-err">{guestError}</div>}
+        </div>
+      </div>
+    </div>
+  );
   if (screen === 'host') return <div className="nc-root full"><NCHost onExit={toMenu} /></div>;
   if (screen === 'join' && /^[A-Z]{5}$/.test(room)) return <div className="nc-root full"><NCPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} /></div>;
   if (screen === 'solo') return <div className="nc-root full"><NCSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} settings={{ target: solo.target, stacking: solo.stacking, sevenZero: solo.sevenZero }} onExit={toMenu} /></div>;
