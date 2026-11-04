@@ -47,7 +47,7 @@ function validatePlayerJoin(payload, roomCode) {
 
   if (role === 'host_player' || role === 'host' || seatNumber === 1) {
     throw new TngApiError(
-      `This TNG account is already hosting room ${roomCode}. Sign in with a different TNG account to join as a player.`,
+      `This guest name is already hosting room ${roomCode}. Choose a different player name to join.`,
       {
         code: 'HOST_ACCOUNT_CANNOT_JOIN_AS_PLAYER',
         status: 409,
@@ -160,10 +160,10 @@ export default function JoinRoom() {
           return;
         }
 
-        // Standalone games have their own player-seat screens and can accept a
-        // short-lived guest identity without creating a TNG account/device.
+        // Standalone rooms have their own player-seat screens. Core rooms
+        // use the same short-lived guest identity and never require sign-in.
         if (registeredRoom.kind === 'standalone') {
-          if (isAuthenticated || getStoredGuestIdentity()) {
+          if (getStoredGuestIdentity()) {
             window.location.replace(registeredRoom.joinPath);
             return;
           }
@@ -172,11 +172,9 @@ export default function JoinRoom() {
           return;
         }
 
-        // Core TNG rooms still use the account-backed central participant
-        // lifecycle until its guest participant schema is migrated.
-        if (!isAuthenticated) {
-          const next = encodeURIComponent(`/join/${roomCode}`);
-          window.location.replace(`/login?next=${next}`);
+        if (!getStoredGuestIdentity()) {
+          setRoomInfo(registeredRoom);
+          setLoadingRoom(false);
           return;
         }
 
@@ -215,15 +213,14 @@ export default function JoinRoom() {
     setError(null);
 
     try {
+      const guestIdentity = getStoredGuestIdentity() || await createGuestIdentity(guestName);
+
       if (roomInfo.kind === 'standalone') {
-        if (!isAuthenticated) {
-          await createGuestIdentity(guestName);
-        }
         window.location.replace(roomInfo.joinPath);
         return;
       }
 
-      let deviceId = await ensurePlayerDevice(user?.id);
+      let deviceId = await ensurePlayerDevice(guestIdentity.id || user?.id || 'guest');
       let payload;
 
       try {
@@ -260,7 +257,7 @@ export default function JoinRoom() {
         throw new Error(`Unknown game type for room "${roomCode}".`);
       }
 
-      window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
+      window.location.replace(`${gamePath}?room=${roomCode}`);
     } catch (joinError) {
       setError(
         joinError?.message ||
@@ -270,9 +267,18 @@ export default function JoinRoom() {
     }
   }
 
-  function spectate() {
+  async function spectate() {
     if (!roomInfo) return;
-    window.location.replace(roomInfo.spectatePath || `/spectate/${roomCode}`);
+    try {
+      if (!getStoredGuestIdentity()) await createGuestIdentity(guestName);
+      window.location.replace(
+        roomInfo.kind === 'standalone'
+          ? (roomInfo.spectatePath || roomInfo.joinPath)
+          : (roomInfo.spectatePath || `/spectate/${roomCode}`),
+      );
+    } catch (spectateError) {
+      setError(spectateError?.message || 'Choose a player name to spectate.');
+    }
   }
 
   return (
@@ -311,7 +317,7 @@ export default function JoinRoom() {
             Join takes a player seat. Spectate opens a read-only live view and does not take a seat or let you make game moves.
           </p>
 
-          {roomInfo.kind === 'standalone' && !isAuthenticated && (
+          {!getStoredGuestIdentity() && (
             <label className="mt-6 block text-left text-xs font-semibold uppercase tracking-widest text-white/60">
               Your player name
               <input
@@ -332,7 +338,7 @@ export default function JoinRoom() {
             <button
               type="button"
               onClick={joinGame}
-              disabled={joining || (roomInfo.kind === 'standalone' && !isAuthenticated && !guestName.trim())}
+              disabled={joining || (!getStoredGuestIdentity() && !guestName.trim())}
               className="rounded-xl border-2 border-[#BC13FE] bg-[#BC13FE]/15 px-5 py-4 font-heading text-lg tracking-wider text-[#BC13FE] transition hover:bg-[#BC13FE]/25 disabled:opacity-40"
             >
               {joining ? 'JOINING…' : 'JOIN GAME'}
@@ -341,7 +347,7 @@ export default function JoinRoom() {
             <button
               type="button"
               onClick={spectate}
-              disabled={joining}
+              disabled={joining || (!getStoredGuestIdentity() && !guestName.trim())}
               className="rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/10 px-5 py-4 font-heading text-lg tracking-wider text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:opacity-40"
             >
               SPECTATE
