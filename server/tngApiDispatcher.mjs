@@ -77,7 +77,7 @@ function isTngStagingOrigin(origin) {
     return url.protocol === 'https:' &&
       (
         host === 'texasnomad-games-git-staging-live-test-texasnomadgames.vercel.app' ||
-        host.endsWith('.vercel.app')
+        (host.endsWith('.vercel.app') || host.endsWith('.pages.dev') || host.endsWith('.workers.dev'))
       );
   } catch {
     return false;
