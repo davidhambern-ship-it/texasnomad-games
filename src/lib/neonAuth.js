@@ -1,7 +1,6 @@
-import { createAuthClient } from '@neondatabase/auth';
-import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
+import { createAuthClient } from 'better-auth/react';
 
-// Vercel serves the Neon Auth proxy on the same origin as the game app.
+// Vercel serves the TNG Auth proxy on the same origin as the game app.
 // Keep the legacy first-party auth host only for local/non-Vercel development.
 function currentAuthOrigin() {
   if (typeof window === 'undefined') return 'https://auth.texasnomadgames.com';
@@ -88,17 +87,16 @@ export function restoreTngBrowserSession() {
 }
 
 
-export const authClient = createAuthClient(NEON_AUTH_URL, {
-  adapter: BetterAuthReactAdapter({
-    fetchOptions: {
-      credentials: 'include',
-      onRequest: (request) => {
-        try {
-          localStorage.setItem('tng_last_auth_request', request.url.toString());
-        } catch {}
-      },
+export const authClient = createAuthClient({
+  baseURL: NEON_AUTH_URL,
+  fetchOptions: {
+    credentials: 'include',
+    onRequest: (request) => {
+      try {
+        localStorage.setItem('tng_last_auth_request', request.url.toString());
+      } catch {}
     },
-  }),
+  },
 });
 
 function unwrapSession(result) {
@@ -118,14 +116,14 @@ export async function getNeonSession({
     cachedSessionAt > 0 &&
     now - cachedSessionAt < SESSION_CACHE_TTL_MS
   ) {
-    // Once this tab has a confirmed Neon session, keep using it for the life
+    // Once this tab has a confirmed TNG session, keep using it for the life
     // of the tab. A backend 401 is the only thing that should force another
     // auth lookup during normal TNG use.
     return cachedSession ?? null;
   }
 
   // Host/game screens can make several authenticated API calls at once.
-  // Share one session lookup instead of hammering Neon Auth for every poll.
+  // Share one session lookup instead of hammering TNG Auth for every poll.
   if (sessionRequestPromise) return sessionRequestPromise;
 
   sessionRequestPromise = (async () => {
@@ -221,7 +219,7 @@ export async function waitForNeonSession({
 }
 
 export async function getNeonAuthToken({ forceRefresh = false } = {}) {
-  // The TNG backend verifies Neon Auth's active opaque session token directly.
+  // The TNG backend verifies TNG Auth's active opaque session token directly.
   // Cache ordinary reads so high-frequency game polling does not rate-limit
   // the auth service; callers can force one fresh lookup after an HTTP 401.
   const session = await getNeonSession({ forceRefresh });
