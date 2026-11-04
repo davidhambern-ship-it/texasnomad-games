@@ -273,7 +273,7 @@ export function createBattleSudokuApi({
         const v = view(room, null, now); v.you = { isHost: true };
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
       }
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
