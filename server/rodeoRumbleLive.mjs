@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 const MAX_PLAYERS = 8;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIGHTERS = new Set(['tex', 'bronco', 'dusty', 'sparky', 'danni', 'katarina', 'brittani', 'richard', 'robert']);
 const COLORS = ['#ff5f6d', '#3ec5ff', '#ffd23f', '#3ef08a', '#c77dff', '#ff9f1c', '#f15bb5', '#e5e7eb'];
 
