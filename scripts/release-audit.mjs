@@ -48,6 +48,8 @@ const [
   rodeoClient,
   viralLiveModule,
   rodeoLiveModule,
+  vercelApi,
+  vercelConfig,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -75,6 +77,8 @@ const [
   text('src/api/rodeoRumbleLive.js'),
   text('server/viralLive.mjs'),
   text('server/rodeoRumbleLive.mjs'),
+  text('api/[...path].mjs'),
+  text('vercel.json'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -251,6 +255,17 @@ ok(
   'first-party service origin',
   serviceOrigin.includes("https://auth.texasnomadgames.com"),
   'browser service origin is not the first-party auth.texasnomadgames.com host',
+);
+
+ok(
+  'Vercel HTTP and WebSocket server adapter',
+  vercelApi.includes("import server from '../server.mjs'") &&
+    vercelApi.includes('export default server') &&
+    server.includes('http.createServer') &&
+    server.includes("server.on('upgrade'") &&
+    server.includes('if (!process.env.VERCEL)') &&
+    vercelConfig.includes('"/api/tng/$1$2"'),
+  'Vercel must export the shared Node HTTP server with its WebSocket upgrade handler',
 );
 
 const browserFiles = [
