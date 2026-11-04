@@ -32,7 +32,7 @@ const trustedOrigins = new Set([
 ]);
 
 for (const host of [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]) {
-  const cleanHost = String(host || "").trim().replace(/^https?:\\/\\//i, "").split("/")[0];
+  const cleanHost = String(host || "").trim().replace(/^https?:\/\//i, "").split("/")[0];
   if (cleanHost && cleanHost.endsWith(".vercel.app")) {
     trustedOrigins.add(`https://${cleanHost}`);
   }
