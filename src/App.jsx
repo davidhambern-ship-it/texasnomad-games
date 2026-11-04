@@ -149,7 +149,11 @@ const AuthenticatedApp = () => {
 
   const isGuestEntryRoute =
     location.pathname.startsWith('/join/') ||
-    (location.pathname.startsWith('/games/') && hasGuestIdentity);
+    (hasGuestIdentity && (
+      location.pathname === '/' ||
+      location.pathname === '/games' ||
+      location.pathname.startsWith('/games/')
+    ));
 
   if (
     !isAuthenticated &&
