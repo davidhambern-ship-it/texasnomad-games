@@ -1,11 +1,20 @@
 import { createAuthClient } from '@neondatabase/auth';
 import { BetterAuthReactAdapter } from '@neondatabase/auth/react/adapters';
 
-// Production auth is proxied through the verified first-party TNG auth domain.
-// This keeps the session same-site with texasnomadgames.com so Safari does not
-// treat the Neon session as a third-party cookie.
-export const NEON_AUTH_URL =
-  'https://auth.texasnomadgames.com/neon-auth';
+// Vercel serves the Neon Auth proxy on the same origin as the game app.
+// Keep the legacy first-party auth host only for local/non-Vercel development.
+function currentAuthOrigin() {
+  if (typeof window === 'undefined') return 'https://auth.texasnomadgames.com';
+  const host = window.location.hostname.toLowerCase();
+  const sameOrigin =
+    host.endsWith('.vercel.app') ||
+    host === 'texasnomadgames.com' ||
+    host === 'www.texasnomadgames.com' ||
+    host.endsWith('.up.railway.app');
+  return sameOrigin ? window.location.origin : 'https://auth.texasnomadgames.com';
+}
+
+export const NEON_AUTH_URL = `${currentAuthOrigin()}/neon-auth`;
 
 export const isNeonStaging = true;
 
