@@ -49,7 +49,7 @@ OUT! is TNG's classic card-shedding party game. It uses original TNG art and nam
 | `src/api/nomadCardsApi.js` | Client (`ncApi`, `ncSeat`, `resolveNomadCardsRoom`) |
 | `src/components/nomadCards/*` | `NCTable` (TV), `NCHand` (phone/solo), `NCCard` (card art), `NCOnline` (host/player/display), `NCSolo`, sounds, CSS |
 | `src/pages/NomadCardsGame.jsx` | Menu / host / join / display / solo |
-| `scripts/out-sim.mjs` | `node scripts/out-sim.mjs` runs 120 CPU games across 2–10 players and every house-rule combo, and checks card conservation, legal play and finishing |
+| `scripts/out-sim.mjs` | `node scripts/nomad-cards-sim.mjs` runs 120 CPU games across 2–10 players and every house-rule combo, and checks card conservation, legal play and finishing |
 
 ## API
 
