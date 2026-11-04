@@ -42,6 +42,10 @@ jobs:
         if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
         run: npm ci --legacy-peer-deps
 
+      - name: Refresh browser compatibility data
+        if: github.event_name == 'pull_request' && github.head_ref == 'migration/off-railway-guest-platform'
+        run: npx --yes update-browserslist-db@latest
+
       - name: Verify TNG
         run: npm run ci:verify
 
