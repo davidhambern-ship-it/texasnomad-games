@@ -385,7 +385,7 @@ export function createRodeoRumbleLive({
 
         if (msg.t === 'display') {
           const code = String(msg.code || '').toUpperCase();
-          room = rooms.get(code);
+          room = await loadRoom(code);
           if (!room) {
             send(ws, { t: 'error', code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found.` });
             ws.close();
@@ -396,7 +396,7 @@ export function createRodeoRumbleLive({
           send(ws, {
             t: 'displayed',
             code: room.code,
-            host: !!room.host,
+            host: Boolean(room.hostOnline || room.host),
             lobby: room.lobby,
             frame: room.latestFrame,
             result: room.latestResult,
@@ -545,6 +545,7 @@ export function createRodeoRumbleLive({
       const anyone = room.host || [...room.players.values()].some((player) => player.ws) || room.displays.size > 0;
       if (!anyone && now - room.updatedAt > 20 * 60 * 1000) {
         rooms.delete(code);
+        room.bridge?.close();
         releaseRoomCode(code, 'rodeo-rumble').catch(() => {});
         continue;
       }
@@ -576,7 +577,7 @@ export function createRodeoRumbleLive({
       wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
       return true;
     },
-    handleHttp(req, res) {
+    async handleHttp(req, res) {
       const url = new URL(req.url || '/', 'http://localhost');
       const json = (status, body) => {
         res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -585,11 +586,11 @@ export function createRodeoRumbleLive({
       if (url.pathname === '/rr-api/health') return json(200, { ok: true, service: 'rodeo-rumble', ...this.stats() });
       if (url.pathname === '/rr-api/resolve') {
         const code = String(url.searchParams.get('code') || '').toUpperCase();
-        const liveRoom = rooms.get(code);
+        const liveRoom = await loadRoom(code);
         return json(200, {
           live: !!liveRoom,
           roomCode: code,
-          hostPresent: !!(liveRoom?.host),
+          hostPresent: Boolean(liveRoom?.hostOnline || liveRoom?.host),
           players: liveRoom ? liveRoom.players.size : 0,
         });
       }
