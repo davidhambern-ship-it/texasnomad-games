@@ -409,11 +409,12 @@ for (const [path, body] of browserFiles) {
 }
 
 ok(
-  'Host Live reconnect backoff',
-  tngApi.includes('scheduleHostLiveReconnect') &&
-    tngApi.includes('reconnectAttempts') &&
-    tngApi.includes('Math.min(10_000'),
-  'Host Live reconnect recovery is missing',
+  'Vercel-compatible Host Live REST polling',
+  tngApi.includes("return request('/api/host/room-state'") &&
+    tngApi.includes("spades: '/api/spades/host'") &&
+    tngApi.includes("hangman: '/api/hangman/host'") &&
+    !tngApi.includes('new WebSocket('),
+  'Host state still depends on persistent WebSocket upgrades unsupported by Vercel Functions',
 );
 
 ok(
