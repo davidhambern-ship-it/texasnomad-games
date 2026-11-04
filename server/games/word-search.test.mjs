@@ -18,21 +18,28 @@ function wordText(grid, cells) {
   }).join('');
 }
 
-test('puzzles have a square board and every listed word matches its cells', () => {
+test('all category and difficulty puzzles have a square board and valid word paths', () => {
+  const categories = [
+    'random', 'popculture', 'online', 'food', 'spiritual',
+    'gaming', 'music', 'travel', 'general',
+  ];
+
   for (const [difficulty, size] of [
     ['simpleton', 12],
     ['reader', 16],
     ['scholar', 22],
   ]) {
-    const { grid, words } = buildWordSearchPuzzle(difficulty, 'random');
-    assert.equal(grid.length, size);
-    assert.ok(grid.every((row) => row.length === size && row.every((cell) => /^[A-Z]$/.test(cell))));
-    assert.ok(words.length > 0);
+    for (const category of categories) {
+      const { grid, words } = buildWordSearchPuzzle(difficulty, category);
+      assert.equal(grid.length, size, `${category} / ${difficulty} board height`);
+      assert.ok(grid.every((row) => row.length === size && row.every((cell) => /^[A-Z]$/.test(cell))));
+      assert.ok(words.length > 0, `${category} / ${difficulty} must place words`);
 
-    for (const word of words) {
-      assert.equal(wordText(grid, word.cells), word.word);
-      assert.equal(word.cells.length, word.word.length);
-      assert.ok(word.points > 0);
+      for (const word of words) {
+        assert.equal(wordText(grid, word.cells), word.word);
+        assert.equal(word.cells.length, word.word.length);
+        assert.ok(word.points > 0);
+      }
     }
   }
 });
