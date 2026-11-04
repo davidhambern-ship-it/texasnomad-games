@@ -1197,7 +1197,7 @@ function loadSaved(){try{const s=JSON.parse(localStorage.getItem(SAVE_KEY)||'nul
 async function getRoom(){ try{ return window.claude&&window.claude.use?await window.claude.use('room'):null; }catch(e){ return null; } }
 async function getUser(){ try{ return window.claude&&window.claude.use?await window.claude.use('user'):null; }catch(e){ return null; } }
 function leaveRoom(){ unsubs.forEach(u=>{try{u();}catch(e){}}); unsubs=[]; if(hb){clearInterval(hb);hb=null;} if(RNAME){try{RNAME.leave();}catch(e){}} RNAME=null; ROOMCODE=null; $('roomTag').hidden=true; }
-const newCode=()=>Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[rand(24)]).join('');
+const newCode=()=> 'TN'+Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rand(32)]).join('');
 let pushT=null;
 function pushState(){ if(MODE!=='host'||!RNAME) return; if(pushT) return; pushT=setTimeout(()=>{pushT=null; sendState();},150); }
 function packState(nLog){
@@ -1939,7 +1939,7 @@ function renderWin(){const el=$('win'); if(!S||!S.winner){el.hidden=true;winShow
 function renderAll(){ if(!S) return; const rb=$('btnRemote'); if(rb) rb.hidden=!(S.started&&MODE!=='client'); $('roundInfo').textContent=S.started?`Round ${S.round} · ${S.players.length} players`:'Set up a game'; renderTurn(); renderCard(); renderPlayers(); renderLog(); renderTokens(); renderHost(); if(!$('remote').hidden) renderRemote(); }
 
 // ---------- setup ----------
-const ROOM_PARAM=(()=>{try{const c=(new URLSearchParams(location.search).get('room')||'').toUpperCase(); return /^[A-Z]{4}$/.test(c)?c:'';}catch(e){return '';}})();
+const ROOM_PARAM=(()=>{try{const c=(new URLSearchParams(location.search).get('room')||'').toUpperCase(); return /^TN[A-Z0-9]{4}$/.test(c)?c:'';}catch(e){return '';}})();
 let setupTab=ROOM_PARAM?'join':'local';
 function openSetup(){
   const el=$('setup'); el.hidden=false; $('win').hidden=true;
@@ -1956,8 +1956,8 @@ function openSetup(){
        <button type="button" id="tHost" aria-pressed="${setupTab==='host'}">Host an online room</button>
        <button type="button" id="tJoin" aria-pressed="${setupTab==='join'}">Join a room</button></div>
      ${setupTab==='join'?`
-       <div class="info">Enter the 4-letter code from the host’s screen. Once the host starts, pick your seat — or just watch.</div>
-       <div class="row"><input id="jCode" aria-label="Room code" maxlength="4" placeholder="ABCD" value="${ROOM_PARAM}" style="text-transform:uppercase;font-size:24px;width:120px"><button type="button" class="primary" id="jGo">Join room</button><span class="info" id="jMsg"></span></div>`
+       <div class="info">Enter the room code from the host’s screen. Once the host starts, pick your seat — or just watch.</div>
+       <div class="row"><input id="jCode" aria-label="Room code" maxlength="6" placeholder="TNXXXX" value="${ROOM_PARAM}" style="text-transform:uppercase;font-size:24px;width:120px"><button type="button" class="primary" id="jGo">Join room</button><span class="info" id="jMsg"></span></div>`
      :`
      ${online?`<div class="row"><span class="info">Room code</span><span class="code">${code}</span><button type="button" id="reCode">New code</button><button type="button" id="copyInv">Copy invite link</button></div><div class="info">Players open the invite link — or go to texasnomadgames.com/viral, choose “Join a room” and enter the code. Set their seats to “Online device”.</div>`:''}
      ${saved&&!saved.winner?'<div class="row"><button type="button" class="primary" id="resume">Resume saved game</button><span class="info">Round '+saved.round+' · '+saved.players.length+' players</span></div>':''}
@@ -1984,7 +1984,7 @@ function openSetup(){
       setupTab='host'; draw();};
     $('tJoin').onclick=()=>{sync(); setupTab='join'; draw();};
     if(setupTab==='join'){
-      $('jGo').onclick=async()=>{const c=($('jCode').value||'').trim().toUpperCase(); if(!/^[A-Z]{4}$/.test(c)){$('jMsg').textContent='Codes are 4 letters.';return;}
+      $('jGo').onclick=async()=>{const c=($('jCode').value||'').trim().toUpperCase(); if(!/^[A-Z]{4}$/.test(c)){$('jMsg').textContent='Codes start with TN and have 4 more characters.';return;}
         $('jMsg').textContent='Joining…'; const err=await joinRoom(c); if(err){$('jMsg').textContent=err;return;} try{history.replaceState(null,'',location.pathname+'?room='+c);}catch(e){}
         el.innerHTML=`<div class="setup"><h1>Room ${esc(c)}</h1><div class="info">Waiting for the host’s game… pick your seat when it appears.</div><div id="seatPick"></div></div>`;};
       return;
