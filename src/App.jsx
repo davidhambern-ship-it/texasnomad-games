@@ -127,6 +127,7 @@ const AuthenticatedApp = () => {
   const onboardingExemptPaths = new Set([
     '/login',
     '/register',
+    '/welcome',
     '/onboarding',
     '/forgot-password',
     '/reset-password',
