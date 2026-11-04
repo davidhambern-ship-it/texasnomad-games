@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -106,6 +107,27 @@ const GAMES = [
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || '');
+  const [guestError, setGuestError] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
+
+
+  const enterAsGuest = async () => {
+    setGuestLoading(true);
+    setGuestError('');
+    try {
+      await createGuestIdentity(guestName);
+      try {
+        sessionStorage.setItem('tng_welcome_complete', '1');
+        sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
+      } catch {}
+      navigate('/games', { replace: true });
+    } catch (error) {
+      setGuestError(error?.message || 'Guest play is not available right now.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const enterTng = () => {
     try {
@@ -327,6 +349,37 @@ export default function Welcome() {
             GO TO TNG HOME
             <ArrowRight className="h-4 w-4" />
           </button>
+          <div className="mt-7 border-t border-white/10 pt-6">
+            <div className="font-heading text-xl tracking-widest uppercase text-[#FF5F1F]">PLAY WITHOUT AN ACCOUNT</div>
+            <p className="mx-auto mt-2 max-w-xl text-xs leading-5 text-white/45">
+              Pick a player name, create a temporary guest session, and jump into supported live games.
+            </p>
+            <div className="mx-auto mt-4 flex max-w-xl flex-col gap-3 sm:flex-row">
+              <input
+                value={guestName}
+                onChange={(event) => { setGuestName(event.target.value); setGuestError(''); }}
+                onKeyDown={(event) => event.key === 'Enter' && enterAsGuest()}
+                maxLength={32}
+                placeholder="YOUR PLAYER NAME"
+                aria-label="Guest player name"
+                className="min-w-0 flex-1 rounded-xl border border-[#FF5F1F]/40 bg-black/70 px-4 py-3 text-center text-sm text-white outline-none focus:border-[#FF5F1F]"
+              />
+              <button
+                type="button"
+                onClick={enterAsGuest}
+                disabled={guestLoading || !guestName.trim()}
+                className="rounded-xl border-2 border-[#FF5F1F] bg-[#FF5F1F]/15 px-6 py-3 text-[#FF8A52] transition-all hover:bg-[#FF5F1F] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ ...PS2, fontSize: 8 }}
+              >
+                {guestLoading ? 'STARTING…' : 'PLAY AS GUEST'}
+              </button>
+            </div>
+            {guestError && <p role="alert" className="mt-3 text-xs text-red-400">{guestError}</p>}
+            <p className="mt-3 text-[10px] text-white/30">
+              Already have a TNG account? <button type="button" onClick={() => navigate('/login')} className="text-[#FFD700] underline">Sign in</button>
+            </p>
+          </div>
+
         </div>
       </section>
 
