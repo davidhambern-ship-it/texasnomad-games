@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
@@ -674,10 +675,29 @@ export default function Games() {
   const [constructionGame, setConstructionGame] = useState(null);
 
   const handleCreateRoom = (gameId) => {
-    // Every multiplayer Host launch goes through the TNG Host Controller first.
-    // Core games create a Neon room there; standalone games are handed off to
-    // their own live service only after the authenticated Host session is ready.
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
+    const guest = getStoredGuestIdentity();
+    if (guest) {
+      // These standalone games have guest-aware room services and their own
+      // host screens. Other Host Controller games still require a signed-in
+      // account/device session.
+      const guestHostPaths = {
+        'see-that': '/games/see-that?host=1',
+        'word-wrangler': '/games/word-wrangler?host=1',
+        sudoku: '/games/sudoku?host=1',
+      };
+      const guestPath = guestHostPaths[hostGameId];
+      if (guestPath) {
+        navigate(guestPath);
+      } else {
+        navigate(`/login?next=${encodeURIComponent(`/host?game=${hostGameId}`)}`);
+      }
+      return;
+    }
+
+    // Signed-in multiplayer Host launches use the TNG Host Controller.
+    // Core games create a Neon room there; other standalone games hand off
+    // to their own live service after the authenticated Host session is ready.
     const hostableGames = new Set([
       'bff',
       'square-biz',
