@@ -10,6 +10,7 @@ import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
+import { createNomadCardsApi } from './server/nomadCardsApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
 import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
@@ -716,6 +717,11 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
   ttlMs: 3 * 60 * 60 * 1000,
 });
 
+const outRoomStore = createLiveRoomStore(bffPool, {
+  service: 'out',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
+
 
 // A longer cleanup cadence avoids waking the free-tier database constantly.
 // Room expiry is enforced by each game store; this is stale-record cleanup.
@@ -729,6 +735,7 @@ async function runRoomMaintenance() {
     ['see-that', () => seeThatRoomStore.cleanup()],
     ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
     ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
+    ['out', () => outRoomStore.cleanup()],
   ];
 
   const results = await Promise.allSettled(
@@ -789,6 +796,16 @@ const handleWordWranglerApi = createWordWranglerApi({
 // BattleSudoku party rooms (/bs-api)
 const handleBattleSudokuApi = createBattleSudokuApi({
   store: battleSudokuRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+});
+
+// OUT! party card game (/nc-api), with guest display-name identities.
+const handleOutApi = createNomadCardsApi({
+  store: outRoomStore,
   resolveIdentity: resolveStandaloneGameIdentity,
   recordResults: recordStandaloneGameResults,
   claimRoomCode: (options) => roomRegistry.claim(options),
@@ -5626,6 +5643,11 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/nc-api')) {
+      await handleOutApi(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/rr-api')) {
       await rodeoRumbleLive.handleHttp(req, res);
       return;
@@ -5685,6 +5707,7 @@ const server = http.createServer(async (req, res) => {
       '/test-feedback',
       '/bff-api',
       '/bs-api',
+      '/nc-api',
       '/rr-api',
       '/rr-live',
       '/st-api',
