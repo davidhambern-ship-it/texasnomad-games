@@ -26,7 +26,7 @@ const DURATIONS = [90, 150, 240];
 const COUNTDOWN_MS = 4000;
 const GRACE_MS = 1500;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CPU_CREW = [
   { id: 'berna', name: 'Berna' }, { id: 'dexter', name: 'Dexter' }, { id: 'lemonade', name: 'Lemonade' },
   { id: 'carlos', name: 'Carlos' }, { id: 'violet', name: 'Violet' }, { id: 'tank', name: 'Tank' },
