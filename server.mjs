@@ -12,6 +12,7 @@ import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
+import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -1993,7 +1994,20 @@ async function resolveAuthenticatedTngIdentity(req) {
 
 async function resolveStandaloneGameIdentity(req) {
   const resolved = await resolveAuthenticatedTngIdentity(req);
-  return resolved.ok ? resolved.identity : null;
+  if (resolved.ok) return resolved.identity;
+
+  const guestToken = String(req?.headers?.['x-tng-guest-token'] || '').trim();
+  const guest = verifyGuestIdentity(guestToken, {
+    secret: process.env.TNG_GUEST_TOKEN_SECRET,
+  });
+  if (!guest) return null;
+
+  return {
+    guestId: guest.guestId,
+    publicName: guest.publicName,
+    isGuest: true,
+    accountId: null,
+  };
 }
 
 async function claimLegacyPlayerStats(accountId, email) {
@@ -6258,6 +6272,37 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    if ((req.url || '').startsWith('/tng-guest/identity')) {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to create a guest identity.' } });
+        return;
+      }
+      const body = await readJsonBody(req).catch(() => ({}));
+      try {
+        const issued = issueGuestIdentity({
+          name: body?.name,
+          secret: process.env.TNG_GUEST_TOKEN_SECRET,
+        });
+        sendJson(res, 200, {
+          token: issued.token,
+          guest: {
+            id: issued.identity.sub,
+            name: issued.identity.name,
+            expiresAt: issued.identity.exp,
+          },
+        });
+      } catch (error) {
+        const status = error?.code === 'GUEST_NAME_REQUIRED' ? 400 : 503;
+        sendJson(res, status, {
+          error: {
+            code: error?.code || 'GUEST_IDENTITY_UNAVAILABLE',
+            message: status === 400 ? error.message : 'Guest play is not configured on this server yet.',
+          },
+        });
+      }
+      return;
+    }
+
     if ((req.url || '').startsWith('/bernaverse-sso')) {
       await handleBernaverseSso(req, res);
       return;
@@ -6404,6 +6449,7 @@ const server = http.createServer(async (req, res) => {
 
     const apiPrefixes = [
       '/bernaverse-sso',
+      '/tng-guest',
       '/neon-auth',
       '/tng-',
       '/viral-',
