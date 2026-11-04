@@ -1338,8 +1338,7 @@ async function resolveAuthenticatedTngAccount(req) {
         a.id,
         lower(a.email) as email,
         a.auth_subject,
-        u.name as auth_name,
-        u.email_verified
+        u.name as auth_name
       from neon_auth.session s
       join neon_auth."user" u on u.id = s."userId"
       join public.accounts a on a.auth_subject = u.id::text
