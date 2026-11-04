@@ -33,7 +33,7 @@ const lastSpots = new Map();
 const MAX_PLAYERS = 12;
 const COUNTDOWN_MS = 4000;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLORS = ['#ffd700', '#ff5f1f', '#22d3ee', '#3ef08a', '#ff7ad9', '#a855f7', '#f97316', '#60a5fa', '#facc15', '#f43f5e', '#14b8a6', '#e5e7eb'];
 
 // ── scenes ──────────────────────────────────────────────────────────────────
