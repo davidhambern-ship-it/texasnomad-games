@@ -57,8 +57,6 @@ const [
   seeThatServer,
   wordWranglerServer,
   battleSudokuServer,
-  dominoStore,
-  gamesPage,
 ] = await Promise.all([
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
@@ -95,8 +93,6 @@ const [
   text('server/seeThatApi.mjs'),
   text('server/wordWranglerApi.mjs'),
   text('server/battleSudokuApi.mjs'),
-  text('src/api/dominoStore.js'),
-  text('src/pages/Games.jsx'),
 ]);
 
 const pkg = JSON.parse(pkgRaw);
@@ -226,7 +222,7 @@ ok(
   dominoStore.includes("headers['X-TNG-Guest-Token']") &&
     server.includes('const guest = await resolveStandaloneGameIdentity(req)') &&
     server.includes('guestId: verifiedHost.guestId || null') &&
-    gamesPage.includes("dominoes: '/games/dominoes/host'"),
+    games.includes("dominoes: '/games/dominoes/host'"),
   'Dominoes guest host identity is not wired end to end',
 );
 
