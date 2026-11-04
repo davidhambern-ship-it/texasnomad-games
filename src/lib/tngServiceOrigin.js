@@ -12,6 +12,8 @@ function isVercelOrTngHost() {
   const host = currentHost();
   return (
     host.endsWith('.vercel.app') ||
+    host.endsWith('.pages.dev') ||
+    host.endsWith('.workers.dev') ||
     host === 'texasnomadgames.com' ||
     host === 'www.texasnomadgames.com'
   );
