@@ -90,7 +90,30 @@ const tngRelayHtml = sourceHtml.replace(
   legacyRelay,
   "return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;",
 );
-const deployedHtml = tngRelayHtml.replace('</body>', `${bridgeTag}</body>`);
+const roomCodePatches = [
+  [
+    "const newCode=()=>Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[rand(24)]).join('');",
+    "const newCode=()=> 'TN'+Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rand(32)]).join('');",
+  ],
+  [
+    'maxlength="4" placeholder="ABCD"',
+    'maxlength="6" placeholder="TNXXXX"',
+  ],
+  [
+    "if(!/^[A-Z]{4}$/.test(c))",
+    "if(!/^TN[A-Z0-9]{4}$/.test(c))",
+  ],
+];
+
+let roomCodeHtml = tngRelayHtml;
+for (const [before, after] of roomCodePatches) {
+  if (!roomCodeHtml.includes(before)) {
+    throw new Error(`VIRAL room-code source changed; expected patch target not found: ${before}`);
+  }
+  roomCodeHtml = roomCodeHtml.replace(before, after);
+}
+
+const deployedHtml = roomCodeHtml.replace('</body>', `${bridgeTag}</body>`);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, deployedHtml);
