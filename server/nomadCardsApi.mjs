@@ -309,16 +309,18 @@ export function createNomadCardsApi({
       if (tokenSeat?.guestId && String(tokenSeat.guestId) !== String(requestIdentity?.guestId || '')) throw err(403, 'IDENTITY_MISMATCH', 'That seat belongs to another player.');
       const findMe = () => tokenSeat || null;
 
+      const beforePhase = room.game?.phase || null;
+      const beforeTickState = room.game ? JSON.stringify(room.game) : null;
       if (room.game) G.tick(room.game, now);
+      const tickChanged = beforeTickState !== (room.game ? JSON.stringify(room.game) : null);
 
       if (req.method === 'GET' && !m[2]) {
-        const beforePhase = room.game?.phase || null;
         const me = findMe();
         if (me) me.lastSeen = now;
         if (token || room.game) room.updatedAt = now;
 
         await saveRoom(room, {
-          force: beforePhase !== (room.game?.phase || null),
+          force: tickChanged || beforePhase !== (room.game?.phase || null),
         });
 
         const v = view(room, me, now); if (isHost && v.you) v.you.isHost = true;
