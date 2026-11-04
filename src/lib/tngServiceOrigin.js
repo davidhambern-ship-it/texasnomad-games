@@ -4,19 +4,29 @@ function normalizeOrigin(value = '') {
   return String(value || '').trim().replace(/\/+$/, '');
 }
 
+function currentHost() {
+  return typeof window === 'undefined' ? '' : window.location.hostname.toLowerCase();
+}
+
 function isRailwayHost() {
+  return currentHost().endsWith('.up.railway.app');
+}
+
+function isVercelOrTngHost() {
+  const host = currentHost();
   return (
-    typeof window !== 'undefined' &&
-    window.location.hostname.endsWith('.up.railway.app')
+    host.endsWith('.vercel.app') ||
+    host === 'texasnomadgames.com' ||
+    host === 'www.texasnomadgames.com'
   );
 }
 
-// Browser traffic uses one TNG service origin. Railway preview/staging can stay
-// same-origin; the public site uses the first-party auth.texasnomadgames.com
-// domain, which is attached to the same TNG server that owns every API/WS route.
+// The Vercel deployment serves both the frontend and the TNG API/WebSocket
+// function. Use same-origin paths there so browser traffic no longer depends
+// on the Railway-backed auth subdomain. Local dev can still target that service.
 export const TNG_SERVICE_ORIGIN =
   normalizeOrigin(import.meta.env.VITE_TNG_SERVICE_ORIGIN) ||
-  (isRailwayHost() ? '' : LIVE_TNG_SERVICE_ORIGIN);
+  (isRailwayHost() || isVercelOrTngHost() ? '' : LIVE_TNG_SERVICE_ORIGIN);
 
 export function tngServiceUrl(path = '') {
   const suffix = String(path || '').startsWith('/') ? String(path || '') : `/${path}`;
