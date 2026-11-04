@@ -277,6 +277,40 @@ export function createWordWranglerApi({
     }
   }
 
+  function tick(room, now) {
+    let changed = false;
+
+    if (room.phase === 'countdown' && now >= Number(room.startsAt || 0)) {
+      room.phase = 'playing';
+      changed = true;
+    }
+
+    if (room.phase === 'playing' && now >= Number(room.endsAt || 0)) {
+      room.phase = 'over';
+      changed = true;
+    }
+
+    if (room.phase === 'playing') {
+      const { dict, trie, common } = dictionary();
+      for (const rival of room.players) {
+        if (!rival.isAI || !rival.st || now < Number(rival.nextAt || 0)) continue;
+
+        const pick = E.cpuPickWord(rival.st, trie, rival.level, { common });
+        if (pick?.path) {
+          const result = E.applyWord(rival.st, pick.path, dict);
+          if (result.ok) {
+            rival.st = result.state;
+            rival.last = { w: result.word, p: result.points, at: now };
+          }
+        }
+        rival.nextAt = now + E.cpuDelayMs(rival.level);
+        changed = true;
+      }
+    }
+
+    if (changed) room.updatedAt = now;
+  }
+
   return async function handleWordWranglerApi(req, res) {
     const url = new URL(req.url || '/', 'http://localhost');
     const path = url.pathname.replace(/^\/ww-api/, '') || '/';
