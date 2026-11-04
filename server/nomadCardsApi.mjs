@@ -284,7 +284,7 @@ export function createNomadCardsApi({
         const v = view(room, room.players[0], now); v.you.isHost = true;
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
       }
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
@@ -398,7 +398,7 @@ export function createNomadCardsApi({
   // authoritative state, including checkpoint writes.
   const pending = new Map();
   return function queuedRequest(req, res) {
-    const key = new URL(req.url || '/', 'http://localhost').pathname.match(/\/rooms\/([A-Za-z]{4,6})/)?.[1]?.toUpperCase();
+    const key = new URL(req.url || '/', 'http://localhost').pathname.match(/\/rooms\/([A-Z0-9]{4,8})/)?.[1]?.toUpperCase();
     if (!key) return handleNomadCardsApi(req, res);
     const task = (pending.get(key) || Promise.resolve()).catch(() => {}).then(() => handleNomadCardsApi(req, res));
     pending.set(key, task);
