@@ -1,11 +1,11 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { addMinutes } from 'date-fns';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
-import { deviceSessions, displayPairings, hostSessions } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { createPairingCode, hashPairingCode } from '../../server/pairing.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
+import { deviceSessions, displayPairings, hostSessions } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { createPairingCode, hashPairingCode } from '../../pairing.js';
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);

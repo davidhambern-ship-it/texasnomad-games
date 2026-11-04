@@ -1,9 +1,9 @@
 import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
-import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
+import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 

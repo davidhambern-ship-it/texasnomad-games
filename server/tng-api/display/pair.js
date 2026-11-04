@@ -1,10 +1,10 @@
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 import { addHours } from 'date-fns';
 
-import { db } from '../../server/db/client.js';
-import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { createDisplayToken, hashDisplayToken, hashPairingCode } from '../../server/pairing.js';
+import { db } from '../../db/client.js';
+import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { createDisplayToken, hashDisplayToken, hashPairingCode } from '../../pairing.js';
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') return methodNotAllowed(response, ['POST']);

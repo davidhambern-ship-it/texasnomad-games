@@ -1,9 +1,9 @@
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
-import { db } from '../../server/db/client.js';
-import { deviceSessions, gameRooms, hostSessions, playerProfiles, roomParticipants, socialNotifications } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { hashDisplayToken } from '../../server/pairing.js';
+import { db } from '../../db/client.js';
+import { deviceSessions, gameRooms, hostSessions, playerProfiles, roomParticipants, socialNotifications } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { hashDisplayToken } from '../../pairing.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

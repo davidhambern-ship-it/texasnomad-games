@@ -1,10 +1,10 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { randomInt } from 'node:crypto';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
-import { gameRooms, hostSessions } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
+import { gameRooms, hostSessions } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';

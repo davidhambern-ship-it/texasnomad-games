@@ -1,5 +1,5 @@
-import { pool } from '../server/db/client.js';
-import { methodNotAllowed, sendError, sendJson } from '../server/http/respond.js';
+import { pool } from '../db/client.js';
+import { methodNotAllowed, sendError, sendJson } from '../http/respond.js';
 
 export default async function handler(request, response) {
   if (request.method !== 'GET') return methodNotAllowed(response, ['GET']);

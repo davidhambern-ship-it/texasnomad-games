@@ -1,14 +1,14 @@
 import { and, eq, gt, inArray } from 'drizzle-orm';
 
-import { requireAccount } from '../../server/auth/require-account.js';
-import { db } from '../../server/db/client.js';
+import { requireAccount } from '../../auth/require-account.js';
+import { db } from '../../db/client.js';
 import {
   deviceSessions,
   gameRooms,
   participantPrivateState,
   playerProfiles,
   roomParticipants,
-} from '../../server/db/schema.js';
+} from '../../db/schema.js';
 import {
   applySpadesBid,
   defaultSpadesState,
@@ -16,8 +16,8 @@ import {
   isSpadeCard,
   nextSpadesSeat,
   validateSpadesPlay,
-} from '../../server/games/spades.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+} from '../../games/spades.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;

@@ -1,12 +1,12 @@
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
 import {
   gameRooms,
   participantPrivateState,
   roomParticipants,
-} from '../../server/db/schema.js';
+} from '../../db/schema.js';
 import {
   applySpadesBid,
   chooseCpuSpadesBid,
@@ -20,9 +20,9 @@ import {
   shuffleSpadesDeck,
   spadesTeamForSeat,
   validateSpadesPlay,
-} from '../../server/games/spades.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
+} from '../../games/spades.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { recordGameStatEvent } from '../../stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const CPU_SEATS = [

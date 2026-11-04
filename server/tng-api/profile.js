@@ -1,10 +1,10 @@
 import { eq, sql } from 'drizzle-orm';
 
-import { requireUser } from '../server/auth/require-user.js';
-import { findAccountForIdentity } from '../server/auth/require-account.js';
-import { db } from '../server/db/client.js';
-import { accounts, hostStats, playerGameStats, playerProfiles } from '../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../server/http/respond.js';
+import { requireUser } from '../auth/require-user.js';
+import { findAccountForIdentity } from '../auth/require-account.js';
+import { db } from '../db/client.js';
+import { accounts, hostStats, playerGameStats, playerProfiles } from '../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../http/respond.js';
 
 const HANDLE_PATTERN = /^[a-z0-9_]{3,24}$/;
 

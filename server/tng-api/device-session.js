@@ -1,9 +1,9 @@
 import { addDays } from 'date-fns';
 
-import { requireAccount } from '../server/auth/require-account.js';
-import { db } from '../server/db/client.js';
-import { deviceSessions } from '../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../server/http/respond.js';
+import { requireAccount } from '../auth/require-account.js';
+import { db } from '../db/client.js';
+import { deviceSessions } from '../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../http/respond.js';
 
 const ALLOWED_ROLES = new Set(['player', 'host_controller', 'spectator']);
 
