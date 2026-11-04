@@ -99,7 +99,7 @@ const [
   text('server/seeThatApi.mjs'),
   text('server/wordWranglerApi.mjs'),
   text('server/battleSudokuApi.mjs'),
-  text('server/tngApi.mjs'),
+  text('server/tngApiDispatcher.mjs'),
   text('server/auth/require-user.js'),
   text('server/auth/require-account.js'),
   text('server/db/schema.js'),
