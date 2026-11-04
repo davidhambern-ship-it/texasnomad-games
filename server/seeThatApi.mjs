@@ -335,14 +335,14 @@ export function createSeeThatApi({
 
       if (req.method === 'POST' && path === '/rooms') {
         const hostIdentity = await resolveIdentity(req);
-        if (!hostIdentity?.accountId) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting See That.');
+        if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting See That.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now — try again soon.');
         const S = scenes();
-        const code = await newCode(hostIdentity.accountId);
+        const code = await newCode(hostIdentity.accountId || null);
         const room = {
-          code, hostToken: newToken(), hostAccountId: hostIdentity.accountId, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
+          code, hostToken: newToken(), hostAccountId: hostIdentity.accountId || null, hostGuestId: hostIdentity.guestId || null, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
           settings: { sceneId: S.list[0]?.id || 'random', count: 10, seconds: 120, rounds: 3, difficulty: 'normal' }, createdAt: now, updatedAt: now,
         };
         try {
@@ -366,8 +366,8 @@ export function createSeeThatApi({
       if (tokenClaimsHost) {
         const hostIdentity = await resolveIdentity(req);
         isHost = Boolean(
-          hostIdentity?.accountId &&
-          (!room.hostAccountId || String(room.hostAccountId) === String(hostIdentity.accountId))
+          ((hostIdentity?.accountId && String(room.hostAccountId || '') === String(hostIdentity.accountId)) ||
+            (hostIdentity?.guestId && String(room.hostGuestId || '') === String(hostIdentity.guestId)))
         );
       }
       const findMe = () => (token && !tokenClaimsHost ? room.players.find(p => p.token === token) || null : null);
@@ -393,12 +393,13 @@ export function createSeeThatApi({
         room.updatedAt = t;
         if (body.action === 'join') {
           const identity = await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining See That.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining See That.');
           }
 
           let me = findMe() || room.players.find(
-            p => String(p.accountId || '') === String(identity.accountId),
+            p => (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId)),)
           ) || null;
           let issued;
 
@@ -409,7 +410,8 @@ export function createSeeThatApi({
             const used = new Set(room.players.map(p => p.color));
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               color: COLORS.find(c => !used.has(c)) || COLORS[room.players.length % COLORS.length],
