@@ -1,36 +1,36 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
 import {
   gameRooms,
   playerProfiles,
   roomParticipants,
-} from '../../server/db/schema.js';
+} from '../../db/schema.js';
 import {
-  applyWordSearchTimeout,
-  defaultWordSearchState,
-  publicWordSearchState,
-  revealWordSearchWord,
-  startWordSearchGame,
-  submitWordSearchSelection,
-} from '../../server/games/word-search.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
+  applyHangmanGuess,
+  defaultHangmanState,
+  nextHangmanGuessSeat,
+  normalizedHangmanState,
+  publicHangmanState,
+  startHangmanBoard,
+} from '../../games/hangman.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { recordGameStatEvent } from '../../stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 
 async function findRoom(hostSessionId, executor = db) {
   const [room] = await executor.select().from(gameRooms).where(and(
     eq(gameRooms.hostSessionId, hostSessionId),
-    eq(gameRooms.gameId, 'word-search'),
+    eq(gameRooms.gameId, 'hangman'),
     inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
   )).limit(1);
 
   if (!room) {
-    const error = new Error('No active Word Search room is connected to this Host Controller.');
+    const error = new Error('No active Hangman room is connected to this Host Controller.');
     error.statusCode = 404;
-    error.code = 'WORD_SEARCH_ROOM_NOT_FOUND';
+    error.code = 'HANGMAN_ROOM_NOT_FOUND';
     throw error;
   }
 
@@ -47,7 +47,7 @@ async function ensureHostSeat(room, accountId, deviceId, executor = db) {
   if (seatOne && seatOne.accountId !== accountId) {
     const error = new Error('Seat 1 is already occupied by another account.');
     error.statusCode = 409;
-    error.code = 'WORD_SEARCH_HOST_SEAT_TAKEN';
+    error.code = 'HANGMAN_HOST_SEAT_TAKEN';
     throw error;
   }
 
@@ -114,86 +114,52 @@ async function activeParticipants(roomId, executor = db) {
 }
 
 
-async function recordWordSearchRound(room, state, participants, executor = db) {
-  if (state?.phase !== 'finished') return;
+async function recordHangmanRound(room, state, participants, executor = db) {
+  if (
+    state?.phase !== 'finished' ||
+    !['solved', 'stumped'].includes(state?.round_result)
+  ) {
+    return;
+  }
 
-  const winnerSeat = Number(state.winner_seat || 0);
+  const winnerSeat = state.round_result === 'stumped'
+    ? Number(state.word_setter_seat || 0)
+    : Number(state.winner_seat || 0);
+
   const scores = state.scores || {};
+  const baseline = state.round_start_scores || {};
 
   await recordGameStatEvent({
     room,
     statKey: `round:${Number(state.round_number || 1)}`,
     entries: participants.map((player) => ({
       accountId: player.accountId,
-      score: Number(scores[String(player.seatNumber)] || 0),
+      score: Number(scores[String(player.seatNumber)] || 0)
+        - Number(baseline[String(player.seatNumber)] || 0),
       won: winnerSeat > 0 ? Number(player.seatNumber) === winnerSeat : null,
     })),
     result: {
+      roundResult: state.round_result,
       winnerSeat: winnerSeat || null,
-      mode: state.mode || null,
-      difficulty: state.difficulty || null,
+      setterSeat: Number(state.word_setter_seat || 0) || null,
     },
     executor,
   });
 }
 
-async function refreshTimeoutIfNeeded(room) {
-  const state = room.displayState?.gameState || {};
-  if (
-    state.phase !== 'playing' ||
-    state.paused === true ||
-    !state.time_end ||
-    Date.now() < Number(state.time_end)
-  ) {
-    return room;
-  }
-
-  return db.transaction(async (transaction) => {
-    const [lockedRoom] = await transaction.select().from(gameRooms)
-      .where(eq(gameRooms.id, room.id))
-      .limit(1)
-      .for('update');
-
-    const participants = await activeParticipants(lockedRoom.id, transaction);
-    const activeSeats = participants.map((item) => item.seatNumber);
-    const current = lockedRoom.displayState || {};
-    const nextState = applyWordSearchTimeout(current.gameState || {}, activeSeats);
-
-    const [updated] = await transaction.update(gameRooms).set({
-      displayState: {
-        ...current,
-        screen: 'game',
-        gameId: 'word-search',
-        gameState: nextState,
-      },
-      status: 'live',
-      revision: lockedRoom.revision + 1,
-      updatedAt: new Date(),
-    }).where(eq(gameRooms.id, lockedRoom.id)).returning();
-
-    await recordWordSearchRound(updated, nextState, participants, transaction);
-
-    return updated;
-  });
-}
-
 async function responsePayload(room, hostParticipant) {
-  const refreshed = await refreshTimeoutIfNeeded(room);
-  const players = await activeParticipants(refreshed.id);
+  const players = await activeParticipants(room.id);
+  const gameState = room.displayState?.gameState || {};
 
   return {
     room: {
-      id: refreshed.id,
-      roomCode: refreshed.roomCode,
-      gameId: refreshed.gameId,
-      status: refreshed.status,
-      revision: refreshed.revision,
-      updatedAt: refreshed.updatedAt,
-      gameState: publicWordSearchState(
-        refreshed.displayState?.gameState || {},
-        players,
-        1,
-      ),
+      id: room.id,
+      roomCode: room.roomCode,
+      gameId: room.gameId,
+      status: room.status,
+      revision: room.revision,
+      updatedAt: room.updatedAt,
+      gameState: publicHangmanState(gameState, players, 1),
     },
     participant: {
       id: hostParticipant.id,
@@ -221,19 +187,20 @@ export default async function handler(request, response) {
     }
 
     const action = request.body?.action;
-    const allowed = new Set([
-      'start_game',
-      'submit_selection',
-      'pause',
-      'resume',
+    const allowedActions = [
+      'set_board',
+      'guess_letter',
+      'guess_word',
+      'reveal_hint',
       'reveal_word',
-      'reset_match',
-    ]);
+      'reset_round',
+      'new_game',
+    ];
 
-    if (!allowed.has(action)) {
-      const error = new Error('Unknown Word Search Host action.');
+    if (!allowedActions.includes(action)) {
+      const error = new Error('Unknown Hangman Host action.');
       error.statusCode = 400;
-      error.code = 'INVALID_WORD_SEARCH_HOST_ACTION';
+      error.code = 'INVALID_HANGMAN_HOST_ACTION';
       throw error;
     }
 
@@ -242,6 +209,13 @@ export default async function handler(request, response) {
         .where(eq(gameRooms.id, room.id))
         .limit(1)
         .for('update');
+
+      if (!lockedRoom) {
+        const error = new Error('This Hangman room is no longer active.');
+        error.statusCode = 404;
+        error.code = 'HANGMAN_ROOM_NOT_FOUND';
+        throw error;
+      }
 
       const currentHost = await ensureHostSeat(
         lockedRoom,
@@ -252,70 +226,90 @@ export default async function handler(request, response) {
       const participants = await activeParticipants(lockedRoom.id, transaction);
       const activeSeats = participants.map((item) => item.seatNumber);
       const current = lockedRoom.displayState || {};
-      const currentState = current.gameState || {};
-      let nextState;
+      const currentGameState = normalizedHangmanState(current.gameState || {});
+      let nextGameState;
 
-      if (action === 'start_game') {
-        nextState = startWordSearchGame(currentState, {
-          mode: request.body?.mode,
-          difficulty: request.body?.difficulty,
+      if (action === 'set_board') {
+        nextGameState = startHangmanBoard(currentGameState, {
+          actorSeat: 1,
+          word: request.body?.word,
           category: request.body?.category,
+          hint: request.body?.hint,
           activeSeats,
         });
-      } else if (action === 'submit_selection') {
-        nextState = submitWordSearchSelection(currentState, {
+      } else if (action === 'guess_letter' || action === 'guess_word') {
+        nextGameState = applyHangmanGuess(currentGameState, {
           actorSeat: 1,
-          cells: request.body?.cells,
+          actorAccountId: account.id,
           activeSeats,
-        }).state;
-      } else if (action === 'pause') {
-        const remaining = currentState.time_end
-          ? Math.max(0, Number(currentState.time_end) - Date.now())
-          : null;
-        nextState = {
-          ...currentState,
-          paused: true,
-          paused_remaining_ms: remaining,
-          time_end: null,
+          action,
+          letter: request.body?.letter,
+          guess: request.body?.guess,
+        });
+      } else if (action === 'reveal_hint') {
+        nextGameState = {
+          ...currentGameState,
+          hint_revealed: true,
           last_action: {
-            type: 'pause',
-            seatNumber: 1,
-            timestamp: Date.now(),
-          },
-        };
-      } else if (action === 'resume') {
-        const fallback = currentState.mode === 'turn' ? 60_000 : 300_000;
-        const remaining = Math.max(
-          1_000,
-          Number(currentState.paused_remaining_ms || fallback),
-        );
-        nextState = {
-          ...currentState,
-          paused: false,
-          paused_remaining_ms: null,
-          time_end: Date.now() + remaining,
-          last_action: {
-            type: 'resume',
+            type: 'reveal_hint',
+            playerId: account.id,
             seatNumber: 1,
             timestamp: Date.now(),
           },
         };
       } else if (action === 'reveal_word') {
-        nextState = revealWordSearchWord(currentState, activeSeats);
+        const setterSeat = Number(currentGameState.word_setter_seat || 1);
+        nextGameState = {
+          ...currentGameState,
+          phase: 'finished',
+          word_revealed: true,
+          current_turn_seat: null,
+          round_result: 'revealed',
+          winner_seat: null,
+          winner_player_id: null,
+          next_setter_seat: setterSeat,
+          last_action: {
+            type: 'reveal_word',
+            playerId: account.id,
+            seatNumber: 1,
+            timestamp: Date.now(),
+          },
+        };
+      } else if (action === 'reset_round') {
+        const setterSeat = Number(currentGameState.word_setter_seat || 1);
+        nextGameState = {
+          ...currentGameState,
+          phase: 'playing',
+          hint_revealed: false,
+          word_revealed: false,
+          guessed_letters: [],
+          wrong_letters: [],
+          current_turn_seat: nextHangmanGuessSeat(activeSeats, setterSeat, setterSeat),
+          round_result: null,
+          winner_seat: null,
+          winner_player_id: null,
+          next_setter_seat: null,
+          last_action: {
+            type: 'reset_round',
+            playerId: account.id,
+            seatNumber: 1,
+            timestamp: Date.now(),
+          },
+        };
       } else {
-        nextState = defaultWordSearchState();
+        nextGameState = defaultHangmanState();
       }
 
       const [nextRoom] = await transaction.update(gameRooms).set({
         displayState: {
           ...current,
           screen: 'game',
-          gameId: 'word-search',
-          gameState: nextState,
+          gameId: 'hangman',
+          gameState: nextGameState,
         },
-        status: nextState.phase === 'setup' ? 'lobby' : 'live',
+        status: nextGameState.phase === 'setup' ? 'lobby' : 'live',
         revision: lockedRoom.revision + 1,
-        startedAt: lockedRoom.startedAt || (nextState.phase === 'playing' ? new Date() : null),
+        startedAt: lockedRoom.startedAt || (nextGameState.phase === 'playing' ? new Date() : null),
         updatedAt: new Date(),
       }).where(eq(gameRooms.id, lockedRoom.id)).returning();
 
@@ -323,7 +317,7 @@ export default async function handler(request, response) {
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentHost.id));
 
-      await recordWordSearchRound(nextRoom, nextState, participants, transaction);
+      await recordHangmanRound(nextRoom, nextGameState, participants, transaction);
 
       return nextRoom;
     });

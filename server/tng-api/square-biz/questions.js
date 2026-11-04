@@ -1,10 +1,10 @@
 import { desc, eq, sql } from 'drizzle-orm';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
-import { squareBizQuestions } from '../../server/db/schema.js';
-import { normalizeSquareBizQuestion } from '../../server/games/square-biz-trivia.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { requireController } from '../../auth/require-controller.js';
+import { db } from '../../db/client.js';
+import { squareBizQuestions } from '../../db/schema.js';
+import { normalizeSquareBizQuestion } from '../../games/square-biz-trivia.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 function serialize(question) {
   return {

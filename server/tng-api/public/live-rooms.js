@@ -1,8 +1,8 @@
 import { and, inArray, isNull, sql } from 'drizzle-orm';
 
-import { db } from '../../server/db/client.js';
-import { gameRooms, roomParticipants } from '../../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
+import { db } from '../../db/client.js';
+import { gameRooms, roomParticipants } from '../../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const ACTIVE_STATUSES = ['lobby', 'live', 'paused'];
 

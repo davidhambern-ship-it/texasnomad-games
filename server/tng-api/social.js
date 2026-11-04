@@ -10,8 +10,8 @@ import {
   or,
 } from 'drizzle-orm';
 
-import { requireAccount } from '../server/auth/require-account.js';
-import { db } from '../server/db/client.js';
+import { requireAccount } from '../auth/require-account.js';
+import { db } from '../db/client.js';
 import {
   directMessages,
   friendships,
@@ -21,8 +21,8 @@ import {
   playerProfiles,
   roomParticipants,
   socialNotifications,
-} from '../server/db/schema.js';
-import { methodNotAllowed, sendError, sendJson } from '../server/http/respond.js';
+} from '../db/schema.js';
+import { methodNotAllowed, sendError, sendJson } from '../http/respond.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const ACTIVE_HOST_STATUSES = ['ready', 'live'];

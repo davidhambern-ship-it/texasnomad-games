@@ -1,20 +1,20 @@
 import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
-import { requireAccount } from '../../server/auth/require-account.js';
-import { db } from '../../server/db/client.js';
+import { requireAccount } from '../../auth/require-account.js';
+import { db } from '../../db/client.js';
 import {
   deviceSessions,
   gameRooms,
   playerProfiles,
   roomParticipants,
-} from '../../server/db/schema.js';
+} from '../../db/schema.js';
 import {
-  applyWordSearchTimeout,
-  publicWordSearchState,
-  submitWordSearchSelection,
-} from '../../server/games/word-search.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
+  applyHangmanGuess,
+  publicHangmanState,
+  startHangmanBoard,
+} from '../../games/hangman.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { recordGameStatEvent } from '../../stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -94,24 +94,34 @@ async function activeParticipants(roomId, executor = db) {
 }
 
 
-async function recordWordSearchRound(room, state, participants, executor = db) {
-  if (state?.phase !== 'finished') return;
+async function recordHangmanRound(room, state, participants, executor = db) {
+  if (
+    state?.phase !== 'finished' ||
+    !['solved', 'stumped'].includes(state?.round_result)
+  ) {
+    return;
+  }
 
-  const winnerSeat = Number(state.winner_seat || 0);
+  const winnerSeat = state.round_result === 'stumped'
+    ? Number(state.word_setter_seat || 0)
+    : Number(state.winner_seat || 0);
+
   const scores = state.scores || {};
+  const baseline = state.round_start_scores || {};
 
   await recordGameStatEvent({
     room,
     statKey: `round:${Number(state.round_number || 1)}`,
     entries: participants.map((player) => ({
       accountId: player.accountId,
-      score: Number(scores[String(player.seatNumber)] || 0),
+      score: Number(scores[String(player.seatNumber)] || 0)
+        - Number(baseline[String(player.seatNumber)] || 0),
       won: winnerSeat > 0 ? Number(player.seatNumber) === winnerSeat : null,
     })),
     result: {
+      roundResult: state.round_result,
       winnerSeat: winnerSeat || null,
-      mode: state.mode || null,
-      difficulty: state.difficulty || null,
+      setterSeat: Number(state.word_setter_seat || 0) || null,
     },
     executor,
   });
@@ -134,7 +144,7 @@ async function ensurePlayerSeat(room, participant) {
 
     const current = participants.find((item) => item.id === participant.id);
     if (!current) {
-      const error = new Error('Join the room before opening Word Search.');
+      const error = new Error('Join the room before opening Hangman.');
       error.statusCode = 409;
       error.code = 'ROOM_JOIN_REQUIRED';
       throw error;
@@ -150,9 +160,9 @@ async function ensurePlayerSeat(room, participant) {
     const seatNumber = PLAYER_SEATS.find((seat) => !occupied.has(seat));
 
     if (!seatNumber) {
-      const error = new Error('This Word Search room already has three Player seats filled.');
+      const error = new Error('This Hangman room already has three Player seats filled.');
       error.statusCode = 409;
-      error.code = 'WORD_SEARCH_ROOM_FULL';
+      error.code = 'HANGMAN_ROOM_FULL';
       throw error;
     }
 
@@ -167,82 +177,60 @@ async function ensurePlayerSeat(room, participant) {
   });
 }
 
-async function findRoom(roomCode) {
+async function resolvePlayer(request) {
+  const account = await requireAccount(request);
+  const device = await requirePlayerDevice(request, account.id);
+  const roomCode = roomCodeFrom(request);
+
+  if (!ROOM_CODE_PATTERN.test(roomCode)) {
+    const error = new Error('Enter a valid TNG room code.');
+    error.statusCode = 400;
+    error.code = 'INVALID_ROOM_CODE';
+    throw error;
+  }
+
   const [room] = await db.select().from(gameRooms).where(and(
     eq(gameRooms.roomCode, roomCode),
-    eq(gameRooms.gameId, 'word-search'),
+    eq(gameRooms.gameId, 'hangman'),
     inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
   )).limit(1);
 
   if (!room) {
-    const error = new Error('This Word Search room is no longer active.');
+    const error = new Error('This Hangman room is no longer active.');
     error.statusCode = 404;
-    error.code = 'WORD_SEARCH_ROOM_NOT_FOUND';
+    error.code = 'HANGMAN_ROOM_NOT_FOUND';
     throw error;
   }
 
-  return room;
-}
+  const [joined] = await db.select().from(roomParticipants).where(and(
+    eq(roomParticipants.roomId, room.id),
+    eq(roomParticipants.accountId, account.id),
+  )).limit(1);
 
-async function refreshTimeoutIfNeeded(room) {
-  const state = room.displayState?.gameState || {};
-  if (
-    state.phase !== 'playing' ||
-    state.paused === true ||
-    !state.time_end ||
-    Date.now() < Number(state.time_end)
-  ) {
-    return room;
+  if (!joined || joined.leftAt) {
+    const error = new Error('Join the room before opening Hangman.');
+    error.statusCode = 409;
+    error.code = 'ROOM_JOIN_REQUIRED';
+    throw error;
   }
 
-  return db.transaction(async (transaction) => {
-    const [lockedRoom] = await transaction.select().from(gameRooms)
-      .where(eq(gameRooms.id, room.id))
-      .limit(1)
-      .for('update');
-
-    const participants = await activeParticipants(lockedRoom.id, transaction);
-    const activeSeats = participants.map((item) => item.seatNumber);
-    const current = lockedRoom.displayState || {};
-    const nextState = applyWordSearchTimeout(current.gameState || {}, activeSeats);
-
-    if (nextState === current.gameState) return lockedRoom;
-
-    const [updated] = await transaction.update(gameRooms).set({
-      displayState: {
-        ...current,
-        screen: 'game',
-        gameId: 'word-search',
-        gameState: nextState,
-      },
-      status: 'live',
-      revision: lockedRoom.revision + 1,
-      updatedAt: new Date(),
-    }).where(eq(gameRooms.id, lockedRoom.id)).returning();
-
-    await recordWordSearchRound(updated, nextState, participants, transaction);
-
-    return updated;
-  });
+  const participant = await ensurePlayerSeat(room, joined);
+  return { account, device, room, participant };
 }
 
 async function responsePayload(room, participant) {
-  const refreshed = await refreshTimeoutIfNeeded(room);
-  const players = await activeParticipants(refreshed.id);
+  const players = await activeParticipants(room.id);
+  const gameState = room.displayState?.gameState || {};
 
   return {
     room: {
-      id: refreshed.id,
-      roomCode: refreshed.roomCode,
-      gameId: refreshed.gameId,
-      status: refreshed.status,
-      revision: refreshed.revision,
-      updatedAt: refreshed.updatedAt,
-      gameState: publicWordSearchState(
-        refreshed.displayState?.gameState || {},
-        players,
-        participant.seatNumber,
-      ),
+      id: room.id,
+      roomCode: room.roomCode,
+      gameId: room.gameId,
+      status: room.status,
+      revision: room.revision,
+      updatedAt: room.updatedAt,
+      gameState: publicHangmanState(gameState, players, participant.seatNumber),
     },
     participant: {
       id: participant.id,
@@ -258,41 +246,18 @@ export default async function handler(request, response) {
   }
 
   try {
-    const account = await requireAccount(request);
-    const device = await requirePlayerDevice(request, account.id);
-    const roomCode = roomCodeFrom(request);
-
-    if (!ROOM_CODE_PATTERN.test(roomCode)) {
-      const error = new Error('Enter a valid TNG room code.');
-      error.statusCode = 400;
-      error.code = 'INVALID_ROOM_CODE';
-      throw error;
-    }
-
-    const room = await findRoom(roomCode);
-    const [joined] = await db.select().from(roomParticipants).where(and(
-      eq(roomParticipants.roomId, room.id),
-      eq(roomParticipants.accountId, account.id),
-    )).limit(1);
-
-    if (!joined || joined.leftAt) {
-      const error = new Error('Join the room before opening Word Search.');
-      error.statusCode = 409;
-      error.code = 'ROOM_JOIN_REQUIRED';
-      throw error;
-    }
-
-    const participant = await ensurePlayerSeat(room, joined);
+    const context = await resolvePlayer(request);
+    const { account, room, participant } = context;
 
     if (request.method === 'GET') {
       return sendJson(response, 200, await responsePayload(room, participant));
     }
 
     const action = request.body?.action;
-    if (action !== 'submit_selection') {
-      const error = new Error('Unknown Word Search Player action.');
+    if (!['guess_letter', 'guess_word', 'set_board'].includes(action)) {
+      const error = new Error('Unknown Hangman Player action.');
       error.statusCode = 400;
-      error.code = 'INVALID_WORD_SEARCH_PLAYER_ACTION';
+      error.code = 'INVALID_HANGMAN_PLAYER_ACTION';
       throw error;
     }
 
@@ -302,6 +267,13 @@ export default async function handler(request, response) {
         .limit(1)
         .for('update');
 
+      if (!lockedRoom) {
+        const error = new Error('This Hangman room is no longer active.');
+        error.statusCode = 404;
+        error.code = 'HANGMAN_ROOM_NOT_FOUND';
+        throw error;
+      }
+
       const [currentParticipant] = await transaction.select().from(roomParticipants).where(and(
         eq(roomParticipants.roomId, lockedRoom.id),
         eq(roomParticipants.accountId, account.id),
@@ -310,29 +282,42 @@ export default async function handler(request, response) {
 
       const seatNumber = Number(currentParticipant?.seatNumber || 0);
       if (!PLAYER_SEATS.includes(seatNumber)) {
-        const error = new Error('Take a Word Search Player seat before selecting words.');
+        const error = new Error('Take a Hangman Player seat before acting.');
         error.statusCode = 409;
-        error.code = 'WORD_SEARCH_SEAT_REQUIRED';
+        error.code = 'HANGMAN_SEAT_REQUIRED';
         throw error;
       }
 
       const participants = await activeParticipants(lockedRoom.id, transaction);
       const activeSeats = participants.map((item) => item.seatNumber);
       const current = lockedRoom.displayState || {};
-      const result = submitWordSearchSelection(current.gameState || {}, {
-        actorSeat: seatNumber,
-        cells: request.body?.cells,
-        activeSeats,
-      });
+      const currentGameState = current.gameState || {};
+
+      const nextGameState = action === 'set_board'
+        ? startHangmanBoard(currentGameState, {
+            actorSeat: seatNumber,
+            word: request.body?.word,
+            category: request.body?.category,
+            hint: request.body?.hint,
+            activeSeats,
+          })
+        : applyHangmanGuess(currentGameState, {
+            actorSeat: seatNumber,
+            actorAccountId: account.id,
+            activeSeats,
+            action,
+            letter: request.body?.letter,
+            guess: request.body?.guess,
+          });
 
       const [nextRoom] = await transaction.update(gameRooms).set({
         displayState: {
           ...current,
           screen: 'game',
-          gameId: 'word-search',
-          gameState: result.state,
+          gameId: 'hangman',
+          gameState: nextGameState,
         },
-        status: 'live',
+        status: nextGameState.phase === 'setup' ? 'lobby' : 'live',
         revision: lockedRoom.revision + 1,
         startedAt: lockedRoom.startedAt || new Date(),
         updatedAt: new Date(),
@@ -342,7 +327,7 @@ export default async function handler(request, response) {
         lastHeartbeatAt: new Date(),
       }).where(eq(roomParticipants.id, currentParticipant.id));
 
-      await recordWordSearchRound(nextRoom, result.state, participants, transaction);
+      await recordHangmanRound(nextRoom, nextGameState, participants, transaction);
 
       return nextRoom;
     });

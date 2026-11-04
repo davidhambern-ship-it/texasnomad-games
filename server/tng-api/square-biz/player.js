@@ -1,37 +1,74 @@
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
-import { requireController } from '../../server/auth/require-controller.js';
-import { db } from '../../server/db/client.js';
+import { requireAccount } from '../../auth/require-account.js';
+import { db } from '../../db/client.js';
 import {
+  deviceSessions,
   gameRooms,
   playerProfiles,
   roomParticipants,
-} from '../../server/db/schema.js';
+} from '../../db/schema.js';
 import {
   advanceSquareBizClock,
-  assignSquareBizPlayers,
-  forceNextSquareBizTurn,
+  answerSquareBizQuestion,
   publicSquareBizState,
-  replaySquareBizQuestion,
-  resetSquareBizBoard,
-  skipSquareBizIntro,
-  startSquareBizRound,
+  selectSquareBizSquare,
   syncSquareBizRoster,
-} from '../../server/games/square-biz.js';
-import { methodNotAllowed, sendError, sendJson } from '../../server/http/respond.js';
-import { recordGameStatEvent } from '../../server/stats/record-game-stat-event.js';
+} from '../../games/square-biz.js';
+import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
+import { recordGameStatEvent } from '../../stats/record-game-stat-event.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const ROOM_CODE_PATTERN = /^[A-Z0-9]{4,8}$/;
 
-async function findRoom(hostSessionId, executor = db) {
+function getHeader(request, name) {
+  return request?.headers?.[name.toLowerCase()] || request?.headers?.[name] || '';
+}
+
+function roomCodeFrom(request) {
+  return String(getHeader(request, 'x-tng-room-code') || request.body?.roomCode || '')
+    .trim()
+    .toUpperCase();
+}
+
+async function requirePlayerDevice(request, accountId) {
+  const deviceId = getHeader(request, 'x-tng-device-id');
+
+  if (!UUID_PATTERN.test(deviceId)) {
+    const error = new Error('A Player device is required.');
+    error.statusCode = 401;
+    error.code = 'PLAYER_DEVICE_REQUIRED';
+    throw error;
+  }
+
+  const [device] = await db.select().from(deviceSessions).where(and(
+    eq(deviceSessions.id, deviceId),
+    eq(deviceSessions.accountId, accountId),
+    eq(deviceSessions.role, 'player'),
+    eq(deviceSessions.status, 'connected'),
+    gt(deviceSessions.expiresAt, new Date()),
+  )).limit(1);
+
+  if (!device) {
+    const error = new Error('This device is not an active Player device.');
+    error.statusCode = 403;
+    error.code = 'INVALID_PLAYER_DEVICE';
+    throw error;
+  }
+
+  return device;
+}
+
+async function findRoom(roomCode, executor = db) {
   const [room] = await executor.select().from(gameRooms).where(and(
-    eq(gameRooms.hostSessionId, hostSessionId),
+    eq(gameRooms.roomCode, roomCode),
     eq(gameRooms.gameId, 'square-biz'),
     inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
   )).limit(1);
 
   if (!room) {
-    const error = new Error('No active Square Biz room is connected to this Host Controller.');
+    const error = new Error('This Square Biz room is no longer active.');
     error.statusCode = 404;
     error.code = 'SQUARE_BIZ_ROOM_NOT_FOUND';
     throw error;
@@ -137,8 +174,12 @@ async function refreshRoomState(room) {
   };
 }
 
-async function responsePayload(room) {
+async function responsePayload(room, participant, accountId) {
   const refreshed = await refreshRoomState(room);
+  const currentParticipant = refreshed.participants.find(
+    (item) => item.accountId === accountId,
+  ) || participant;
+
   return {
     room: {
       id: refreshed.room.id,
@@ -150,10 +191,14 @@ async function responsePayload(room) {
       gameState: publicSquareBizState(
         refreshed.room.displayState?.gameState || {},
         refreshed.participants,
-        null,
-        { host: true },
+        accountId,
       ),
     },
+    participant: currentParticipant ? {
+      id: currentParticipant.id,
+      seatNumber: currentParticipant.seatNumber,
+      role: currentParticipant.role,
+    } : null,
   };
 }
 
@@ -163,30 +208,40 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { hostSession } = await requireController(request, {
-      hostSessionRequired: true,
-    });
+    const account = await requireAccount(request);
+    await requirePlayerDevice(request, account.id);
 
-    const room = await findRoom(hostSession.id);
+    const roomCode = roomCodeFrom(request);
+    if (!ROOM_CODE_PATTERN.test(roomCode)) {
+      const error = new Error('Enter a valid TNG room code.');
+      error.statusCode = 400;
+      error.code = 'INVALID_ROOM_CODE';
+      throw error;
+    }
+
+    const room = await findRoom(roomCode);
+    const [participant] = await db.select().from(roomParticipants).where(and(
+      eq(roomParticipants.roomId, room.id),
+      eq(roomParticipants.accountId, account.id),
+      isNull(roomParticipants.leftAt),
+    )).limit(1);
+
+    if (!participant) {
+      const error = new Error('Join the room before opening Square Biz.');
+      error.statusCode = 409;
+      error.code = 'ROOM_JOIN_REQUIRED';
+      throw error;
+    }
 
     if (request.method === 'GET') {
-      return sendJson(response, 200, await responsePayload(room));
+      return sendJson(response, 200, await responsePayload(room, participant, account.id));
     }
 
     const action = String(request.body?.action || '').trim();
-    const allowed = new Set([
-      'start_round',
-      'skip_intro',
-      'replay_question',
-      'reset_board',
-      'next_turn',
-      'replay_intro',
-    ]);
-
-    if (!allowed.has(action)) {
-      const error = new Error('Unknown Square Biz Host action.');
+    if (!['select_square', 'answer'].includes(action)) {
+      const error = new Error('Unknown Square Biz Player action.');
       error.statusCode = 400;
-      error.code = 'INVALID_SQUARE_BIZ_HOST_ACTION';
+      error.code = 'INVALID_SQUARE_BIZ_PLAYER_ACTION';
       throw error;
     }
 
@@ -196,55 +251,37 @@ export default async function handler(request, response) {
         .limit(1)
         .for('update');
 
-      if (!lockedRoom) {
-        const error = new Error('Square Biz room not found.');
-        error.statusCode = 404;
-        error.code = 'SQUARE_BIZ_ROOM_NOT_FOUND';
-        throw error;
-      }
-
-      let participants = await activeParticipants(lockedRoom.id, transaction);
+      const participants = await activeParticipants(lockedRoom.id, transaction);
       let state = advanceSquareBizClock(
         syncSquareBizRoster(lockedRoom.displayState?.gameState || {}, participants),
       );
 
-      if (action === 'start_round') {
-        const assigned = await assignSquareBizPlayers(
-          lockedRoom.id,
-          participants,
-          transaction,
-        );
-        participants = await activeParticipants(lockedRoom.id, transaction);
-        state = startSquareBizRound(state, assigned, {
-          introDurationMs: request.body?.introDurationMs,
+      if (action === 'select_square') {
+        state = await selectSquareBizSquare(state, {
+          actorAccountId: account.id,
+          squareIndex: request.body?.squareIndex,
+          executor: transaction,
         });
-      } else if (action === 'skip_intro') {
-        state = skipSquareBizIntro(state);
-      } else if (action === 'replay_question') {
-        state = replaySquareBizQuestion(state);
-      } else if (action === 'reset_board') {
-        state = resetSquareBizBoard(state);
-      } else if (action === 'next_turn') {
-        state = forceNextSquareBizTurn(state);
-      } else if (action === 'replay_intro') {
-        const now = Date.now();
-        const duration = Math.max(1_000, Number(request.body?.introDurationMs || 15_000));
-        state = {
-          ...state,
-          phase: 'intro',
-          intro_started_at: now,
-          intro_ends_at: now + duration,
-          last_action: {
-            type: 'intro_replayed',
-            timestamp: now,
-          },
-        };
+      } else {
+        state = await answerSquareBizQuestion(state, {
+          actorAccountId: account.id,
+          answer: request.body?.answer,
+          executor: transaction,
+        });
       }
+
+      await transaction.update(roomParticipants).set({
+        lastHeartbeatAt: new Date(),
+      }).where(eq(roomParticipants.id, participant.id));
 
       return persistProjectedState(lockedRoom, state, transaction);
     });
 
-    return sendJson(response, 200, await responsePayload(updatedRoom));
+    return sendJson(
+      response,
+      200,
+      await responsePayload(updatedRoom, participant, account.id),
+    );
   } catch (error) {
     return sendError(response, error);
   }
