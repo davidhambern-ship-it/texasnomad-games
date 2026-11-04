@@ -398,8 +398,10 @@ export function createSeeThatApi({
           }
 
           let me = findMe() || room.players.find(
-            p => (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
-              (identity.guestId && String(p.guestId || '') === String(identity.guestId)),)
+            (p) => (
+              (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId))
+            ),
           ) || null;
           let issued;
 
