@@ -61,15 +61,6 @@ export default function Header() {
           </button>
         )}
 
-        {/* Host Link - Desktop */}
-        <Link
-          to="/host"
-          className="hidden md:flex items-center gap-1.5 px-3 py-1 border border-[#BC13FE]/40 text-[#BC13FE]/70 rounded text-[9px] tracking-widest uppercase hover:bg-[#BC13FE]/10 hover:border-[#BC13FE] transition-all mr-2"
-          style={{ fontFamily: "'Press Start 2P', monospace" }}
-        >
-          🎛 HOST
-        </Link>
-
         {/* Mobile Menu Button */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -123,15 +114,6 @@ export default function Header() {
               style={{ fontFamily: "'Press Start 2P', monospace" }}
             >
               👤 PROFILE
-            </Link>
-
-            <Link
-              to="/host"
-              onClick={() => setMobileMenuOpen(false)}
-              className="block px-4 py-3 text-sm tracking-widest text-[#BC13FE]/70 hover:text-[#BC13FE] hover:bg-[#BC13FE]/10 rounded-lg transition-colors uppercase border border-[#BC13FE]/30"
-              style={{ fontFamily: "'Press Start 2P', monospace" }}
-            >
-              🎛 HOST
             </Link>
 
             {user && (
