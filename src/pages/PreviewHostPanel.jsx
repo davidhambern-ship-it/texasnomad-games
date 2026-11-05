@@ -121,9 +121,8 @@ export default function PreviewHostPanel() {
     [activeRoom, selectedGame],
   );
 
-  const hostOnlyActive =
-    displayMode === 'embedded' &&
-    Boolean(embeddedDisplay?.deviceId && embeddedDisplay?.token);
+  // The host room now renders its own live board; no paired Game Display is required.
+  const hostOnlyActive = true;
 
   const hostBoardSideBySide =
     hostOnlyActive &&
@@ -345,57 +344,18 @@ export default function PreviewHostPanel() {
             return;
           }
 
-          const savedMode = readHostDisplayMode();
-
-          if (savedMode === 'embedded') {
-            setHostDisplayMode('embedded');
-            await ensureEmbeddedDisplay(deviceId);
-            if (cancelled) return;
-          } else {
-            setHostDisplayMode('external');
-          }
-
+          setPairing(null);
+          setRepairingDisplay(false);
           setPhase('room');
           return;
         }
 
-        const savedMode = readHostDisplayMode();
-
-        if (session.hostSession?.displayDeviceId) {
-          if (savedMode === 'embedded') {
-            setHostDisplayMode('embedded');
-            await ensureEmbeddedDisplay(deviceId);
-            if (cancelled) return;
-          } else {
-            setHostDisplayMode('external');
-          }
-
-          setError('');
-          setPhase('ready');
-          return;
-        }
-
-        if (savedMode === 'embedded') {
-          setHostDisplayMode('embedded');
-          await ensureEmbeddedDisplay(deviceId);
-          if (cancelled) return;
-
-          const refreshedSession = await tngApi.host.startSession(deviceId);
-          if (cancelled) return;
-
-          setPairing(null);
-          setRepairingDisplay(false);
-          setActiveRoom(refreshedSession.activeRoom || null);
-          setError('');
-          setPhase(refreshedSession.activeRoom ? 'room' : 'ready');
-          return;
-        }
-
-        const pairingPayload = await tngApi.host.createPairing(deviceId);
-        if (cancelled) return;
-
-        setPairing(pairingPayload.pairing);
-        setPhase('pairing');
+        // A host session is ready to create rooms immediately. Game boards
+        // are rendered from the live room API inside this host screen.
+        setPairing(null);
+        setRepairingDisplay(false);
+        setError('');
+        setPhase('ready');
       } catch (initializeError) {
         if (await recoverExpiredPreviewSession(initializeError)) return;
 
