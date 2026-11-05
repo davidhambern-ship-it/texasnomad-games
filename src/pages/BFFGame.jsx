@@ -26,7 +26,7 @@ export default function BFFGame() {
             HOME
           </Link>
           <Link to="/host?game=bff" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">
-            HOST BFF
+            CREATE ROOM
           </Link>
         </div>
       </div>
