@@ -26,7 +26,7 @@ export default function HangmanGame() {
             HOME
           </Link>
           <Link to="/host?game=hangman" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">
-            HOST HANGMAN
+            CREATE ROOM
           </Link>
         </div>
       </div>
