@@ -5,6 +5,16 @@ import TXDDomino from '@/components/domino/TXDDomino';
 // When a new game is added, add it here and it automatically appears in the room launcher.
 export const ALL_GAMES = [
   {
+    id: 'out',
+    title: 'OUT!',
+    subtitle: 'LAST CARD WINS',
+    color: '#FFD700',
+    emoji: '🃏',
+    path: '/games/out',
+    hostPath: '/games/out?host=1',
+    standalone: true,
+  },
+  {
     id: 'bff',
     title: 'BFF',
     subtitle: 'BIGO FAMILY FEUD',
