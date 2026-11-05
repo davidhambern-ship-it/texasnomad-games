@@ -95,7 +95,7 @@ export default function RodeoRumbleGame() {
             <button
               type="button"
               className="rr-mode"
-              onClick={() => window.location.assign(getStoredGuestIdentity() ? '/games/rodeo-rumble?host=1' : '/host?game=rodeo-rumble')}
+              onClick={() => window.location.assign('/room?game=rodeo-rumble')}
             >
               <b>Create Room</b>
               <span>Launch a live room, then 2–8 players join on their phones with a guest name or TNG account.</span>
