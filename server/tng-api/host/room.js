@@ -38,7 +38,7 @@ export default async function handler(request, response) {
         }).where(eq(gameRooms.id, existingRoom.id)).returning();
 
         await transaction.update(hostSessions).set({
-          status: hostSession.displayDeviceId ? 'ready' : 'pairing',
+          status: 'ready',
           updatedAt: now,
         }).where(eq(hostSessions.id, hostSession.id));
 
@@ -57,10 +57,10 @@ export default async function handler(request, response) {
       throw error;
     }
 
-    if (!hostSession.displayDeviceId || !['ready', 'live'].includes(hostSession.status)) {
-      const error = new Error('Connect the Game Display before creating a live room.');
+    if (!['pairing', 'ready', 'live'].includes(hostSession.status)) {
+      const error = new Error('The room controller is not ready to create a live room.');
       error.statusCode = 409;
-      error.code = 'DISPLAY_REQUIRED';
+      error.code = 'HOST_SESSION_NOT_READY';
       throw error;
     }
 
@@ -70,7 +70,7 @@ export default async function handler(request, response) {
     )).limit(1);
 
     if (existingRoom) {
-      const error = new Error('This Host Panel is already connected to a live room.');
+      const error = new Error('This room controller already has an active live room.');
       error.statusCode = 409;
       error.code = 'HOST_ROOM_ALREADY_ACTIVE';
       error.room = existingRoom;
