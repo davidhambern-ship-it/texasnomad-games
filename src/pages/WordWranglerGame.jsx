@@ -13,9 +13,9 @@ import '@/components/wordWrangler/ww.css';
 export default function WordWranglerGame() {
   const [params, setParams] = useSearchParams();
   const roomParam = (params.get('room') || '').toUpperCase();
-  const validRoom = /^[A-Z]{5}$/.test(roomParam) ? roomParam : '';
+  const validRoom = /^TN[A-Z0-9]{4}$/.test(roomParam) ? roomParam : '';
   const displayParam = (params.get('display') || '').toUpperCase();
-  const validDisplay = /^[A-Z]{5}$/.test(displayParam) ? displayParam : '';
+  const validDisplay = /^TN[A-Z0-9]{4}$/.test(displayParam) ? displayParam : '';
   const [launchedFromHost] = useState(() => params.get('host') === '1');
   const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | online
   const [dict, setDict] = useState(null);
