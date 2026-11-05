@@ -685,6 +685,7 @@ export default function Games() {
         sudoku: '/games/sudoku?host=1',
         dominoes: '/games/dominoes/host',
         'rodeo-rumble': '/games/rodeo-rumble?host=1',
+        'word-search': '/host?game=word-search',
       };
       const guestPath = guestHostPaths[hostGameId];
       if (guestPath) {
