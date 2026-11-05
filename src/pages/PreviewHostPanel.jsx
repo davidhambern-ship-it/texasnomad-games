@@ -239,7 +239,7 @@ export default function PreviewHostPanel() {
         return false;
       }
     } catch (sessionError) {
-      console.warn('[PreviewHostPanel] auth recheck failed; keeping Host panel alive:', sessionError);
+      console.warn('[PreviewHostPanel] auth recheck failed; keeping the room screen alive:', sessionError);
       authRecoveryStartedRef.current = false;
       return false;
     }
@@ -929,7 +929,7 @@ export default function PreviewHostPanel() {
                     SINGLE-SCREEN ROOM
                   </div>
                   <p className="mt-3 text-sm leading-relaxed text-white/45">
-                    No second screen required. The live game board will appear inside your Host Panel beside the controls,
+                    No second screen required. The live game board will appear inside this room screen beside the game controls,
                     and TNG will resize it for desktop, tablet, or phone.
                   </p>
 
@@ -975,7 +975,7 @@ export default function PreviewHostPanel() {
                   }`}
                   style={PS2}
                 >
-                  {displayMode === 'embedded' ? 'HOST PANEL ONLY' : 'GAME DISPLAY CONNECTED'}
+                  {displayMode === 'embedded' ? 'SINGLE SCREEN' : 'GAME DISPLAY CONNECTED'}
                 </span>
 
                 {displayMode === 'embedded' ? (
@@ -994,7 +994,7 @@ export default function PreviewHostPanel() {
                     disabled={busy}
                     className="rounded-lg border border-[#BC13FE]/45 px-3 py-2 text-xs text-[#BC13FE] disabled:opacity-40"
                   >
-                    HOST PANEL ONLY
+                    SINGLE SCREEN
                   </button>
                 )}
               </div>
@@ -1082,7 +1082,7 @@ export default function PreviewHostPanel() {
                         onClick={switchToHostOnly}
                         disabled={busy}
                         className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE] disabled:opacity-40"
-                        title="Use Host Panel only"
+                        title="Use Single-screen room"
                       >
                         <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
                         <span className="hidden text-[9px] sm:inline">SINGLE SCREEN</span>
