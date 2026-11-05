@@ -92,7 +92,7 @@ export default function SeeThatGame() {
             {identity.error && <div className="st-err">{identity.error}</div>}
           </div>
           <div className="st-modes">
-            <button type="button" className="st-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}>
+            <button type="button" className="st-mode" onClick={() => { sfx.unlock(); window.location.assign('/room?game=see-that'); }}>
               <div className="st-h">Create Room</div>
               <p>Open this on the TV or a laptop. You pick the scene, players join with the code, and the hunt plays out on the big screen.</p>
             </button>
