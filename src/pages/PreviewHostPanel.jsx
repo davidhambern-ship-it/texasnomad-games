@@ -845,119 +845,11 @@ export default function PreviewHostPanel() {
           </div>
         )}
 
-        {phase === 'pairing' && (
-          <div className="h-full flex items-center justify-center px-2">
-            <div className="w-full max-w-4xl text-center">
-              <Monitor className="w-14 h-14 mx-auto mb-4 text-[#FFD700]" />
-              <h1 className="text-3xl mb-3">Choose Your Host Setup</h1>
-              <p className="mx-auto mb-7 max-w-2xl text-white/45">
-                Use a TV or second screen for the game board, or run everything from this Host device.
-                TNG will remember your choice for the next room.
-              </p>
-
-              {error && <p className="mb-5 text-sm text-red-400">{error}</p>}
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-2xl border border-[#FFD700]/35 bg-[#FFD700]/[0.04] p-5">
-                  <div className="text-[#FFD700]" style={{ ...PS2, fontSize: 8 }}>
-                    USE A GAME DISPLAY
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-white/45">
-                    Best for TVs, projectors, or a second tablet. Players look at the shared board while you keep the controls here.
-                  </p>
-
-                  <div className="mt-5 rounded-xl border-2 border-[#FFD700]/50 p-5 font-mono text-4xl tracking-[0.2em] text-[#FFD700] sm:text-5xl">
-                    {pairing?.code || '------'}
-                  </div>
-
-                  <Link
-                    to="/display"
-                    target="_blank"
-                    className="mt-5 inline-block rounded-lg bg-[#FFD700] px-5 py-3 text-black"
-                    style={{ ...PS2, fontSize: 8 }}
-                  >
-                    OPEN DISPLAY
-                  </Link>
-
-                  <p className="mt-3 text-xs text-white/30">
-                    Enter the code above on the display screen.
-                  </p>
-                </section>
-
-                <section className="rounded-2xl border border-[#BC13FE]/40 bg-[#BC13FE]/[0.05] p-5">
-                  <div className="text-[#BC13FE]" style={{ ...PS2, fontSize: 8 }}>
-                    SINGLE-SCREEN ROOM
-                  </div>
-                  <p className="mt-3 text-sm leading-relaxed text-white/45">
-                    No second screen required. The live game board will appear inside this room screen beside the game controls,
-                    and TNG will resize it for desktop, tablet, or phone.
-                  </p>
-
-                  <div className="mt-6 rounded-xl border border-white/10 bg-black/30 p-4 text-left text-sm text-white/45">
-                    <div>• Desktop / landscape tablet: board + controls side by side</div>
-                    <div className="mt-2">• Portrait tablet / phone: board fits above the controls</div>
-                    <div className="mt-2">• Fullscreen board button included</div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={continueWithoutDisplay}
-                    disabled={busy || !pairing?.code}
-                    className="mt-5 w-full rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 px-5 py-3 text-[#BC13FE] transition hover:bg-[#BC13FE]/20 disabled:opacity-50"
-                    style={{ ...PS2, fontSize: 8 }}
-                  >
-                    {busy ? 'STARTING SINGLE SCREEN MODE…' : 'USE ROOM ONLY'}
-                  </button>
-                </section>
-              </div>
-
-              {repairingDisplay && (
-                <p className="mt-4 text-xs text-white/35">
-                  Your current live room stays intact while you change the screen setup.
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-
         {phase === 'ready' && (
           <div className="h-full flex items-center justify-center">
             <div className="w-full max-w-2xl text-center">
               <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
               <h1 className="text-3xl mb-3">Room Ready</h1>
-
-              <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
-                <span
-                  className={`rounded-full border px-3 py-2 text-[7px] uppercase tracking-widest ${
-                    displayMode === 'embedded'
-                      ? 'border-[#BC13FE]/40 bg-[#BC13FE]/10 text-[#BC13FE]'
-                      : 'border-[#FFD700]/40 bg-[#FFD700]/10 text-[#FFD700]'
-                  }`}
-                  style={PS2}
-                >
-                  {displayMode === 'embedded' ? 'SINGLE SCREEN' : 'GAME DISPLAY CONNECTED'}
-                </span>
-
-                {displayMode === 'embedded' ? (
-                  <button
-                    type="button"
-                    onClick={replaceDisplay}
-                    disabled={busy}
-                    className="rounded-lg border border-[#FFD700]/45 px-3 py-2 text-xs text-[#FFD700] disabled:opacity-40"
-                  >
-                    USE DISPLAY
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={switchToHostOnly}
-                    disabled={busy}
-                    className="rounded-lg border border-[#BC13FE]/45 px-3 py-2 text-xs text-[#BC13FE] disabled:opacity-40"
-                  >
-                    SINGLE SCREEN
-                  </button>
-                )}
-              </div>
 
               {error && <p className="text-red-400 mb-4">{error}</p>}
 
@@ -1011,18 +903,8 @@ export default function PreviewHostPanel() {
                       <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
                         LIVE HOST
                       </span>
-                      <span
-                        className={`inline-flex items-center gap-1 text-[6px] uppercase tracking-widest ${
-                          displayMode === 'embedded' ? 'text-[#BC13FE]' : 'text-[#FFD700]'
-                        }`}
-                        style={PS2}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full animate-pulse ${
-                            displayMode === 'embedded' ? 'bg-[#BC13FE]' : 'bg-[#FFD700]'
-                          }`}
-                        />
-                        {displayMode === 'embedded' ? 'SINGLE SCREEN' : 'DISPLAY'}
+                      <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
+                        HOST CONSOLE
                       </span>
                       <span
                         className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
@@ -1036,40 +918,6 @@ export default function PreviewHostPanel() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-1.5">
-                  {displayMode === 'external' ? (
-                    <>
-                      <button
-                        onClick={switchToHostOnly}
-                        disabled={busy}
-                        className="rounded-lg border border-[#BC13FE]/50 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE] disabled:opacity-40"
-                        title="Use Single-screen room"
-                      >
-                        <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                        <span className="hidden text-[9px] sm:inline">SINGLE SCREEN</span>
-                      </button>
-
-                      <button
-                        onClick={replaceDisplay}
-                        disabled={busy}
-                        className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
-                        title="Re-pair display"
-                      >
-                        <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                        <span className="hidden text-[9px] sm:inline">PAIR</span>
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={replaceDisplay}
-                      disabled={busy}
-                      className="rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2.5 py-2 text-[#FFD700] disabled:opacity-40"
-                      title="Move board to a separate Game Display"
-                    >
-                      <Monitor className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                      <span className="hidden text-[9px] sm:inline">USE DISPLAY</span>
-                    </button>
-                  )}
-
                   <button
                     onClick={endRoom}
                     disabled={busy}
@@ -1085,74 +933,6 @@ export default function PreviewHostPanel() {
             </div>
 
             <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
-
-            <section className="mb-3 rounded-xl border border-white/10 bg-black/55 px-3 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="text-[7px] uppercase tracking-[0.16em] text-green-400" style={PS2}>
-                    PEOPLE IN ROOM
-                  </div>
-                  <div className="rounded-full border border-green-400/25 bg-green-400/[0.06] px-2 py-1 text-[10px] text-green-400">
-                    {roomPeople.length}
-                  </div>
-                </div>
-
-                <div className="text-[10px] text-white/25">
-                  Players and active spectators update automatically.
-                </div>
-              </div>
-
-              {rosterError ? (
-                <div className="mt-3 text-xs text-red-400">{rosterError}</div>
-              ) : roomPeople.length ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {roomPeople.map((person, index) => {
-                    const label =
-                      person.role === 'host'
-                        ? 'HOST'
-                        : person.role === 'spectator'
-                          ? 'SPECTATOR'
-                          : person.seatNumber
-                            ? `SEAT ${person.seatNumber}`
-                            : 'PLAYER';
-
-                    return (
-                      <div
-                        key={person.accountId || person.handle || `${person.role}-${index}`}
-                        className={`rounded-lg border px-3 py-2 ${
-                          person.role === 'spectator'
-                            ? 'border-[#22D3EE]/30 bg-[#22D3EE]/[0.05]'
-                            : person.role === 'host'
-                              ? 'border-[#FFD700]/30 bg-[#FFD700]/[0.05]'
-                              : 'border-[#BC13FE]/30 bg-[#BC13FE]/[0.05]'
-                        }`}
-                      >
-                        <div className="max-w-[180px] truncate text-sm text-white/80">
-                          {person.displayName || person.handle || 'Player'}
-                        </div>
-                        <div
-                          className={`mt-1 text-[6px] uppercase tracking-widest ${
-                            person.role === 'spectator'
-                              ? 'text-[#8DEEFF]'
-                              : person.role === 'host'
-                                ? 'text-[#FFD700]'
-                                : 'text-[#BC13FE]'
-                          }`}
-                          style={PS2}
-                        >
-                          {label}
-                          {person.handle ? ` · @${person.handle}` : ''}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-sm text-white/30">
-                  No connected players or spectators are being reported yet.
-                </div>
-              )}
-            </section>
 
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
@@ -1170,7 +950,7 @@ export default function PreviewHostPanel() {
               <div
                 className={
                   hostBoardSideBySide
-                    ? 'grid min-w-0 grid-cols-[minmax(0,1.08fr)_minmax(360px,.92fr)] items-start gap-3'
+                    ? 'grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)] items-start gap-3'
                     : 'min-w-0 space-y-3'
                 }
               >
@@ -1212,7 +992,82 @@ export default function PreviewHostPanel() {
                   </section>
                 )}
 
-                <section className="min-w-0">
+                <section className="min-w-0 space-y-3">
+                  <div className="rounded-xl border border-[#BC13FE]/30 bg-black/70 px-3 py-3">
+                    <div className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>ROOM INFORMATION</div>
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <span className="text-xs text-white/45">Share this code</span>
+                      <span className="font-mono text-lg tracking-[0.16em] text-[#FFD700]">{activeRoom.roomCode}</span>
+                    </div>
+                    <div className="mt-2 text-xs text-white/35">{roomGame?.title || activeRoom.gameId} · {roomPeople.length} connected</div>
+                  </div>
+                              <section className="mb-3 rounded-xl border border-white/10 bg-black/55 px-3 py-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-[7px] uppercase tracking-[0.16em] text-green-400" style={PS2}>
+                                      PEOPLE IN ROOM
+                                    </div>
+                                    <div className="rounded-full border border-green-400/25 bg-green-400/[0.06] px-2 py-1 text-[10px] text-green-400">
+                                      {roomPeople.length}
+                                    </div>
+                                  </div>
+                  
+                                  <div className="text-[10px] text-white/25">
+                                    Players and active spectators update automatically.
+                                  </div>
+                                </div>
+                  
+                                {rosterError ? (
+                                  <div className="mt-3 text-xs text-red-400">{rosterError}</div>
+                                ) : roomPeople.length ? (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {roomPeople.map((person, index) => {
+                                      const label =
+                                        person.role === 'host'
+                                          ? 'HOST'
+                                          : person.role === 'spectator'
+                                            ? 'SPECTATOR'
+                                            : person.seatNumber
+                                              ? `SEAT ${person.seatNumber}`
+                                              : 'PLAYER';
+                  
+                                      return (
+                                        <div
+                                          key={person.accountId || person.handle || `${person.role}-${index}`}
+                                          className={`rounded-lg border px-3 py-2 ${
+                                            person.role === 'spectator'
+                                              ? 'border-[#22D3EE]/30 bg-[#22D3EE]/[0.05]'
+                                              : person.role === 'host'
+                                                ? 'border-[#FFD700]/30 bg-[#FFD700]/[0.05]'
+                                                : 'border-[#BC13FE]/30 bg-[#BC13FE]/[0.05]'
+                                          }`}
+                                        >
+                                          <div className="max-w-[180px] truncate text-sm text-white/80">
+                                            {person.displayName || person.handle || 'Player'}
+                                          </div>
+                                          <div
+                                            className={`mt-1 text-[6px] uppercase tracking-widest ${
+                                              person.role === 'spectator'
+                                                ? 'text-[#8DEEFF]'
+                                                : person.role === 'host'
+                                                  ? 'text-[#FFD700]'
+                                                  : 'text-[#BC13FE]'
+                                            }`}
+                                            style={PS2}
+                                          >
+                                            {label}
+                                            {person.handle ? ` · @${person.handle}` : ''}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="mt-3 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-3 text-sm text-white/30">
+                                    No connected players or spectators are being reported yet.
+                                  </div>
+                                )}
+                              </section>
                   {roomState?.gameId === 'hangman' && (
                     <HangmanHostPanel controllerId={controllerId} />
                   )}
@@ -1234,12 +1089,8 @@ export default function PreviewHostPanel() {
                   )}
 
                   {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
-                    <div className="py-16 text-center text-white/40">
-                      <div className="text-4xl mb-4">{roomGame?.emoji || '🎮'}</div>
-                      <p>
-                        {roomGame?.title || roomState.gameId} is connected to the new Neon room.
-                        Its game controls are next in the migration queue.
-                      </p>
+                    <div className="rounded-xl border border-white/10 bg-black/50 p-4 text-sm text-white/40">
+                      {roomGame?.title || roomState.gameId} host controls are not yet available in this shared console.
                     </div>
                   )}
                 </section>
