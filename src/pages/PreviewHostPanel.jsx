@@ -39,7 +39,7 @@ function readHostDisplayMode() {
     return 'embedded';
   }
 
-  return 'external';
+  return 'embedded';
 }
 
 function detectHostViewport() {
@@ -260,7 +260,7 @@ export default function PreviewHostPanel() {
   async function createController() {
     const { device } = await tngApi.devices.create({
       role: 'host_controller',
-      deviceLabel: 'Host Controller',
+      deviceLabel: 'Room Controller',
     });
     localStorage.setItem('tng_device_id', device.id);
     localStorage.setItem('tng_connection_role', 'host_controller');
@@ -282,7 +282,7 @@ export default function PreviewHostPanel() {
       }
 
       // HOST_ALREADY_CONTROLLED is intentionally allowed to bubble up.
-      // The Host Panel will show an explicit recovery choice instead of
+      // The Room will show an explicit recovery choice instead of
       // assuming this browser must be the Game Display.
       throw sessionError;
     }
@@ -585,7 +585,7 @@ export default function PreviewHostPanel() {
     } catch (bypassError) {
       setError(
         bypassError?.message ||
-          'TNG could not start Host Panel Only mode.',
+          'TNG could not start Room mode.',
       );
     } finally {
       setBusy(false);
@@ -760,7 +760,7 @@ export default function PreviewHostPanel() {
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
       <header className="fixed inset-x-0 top-0 z-50 h-14 border-b border-[#BC13FE]/40 bg-[#050505]/95 backdrop-blur-xl flex items-center justify-between px-4">
         <Link to="/" className="font-heading tracking-widest">
-          TEXASNOMAD <span className="text-[#FF5F1F]">HOST</span>
+          TEXASNOMAD <span className="text-[#FF5F1F]">ROOM</span>
         </Link>
 
         <div className="flex items-center gap-3">
@@ -768,7 +768,7 @@ export default function PreviewHostPanel() {
             {user?.full_name || user?.email}
           </span>
           <button onClick={signOut} className="text-xs text-white/40">
-            SIGN OUT
+            LEAVE ROOM
           </button>
         </div>
       </header>
@@ -778,7 +778,7 @@ export default function PreviewHostPanel() {
           <div className="h-full flex items-center justify-center text-center">
             <div>
               <Loader2 className="w-10 h-10 animate-spin mx-auto mb-4 text-[#BC13FE]" />
-              <div style={PS2}>STARTING HOST CONTROLLER</div>
+              <div style={PS2}>SETTING UP YOUR ROOM</div>
             </div>
           </div>
         )}
@@ -786,7 +786,7 @@ export default function PreviewHostPanel() {
         {phase === 'error' && (
           <div className="h-full flex items-center justify-center text-center text-red-400">
             <div>
-              <div style={PS2}>HOST CONTROLLER ERROR</div>
+              <div style={PS2}>ROOM SETUP ERROR</div>
               <p className="mt-4">{error}</p>
             </div>
           </div>
@@ -834,7 +834,7 @@ export default function PreviewHostPanel() {
                   disabled={busy}
                   className="px-5 py-3 rounded-lg border border-[#BC13FE]/60 bg-[#BC13FE]/10 text-[#BC13FE] disabled:opacity-40"
                 >
-                  {busy ? 'REJOINING…' : 'REJOIN AS HOST'}
+                  {busy ? 'REJOINING…' : 'REJOIN ROOM'}
                 </button>
 
                 <button
@@ -843,7 +843,7 @@ export default function PreviewHostPanel() {
                   disabled={busy}
                   className="px-5 py-3 rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/5 text-[#FFD700] disabled:opacity-40"
                 >
-                  USE THIS DEVICE AS DISPLAY
+                  USE THIS DEVICE
                 </button>
               </div>
             </div>
@@ -926,7 +926,7 @@ export default function PreviewHostPanel() {
 
                 <section className="rounded-2xl border border-[#BC13FE]/40 bg-[#BC13FE]/[0.05] p-5">
                   <div className="text-[#BC13FE]" style={{ ...PS2, fontSize: 8 }}>
-                    HOST PANEL ONLY
+                    SINGLE-SCREEN ROOM
                   </div>
                   <p className="mt-3 text-sm leading-relaxed text-white/45">
                     No second screen required. The live game board will appear inside your Host Panel beside the controls,
@@ -946,7 +946,7 @@ export default function PreviewHostPanel() {
                     className="mt-5 w-full rounded-lg border-2 border-[#BC13FE]/70 bg-[#BC13FE]/10 px-5 py-3 text-[#BC13FE] transition hover:bg-[#BC13FE]/20 disabled:opacity-50"
                     style={{ ...PS2, fontSize: 8 }}
                   >
-                    {busy ? 'STARTING HOST-ONLY MODE…' : 'USE HOST PANEL ONLY'}
+                    {busy ? 'STARTING SINGLE SCREEN MODE…' : 'USE ROOM ONLY'}
                   </button>
                 </section>
               </div>
@@ -964,7 +964,7 @@ export default function PreviewHostPanel() {
           <div className="h-full flex items-center justify-center">
             <div className="w-full max-w-2xl text-center">
               <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
-              <h1 className="text-3xl mb-3">Host System Ready</h1>
+              <h1 className="text-3xl mb-3">Room Ready</h1>
 
               <div className="mb-5 flex flex-wrap items-center justify-center gap-2">
                 <span
@@ -1062,7 +1062,7 @@ export default function PreviewHostPanel() {
                             displayMode === 'embedded' ? 'bg-[#BC13FE]' : 'bg-[#FFD700]'
                           }`}
                         />
-                        {displayMode === 'embedded' ? 'HOST-ONLY' : 'DISPLAY'}
+                        {displayMode === 'embedded' ? 'SINGLE SCREEN' : 'DISPLAY'}
                       </span>
                       <span
                         className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
@@ -1085,7 +1085,7 @@ export default function PreviewHostPanel() {
                         title="Use Host Panel only"
                       >
                         <ShieldCheck className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                        <span className="hidden text-[9px] sm:inline">HOST ONLY</span>
+                        <span className="hidden text-[9px] sm:inline">SINGLE SCREEN</span>
                       </button>
 
                       <button
