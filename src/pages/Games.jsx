@@ -680,18 +680,22 @@ export default function Games() {
       // account/device session.
       const guestHostPaths = {
         out: '/games/out',
+        bff: '/room?game=bff',
+        'square-biz': '/room?game=square-biz',
+        hangman: '/room?game=hangman',
+        spades: '/room?game=spades',
         'see-that': '/games/see-that?host=1',
         'word-wrangler': '/games/word-wrangler?host=1',
         sudoku: '/games/sudoku?host=1',
         dominoes: '/games/dominoes/host',
         'rodeo-rumble': '/games/rodeo-rumble?host=1',
-        'word-search': '/host?game=word-search',
+        'word-search': '/room?game=word-search',
       };
       const guestPath = guestHostPaths[hostGameId];
       if (guestPath) {
         navigate(guestPath);
       } else {
-        navigate(`/login?next=${encodeURIComponent(`/host?game=${hostGameId}`)}`);
+        navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
       }
       return;
     }
@@ -716,7 +720,7 @@ export default function Games() {
     ]);
 
     if (hostableGames.has(hostGameId)) {
-      navigate(`/host?game=${encodeURIComponent(hostGameId)}`);
+      navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
       return;
     }
 
