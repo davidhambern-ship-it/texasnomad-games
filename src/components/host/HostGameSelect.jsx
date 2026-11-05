@@ -2,7 +2,7 @@ import React from 'react';
 import TXDDomino from '@/components/domino/TXDDomino';
 
 // This list is the single source of truth for ALL games on the platform.
-// When a new game is added, add it here and it automatically appears in the Host Panel.
+// When a new game is added, add it here and it automatically appears in the room launcher.
 export const ALL_GAMES = [
   {
     id: 'bff',
@@ -106,7 +106,7 @@ export const ALL_GAMES = [
   },
 ];
 
-export function HostGameIcon({ game, size = 'lg' }) {
+export function RoomGameIcon({ game, size = 'lg' }) {
   const compact = size === 'sm';
 
   if (game?.iconType === 'viral-stars') {
