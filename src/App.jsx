@@ -144,6 +144,13 @@ const AuthenticatedApp = () => {
     'hangman',
     'spades',
     'word-search',
+    'out',
+    'dominoes',
+    'viral',
+    'see-that',
+    'word-wrangler',
+    'sudoku',
+    'rodeo-rumble',
   ]);
   const requestedHostGameId = new URLSearchParams(location.search).get('game');
   const isGuestHostRoute =
