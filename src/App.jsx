@@ -19,7 +19,7 @@ const HangmanGame = lazy(() => import('@/pages/HangmanGame'));
 const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
-const RoomPage = lazy(() => import('@/pages/PreviewHostPanel'));
+const RoomPage = lazy(() => import('@/pages/RoomPage'));
 const Games = lazy(() => import('@/pages/Games'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -33,7 +33,6 @@ const DominoHost = lazy(() => import('@/pages/DominoHost'));
 const DominoGame = lazy(() => import('@/pages/DominoGame'));
 const OutGame = lazy(() => import('@/pages/OutGame'));
 const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
-const GameDisplay = lazy(() => import('@/pages/GameDisplay'));
 
 function RouteFallback() {
   return (
@@ -132,7 +131,6 @@ const AuthenticatedApp = () => {
     '/register',
     '/forgot-password',
     '/reset-password',
-    '/display',
   ]);
 
   let hasGuestIdentity = false;
@@ -211,8 +209,6 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Navigate to="/welcome" replace />} />
       <Route path="/login" element={<Navigate to="/welcome" replace />} />
       <Route path="/onboarding" element={<Navigate to="/welcome" replace />} />
-      <Route path="/display" element={<GameDisplay />} />
-      <Route path="/spectate/:roomCode" element={<GameDisplay spectator />} />
       <Route path="/forgot-password" element={<Navigate to="/welcome" replace />} />
       <Route path="/reset-password" element={<Navigate to="/welcome" replace />} />
       <Route path="/" element={<HomeGate />} />
