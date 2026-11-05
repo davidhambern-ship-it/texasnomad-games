@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ShieldCheck, Unplug } from 'lucide-react';
 
-import { ALL_GAMES, HostGameIcon } from '@/components/host/HostGameSelect';
+import { ALL_GAMES, RoomGameIcon } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
 import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
@@ -853,7 +853,7 @@ export default function RoomPage() {
                     style={{ borderColor: game.color + '55' }}
                   >
                     <div className="mb-3 flex h-16 items-center justify-center">
-                      <HostGameIcon game={game} />
+                      <RoomGameIcon game={game} />
                     </div>
                     <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
                       {game.title}
@@ -872,7 +872,7 @@ export default function RoomPage() {
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="flex h-7 w-10 items-center justify-center">
-                    <HostGameIcon game={roomGame} size="sm" />
+                    <RoomGameIcon game={roomGame} size="sm" />
                   </span>
                   <div className="min-w-0">
                     <div className="flex min-w-0 items-center gap-2">
