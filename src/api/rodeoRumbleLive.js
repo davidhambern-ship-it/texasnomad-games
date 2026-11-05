@@ -64,7 +64,7 @@ export function rrConnect({ hello, onMessage, onStatus }) {
 
 export async function resolveRodeoRumbleRoom(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{5}$/.test(c)) return null;
+  if (!/^TN[A-Z0-9]{4}$/.test(c)) return null;
   try {
     const response = await fetch(tngServiceUrl(`/rr-api/resolve?code=${encodeURIComponent(c)}`), {
       headers: { Accept: 'application/json' },
