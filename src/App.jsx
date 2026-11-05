@@ -140,10 +140,23 @@ const AuthenticatedApp = () => {
     hasGuestIdentity = Boolean(getStoredGuestIdentity());
   } catch {}
 
+  const guestHostGameIds = new Set([
+    'bff',
+    'square-biz',
+    'hangman',
+    'spades',
+    'word-search',
+  ]);
+  const requestedHostGameId = new URLSearchParams(location.search).get('game');
+  const isGuestHostRoute =
+    location.pathname === '/host' &&
+    guestHostGameIds.has(String(requestedHostGameId || '').trim().toLowerCase());
+
   const isGuestEntryRoute =
     location.pathname === '/games' ||
     location.pathname.startsWith('/games/') ||
     location.pathname.startsWith('/join/') ||
+    isGuestHostRoute ||
     (hasGuestIdentity && (
       location.pathname === '/' ||
       location.pathname === '/games' ||
