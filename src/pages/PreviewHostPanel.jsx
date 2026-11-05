@@ -574,17 +574,9 @@ export default function PreviewHostPanel() {
         return;
       }
 
-      if (session.hostSession?.displayDeviceId) {
-        setPairing(null);
-        setRepairingDisplay(false);
-        setPhase('ready');
-        return;
-      }
-
-      const pairingPayload = await tngApi.host.createPairing(controllerId);
-      setPairing(pairingPayload.pairing);
+      setPairing(null);
       setRepairingDisplay(false);
-      setPhase('pairing');
+      setPhase('ready');
     } catch (reclaimError) {
       setError(
         reclaimError?.message ||
@@ -797,14 +789,7 @@ export default function PreviewHostPanel() {
                   {busy ? 'REJOINING…' : 'REJOIN ROOM'}
                 </button>
 
-                <button
-                  type="button"
-                  onClick={continueAsDisplay}
-                  disabled={busy}
-                  className="px-5 py-3 rounded-lg border border-[#FFD700]/45 bg-[#FFD700]/5 text-[#FFD700] disabled:opacity-40"
-                >
-                  USE THIS DEVICE
-                </button>
+
               </div>
             </div>
           </div>
