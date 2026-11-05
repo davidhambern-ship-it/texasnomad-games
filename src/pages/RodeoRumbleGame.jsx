@@ -49,7 +49,7 @@ export default function RodeoRumbleGame() {
   const join = () => {
     const c = code.trim().toUpperCase();
     if (!/^[A-Z]{5}$/.test(c)) {
-      setErr('Room codes are 5 letters — check the Host screen.');
+      setErr('Room codes use TN followed by 4 letters or numbers.');
       return;
     }
     rrSfx.unlock();
@@ -77,10 +77,10 @@ export default function RodeoRumbleGame() {
                 className="rr-input"
                 style={{ maxWidth: 220 }}
                 value={code}
-                maxLength={5}
+                maxLength={6}
                 placeholder="CODE"
                 onChange={(event) => {
-                  setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ''));
+                  setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
                   setErr('');
                 }}
                 onKeyDown={(event) => event.key === 'Enter' && join()}
