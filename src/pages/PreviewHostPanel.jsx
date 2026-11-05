@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Expand, Loader2, Monitor, ShieldCheck, Unplug } from 'lucide-react';
+import { Loader2, ShieldCheck, Unplug } from 'lucide-react';
 
 import { ALL_GAMES, HostGameIcon } from '@/components/host/HostGameSelect';
 import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
@@ -8,7 +8,6 @@ import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
 import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
 import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
-import GameDisplay from '@/pages/GameDisplay';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getNeonSession } from '@/lib/neonAuth';
@@ -939,44 +938,23 @@ export default function PreviewHostPanel() {
                     : 'min-w-0 space-y-3'
                 }
               >
-                {hostOnlyActive && (
-                  <section
-                    ref={hostBoardRef}
-                    className={`min-w-0 overflow-hidden rounded-2xl border border-[#BC13FE]/30 bg-[#030207] shadow-[0_0_35px_rgba(188,19,254,.08)] ${
-                      hostBoardSideBySide ? 'sticky top-[122px]' : ''
-                    }`}
-                    style={{ height: hostBoardHeight }}
-                    data-host-device={hostViewport.kind}
-                    data-host-orientation={hostViewport.orientation}
-                  >
-                    <div className="flex h-9 items-center justify-between border-b border-white/10 bg-black/75 px-3">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
-                        <span className="text-[6px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
-                          LIVE BOARD · {hostViewport.kind.toUpperCase()} {hostViewport.orientation.toUpperCase()}
-                        </span>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={toggleHostBoardFullscreen}
-                        className="flex items-center gap-1 rounded-md border border-white/10 px-2 py-1 text-[7px] text-white/55"
-                        title="Fullscreen game board"
-                      >
-                        <Expand className="h-3.5 w-3.5" />
-                        <span className="hidden sm:inline">BOARD</span>
-                      </button>
-                    </div>
-
-                    <div className="h-[calc(100%-2.25rem)] min-h-0">
-                      <GameDisplay
-                        embedded
-                        spectator
-                        roomCode={activeRoom.roomCode}
-                      />
-                    </div>
-                  </section>
-                )}
+                <section
+                  ref={hostBoardRef}
+                  className="min-w-0 overflow-hidden rounded-2xl border border-[#BC13FE]/30 bg-[#030207] p-3 shadow-[0_0_35px_rgba(188,19,254,.08)]"
+                  style={{ minHeight: hostBoardHeight }}
+                >
+                  <div className="mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
+                    <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
+                    <span className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
+                      PLAYABLE HOST GAME · {roomGame?.title || activeRoom.gameId}
+                    </span>
+                  </div>
+                  {roomState?.gameId === 'hangman' && <HangmanHostPanel controllerId={controllerId} />}
+                  {roomState?.gameId === 'spades' && <NeonSpadesHostPanel controllerId={controllerId} />}
+                  {roomState?.gameId === 'word-search' && <NeonWordSearchHostPanel controllerId={controllerId} />}
+                  {roomState?.gameId === 'square-biz' && <NeonSquareBizHostPanel controllerId={controllerId} />}
+                  {roomState?.gameId === 'bff' && <NeonBFFHostPanel controllerId={controllerId} />}
+                </section>
 
                 <section className="min-w-0 space-y-3">
                   <div className="rounded-xl border border-[#BC13FE]/30 bg-black/70 px-3 py-3">
@@ -1054,26 +1032,6 @@ export default function PreviewHostPanel() {
                                   </div>
                                 )}
                               </section>
-                  {roomState?.gameId === 'hangman' && (
-                    <HangmanHostPanel controllerId={controllerId} />
-                  )}
-
-                  {roomState?.gameId === 'spades' && (
-                    <NeonSpadesHostPanel controllerId={controllerId} />
-                  )}
-
-                  {roomState?.gameId === 'word-search' && (
-                    <NeonWordSearchHostPanel controllerId={controllerId} />
-                  )}
-
-                  {roomState?.gameId === 'square-biz' && (
-                    <NeonSquareBizHostPanel controllerId={controllerId} />
-                  )}
-
-                  {roomState?.gameId === 'bff' && (
-                    <NeonBFFHostPanel controllerId={controllerId} />
-                  )}
-
                   {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
                     <div className="rounded-xl border border-white/10 bg-black/50 p-4 text-sm text-white/40">
                       {roomGame?.title || roomState.gameId} host controls are not yet available in this shared console.
