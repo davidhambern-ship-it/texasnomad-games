@@ -81,7 +81,7 @@ export default function WordWranglerGame() {
           {identity.error && <div className="ww-err">{identity.error}</div>}
         </div>
         <div className="ww-modes">
-          <button type="button" className="ww-mode" onClick={() => setScreen('online')}>
+          <button type="button" className="ww-mode" onClick={() => window.location.assign('/room?game=word-wrangler')}>
             <div className="ww-h">Online Race</div>
             <p>Create Room, share the code, and race friends live on identical boards.</p>
             <span className="tag">2–8 players</span>
