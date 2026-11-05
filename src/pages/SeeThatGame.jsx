@@ -66,7 +66,7 @@ export default function SeeThatGame() {
   } else {
     const join = () => {
       const c = code.trim().toUpperCase();
-      if (!/^[A-Z]{5}$/.test(c)) { setErr('Game codes are 5 letters.'); return; }
+      if (!/^[A-Z]{5}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; }
       setParams({ room: c }, { replace: true }); setScreen('join');
     };
     body = (
@@ -79,7 +79,7 @@ export default function SeeThatGame() {
           <div className="st-card">
             <div className="st-label-sm" style={{ marginBottom: 8 }}>Joining a game? Enter the code from the big screen</div>
             <div className="st-row">
-              <input className="st-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={5} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
+              <input className="st-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={6} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
               <button type="button" className="st-btn primary" style={{ padding: '12px 22px', fontSize: 18 }} onClick={join}>Join</button>
             </div>
             {err && <div className="st-err">{err}</div>}
