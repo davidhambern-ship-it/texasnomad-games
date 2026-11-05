@@ -16,11 +16,11 @@ export default function WordSearchGame() {
       <div className="max-w-xl rounded-2xl border border-white/10 bg-black/35 p-8">
         <h1 className="font-heading text-4xl text-outlaw-gold">WORD SEARCH</h1>
         <p className="mt-4 text-white/60">
-          Word Search is a live TNG room game. Join with a room code or launch it from the Host Panel.
+          Word Search is a live TNG room game. Join with a room code, or create a room and wait for your players to join.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/" className="rounded-xl border border-outlaw-gold px-5 py-3 text-outlaw-gold">HOME</Link>
-          <Link to="/host?game=word-search" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">CREATE ROOM</Link>
+          <Link to="/room?game=word-search" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">CREATE ROOM</Link>
         </div>
       </div>
     </div>
