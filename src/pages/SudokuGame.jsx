@@ -53,7 +53,7 @@ export default function SudokuGame() {
             {identity.error && <div className="bs-err">{identity.error}</div>}
           </div>
           <div className="bs-modes">
-            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}><div className="bs-h">Create Room</div><p>Open the battle from the Host Panel. Captains join on their phones — 2 to 8 human players.</p></button>
+            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); window.location.assign('/room?game=sudoku'); }}><div className="bs-h">Create Room</div><p>Open the battle from the Host Panel. Captains join on their phones — 2 to 8 human players.</p></button>
           </div>
           <div className="bs-card">
             <div className="bs-label">How it plays</div>
