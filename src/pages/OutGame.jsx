@@ -89,7 +89,7 @@ export default function NomadCardsGame() {
           {err && <div className="nc-err">{err}</div>}
         </div>
         <div className="nc-modes">
-          <button type="button" className="nc-mode" onClick={() => { ncSfx.unlock(); setScreen('host'); }}><b>Host a table</b><span>Play together on your own devices. 2–10 seats including you, with a private hand for everyone. CPUs can fill seats.</span></button>
+          <button type="button" className="nc-mode" onClick={() => { ncSfx.unlock(); setScreen('host'); }}><b>Create Room</b><span>Play together on your own devices. 2–10 seats including you, with a private hand for everyone. CPUs can fill seats.</span></button>
           <div className="nc-mode solo">
             <b>Solo vs CPU</b>
             <div className="nc-row"><span className="nc-label">Rivals</span><SoloOptions solo={solo} setSolo={setSolo} field="rivals" opts={[[1, '1'], [2, '2'], [3, '3'], [5, '5']]} /></div>
