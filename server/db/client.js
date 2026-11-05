@@ -29,8 +29,8 @@ if (typeof Deno !== 'undefined') {
   ]);
 
   const sql = postgres(connectionString, {
-    max: 5,
-    idle_timeout: 30,
+    max: 1,
+    idle_timeout: 5,
     connect_timeout: 10,
     ssl: 'require',
   });
@@ -63,8 +63,8 @@ if (typeof Deno !== 'undefined') {
 
   pool = globalForDatabase.__tngPool ?? new Pool({
     connectionString: normalizePgConnectionString(process.env.DATABASE_URL),
-    max: 5,
-    idleTimeoutMillis: 30_000,
+    max: 1,
+    idleTimeoutMillis: 5_000,
     connectionTimeoutMillis: 10_000,
   });
 
