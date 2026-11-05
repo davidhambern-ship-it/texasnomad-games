@@ -83,7 +83,7 @@ export default function WordWranglerGame() {
         <div className="ww-modes">
           <button type="button" className="ww-mode" onClick={() => setScreen('online')}>
             <div className="ww-h">Online Race</div>
-            <p>Host a room, share the code, and race friends live on identical boards.</p>
+            <p>Create Room, share the code, and race friends live on identical boards.</p>
             <span className="tag">2–8 players</span>
           </button>
         </div>
