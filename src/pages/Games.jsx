@@ -198,13 +198,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {game.launchLabel
-              ? game.launchLabel
-              : game.standalone
-                ? '🚀 LAUNCH GAME'
-                : creating === game.id
-                  ? '⚙ CREATING…'
-                  : '⚡ CREATE ROOM'}
+            Create Room
           </button>
 
           {(!game.standalone || game.supportsDirectJoin) && (
