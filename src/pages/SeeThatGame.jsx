@@ -93,7 +93,7 @@ export default function SeeThatGame() {
           </div>
           <div className="st-modes">
             <button type="button" className="st-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}>
-              <div className="st-h">Host a game</div>
+              <div className="st-h">Create Room</div>
               <p>Open this on the TV or a laptop. You pick the scene, players join with the code, and the hunt plays out on the big screen.</p>
             </button>
             <button type="button" className="st-mode" onClick={() => setScreen('pickscene')}>
