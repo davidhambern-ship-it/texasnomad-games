@@ -34,6 +34,6 @@ export const ncSeat = {
 };
 export async function resolveNomadCardsRoom(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{5}$/.test(c)) return null;
+  if (!/^TN[A-Z0-9]{4}$/.test(c)) return null;
   try { const d = await ncApi.getRoom(c); return d?.room || null; } catch { return null; }
 }
