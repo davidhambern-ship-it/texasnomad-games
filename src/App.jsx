@@ -149,7 +149,7 @@ const AuthenticatedApp = () => {
   ]);
   const requestedHostGameId = new URLSearchParams(location.search).get('game');
   const isGuestHostRoute =
-    location.pathname === '/host' &&
+    (location.pathname === '/room' || location.pathname === '/host') &&
     guestHostGameIds.has(String(requestedHostGameId || '').trim().toLowerCase());
 
   const isGuestEntryRoute =
@@ -235,7 +235,8 @@ const AuthenticatedApp = () => {
       <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
-      <Route path="/host" element={<HostPanel />} />
+      <Route path="/room" element={<HostPanel />} />
+      <Route path="/host" element={<Navigate to="/games" replace />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </Suspense>
