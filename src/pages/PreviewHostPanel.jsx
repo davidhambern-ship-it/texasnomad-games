@@ -971,7 +971,8 @@ export default function PreviewHostPanel() {
                     <div className="h-[calc(100%-2.25rem)] min-h-0">
                       <GameDisplay
                         embedded
-                        displayCredentials={embeddedDisplay}
+                        spectator
+                        roomCode={activeRoom.roomCode}
                       />
                     </div>
                   </section>
