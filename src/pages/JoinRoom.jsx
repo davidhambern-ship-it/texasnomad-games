@@ -172,22 +172,10 @@ export default function JoinRoom() {
           return;
         }
 
-        if (!getStoredGuestIdentity()) {
-          setRoomInfo(registeredRoom);
-          setLoadingRoom(false);
-          return;
-        }
-
-        const payload = await tngApi.spectator.getState(roomCode);
-        if (cancelled) return;
-
-        if (!payload?.room?.gameId) {
-          setError(`Room "${roomCode}" could not be loaded.`);
-          setLoadingRoom(false);
-          return;
-        }
-
-        setRoomInfo(payload.room);
+        // A saved guest identity does not mean this browser has joined this
+        // room. Always show the room's join screen so the player explicitly
+        // registers through /api/player/room before opening the game.
+        setRoomInfo(registeredRoom);
         setLoadingRoom(false);
       } catch (roomError) {
         if (cancelled) return;
