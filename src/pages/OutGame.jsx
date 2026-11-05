@@ -70,7 +70,7 @@ export default function NomadCardsGame() {
   if (screen === 'join' && /^[A-Z]{5}$/.test(room)) return <div className="nc-root full"><NCPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} /></div>;
   if (screen === 'solo') return <div className="nc-root full"><NCSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} settings={{ target: solo.target, stacking: solo.stacking, sevenZero: solo.sevenZero }} onExit={toMenu} /></div>;
 
-  const join = () => { const c = code.trim().toUpperCase(); if (!/^[A-Z]{5}$/.test(c)) { setErr('Table codes are 5 letters.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
+  const join = () => { const c = code.trim().toUpperCase(); if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes must be TN followed by 4 letters or numbers.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
   return (
     <div className="nc-root">
       <Header />
@@ -83,7 +83,7 @@ export default function NomadCardsGame() {
         <div className="nc-panel" style={{ textAlign: 'center' }}>
           <div className="nc-label" style={{ marginBottom: 8 }}>Got a table code?</div>
           <div className="nc-row" style={{ justifyContent: 'center' }}>
-            <input className="nc-input" style={{ maxWidth: 220 }} value={code} maxLength={5} placeholder="CODE" onChange={e => { setCode(e.target.value.toUpperCase()); setErr(''); }} onKeyDown={e => e.key === 'Enter' && join()} />
+            <input className="nc-input" style={{ maxWidth: 220 }} value={code} maxLength={6} placeholder="TN7K4P" onChange={e => { setCode(e.target.value.toUpperCase()); setErr(''); }} onKeyDown={e => e.key === 'Enter' && join()} />
             <button type="button" className="nc-btn primary" onClick={join}>Join</button>
           </div>
           {err && <div className="nc-err">{err}</div>}
