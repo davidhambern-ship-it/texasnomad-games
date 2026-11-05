@@ -163,7 +163,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
 
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
-    if (!/^[A-Z]{5}$/.test(cc)) { setError('Room codes are 5 letters.'); return; }
+    if (!/^TN[A-Z0-9]{4}$/.test(cc)) { setError('Room codes use TN followed by 4 letters or numbers.'); return; }
     if (!identityReady) { setError('Loading your TNG player profile…'); return; }
     setBusy(true); setError('');
     try {
@@ -195,7 +195,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
           <div className="ww-row" style={{ marginTop: 14 }}>
             <button type="button" className="ww-btn primary" disabled={busy || !identityReady} onClick={host}>Host a race</button>
             <span style={{ color: 'var(--ww-dim)' }}>or</span>
-            <input className="ww-input" style={{ width: 150, textTransform: 'uppercase', letterSpacing: '.2em' }} maxLength={5} placeholder="CODE" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join(joinCode)} />
+            <input className="ww-input" style={{ width: 150, textTransform: 'uppercase', letterSpacing: '.2em' }} maxLength={6} placeholder="CODE" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && join(joinCode)} />
             <button type="button" className="ww-btn" disabled={busy || !identityReady} onClick={() => join(joinCode)}>Join</button>
           </div>
           {error && <div className="ww-err">{error}</div>}
