@@ -146,7 +146,7 @@ export default function DominoGame() {
               onChange={e => setCodeInput(e.target.value.toUpperCase())} onKeyDown={e => e.key === 'Enter' && codeInput.trim() && setSearchParams({ room: codeInput.trim() })} />
             <div style={{ display: 'flex', gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
               <button type="button" className="tnd-btn primary" style={{ flex: 1 }} disabled={!codeInput.trim()} onClick={() => setSearchParams({ room: codeInput.trim() })}>Find table</button>
-              <button type="button" className="tnd-btn" onClick={() => navigate('/host?game=dominoes')}>Create Room</button>
+              <button type="button" className="tnd-btn" onClick={() => navigate('/room?game=dominoes')}>Create Room</button>
             </div>
           </div>
         </div></div>
