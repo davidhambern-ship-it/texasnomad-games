@@ -20,7 +20,7 @@ export default function WordSearchGame() {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/" className="rounded-xl border border-outlaw-gold px-5 py-3 text-outlaw-gold">HOME</Link>
-          <Link to="/host?game=word-search" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">HOST WORD SEARCH</Link>
+          <Link to="/host?game=word-search" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">CREATE ROOM</Link>
         </div>
       </div>
     </div>
