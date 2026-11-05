@@ -67,7 +67,7 @@ export default function NomadCardsGame() {
     </div>
   );
   if (screen === 'host') return <div className="nc-root full"><NCHost onExit={toMenu} /></div>;
-  if (screen === 'join' && /^[A-Z]{5}$/.test(room)) return <div className="nc-root full"><NCPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} /></div>;
+  if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) return <div className="nc-root full"><NCPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} /></div>;
   if (screen === 'solo') return <div className="nc-root full"><NCSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} settings={{ target: solo.target, stacking: solo.stacking, sevenZero: solo.sevenZero }} onExit={toMenu} /></div>;
 
   const join = () => { const c = code.trim().toUpperCase(); if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes must be TN followed by 4 letters or numbers.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
