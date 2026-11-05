@@ -1785,9 +1785,10 @@ export default function GameDisplay({
   spectator = false,
   embedded = false,
   displayCredentials = null,
+  roomCode: requestedRoomCode = '',
 }) {
   const spectatorRoomCode = spectator
-    ? decodeURIComponent(window.location.pathname.split('/spectate/')[1] || '').trim().toUpperCase()
+    ? String(requestedRoomCode || decodeURIComponent(window.location.pathname.split('/spectate/')[1] || '')).trim().toUpperCase()
     : '';
   const initial = useMemo(
     () => spectator
