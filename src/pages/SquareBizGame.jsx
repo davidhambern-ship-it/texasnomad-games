@@ -20,7 +20,7 @@ export default function SquareBizGame() {
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link to="/" className="rounded-xl border border-outlaw-gold px-5 py-3 text-outlaw-gold">HOME</Link>
-          <Link to="/host?game=square-biz" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">HOST SQUARE BIZ</Link>
+          <Link to="/host?game=square-biz" className="rounded-xl border border-cyber-purple px-5 py-3 text-cyber-purple">CREATE ROOM</Link>
         </div>
       </div>
     </div>
