@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
@@ -20,6 +20,7 @@ const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
 const RoomPage = lazy(() => import('@/pages/RoomPage'));
+const SharedGamePage = lazy(() => import('@/pages/SharedGamePage'));
 const Games = lazy(() => import('@/pages/Games'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -45,6 +46,13 @@ function RouteFallback() {
 function HomeGate() {
   // The public home page must never require a welcome flag or player session.
   return <Home />;
+}
+
+function RoomRoute() {
+  const [params] = useSearchParams();
+  const gameId = String(params.get('game') || '').trim().toLowerCase();
+  const guestEngineGames = new Set(['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble']);
+  return guestEngineGames.has(gameId) ? <SharedGamePage gameId={gameId} /> : <RoomPage />;
 }
 
 const AuthenticatedApp = () => {
@@ -238,7 +246,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
-      <Route path="/room" element={<RoomPage />} />
+      <Route path="/room" element={<RoomRoute />} />
       <Route path="/host" element={<Navigate to="/games" replace />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
