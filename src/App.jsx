@@ -20,7 +20,6 @@ const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
 const SharedRoomPage = lazy(() => import('@/pages/SharedRoomPage'));
-const SharedGamePage = lazy(() => import('@/pages/SharedGamePage'));
 const Games = lazy(() => import('@/pages/Games'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -50,8 +49,15 @@ function HomeGate() {
 function RoomRoute() {
   const [params] = useSearchParams();
   const gameId = String(params.get('game') || '').trim().toLowerCase();
-  const guestEngineGames = new Set(['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble']);
-  return guestEngineGames.has(gameId) ? <SharedGamePage gameId={gameId} /> : <SharedRoomPage />;
+  const roomGames = new Set([
+    'bff', 'square-biz', 'hangman', 'spades', 'word-search',
+    'out', 'viral', 'dominoes', 'see-that', 'word-wrangler',
+    'sudoku', 'rodeo-rumble',
+  ]);
+
+  // Every game enters the same host room flow. The separate guest-game
+  // launcher caused hosts to land on an unrelated standalone game screen.
+  return roomGames.has(gameId) ? <SharedRoomPage /> : <Navigate to="/games" replace />;
 }
 
 const AuthenticatedApp = () => {
