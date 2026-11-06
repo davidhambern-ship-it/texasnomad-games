@@ -5,9 +5,9 @@ import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
 import {
-  HostControlDeck,
-  HostControlCard,
-} from '@/components/host/GameControllerLayout';
+  GameControlDeck,
+  GameControlCard,
+} from '@/components/games/GameWorkspaceLayout';
 import { getPublicTngName } from '@/lib/publicTngName';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
@@ -321,8 +321,8 @@ export default function WordSearchGameBoard({ controllerId }) {
             </div>
           </section>
 
-          <HostControlDeck>
-            <HostControlCard
+          <GameControlDeck>
+            <GameControlCard
               title="MATCH STATUS"
               accent="#FFD700"
               value={phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
@@ -347,9 +347,9 @@ export default function WordSearchGameBoard({ controllerId }) {
                     : `Waiting for ${getPublicTngName(activePlayer, `Seat ${activeSeat}`)}.`
                   : 'All active players are searching.'}
               </div>
-            </HostControlCard>
+            </GameControlCard>
 
-            <HostControlCard title="PLAYER SCORES" accent="#BC13FE" className="col-span-2 min-[680px]:col-span-2">
+            <GameControlCard title="PLAYER SCORES" accent="#BC13FE" className="col-span-2 min-[680px]:col-span-2">
               <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
                   const seat = Number(player.seatNumber);
@@ -379,9 +379,9 @@ export default function WordSearchGameBoard({ controllerId }) {
                   );
                 })}
               </div>
-            </HostControlCard>
+            </GameControlCard>
 
-            <HostControlCard title="GAME CONTROLS" accent="#FF5F1F" className="min-[680px]:col-span-1">
+            <GameControlCard title="GAME CONTROLS" accent="#FF5F1F" className="min-[680px]:col-span-1">
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
@@ -411,10 +411,10 @@ export default function WordSearchGameBoard({ controllerId }) {
                   Reset
                 </button>
               </div>
-            </HostControlCard>
+            </GameControlCard>
 
 
-          </HostControlDeck>
+          </GameControlDeck>
 
           {phase === 'finished' && (
             <section className="rounded-xl border border-green-400/30 bg-green-400/5 p-3 text-center">
