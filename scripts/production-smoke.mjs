@@ -442,10 +442,10 @@ async function main() {
     }
     const [hostFire, playerFire] = await Promise.all([
       api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
-        action: 'order', kind: 'fire', target: hostTarget, cell: 0,
+        action: 'order', kind: 'fire', target: hostTarget, cell: playerView.payload.room.game.me.ships[0].cells[0],
       }),
       api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
-        action: 'order', kind: 'fire', target: playerTarget, cell: 1,
+        action: 'order', kind: 'fire', target: playerTarget, cell: hostView.payload.room.game.me.ships[0].cells[0],
       }),
     ]);
     if (!hostFire.response.ok || hostFire.payload?.result?.ok !== true ||
@@ -470,8 +470,8 @@ async function main() {
     if (!revealViews) throw new Error('battle orders were accepted but volley did not resolve into reveal phase');
     const hostEvents = revealViews.host.reveal?.events || [];
     const playerEvents = revealViews.player.reveal?.events || [];
-    const hostShot = hostEvents.find((event) => event.by === hostId && event.target === playerId && event.cell === 0 && ['hit', 'miss'].includes(event.result));
-    const playerShot = playerEvents.find((event) => event.by === playerId && event.target === hostId && event.cell === 1 && ['hit', 'miss'].includes(event.result));
+    const hostShot = hostEvents.find((event) => event.by === hostId && event.target === playerId && event.cell === playerView.payload.room.game.me.ships[0].cells[0] && event.result === 'hit');
+    const playerShot = playerEvents.find((event) => event.by === playerId && event.target === hostId && event.cell === hostView.payload.room.game.me.ships[0].cells[0] && event.result === 'hit');
     if (!hostShot || !playerShot) {
       throw new Error(`resolved reveal missing one or both real attacks: host=${JSON.stringify(hostShot)} player=${JSON.stringify(playerShot)}`);
     }
@@ -479,14 +479,31 @@ async function main() {
     const playerSeesHostMark = revealViews.player.players.find((player) => player.id === hostId)?.marks?.[1];
     if (hostSeesPlayerMark !== (hostShot.result === 'hit' ? 'hit' : 'miss') ||
         playerSeesHostMark !== (playerShot.result === 'hit' ? 'hit' : 'miss')) {
-      throw new Error('resolved attack results did not synchronize to both opponents’ battle maps');
+      throw new Error('guaranteed ship hits did not synchronize to both opponents’ battle maps');
     }
+
+    // Confirm the reveal phase rolls forward into the next solve volley for both captains.
+    let nextVolley = null;
+    const nextDeadline = Date.now() + 11000;
+    while (Date.now() < nextDeadline) {
+      const [h, p] = await Promise.all([
+        api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+        api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+      ]);
+      if (h.payload?.room?.game?.phase === 'solve' && p.payload?.room?.game?.phase === 'solve' &&
+          h.payload.room.game.volley === 2 && p.payload.room.game.volley === 2) {
+        nextVolley = true;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!nextVolley) throw new Error('both captains did not return to solve phase for volley 2 after reveal');
 
     await Promise.all([
       api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'leave' }),
       api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'leave' }),
     ]).catch(() => {});
-    return `room ${code}: two guests joined, both solved a correct cell, both entered battle, queued fire orders, and verified resolved hit/miss results on both opposing maps`;
+    return `room ${code}: two guests joined, each solved a correct Sudoku cell, both entered battle, each fired at a known enemy ship cell and confirmed a hit on the opposing map, then both advanced through reveal into solve volley 2`;
   });
 
   await check('unauthenticated API rejects protected profile', async () => {
