@@ -64,7 +64,7 @@ export function BSDisplay({ code }) {
   return <BSBigScreen data={data} isHost={false} act={() => {}} offset={offset} onExit={() => {}} joinUrl={joinUrlFor()} />;
 }
 
-export function BSPlayer({ code, name, identityReady = false, onExit }) {
+export function BSPlayer({ code, name, onExit }) {
   const [seat, setSeat] = useState(() => bsSeat.get(code));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -72,7 +72,6 @@ export function BSPlayer({ code, name, identityReady = false, onExit }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 200); return () => clearInterval(t); }, []);
   const join = async () => {
-    if (!identityReady) { setErr('Loading your TNG player profile…'); return; }
     setBusy(true); setErr(''); sfx.unlock();
     try {
       const d = await bsApi.action(code, seat?.token, 'join');
@@ -95,9 +94,9 @@ export function BSPlayer({ code, name, identityReady = false, onExit }) {
           <h1 className="bs-h bs-logo" style={{ fontSize: 60 }}>Battle<b>Sudoku</b></h1>
           <p className="bs-sub">Battle <b style={{ color: 'var(--bs-brass)', letterSpacing: '.15em' }}>{code}</b> · {room.roster.length} captain{room.roster.length === 1 ? '' : 's'}</p>
           <p className="bs-sub" style={{ marginTop: 14 }}>
-            Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || 'Loading TNG profile…'}</b>
+            Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || 'Guest'}</b>
           </p>
-          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy || !identityReady} onClick={join}>Join the fleet</button>
+          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy} onClick={join}>Join the fleet</button>
           {err && <div className="bs-err">{err}</div>}
           <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={onExit}>Back</button>
         </div>
