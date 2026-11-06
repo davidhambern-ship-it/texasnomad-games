@@ -8,6 +8,7 @@ import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
 import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
 import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
 import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
+import SharedGameBoard from '@/components/host/SharedGameBoard';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getNeonSession } from '@/lib/neonAuth';
@@ -644,11 +645,6 @@ export default function RoomPage() {
     requestedGameHandledRef.current = true;
     clearRequestedGameParam();
 
-    if (game.standalone) {
-      window.location.assign(game.hostPath || game.path);
-      return;
-    }
-
     createRoom(game);
   }, [phase, controllerId, activeRoom, busy]);
 
@@ -843,10 +839,6 @@ export default function RoomPage() {
                     key={game.id}
                     disabled={busy}
                     onClick={() => {
-                      if (game.standalone) {
-                        window.location.assign(game.hostPath || game.path);
-                        return;
-                      }
                       createRoom(game);
                     }}
                     className="border-2 rounded-xl p-6 bg-black/50"
@@ -954,6 +946,9 @@ export default function RoomPage() {
                   {roomState?.gameId === 'word-search' && <NeonWordSearchHostPanel controllerId={controllerId} />}
                   {roomState?.gameId === 'square-biz' && <NeonSquareBizHostPanel controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <NeonBFFHostPanel controllerId={controllerId} />}
+                  {['out', 'see-that', 'word-wrangler', 'sudoku'].includes(roomState?.gameId) && (
+                    <SharedGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
+                  )}
                 </section>
 
                 <section className="min-w-0 space-y-3">
