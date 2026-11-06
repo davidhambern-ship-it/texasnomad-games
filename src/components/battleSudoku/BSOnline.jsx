@@ -30,8 +30,8 @@ const TNG_PUBLIC_ORIGIN = String(
 ).replace(/\/+$/, '');
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, '')}/games/sudoku`;
 
-export function BSHost({ onExit, initialCode = '' }) {
-  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('bs_host') || 'null'); return initialCode && saved?.code !== initialCode ? null : saved; } catch { return null; } });
+export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
+  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('bs_host') || 'null'); return freshRoom || (initialCode && saved?.code !== initialCode) ? null : saved; } catch { return null; } });
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
   const { data, offset, error, apply } = useRoom(seat?.code, seat?.token, () => { try { localStorage.removeItem('bs_host'); } catch { /* ignore */ } setSeat(null); });
