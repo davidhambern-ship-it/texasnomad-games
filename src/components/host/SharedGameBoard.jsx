@@ -3,6 +3,7 @@ import { NCHost } from '@/components/nomadCards/NCOnline';
 import { STHost } from '@/components/seeThat/STOnline';
 import { BSHost } from '@/components/battleSudoku/BSOnline';
 import WWOnline from '@/components/wordWrangler/WWOnline';
+import DominoHost from '@/pages/DominoHost';
 import { loadSceneList } from '@/api/seeThatApi';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
@@ -30,6 +31,7 @@ export default function SharedGameBoard({ gameId, roomCode }) {
   }, [gameId]);
 
   if (gameId === 'out') return <NCHost initialCode={roomCode} onExit={() => {}} />;
+  if (gameId === 'dominoes') return <DominoHost initialCode={roomCode} />;
   if (gameId === 'see-that') {
     if (loadError) return <p className="p-4 text-red-400">{loadError}</p>;
     return scenes.length ? <STHost initialCode={roomCode} scenes={scenes} onExit={() => {}} /> : <p className="p-4 text-white/50">Loading See That scenes…</p>;
