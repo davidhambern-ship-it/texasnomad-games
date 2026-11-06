@@ -2,13 +2,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, ShieldCheck, Unplug } from 'lucide-react';
 
-import { ALL_GAMES, RoomGameIcon } from '@/components/host/HostGameSelect';
+import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
 import HangmanGameBoard from '@/components/games/HangmanGameBoard';
 import SpadesGameBoard from '@/components/games/SpadesGameBoard';
 import WordSearchGameBoard from '@/components/games/WordSearchGameBoard';
 import SquareBizGameBoard from '@/components/games/SquareBizGameBoard';
 import BFFGameBoard from '@/components/games/BFFGameBoard';
-import SharedGameBoard from '@/components/host/SharedGameBoard';
+import RoomGameBoard from '@/components/rooms/RoomGameBoard';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getNeonSession } from '@/lib/neonAuth';
@@ -947,7 +947,7 @@ export default function SharedRoomPage() {
                   {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
                   {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
-                    <SharedGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
+                    <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
                   )}
                 </section>
 
