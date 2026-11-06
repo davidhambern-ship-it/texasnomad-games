@@ -346,7 +346,10 @@ export const tngApi = {
           '',
         ).trim().toUpperCase();
 
-        if (!roomCode) {
+        if (!roomCode || gameId === 'out') {
+          // OUT! owns its room registration in the Nomad Cards service.
+          // Do not send its code through the core-game registry, which
+          // intentionally accepts only the five core multiplayer game IDs.
           requestHostLiveRefresh();
           return result;
         }
