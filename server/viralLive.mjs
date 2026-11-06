@@ -313,7 +313,7 @@ export function createViralLive({
             gameId: 'viral',
             service: 'viral-live',
             kind: 'standalone',
-            joinPath: `/viral/index.html?join=${encodeURIComponent(publicCode)}`,
+            joinPath: `/games/viral?room=${encodeURIComponent(publicCode)}`,
             spectatePath: `/viral/index.html?display=${encodeURIComponent(publicCode)}`,
             hostAccountId: accountId,
             ttlMs: KEEP_STATE_MS,
