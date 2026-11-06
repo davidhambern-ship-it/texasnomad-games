@@ -271,7 +271,7 @@ export default function Welcome() {
           <div className="mt-5 rounded-2xl border border-[#3B82F6]/25 bg-[#3B82F6]/[.05] p-5 text-center">
             <div className="font-heading text-2xl tracking-widest uppercase text-[#3B82F6]">ONE SHARED ROOM SCREEN</div>
             <p className="mx-auto mt-2 max-w-3xl text-sm leading-6 text-white/50">
-              Hosts and players use the same live game room. The host controls appear beside the playable board — no separate Host Panel or Game Display.
+              Hosts and players use the same live game room. Host controls appear beside the playable board.
             </p>
           </div>
         </div>
