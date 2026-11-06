@@ -46,7 +46,7 @@ export default function SeeThatGame() {
 
   let body;
   if (screen === 'host') body = <STHost scenes={scenes} onExit={leaveHost} />;
-  else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <STPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
+  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <STPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
   else if (screen === 'editor') body = <STEditor onExit={toMenu} />;
   else if (screen === 'practice' && practice) body = <STPractice key={practice.k} scene={practice.scene} imageUrl={practice.scene.__img} count={10} seconds={120} name={name || 'You'} onExit={toMenu} />;
   else if (screen === 'pickscene') {
@@ -66,7 +66,7 @@ export default function SeeThatGame() {
   } else {
     const join = () => {
       const c = code.trim().toUpperCase();
-      if (!/^[A-Z]{5}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; }
+      if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; }
       setParams({ room: c }, { replace: true }); setScreen('join');
     };
     body = (
