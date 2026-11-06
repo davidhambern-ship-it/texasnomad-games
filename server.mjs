@@ -1278,8 +1278,7 @@ async function handleTngSessionLifecycle(req, res) {
              updated_at = now()
          where account_id = $1::uuid
            and id = any($2::uuid[])
-           and role::text <> 'game_display'
-         returning id`,
+                    returning id`,
         [resolved.account.id, deviceIds],
       );
 
@@ -1387,7 +1386,6 @@ async function handleTngAccountRoute(req, res) {
       hs.id,
       hs.status::text as status,
       hs.controller_device_id,
-      hs.display_device_id,
       hs.updated_at
     from public.host_sessions hs
     join public.device_sessions ds
