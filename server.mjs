@@ -232,10 +232,14 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 }
 
 async function resolveViralPlayerIdentity({ token }) {
+  const cleanToken = String(token || '').trim();
   const resolved = await resolveAuthenticatedTngIdentity({
-    headers: { authorization: `Bearer ${String(token || '').trim()}` },
+    headers: { authorization: `Bearer ${cleanToken}` },
   }).catch(() => null);
-  return resolved?.ok ? resolved.identity : null;
+  if (resolved?.ok) return resolved.identity;
+  return resolveStandaloneGameIdentity({
+    headers: { 'x-tng-guest-token': cleanToken },
+  }).catch(() => null);
 }
 
 // One public room-code namespace across every TNG game. Standalone games
