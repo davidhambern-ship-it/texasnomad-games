@@ -9,27 +9,28 @@ import '@/components/battleSudoku/bs.css';
 
 // BattleSudoku — /games/sudoku
 //   ?room=CODE     join on a phone
+//   ?display=CODE  read-only big screen (TNG Game Display / second TV)
+//   ?host=1        host a standalone room
 export default function SudokuGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
   const display = (params.get('display') || '').toUpperCase();
-  // Battle Sudoku uses a temporary named guest session; no player account or TNG profile is required.
   const guestIdentity = getStoredGuestIdentity();
   const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' && guestIdentity ? 'host' : 'menu');
   const [code, setCode] = useState('');
-  const [guestName, setGuestName] = useState(guestIdentity?.name || '');
+  const [name, setName] = useState(guestIdentity?.name || '');
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
   const startHosting = async () => {
     try {
-      const identity = await createGuestIdentity(guestName);
-      setGuestName(identity.name);
+      const identity = await createGuestIdentity(name);
+      setName(identity.name);
       setErr('');
       setParams({ host: '1' }, { replace: true });
       setScreen('host');
     } catch (error) {
-      setErr(error.message || 'Enter a player name to host.');
+      setErr(error.message || 'Enter your player name to create a room.');
     }
   };
 
@@ -37,7 +38,7 @@ export default function SudokuGame() {
 
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
-  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={guestName || guestIdentity?.name || ''} onExit={toMenu} />;
+  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={name} onExit={toMenu} />;
   else {
     const join = () => { const c = code.trim().toUpperCase(); if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
     body = (
@@ -50,20 +51,19 @@ export default function SudokuGame() {
           <div className="bs-card">
             <div className="bs-label" style={{ marginBottom: 8 }}>Joining a battle? Enter the code from the big screen</div>
             <div className="bs-row">
-              <input className="bs-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={6} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
+              <input className="bs-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={5} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
               <button type="button" className="bs-btn primary" style={{ padding: '12px 22px', fontSize: 18 }} onClick={join}>Join</button>
             </div>
             {err && <div className="bs-err">{err}</div>}
           </div>
           <div className="bs-card">
             <label className="bs-label" htmlFor="bs-host-name">Your player name</label>
-            <input id="bs-host-name" className="bs-input" style={{ width: '100%', marginTop: 8, fontSize: 18 }} maxLength={32} autoComplete="nickname" placeholder="Enter your name" value={guestName} onChange={e => setGuestName(e.target.value)} />
+            <input id="bs-host-name" className="bs-input" style={{ width: '100%', marginTop: 8, fontSize: 18 }} maxLength={32} autoComplete="nickname" placeholder="Enter your name" value={name} onChange={e => setName(e.target.value)} />
             <p className="bs-sub" style={{ marginTop: 8 }}>No account needed. Your name identifies you in this battle.</p>
           </div>
           <div className="bs-modes">
-            <button type="button" className="bs-mode" disabled={!guestName.trim()} onClick={() => { sfx.unlock(); startHosting(); }}><div className="bs-h">Create Room</div><p>Open a shared live room. Players join with the room code — 2 to 8 human players.</p></button>
+            <button type="button" className="bs-mode" disabled={!name.trim()} onClick={() => { sfx.unlock(); startHosting(); }}><div className="bs-h">Create Room</div><p>Open a shared live room. Players join with the room code — 2 to 8 human players.</p></button>
           </div>
-          {err && <div className="bs-err">{err}</div>}
           <div className="bs-card">
             <div className="bs-label">How it plays</div>
             <ul className="bs-steps">
@@ -85,7 +85,7 @@ export default function SudokuGame() {
     <div className="bs-root">
       {!full && <Header />}
       {body}
-      {!full && <TestFeedbackButton gameId="sudoku" roomCode={room} testerName={guestName || guestIdentity?.name || 'Guest'} />}
+      {!full && <TestFeedbackButton gameId="sudoku" roomCode={room} testerName={name || 'Guest'} />}
     </div>
   );
 }
