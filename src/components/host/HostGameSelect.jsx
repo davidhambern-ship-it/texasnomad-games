@@ -11,8 +11,6 @@ export const ALL_GAMES = [
     color: '#FFD700',
     emoji: '🃏',
     path: '/games/out',
-    hostPath: '/games/out?host=1',
-    standalone: true,
   },
   {
     id: 'bff',
@@ -61,8 +59,6 @@ export const ALL_GAMES = [
     color: '#BC13FE',
     iconType: 'viral-stars',
     path: '/games/viral',
-    hostPath: '/games/viral?host=1',
-    standalone: true,
   },
   {
     id: 'dominoes',
@@ -71,8 +67,6 @@ export const ALL_GAMES = [
     color: '#FFD700',
     iconType: 'domino-32',
     path: '/games/dominoes',
-    hostPath: '/games/dominoes/host',
-    standalone: true,
   },
   {
     id: 'see-that',
@@ -81,8 +75,6 @@ export const ALL_GAMES = [
     color: '#4ade80',
     emoji: '👁',
     path: '/games/see-that',
-    hostPath: '/games/see-that?host=1',
-    standalone: true,
   },
   {
     id: 'word-wrangler',
@@ -91,8 +83,6 @@ export const ALL_GAMES = [
     color: '#BC13FE',
     emoji: '🔤',
     path: '/games/word-wrangler',
-    hostPath: '/games/word-wrangler?host=1',
-    standalone: true,
   },
   {
     id: 'sudoku',
@@ -101,8 +91,6 @@ export const ALL_GAMES = [
     color: '#22d3ee',
     emoji: '⚓',
     path: '/games/sudoku',
-    hostPath: '/games/sudoku?host=1',
-    standalone: true,
   },
   {
     id: 'rodeo-rumble',
@@ -111,8 +99,6 @@ export const ALL_GAMES = [
     color: '#ff7a3d',
     emoji: '🤠',
     path: '/games/rodeo-rumble',
-    hostPath: '/games/rodeo-rumble?host=1',
-    standalone: true,
   },
 ];
 
