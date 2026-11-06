@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ROSTER, fighterById } from '@/lib/brawl/fighters';
 import { STAGE_LIST } from '@/lib/brawl/engine';
-import { clearRodeoDisplayTarget, rrConnect, setRodeoDisplayTarget } from '@/api/rodeoRumbleLive';
+import { rrConnect } from '@/api/rodeoRumbleLive';
 import RRFight from './RRFight';
 import RRPortrait from './RRPortrait';
 import { rrSfx } from './rrSfx';
@@ -27,7 +27,6 @@ export default function RRHost({ onExit, initialCode = '' }) {
   const [lineup, setLineup] = useState(null);
   const [stage, setStage] = useState(() => { try { return localStorage.getItem('rr_stage') || 'mesa'; } catch { return 'mesa'; } });
   const [stocks, setStocks] = useState(3);
-  const [displayAttached, setDisplayAttached] = useState(false);
   const sock = useRef(null);
   const inputs = useRef({});
   const statusAt = useRef(0);
@@ -121,25 +120,7 @@ export default function RRHost({ onExit, initialCode = '' }) {
     });
   }, [phase, stage, stocks, roster, code, lineup, conn]);
 
-  useEffect(() => {
-    if (!code) return undefined;
-    let cancelled = false;
-    const attach = async () => {
-      try {
-        const result = await setRodeoDisplayTarget(code);
-        if (!cancelled) setDisplayAttached(Boolean(result?.displayAttached));
-      } catch (attachError) {
-        if (!cancelled) console.warn('[Rodeo Rumble] display attach failed', attachError);
-      }
-    };
-    attach();
-    const timer = window.setInterval(attach, 45_000);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-      clearRodeoDisplayTarget();
-    };
-  }, [code]);
+;
 
   const remote = useMemo(() => ({
     read(id) {
@@ -217,7 +198,6 @@ export default function RRHost({ onExit, initialCode = '' }) {
 
   const closeRoom = () => {
     sock.current?.send({ t: 'close' });
-    clearRodeoDisplayTarget();
     try { localStorage.removeItem('rr_host'); } catch { /* ignore */ }
     onExit();
   };
@@ -239,7 +219,7 @@ export default function RRHost({ onExit, initialCode = '' }) {
           onSetup={backToLobby}
           onExit={backToLobby}
         />
-        <div className="rr-roomtag">Room <b>{code}</b>{displayAttached ? ' · Display linked' : ''}</div>
+        <div className="rr-roomtag">Room <b>{code}</b></div>
       </div>
     );
   }
