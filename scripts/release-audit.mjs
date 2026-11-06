@@ -43,7 +43,6 @@ const [
   wordWrangler,
   battleSudoku,
   rodeoRumble,
-  dominoHost,
   dominoGame,
   dominoStore,
   tngProfile,
@@ -98,7 +97,6 @@ const [
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
   text('src/pages/RodeoRumbleGame.jsx'),
-  text('src/pages/DominoHost.jsx'),
   text('src/pages/DominoGame.jsx'),
   text('src/api/dominoStore.js'),
   text('src/lib/tngProfile.js'),
@@ -240,9 +238,9 @@ ok(
     !battleSudoku.includes('CPU skill') &&
     !rodeoRumble.includes('Practice') &&
     !rodeoRumble.includes('CPU Fill') &&
-    !dominoHost.includes('chooseAIMove') &&
-    !dominoHost.includes('addAI(') &&
-    !dominoHost.includes('CPU fills empty seats') &&
+    !dominoGame.includes('chooseAIMove') &&
+    !dominoGame.includes('addAI(') &&
+    !dominoGame.includes('CPU fills empty seats') &&
     games.includes("tags: ['2–8 Players', 'Word Game', 'Online Race']") &&
     games.includes("tags: ['2–8 Players', 'Puzzle', 'Party Battle']") &&
     games.includes("tags: ['2–8 Players', 'Fighting', 'Party']") &&
@@ -352,7 +350,7 @@ ok(
 
 ok(
   'Dominoes uses first-party store naming',
-  !dominoHost.includes('base44') &&
+  !dominoGame.includes('base44') &&
     !dominoGame.includes('base44') &&
     !dominoStore.includes('Base44'),
   'Dominoes still carries Base44 compatibility naming',
