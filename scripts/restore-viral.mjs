@@ -128,7 +128,7 @@ for (const [before, after] of roomCodePatches) {
 const hostModePatches = [
   [
     "let setupTab=ROOM_PARAM?'join':'local';",
-    "const HOST_PARAM=(()=>{try{return new URLSearchParams(location.search).get('host')==='1';}catch(e){return false;}})();\\nlet setupTab=HOST_PARAM?'host':ROOM_PARAM?'join':'local';",
+    "const HOST_PARAM=(()=>{try{return new URLSearchParams(location.search).get('host')==='1';}catch(e){return false;}})();\nlet setupTab=HOST_PARAM?'host':ROOM_PARAM?'join':'local';",
   ],
   [
     "let code=ROOMCODE||newCode();",
