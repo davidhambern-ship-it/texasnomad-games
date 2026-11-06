@@ -81,7 +81,7 @@ const [
   text('src/App.jsx'),
   text('src/pages/Games.jsx'),
   text('src/pages/OutGame.jsx'),
-  text('src/components/host/panels/NeonWordSearchHostPanel.jsx'),
+  text('src/components/games/WordSearchGameBoard.jsx'),
   text('src/pages/NeonWordSearchPlayer.jsx'),
   text('server/games/word-search.js'),
   text('server/tng-api/word-search/host.js'),
@@ -95,7 +95,7 @@ const [
   text('server/seeThatApi.mjs'),
   text('server/wordWranglerApi.mjs'),
   text('server/rodeoRumbleLive.mjs'),
-  text('src/pages/PreviewHostPanel.jsx'),
+  text('src/pages/SharedRoomPage.jsx'),
   text('src/pages/WordWranglerGame.jsx'),
   text('src/pages/SudokuGame.jsx'),
   text('src/pages/RodeoRumbleGame.jsx'),
@@ -105,7 +105,7 @@ const [
   text('src/lib/tngProfile.js'),
   text('src/api/tngApi.js'),
   text('src/main.jsx'),
-  text('src/pages/GameDisplay.jsx'),
+  text('src/pages/SharedGamePage.jsx'),
   text('src/lib/tngServiceOrigin.js'),
   text('server.mjs'),
   text('package.json'),
@@ -485,27 +485,35 @@ ok(
 );
 
 ok(
-  'Display single-flight polling',
-  display.includes('let inFlight = false;') &&
-    display.includes("setStatus('reconnecting')"),
-  'Display/Spectator recovery polling is missing',
+  'legacy Host Panel and Game Display pages removed',
+  !(await exists('src/pages/HostPanel.jsx')) &&
+    !(await exists('src/pages/PreviewHostPanel.jsx')) &&
+    !(await exists('src/pages/GameDisplay.jsx')) &&
+    !(await exists('src/components/host/HostConsole.jsx')) &&
+    !(await exists('src/components/host/HostRoomConnect.jsx')) &&
+    !(await exists('src/components/host/panels')),
+  'Legacy Host Panel pages, console, controls, or Game Display code remain',
 );
 
 ok(
-  'Host-only mode separated from legacy test state',
-  hostPanel.includes('function readHostDisplayMode()') &&
-    hostPanel.includes("localStorage.removeItem('tng_player_test_mode')") &&
-    !hostPanel.includes('resumeTestRoom') &&
-    !hostPanel.includes('playerTestMode'),
-  'Host-only production mode is still coupled to the legacy player-test flag',
+  'shared room page has no display pairing workflow',
+  !hostPanel.includes('HostPanel') &&
+    !hostPanel.includes('Host Panel') &&
+    !hostPanel.includes('tngApi.display') &&
+    !hostPanel.includes('createPairing') &&
+    !hostPanel.includes('continueAsDisplay'),
+  'The shared room screen still contains legacy panel or display-pairing code',
 );
 
 ok(
-  'Safari fullscreen fallback',
-  display.includes('webkitRequestFullscreen') &&
-    display.includes('webkitExitFullscreen') &&
-    display.includes('webkitfullscreenchange'),
-  'Safari fullscreen fallbacks are missing',
+  'shared room uses game board modules and shared room board',
+  hostPanel.includes('@/components/games/HangmanGameBoard') &&
+    hostPanel.includes('@/components/games/SpadesGameBoard') &&
+    hostPanel.includes('@/components/games/WordSearchGameBoard') &&
+    hostPanel.includes('@/components/games/SquareBizGameBoard') &&
+    hostPanel.includes('@/components/games/BFFGameBoard') &&
+    display.includes('@/components/rooms/RoomGameBoard'),
+  'The shared room experience is not using the renamed game-board modules',
 );
 
 ok(
