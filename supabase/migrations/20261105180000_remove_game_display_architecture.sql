@@ -19,17 +19,6 @@ ALTER TABLE public.device_sessions
 ALTER TABLE public.device_sessions
   DROP CONSTRAINT IF EXISTS device_sessions_identity_owner_check;
 
-ALTER TABLE public.device_sessions
-  ADD CONSTRAINT device_sessions_identity_owner_check
-  CHECK (
-    role::text IN ('player', 'host_controller', 'spectator')
-    AND (
-      (account_id IS NOT NULL AND guest_id IS NULL)
-      OR
-      (account_id IS NULL AND guest_id IS NOT NULL)
-    )
-  );
-
 -- PostgreSQL enum values cannot be dropped in place; rebuild the enum without
 -- game_display while preserving all remaining role values.
 CREATE TYPE public.connection_role_without_display AS ENUM (
@@ -45,3 +34,14 @@ ALTER TABLE public.device_sessions
 DROP TYPE public.connection_role;
 ALTER TYPE public.connection_role_without_display
   RENAME TO connection_role;
+
+ALTER TABLE public.device_sessions
+  ADD CONSTRAINT device_sessions_identity_owner_check
+  CHECK (
+    role::text IN ('player', 'host_controller', 'spectator')
+    AND (
+      (account_id IS NOT NULL AND guest_id IS NULL)
+      OR
+      (account_id IS NULL AND guest_id IS NOT NULL)
+    )
+  );
