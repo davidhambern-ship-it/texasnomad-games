@@ -166,18 +166,19 @@ export function createRodeoRumbleLive({
     const requested = String(requestedCode || '').trim().toUpperCase();
     if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) return null;
     for (let attempt = 0; attempt < (requested ? 1 : 50); attempt += 1) {
-      const code = requested || 'TN' + Array.from(
+      const code = 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
-      if (rooms.has(code)) continue;
+      const candidate = requested || code;
+      if (rooms.has(candidate)) continue;
       const ok = await claimRoomCode({
-        code,
+        code: candidate,
         gameId: 'rodeo-rumble',
         service: 'rodeo-rumble',
         kind: 'standalone',
-        joinPath: `/games/rodeo-rumble?room=${encodeURIComponent(code)}`,
-        spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(code)}`,
+        joinPath: `/games/rodeo-rumble?room=${encodeURIComponent(candidate)}`,
+        spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(candidate)}`,
         hostAccountId: hostIdentity.accountId || null,
         ttlMs: ROOM_TTL_MS,
         allowExisting: Boolean(requested),
