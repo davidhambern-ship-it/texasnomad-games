@@ -30,7 +30,6 @@ const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
 const RodeoRumbleGame = lazy(() => import('@/pages/RodeoRumbleGame'));
 const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
-const DominoHost = lazy(() => import('@/pages/DominoHost'));
 const DominoGame = lazy(() => import('@/pages/DominoGame'));
 const OutGame = lazy(() => import('@/pages/OutGame'));
 const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
@@ -242,7 +241,6 @@ const AuthenticatedApp = () => {
       <Route path="/games/rodeo-rumble" element={<RodeoRumbleGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
-      <Route path="/games/dominoes/host" element={<DominoHost />} />
       <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
