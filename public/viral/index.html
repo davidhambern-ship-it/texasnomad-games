@@ -1940,14 +1940,15 @@ function renderAll(){ if(!S) return; const rb=$('btnRemote'); if(rb) rb.hidden=!
 
 // ---------- setup ----------
 const ROOM_PARAM=(()=>{try{const c=(new URLSearchParams(location.search).get('room')||'').toUpperCase(); return /^TN[A-Z0-9]{4}$/.test(c)?c:'';}catch(e){return '';}})();
-let setupTab=ROOM_PARAM?'join':'local';
+const HOST_PARAM=(()=>{try{return new URLSearchParams(location.search).get('host')==='1';}catch(e){return false;}})();
+let setupTab=HOST_PARAM?'host':ROOM_PARAM?'join':'local';
 function openSetup(){
   const el=$('setup'); el.hidden=false; $('win').hidden=true;
   const saved=loadSaved();
   const seats=(S&&S.players&&S.players.length&&MODE!=='client')?S.players.map(p=>({name:p.name,token:p.token,ctrl:p.ai?'a':p.remote?'r':'h'})):[
     {name:'Player 1',token:0,ctrl:'h'},{name:'Player 2',token:1,ctrl:'h'},{name:'Lemonade',token:2,ctrl:'a'},{name:'Carlos',token:3,ctrl:'a'}];
   const st={...DEFAULTS,...(S&&S.settings?S.settings:{})};
-  let code=ROOMCODE||newCode();
+  let code=ROOMCODE||ROOM_PARAM||newCode();
   const draw=()=>{
     const online=setupTab==='host';
     el.innerHTML=`<form class="setup" id="setupForm"><h1>VIRAL! game table</h1>
