@@ -410,11 +410,83 @@ async function main() {
       }
     }
 
+    // Set the shortest supported live phase lengths so the production test can
+    // observe a complete attack volley without waiting through default timers.
+    const settings = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostToken, {
+      action: 'settings', solveSec: 30, battleSec: 10, volleys: 6,
+    });
+    if (!settings.response.ok) throw new Error('host could not set test volley timings');
+
+    // Wait for the server-owned solve timer to advance into battle.
+    let battleView = null;
+    const battleDeadline = Date.now() + 40000;
+    while (Date.now() < battleDeadline) {
+      const [h, p] = await Promise.all([
+        api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+        api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+      ]);
+      if (h.payload?.room?.game?.phase === 'battle' && p.payload?.room?.game?.phase === 'battle') {
+        battleView = { host: h.payload.room.game, player: p.payload.room.game };
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+    if (!battleView) throw new Error('both sessions did not advance from solve into battle phase');
+
+    const hostId = battleView.host.me.id;
+    const playerId = battleView.player.me.id;
+    const hostTarget = battleView.host.me.rival;
+    const playerTarget = battleView.player.me.rival;
+    if (hostTarget !== playerId || playerTarget !== hostId) {
+      throw new Error('captains were not assigned each other as battle targets');
+    }
+    const [hostFire, playerFire] = await Promise.all([
+      api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
+        action: 'order', kind: 'fire', target: hostTarget, cell: 0,
+      }),
+      api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
+        action: 'order', kind: 'fire', target: playerTarget, cell: 1,
+      }),
+    ]);
+    if (!hostFire.response.ok || hostFire.payload?.result?.ok !== true ||
+        !playerFire.response.ok || playerFire.payload?.result?.ok !== true) {
+      throw new Error(`one or both captains could not queue a fire order: host=${JSON.stringify(hostFire.payload?.result)} player=${JSON.stringify(playerFire.payload?.result)}`);
+    }
+
+    // Poll until the battle timer resolves both simultaneous attacks.
+    let revealViews = null;
+    const revealDeadline = Date.now() + 16000;
+    while (Date.now() < revealDeadline) {
+      const [h, p] = await Promise.all([
+        api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+        api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+      ]);
+      if (h.payload?.room?.game?.phase === 'reveal' && p.payload?.room?.game?.phase === 'reveal') {
+        revealViews = { host: h.payload.room.game, player: p.payload.room.game };
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!revealViews) throw new Error('battle orders were accepted but volley did not resolve into reveal phase');
+    const hostEvents = revealViews.host.reveal?.events || [];
+    const playerEvents = revealViews.player.reveal?.events || [];
+    const hostShot = hostEvents.find((event) => event.by === hostId && event.target === playerId && event.cell === 0 && ['hit', 'miss'].includes(event.result));
+    const playerShot = playerEvents.find((event) => event.by === playerId && event.target === hostId && event.cell === 1 && ['hit', 'miss'].includes(event.result));
+    if (!hostShot || !playerShot) {
+      throw new Error(`resolved reveal missing one or both real attacks: host=${JSON.stringify(hostShot)} player=${JSON.stringify(playerShot)}`);
+    }
+    const hostSeesPlayerMark = revealViews.host.players.find((player) => player.id === playerId)?.marks?.[0];
+    const playerSeesHostMark = revealViews.player.players.find((player) => player.id === hostId)?.marks?.[1];
+    if (hostSeesPlayerMark !== (hostShot.result === 'hit' ? 'hit' : 'miss') ||
+        playerSeesHostMark !== (playerShot.result === 'hit' ? 'hit' : 'miss')) {
+      throw new Error('resolved attack results did not synchronize to both opponents’ battle maps');
+    }
+
     await Promise.all([
       api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'leave' }),
       api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'leave' }),
     ]).catch(() => {});
-    return `room ${code}: 2 guests joined; both locked fleets, entered solve phase, and each submitted a correct Sudoku move (cell ${cell + 1}, digit ${digit}) verified on their own board`;
+    return `room ${code}: two guests joined, both solved a correct cell, both entered battle, queued fire orders, and verified resolved hit/miss results on both opposing maps`;
   });
 
   await check('unauthenticated API rejects protected profile', async () => {
