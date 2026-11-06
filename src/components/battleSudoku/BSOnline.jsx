@@ -27,7 +27,7 @@ function useRoom(code, token, onGone) {
   return { data, offset, error, apply };
 }
 const TNG_PUBLIC_ORIGIN = String(
-  import.meta.env.VITE_TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
+  import.meta.env.VITE_TNG_PUBLIC_ORIGIN || 'https://www.texasnomadgames.com',
 ).replace(/\/+$/, '');
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, '')}/games/sudoku`;
 
