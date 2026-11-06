@@ -36,7 +36,7 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 }
 
 export const wwApi = {
-  createRoom: (name) => call('/rooms', { method: 'POST', body: { name } }),
+  createRoom: (name, roomCode) => call('/rooms', { method: 'POST', body: { name, roomCode } }),
   getRoom: (code, token, full = false) => call(`/rooms/${encodeURIComponent(code)}${full ? '?full=1' : ''}`, { token }),
   action: (code, token, action, payload = {}) => call(`/rooms/${encodeURIComponent(code)}/action`, { method: 'POST', token, body: { action, ...payload } }),
 };
