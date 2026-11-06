@@ -27,8 +27,8 @@ function useRoom(code, token, onGone) {
 const TNG_PUBLIC_ORIGIN = String((import.meta.env && import.meta.env.VITE_TNG_PUBLIC_ORIGIN) || 'https://www.texasnomadgames.com').replace(/\/+$/, '');
 const joinUrlFor = (roomCode) => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, "")}/join/${encodeURIComponent(roomCode)}`;
 
-export function NCHost({ onExit, initialCode = '' }) {
-  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('nc_host') || 'null'); return initialCode && saved?.code !== initialCode ? null : saved; } catch { return null; } });
+export function NCHost({ onExit, initialCode = '', freshRoom = false }) {
+  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('nc_host') || 'null'); return freshRoom || (initialCode && saved?.code !== initialCode) ? null : saved; } catch { return null; } });
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
   const [now, setNow] = useState(Date.now());
