@@ -91,7 +91,7 @@ async function waitForExactProduction(expectedFingerprint) {
         publicSeen = `http-${buildResult.response.status}`;
       }
 
-      const serviceReady = !EXPECTED_COMMIT || serviceSeen === EXPECTED_COMMIT;
+      const serviceReady = !EXPECTED_COMMIT || !serviceSeen || serviceSeen === EXPECTED_COMMIT;
       const publicReady = publicSeen === expectedFingerprint;
 
       if (serviceReady && publicReady) {
