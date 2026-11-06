@@ -495,7 +495,7 @@ const GROUND_URI="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5v
       var api = {
         emit: function (topic, data) { if (closed) return Promise.reject(new Error('left')); rawSend({ t: 'emit', topic: topic, data: data }); return Promise.resolve(); },
         on: function (topic, fn) { (handlers[topic] = handlers[topic] || []).push(fn); return function () { handlers[topic] = (handlers[topic] || []).filter(function (f) { return f !== fn; }); }; },
-        presence: function (p) { myPresence = p || {}; if (myPresence.role === 'host') { myPresence._tngHostAuth = { token: localStorage.getItem('tng_guest_token') || '', deviceId: localStorage.getItem('tng_device_id') || '' }; } rawSend({ t: 'presence', p: myPresence }); return Promise.resolve(); },
+        presence: function (p) { myPresence = p || {}; if (myPresence.role === 'host') { myPresence._tngHostAuth = { token: localStorage.getItem('tng_guest_token') || '', deviceId: localStorage.getItem('tng_device_id') || '' }; } else if (typeof myPresence.seat === 'string') { myPresence._tngPlayerAuth = { token: localStorage.getItem('tng_guest_token') || '' }; } rawSend({ t: 'presence', p: myPresence }); return Promise.resolve(); },
         onPeers: function (fn) { peerFns.push(fn); return function () { peerFns = peerFns.filter(function (f) { return f !== fn; }); }; },
         peers: function () { return peers.map(function (p) { return { id: p.id, presence: p.presence || {}, self: p.id === myId }; }); },
         leave: function () { closed = true; clearInterval(pingT); setStatus('closed'); try { ws && ws.close(); } catch (e) {} return Promise.resolve(); }
