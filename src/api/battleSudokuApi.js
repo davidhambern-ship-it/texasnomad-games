@@ -43,6 +43,6 @@ export const bsSeat = {
 };
 export async function resolveBattleSudokuRoom(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{5}$/.test(c)) return null;
+  if (!/^TN[A-Z0-9]{4}$/.test(c)) return null;
   try { const d = await bsApi.getRoom(c); return d?.room || null; } catch { return null; }
 }
