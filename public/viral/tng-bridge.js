@@ -473,7 +473,7 @@
   }
 
   function currentRoomCode() {
-    const fromJoin = String(params.get('join') || '').trim().toUpperCase();
+    const fromJoin = String(params.get('room') || params.get('join') || '').trim().toUpperCase();
     if (/^TN[A-Z0-9]{4}$/.test(fromJoin)) return fromJoin;
     if (/^TN[A-Z0-9]{4}$/.test(requestedDisplay)) return requestedDisplay;
 
