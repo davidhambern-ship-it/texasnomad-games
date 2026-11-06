@@ -125,6 +125,24 @@ for (const [before, after] of roomCodePatches) {
   roomCodeHtml = roomCodeHtml.replace(before, after);
 }
 
+const hostModePatches = [
+  [
+    "let setupTab=ROOM_PARAM?'join':'local';",
+    "const HOST_PARAM=(()=>{try{return new URLSearchParams(location.search).get('host')==='1';}catch(e){return false;}})();\\nlet setupTab=HOST_PARAM?'host':ROOM_PARAM?'join':'local';",
+  ],
+  [
+    "let code=ROOMCODE||newCode();",
+    "let code=ROOMCODE||ROOM_PARAM||newCode();",
+  ],
+];
+
+for (const [before, after] of hostModePatches) {
+  if (!roomCodeHtml.includes(before)) {
+    throw new Error(`VIRAL host-mode source changed; expected patch target not found: ${before}`);
+  }
+  roomCodeHtml = roomCodeHtml.replace(before, after);
+}
+
 const deployedHtml = roomCodeHtml.replace('</body>', `${bridgeTag}</body>`);
 
 fs.mkdirSync(outputDir, { recursive: true });
