@@ -475,11 +475,11 @@ async function main() {
     if (!hostShot || !playerShot) {
       throw new Error(`resolved reveal missing one or both real attacks: host=${JSON.stringify(hostShot)} player=${JSON.stringify(playerShot)}`);
     }
-    const hostSeesPlayerMark = revealViews.host.players.find((player) => player.id === playerId)?.marks?.[0];
-    const playerSeesHostMark = revealViews.player.players.find((player) => player.id === hostId)?.marks?.[1];
+    const hostSeesPlayerMark = revealViews.host.players.find((player) => player.id === playerId)?.marks?.[playerView.payload.room.game.me.ships[0].cells[0]];
+    const playerSeesHostMark = revealViews.player.players.find((player) => player.id === hostId)?.marks?.[hostView.payload.room.game.me.ships[0].cells[0]];
     if (hostSeesPlayerMark !== (hostShot.result === 'hit' ? 'hit' : 'miss') ||
         playerSeesHostMark !== (playerShot.result === 'hit' ? 'hit' : 'miss')) {
-      throw new Error('guaranteed ship hits did not synchronize to both opponents’ battle maps');
+      throw new Error(`guaranteed ship hits did not synchronize: hostShot=${JSON.stringify(hostShot)} playerShot=${JSON.stringify(playerShot)} hostMark=${hostSeesPlayerMark} playerMark=${playerSeesHostMark}`);
     }
 
     // Confirm the reveal phase rolls forward into the next solve volley for both captains.
