@@ -11,9 +11,7 @@ import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import '@/components/nomadCards/nc.css';
 
 // OUT! — /games/out
-//   ?host=1        host on the TV (TNG Host Panel)
 //   ?room=CODE     join on a phone (your hand)
-//   ?display=CODE  read-only table for TNG Game Display / a second TV
 function SoloOptions({ field, opts, solo, setSolo }) {
   return <div className="nc-seg">{opts.map(([v, l]) => <button key={String(v)} type="button" aria-pressed={solo[field] === v} onClick={() => setSolo(s => ({ ...s, [field]: v }))}>{l}</button>)}</div>;
 }
