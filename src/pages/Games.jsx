@@ -675,35 +675,12 @@ export default function Games() {
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
     const guest = getStoredGuestIdentity();
     if (guest) {
-      // These standalone games have guest-aware room services and their own
-      // host screens. Other Host Controller games still require a signed-in
-      // account/device session.
-      const guestHostPaths = {
-        out: '/games/out',
-        bff: '/room?game=bff',
-        'square-biz': '/room?game=square-biz',
-        hangman: '/room?game=hangman',
-        spades: '/room?game=spades',
-        'see-that': '/games/see-that?host=1',
-        'word-wrangler': '/games/word-wrangler?host=1',
-        sudoku: '/games/sudoku?host=1',
-        dominoes: '/games/dominoes/host',
-        'rodeo-rumble': '/games/rodeo-rumble?host=1',
-        'word-search': '/room?game=word-search',
-      };
-      const guestPath = guestHostPaths[hostGameId];
-      if (guestPath) {
-        navigate(guestPath);
-      } else {
-        navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
-      }
+      navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
       return;
     }
 
     // Signed-in multiplayer Host launches use the TNG Host Controller.
-    // Core games create a Neon room there; other standalone games hand off
-    // to their own live service after the authenticated Host session is ready.
-    if (hostGameId === 'out') { navigate('/games/out'); return; }
+    // Every multiplayer game uses the same shared room experience.
 
     const hostableGames = new Set([
       'bff',
@@ -717,6 +694,7 @@ export default function Games() {
       'sudoku',
       'rodeo-rumble',
       'dominoes',
+      'out',
     ]);
 
     if (hostableGames.has(hostGameId)) {
