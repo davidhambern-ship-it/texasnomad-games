@@ -142,12 +142,18 @@ export function createBattleSudokuApi({
     if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
       throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
     }
-    for (let i = 0; i < (requested ? 1 : 50); i++) {
-      const c = 'TN' + Array.from(
-        { length: 4 },
-        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
-      ).join('');
-      const candidate = requested || c;
+
+    // Use cryptographic randomness for public room codes. Math.random can be
+    // repeated or poorly seeded across short-lived edge isolates, causing
+    // every reservation attempt to collide with an existing room.
+    const makeCandidate = () => {
+      const bytes = randomBytes(4);
+      return 'TN' + Array.from(bytes, (byte) => CODE_CHARS[byte % CODE_CHARS.length]).join('');
+    };
+
+    const attempts = requested ? 1 : 128;
+    for (let i = 0; i < attempts; i++) {
+      const candidate = requested || makeCandidate();
 
       if (await roomExists(candidate)) continue;
 
