@@ -847,6 +847,23 @@ async function resolveAuthenticatedTngIdentity(req) {
 }
 
 async function resolveStandaloneGameIdentity(req) {
+  // Standalone party games use signed, temporary guest identities directly.
+  // Do not route these guests through TNG account/profile resolution: a name
+  // plus a valid guest token is sufficient to host or join a room.
+  const guestToken = String(req?.headers?.['x-tng-guest-token'] || '').trim();
+  const guest = verifyGuestIdentity(guestToken, {
+    secret: process.env.TNG_GUEST_TOKEN_SECRET,
+  });
+  if (guest) {
+    return {
+      guestId: guest.guestId,
+      isGuest: true,
+      publicName: guest.publicName,
+      handle: '',
+    };
+  }
+
+  // Preserve compatibility for any existing authenticated TNG sessions.
   const resolved = await resolveAuthenticatedTngIdentity(req);
   return resolved.ok ? resolved.identity : null;
 }
