@@ -55,8 +55,12 @@ function RoomRoute() {
     'sudoku', 'rodeo-rumble',
   ]);
 
-  // Every game enters the same host room flow. The separate guest-game
-  // launcher caused hosts to land on an unrelated standalone game screen.
+  // OUT! has its own persistent Nomad Cards room service. Route its host
+  // entry to that service instead of the core registry, which cannot resolve
+  // OUT! room codes and otherwise reports "Room Not Found".
+  if (gameId === 'out') return <Navigate to="/games/out?host=1" replace />;
+
+  // All core games use the shared host room experience.
   return roomGames.has(gameId) ? <SharedRoomPage /> : <Navigate to="/games" replace />;
 }
 
