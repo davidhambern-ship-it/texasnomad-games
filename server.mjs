@@ -4745,6 +4745,7 @@ async function handleDominoApi(req, res) {
       spectatePath: `/games/dominoes?display=${encodeURIComponent(roomCode)}`,
       hostAccountId: verifiedHost.accountId || null,
       ttlMs: DOMINO_ROOM_TTL_MS,
+      allowExisting: Boolean(data?.sharedRoom),
     });
 
     if (!registryClaimed) {
