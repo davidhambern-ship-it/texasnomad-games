@@ -39,7 +39,7 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
 export const stApi = {
   scenes: () => call('/scenes'),
-  createRoom: () => call('/rooms', { method: 'POST', body: {} }),
+  createRoom: (roomCode) => call('/rooms', { method: 'POST', body: { roomCode } }),
   getRoom: (code, token) => call(`/rooms/${encodeURIComponent(code)}`, { token }),
   action: (code, token, action, payload = {}) => call(`/rooms/${encodeURIComponent(code)}/action`, { method: 'POST', token, body: { action, ...payload } }),
 };
