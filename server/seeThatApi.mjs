@@ -176,26 +176,27 @@ export function createSeeThatApi({
       throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
     }
     for (let i = 0; i < (requested ? 1 : 50); i++) {
-      const c = requested || 'TN' + Array.from(
+      const c = 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
+      const candidate = requested || c;
 
-      if (await roomExists(c)) continue;
+      if (await roomExists(candidate)) continue;
 
       const claimed = await claimRoomCode({
-        code: c,
+        code: candidate,
         gameId: 'see-that',
         service: 'see-that',
         kind: 'standalone',
-        joinPath: '/games/see-that?room=' + encodeURIComponent(c),
-        spectatePath: '/games/see-that?display=' + encodeURIComponent(c),
+        joinPath: '/games/see-that?room=' + encodeURIComponent(candidate),
+        spectatePath: '/games/see-that?display=' + encodeURIComponent(candidate),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
         allowExisting: Boolean(requested),
       });
 
-      if (claimed) return c;
+      if (claimed) return candidate;
     }
     throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
