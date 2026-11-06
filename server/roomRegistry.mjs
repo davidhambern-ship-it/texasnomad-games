@@ -12,6 +12,13 @@ const CORE_GAME_PATHS = {
   hangman: '/games/hangman',
   spades: '/games/spades',
   'word-search': '/games/word-search',
+  out: '/games/out',
+  viral: '/games/viral',
+  dominoes: '/games/dominoes',
+  'see-that': '/games/see-that',
+  'word-wrangler': '/games/word-wrangler',
+  sudoku: '/games/sudoku',
+  'rodeo-rumble': '/games/rodeo-rumble',
 };
 
 function cleanCode(value) {
@@ -382,7 +389,10 @@ export function createRoomRegistry(pool) {
       await cleanupCode(code);
 
       const core = await loadCoreRoom(code);
-      if (core) return false;
+      const matchingCoreReservation = Boolean(
+        allowExisting && core && String(core.game_id || '') === String(gameId || ''),
+      );
+      if (core && !matchingCoreReservation) return false;
 
       let existing = await loadRegistry(code);
 
@@ -390,6 +400,9 @@ export function createRoomRegistry(pool) {
       // core room is still active before letting it block code reuse.
       if (existing?.service === 'core') {
         const activeCore = await loadCoreRoom(code);
+        if (activeCore && allowExisting && String(activeCore.game_id || '') === String(gameId || '')) {
+          return true;
+        }
         if (!activeCore) {
           await pool.query(
             `delete from public.tng_room_registry
