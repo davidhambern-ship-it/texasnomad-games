@@ -120,7 +120,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     if (!identityReady) { setError('Loading your TNG player profile…'); return; }
     setBusy(true); setError('');
     try {
-      const d = await wwApi.createRoom();
+      const d = await wwApi.createRoom(name, initialCode);
       const s = { token: d.token, playerId: d.playerId };
       wwSeat.set(d.roomCode, s);
       setSeat(s); setCode(d.roomCode); onCode && onCode(d.roomCode); apply(d);
