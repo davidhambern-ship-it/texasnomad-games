@@ -5,7 +5,6 @@ const API_BASE = tngServiceUrl('/tng-api');
 const BFF_API_BASE = tngServiceUrl('/bff-api');
 const STATS_API_BASE = tngServiceUrl('/tng-stats');
 const ACCOUNT_ROUTE_API_BASE = tngServiceUrl('/tng-api');
-const DISPLAY_STATE_API_BASE = tngServiceUrl('/tng-display');
 const SPECTATOR_API_BASE = tngServiceUrl('/tng-spectator');
 const HOST_ROSTER_API_BASE = tngServiceUrl('/tng-host-stage');
 const ROOM_REGISTRY_API_BASE = tngServiceUrl('/tng-rooms');
@@ -71,8 +70,6 @@ async function request(path, {
   method='GET',
   body,
   deviceId,
-  displayId,
-  displayToken,
   roomCode,
   authenticated=true,
   apiBase=API_BASE,
@@ -89,8 +86,6 @@ async function request(path, {
     headers['X-TNG-Guest-Token'] = guest.token;
   }
   if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
-  if (displayId) headers['X-TNG-Display-Id'] = displayId;
-  if (displayToken) headers['X-TNG-Display-Token'] = displayToken;
   if (roomCode) headers['X-TNG-Room-Code'] = roomCode;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 
@@ -335,11 +330,6 @@ export const tngApi = {
       closeHostLiveConnection();
       return result;
     },
-    createPairing: (deviceId, replaceDisplay = false) => request('/api/host/pairing', {
-      method:'POST',
-      deviceId,
-      body:{ replaceDisplay },
-    }),
     createRoom: async (deviceId, gameId) => {
       let lastCollision = null;
 
@@ -446,15 +436,6 @@ export const tngApi = {
       body:{ action, ...payload },
     }),
   },
-  display: {
-    pair: (code) => request('/api/display/pair', { method:'POST', body:{code}, authenticated:false }),
-    getState: (displayId, displayToken) => request('/state', {
-      displayId,
-      displayToken,
-      authenticated:false,
-      apiBase: DISPLAY_STATE_API_BASE,
-    }),
-  },
   spades: {
     getHostState: (deviceId) => getHostLiveGameState(deviceId, 'spades'),
     hostAction: (deviceId, action, payload = {}) =>
@@ -507,10 +488,6 @@ export const tngApi = {
     getPlayerState: (deviceId, roomCode) => request('/player', {
       deviceId,
       roomCode,
-      apiBase:BFF_API_BASE,
-    }),
-    getDisplayState: (roomCode) => request(`/display?room=${encodeURIComponent(roomCode)}`, {
-      authenticated:false,
       apiBase:BFF_API_BASE,
     }),
     playerAction: (deviceId, roomCode, action, payload = {}) => request('/player', {
