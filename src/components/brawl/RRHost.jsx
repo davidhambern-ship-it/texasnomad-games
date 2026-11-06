@@ -18,7 +18,7 @@ const STAGE_LOOKS = {
 const readHost = () => { try { return JSON.parse(localStorage.getItem('rr_host') || 'null'); } catch { return null; } };
 
 /** Authenticated Host + local fight engine. Players use signed-in phones as controllers. */
-export default function RRHost({ onExit }) {
+export default function RRHost({ onExit, initialCode = '' }) {
   const [conn, setConn] = useState('connecting');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -36,10 +36,11 @@ export default function RRHost({ onExit }) {
     const socket = rrConnect({
       hello: ({ authToken }) => {
         const saved = readHost();
+        const sameRoom = Boolean(initialCode && saved?.code === initialCode);
         return {
           t: 'host',
-          code: saved?.code,
-          token: saved?.token,
+          code: initialCode || saved?.code,
+          token: initialCode ? (sameRoom ? saved?.token : '') : saved?.token,
           authToken,
           deviceId: localStorage.getItem('tng_device_id') || '',
         };
