@@ -170,9 +170,13 @@ export function createSeeThatApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = 'TN' + Array.from(
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
+    for (let i = 0; i < (requested ? 1 : 50); i++) {
+      const c = requested || 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
@@ -188,6 +192,7 @@ export function createSeeThatApi({
         spectatePath: '/games/see-that?display=' + encodeURIComponent(c),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
       if (claimed) return c;
@@ -334,13 +339,14 @@ export function createSeeThatApi({
       if (req.method === 'GET' && path === '/scenes') return send(res, 200, { scenes: scenes().list });
 
       if (req.method === 'POST' && path === '/rooms') {
+        const body = await readBody(req);
         const hostIdentity = await resolveIdentity(req);
         if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
           throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting See That.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now — try again soon.');
         const S = scenes();
-        const code = await newCode(hostIdentity.accountId || null);
+        const code = await newCode(hostIdentity.accountId || null, body?.roomCode);
         const room = {
           code, hostToken: newToken(), hostAccountId: hostIdentity.accountId || null, hostGuestId: hostIdentity.guestId || null, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
           settings: { sceneId: S.list[0]?.id || 'random', count: 10, seconds: 120, rounds: 3, difficulty: 'normal' }, createdAt: now, updatedAt: now,
