@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, ShieldCheck, Unplug } from 'lucide-react';
+import { Loader2, Unplug } from 'lucide-react';
 
 import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
 import HangmanGameBoard from '@/components/games/HangmanGameBoard';
@@ -617,33 +617,10 @@ export default function SharedRoomPage() {
         )}
 
         {phase === 'ready' && (
-          <div className="h-full flex items-center justify-center">
-            <div className="w-full max-w-2xl text-center">
-              <ShieldCheck className="w-12 h-12 mx-auto mb-4 text-green-400" />
-              <h1 className="text-3xl mb-3">Choose a game</h1>
-
-              {error && <p className="text-red-400 mb-4">{error}</p>}
-
-              <div className="grid sm:grid-cols-3 gap-4">
-                {ALL_GAMES.map((game) => (
-                  <button
-                    key={game.id}
-                    disabled={busy}
-                    onClick={() => {
-                      createRoom(game);
-                    }}
-                    className="border-2 rounded-xl p-6 bg-black/50"
-                    style={{ borderColor: game.color + '55' }}
-                  >
-                    <div className="mb-3 flex h-16 items-center justify-center">
-                      <RoomGameIcon game={game} />
-                    </div>
-                    <div style={{ ...PS2, color: game.color, fontSize: 10 }}>
-                      {game.title}
-                    </div>
-                  </button>
-                ))}
-              </div>
+          <div className="flex min-h-[65vh] items-center justify-center text-center">
+            <div>
+              <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-[#BC13FE]" />
+              <p className="text-sm text-white/60">Opening your game room…</p>
             </div>
           </div>
         )}
