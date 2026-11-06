@@ -64,7 +64,7 @@ export default function NomadCardsGame() {
       </div>
     </div>
   );
-  if (screen === 'host') return <div className="nc-root full"><NCHost onExit={toMenu} freshRoom /></div>;
+  if (screen === 'host') return <div className="nc-root full"><NCHost onExit={toMenu} /></div>;
   if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) return <div className="nc-root full"><NCPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} /></div>;
   if (screen === 'solo') return <div className="nc-root full"><NCSolo name={name || 'You'} rivals={solo.rivals} level={solo.level} settings={{ target: solo.target, stacking: solo.stacking, sevenZero: solo.sevenZero }} onExit={toMenu} /></div>;
 
@@ -87,7 +87,7 @@ export default function NomadCardsGame() {
           {err && <div className="nc-err">{err}</div>}
         </div>
         <div className="nc-modes">
-          <button type="button" className="nc-mode" onClick={() => { ncSfx.unlock(); setScreen('host'); }}><b>Create Room</b><span>Play together on your own devices. 2–10 seats including you, with a private hand for everyone. CPUs can fill seats.</span></button>
+          <button type="button" className="nc-mode" onClick={() => { ncSfx.unlock(); window.location.assign('/room?game=out'); }}><b>Create Room</b><span>Play together on your own devices. 2–10 seats including you, with a private hand for everyone. CPUs can fill seats.</span></button>
           <div className="nc-mode solo">
             <b>Solo vs CPU</b>
             <div className="nc-row"><span className="nc-label">Rivals</span><SoloOptions solo={solo} setSolo={setSolo} field="rivals" opts={[[1, '1'], [2, '2'], [3, '3'], [5, '5']]} /></div>
