@@ -66,7 +66,7 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
   return (
     <>
       {!data.room.game
-        ? <BSLobby room={data.room} isHost act={act} onExit={exit} joinUrl={`${TNG_PUBLIC_ORIGIN}/games/sudoku?room=${seat.code}`} playerName={getStoredGuestIdentity()?.name || ''} />
+        ? <BSLobby room={data.room} isHost act={act} onExit={exit} joinUrl={`${TNG_PUBLIC_ORIGIN}/games/sudoku?room=${seat.code}`} playerName={getStoredGuestIdentity()?.name || ''} selfPlayerId={playerData?.you?.id || ''} />
         : playerData?.room?.game?.me
           ? <BSPhone v={playerData.room.game} act={async (type, payload = {}) => {
               try { const d = await bsApi.action(seat.code, seat.playerToken, type, payload); applyPlayer(d); return d.result; }
