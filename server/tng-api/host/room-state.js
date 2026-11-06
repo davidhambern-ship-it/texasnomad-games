@@ -149,7 +149,41 @@ export default async function handler(request, response) {
     }
 
     if (request.method === 'GET') {
-      return sendJson(response, 200, { room: await normalizeRoom(room) });
+      // The lobby roster is sourced from room participants, not the game
+      // board's gameState. Word Search and other dedicated game APIs keep
+      // their own state shape, so reading players from gameState can show 0
+      // even after a guest has joined successfully.
+      const participants = await db.select().from(roomParticipants).where(and(
+        eq(roomParticipants.roomId, room.id),
+        isNull(roomParticipants.leftAt),
+      ));
+      const accountIds = [...new Set(participants.map((person) => person.accountId))];
+      const profiles = accountIds.length > 0
+        ? await db.select({
+            accountId: playerProfiles.accountId,
+            displayName: playerProfiles.displayName,
+            handle: playerProfiles.handle,
+          }).from(playerProfiles).where(inArray(playerProfiles.accountId, accountIds))
+        : [];
+      const profileByAccount = new Map(profiles.map((profile) => [profile.accountId, profile]));
+      const people = participants.map((person) => {
+        const profile = profileByAccount.get(person.accountId);
+        return {
+          playerId: person.accountId,
+          accountId: person.accountId,
+          seatNumber: person.seatNumber == null ? null : Number(person.seatNumber),
+          role: person.role,
+          playerType: 'human',
+          name: profile?.displayName || profile?.handle ||
+            (person.role === 'host_player' ? 'HOST' : 'Player'),
+          handle: profile?.handle || null,
+        };
+      }).sort((left, right) => (left.seatNumber || 99) - (right.seatNumber || 99));
+
+      return sendJson(response, 200, {
+        room: await normalizeRoom(room),
+        people,
+      });
     }
 
     if (room.gameId === 'hangman' || room.gameId === 'word-search') {
