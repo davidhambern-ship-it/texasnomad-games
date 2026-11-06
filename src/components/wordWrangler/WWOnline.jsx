@@ -3,7 +3,6 @@ import WWPlay from './WWPlay';
 import { Avatar, Confetti, Countdown, RIVALS, colorFor } from './WWShared';
 import { createGame } from '@/lib/wordWranglerEngine';
 import { wwApi, wwSeat } from '@/api/wordWranglerApi';
-import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 import { soundManager } from '@/lib/wordWranglerSound';
 
 const DURS = [[90, '1:30'], [150, '2:30'], [240, '4:00']];
@@ -140,26 +139,6 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     autoHostStarted.current = true;
     host();
   }, [autoHost, identityReady, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const ownsRoom = Boolean(data?.you?.isHost);
-  useEffect(() => {
-    if (!ownsRoom || !code) return undefined;
-
-    let alive = true;
-    const sync = async () => {
-      const result = await claimStandaloneDisplay('word-wrangler', code).catch(() => null);
-      if (!alive || !result?.ok) return;
-    };
-
-    sync();
-    const timer = window.setInterval(sync, 30000);
-
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-      releaseStandaloneDisplay().catch(() => {});
-    };
-  }, [ownsRoom, code]);
 
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
