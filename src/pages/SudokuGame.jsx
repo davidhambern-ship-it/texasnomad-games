@@ -4,7 +4,7 @@ import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { BSDisplay, BSHost, BSPlayer } from '@/components/battleSudoku/BSOnline';
 import { sfx } from '@/components/battleSudoku/bsSfx';
-import { getStoredGuestIdentity } from '@/lib/guestIdentity';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/battleSudoku/bs.css';
 
 // BattleSudoku — /games/sudoku
@@ -13,20 +13,31 @@ export default function SudokuGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
   const display = (params.get('display') || '').toUpperCase();
-  const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' ? 'host' : 'menu');
-  const [code, setCode] = useState('');
-  // Live Sudoku uses the temporary guest identity only; never fetch a TNG profile.
+  // Battle Sudoku uses a temporary named guest session; no player account or TNG profile is required.
   const guestIdentity = getStoredGuestIdentity();
-  const name = guestIdentity?.name || 'Guest';
+  const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' && guestIdentity ? 'host' : 'menu');
+  const [code, setCode] = useState('');
+  const [guestName, setGuestName] = useState(guestIdentity?.name || '');
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
+  const startHosting = async () => {
+    try {
+      const identity = await createGuestIdentity(guestName);
+      setGuestName(identity.name);
+      setErr('');
+      setParams({ host: '1' }, { replace: true });
+      setScreen('host');
+    } catch (error) {
+      setErr(error.message || 'Enter a player name to host.');
+    }
+  };
 
   if (display) return <div className="bs-root"><BSDisplay code={display} /></div>;
 
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
-  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={name} onExit={toMenu} />;
+  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={guestName || guestIdentity?.name || ''} onExit={toMenu} />;
   else {
     const join = () => { const c = code.trim().toUpperCase(); if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
     body = (
@@ -45,14 +56,14 @@ export default function SudokuGame() {
             {err && <div className="bs-err">{err}</div>}
           </div>
           <div className="bs-card">
-            <div className="bs-label">Guest player</div>
-            <p className="bs-sub" style={{ marginTop: 8 }}>
-              Playing as <b style={{ color: 'var(--bs-brass)' }}>{name}</b>
-            </p>
+            <label className="bs-label" htmlFor="bs-host-name">Your player name</label>
+            <input id="bs-host-name" className="bs-input" style={{ width: '100%', marginTop: 8, fontSize: 18 }} maxLength={32} autoComplete="nickname" placeholder="Enter your name" value={guestName} onChange={e => setGuestName(e.target.value)} />
+            <p className="bs-sub" style={{ marginTop: 8 }}>No account needed. Your name identifies you in this battle.</p>
           </div>
           <div className="bs-modes">
-            <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); window.location.assign('/room?game=sudoku'); }}><div className="bs-h">Create Room</div><p>Open a shared live room. Players join with the room code — 2 to 8 human players.</p></button>
+            <button type="button" className="bs-mode" disabled={!guestName.trim()} onClick={() => { sfx.unlock(); startHosting(); }}><div className="bs-h">Create Room</div><p>Open a shared live room. Players join with the room code — 2 to 8 human players.</p></button>
           </div>
+          {err && <div className="bs-err">{err}</div>}
           <div className="bs-card">
             <div className="bs-label">How it plays</div>
             <ul className="bs-steps">
@@ -74,7 +85,7 @@ export default function SudokuGame() {
     <div className="bs-root">
       {!full && <Header />}
       {body}
-      {!full && <TestFeedbackButton gameId="sudoku" roomCode={room} testerName={name} />}
+      {!full && <TestFeedbackButton gameId="sudoku" roomCode={room} testerName={guestName || guestIdentity?.name || 'Guest'} />}
     </div>
   );
 }
