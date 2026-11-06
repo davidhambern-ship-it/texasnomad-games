@@ -4642,7 +4642,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-tng-guest-token, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-room-code, x-tng-guest-token, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
