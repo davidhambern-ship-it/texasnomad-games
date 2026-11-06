@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { dominoStore } from '@/api/dominoStore';
 import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
@@ -36,6 +36,7 @@ export default function DominoHost({ initialCode = '' }) {
   const [scoreLimit, setScoreLimit] = useState(150);
   const [loading, setLoading] = useState(false);
   const [hostError, setHostError] = useState('');
+  const autoCreateStarted = useRef(false);
   const [copied, setCopied] = useState(false);
   const [savedRoom] = useState(() => { try { return initialCode ? null : localStorage.getItem(HOST_KEY); } catch { return null; } });
   const savedRoomAuthorized = Boolean(
@@ -119,6 +120,12 @@ export default function DominoHost({ initialCode = '' }) {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (autoCreateStarted.current || identity.loading || !hostName || game || loading) return;
+    autoCreateStarted.current = true;
+    createRoom();
+  }, [identity.loading, hostName, game, loading]);
 
   const resumeRoom = async () => {
     setLoading(true);
