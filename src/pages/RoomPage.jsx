@@ -946,7 +946,7 @@ export default function RoomPage() {
                   {roomState?.gameId === 'word-search' && <NeonWordSearchHostPanel controllerId={controllerId} />}
                   {roomState?.gameId === 'square-biz' && <NeonSquareBizHostPanel controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <NeonBFFHostPanel controllerId={controllerId} />}
-                  {['out', 'see-that', 'word-wrangler', 'sudoku'].includes(roomState?.gameId) && (
+                  {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
                     <SharedGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
                   )}
                 </section>
