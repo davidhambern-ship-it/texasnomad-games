@@ -29,7 +29,7 @@ function SeatAvatar({ p, seat }) {
   return <div className="tnd-avatar tnd-avatar-txt" style={{ width: 40, height: 40, borderColor: color, background: `${color}33`, fontSize: 15 }}>{p?.playerName ? p.playerName.slice(0, 2).toUpperCase() : '·'}</div>;
 }
 
-export default function DominoHost() {
+export default function DominoHost({ initialCode = '' }) {
   const [game, setGame] = useState(null);
   const identity = useTngGameIdentity();
   const hostName = identity.publicName;
@@ -37,7 +37,7 @@ export default function DominoHost() {
   const [loading, setLoading] = useState(false);
   const [hostError, setHostError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [savedRoom] = useState(() => { try { return localStorage.getItem(HOST_KEY); } catch { return null; } });
+  const [savedRoom] = useState(() => { try { return initialCode ? null : localStorage.getItem(HOST_KEY); } catch { return null; } });
   const savedRoomAuthorized = Boolean(
     savedRoom && dominoStore.entities.DominoGame.hostToken(savedRoom),
   );
@@ -92,7 +92,7 @@ export default function DominoHost() {
       for (let attempt = 0; attempt < 5 && !created; attempt += 1) {
         try {
           created = await dominoStore.entities.DominoGame.create({
-            room_code: generateRoomCode(), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
+            room_code: initialCode || generateRoomCode(), sharedRoom: Boolean(initialCode), status: 'waiting', phase: 'waiting', players, board: [], boneyard: [],
             currentSeat: 0, roundNumber: 1, teamScores: { teamA: 0, teamB: 0 }, scoreLimit, activityLog: [],
           });
         } catch (error) {
