@@ -90,7 +90,6 @@ export default function SharedRoomPage() {
     [activeRoom, selectedGame],
   );
 
-  // The host room now renders its own live board; no paired Game Display is required.
   const hostOnlyActive = true;
 
   const hostBoardSideBySide =
@@ -208,7 +207,6 @@ export default function SharedRoomPage() {
 
       // HOST_ALREADY_CONTROLLED is intentionally allowed to bubble up.
       // The Room will show an explicit recovery choice instead of
-      // assuming this browser must be the Game Display.
       throw sessionError;
     }
   }
@@ -562,7 +560,7 @@ export default function SharedRoomPage() {
 
               <p className="mt-4 text-sm leading-relaxed text-white/55">
                 Rejoining transfers Host control to this device. The existing room, players,
-                scores, board state, and paired Display stay attached to the same live session.
+                scores and board state stay attached to the same live session.
               </p>
 
               {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
