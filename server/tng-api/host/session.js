@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 
 import { requireController } from '../../auth/require-controller.js';
 import { db } from '../../db/client.js';
-import { deviceSessions, displayPairings, gameRooms, hostSessions } from '../../db/schema.js';
+import { deviceSessions, gameRooms, hostSessions } from '../../db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const ACTIVE_ROOM_STATUSES = ['lobby', 'live', 'paused'];
@@ -58,18 +58,6 @@ export default async function handler(request, response) {
           inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
         ));
 
-        await transaction.update(displayPairings).set({ consumedAt: now }).where(and(
-          eq(displayPairings.hostSessionId, hostSession.id),
-          isNull(displayPairings.consumedAt),
-        ));
-
-        if (hostSession.displayDeviceId) {
-          await transaction.update(deviceSessions).set({
-            status: 'disconnected',
-            updatedAt: now,
-          }).where(eq(deviceSessions.id, hostSession.displayDeviceId));
-        }
-
         await transaction.update(hostSessions).set({
           status: 'ended',
           endedAt: now,
@@ -97,7 +85,6 @@ export default async function handler(request, response) {
         // Development player-testing recovery:
         // if this account already owns a LIVE room, a valid controller device
         // for the same account may reclaim that room automatically. This keeps
-        // Preview auth refreshes from forcing a Game Display reconnect.
         const reclaimController =
           request.body?.reclaimController === true ||
           Boolean(activeRoom);
