@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import BSBigScreen from './BSBigScreen';
 import BSPhone from './BSPhone';
 import { bsApi, bsSeat } from '@/api/battleSudokuApi';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { sfx } from './bsSfx';
 
 function useRoom(code, token, onGone) {
@@ -68,13 +69,17 @@ export function BSPlayer({ code, name, onExit }) {
   const [seat, setSeat] = useState(() => bsSeat.get(code));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [displayName, setDisplayName] = useState(() => name || getStoredGuestIdentity()?.name || '');
   const { data, offset, error, apply } = useRoom(code, seat?.token, () => bsSeat.clear(code));
   const [now, setNow] = useState(Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 200); return () => clearInterval(t); }, []);
   const join = async () => {
     setBusy(true); setErr(''); sfx.unlock();
     try {
-      const d = await bsApi.action(code, seat?.token, 'join');
+      const cleanName = String(displayName || '').trim().slice(0, 32);
+      if (!cleanName) throw new Error('Enter your player name to join.');
+      await createGuestIdentity(cleanName);
+      const d = await bsApi.action(code, seat?.token, 'join', { name: cleanName });
       const s = { token: d.token, playerId: d.playerId }; bsSeat.set(code, s); setSeat(s); apply(d);
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
