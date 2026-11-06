@@ -13,8 +13,6 @@ import '@/components/seeThat/st.css';
 
 // /games/see-that              menu
 // /games/see-that?room=CODE    join on a phone
-// /games/see-that?host=1      host directly from the TNG Host Panel
-// /games/see-that?display=CODE read-only big screen (TNG Game Display / second TV)
 // /games/see-that?editor=1     scene editor
 export default function SeeThatGame() {
   const [params, setParams] = useSearchParams();
