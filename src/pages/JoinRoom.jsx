@@ -6,7 +6,7 @@ import { resolveTngRoom } from '@/api/roomRegistry';
 import { useAuth } from '@/lib/AuthContext';
 import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 
-const ENGINE_ROOM_GAME_IDS = new Set(['out', 'dominoes', 'see-that', 'word-wrangler', 'sudoku']);
+const ENGINE_ROOM_GAME_IDS = new Set(['out', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble']);
 
 const GAME_PATHS = {
   bff: '/games/bff',
