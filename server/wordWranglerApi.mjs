@@ -156,9 +156,13 @@ export function createWordWranglerApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = 'TN' + Array.from(
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
+    for (let i = 0; i < (requested ? 1 : 50); i++) {
+      const c = requested || 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
@@ -174,6 +178,7 @@ export function createWordWranglerApi({
         spectatePath: '/games/word-wrangler?display=' + encodeURIComponent(c),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
       if (claimed) return c;
@@ -331,7 +336,7 @@ export function createWordWranglerApi({
       }
 
       if (req.method === 'POST' && path === '/rooms') {
-        await readBody(req);
+        const body = await readBody(req);
         const identity = await resolveIdentity(req);
         if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
           throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting Word Wrangler.');
@@ -339,7 +344,7 @@ export function createWordWranglerApi({
         const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode(identity.accountId || null);
+        const code = await newCode(identity.accountId || null, body?.roomCode);
         const host = {
           id: newId(),
           accountId: identity.accountId || null,
