@@ -268,6 +268,88 @@ async function main() {
     return 'bridge + relay verified';
   });
 
+  await check('Battle Sudoku live two-browser guest room', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `SmokeH${suffix}`;
+    const playerName = `SmokeP${suffix}`;
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) {
+        throw new Error(`guest identity failed: HTTP ${response.status} ${payload?.error?.message || ''}`);
+      }
+      return payload.token;
+    };
+    const hostGuestToken = await createIdentity(hostName);
+    const playerGuestToken = await createIdentity(playerName);
+    const api = (path, token, body) => json(`${SERVICE_ORIGIN}${path}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: {
+        ...(token ? { 'X-TNG-Guest-Token': token } : {}),
+        ...(body?.bsToken ? { 'X-BS-Token': body.bsToken } : {}),
+        ...(body?.payload ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(body?.payload ? { body: JSON.stringify(body.payload) } : {}),
+    });
+
+    const created = await api('/bs-api/rooms', hostGuestToken, { payload: {} });
+    if (!created.response.ok || !created.payload?.roomCode || !created.payload?.token) {
+      throw new Error(`host room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+    }
+    const code = created.payload.roomCode;
+    const hostToken = created.payload.token;
+    if (!/^TN[A-Z0-9]{4}$/.test(code)) throw new Error(`invalid room code ${code}`);
+
+    const hostJoin = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, {
+      bsToken: hostToken, payload: { action: 'join', name: hostName },
+    });
+    if (!hostJoin.response.ok || !hostJoin.payload?.token) {
+      throw new Error(`host captain seat failed: HTTP ${hostJoin.response.status} ${hostJoin.payload?.error?.message || ''}`);
+    }
+
+    const playerJoin = await api(`/bs-api/rooms/${code}/action`, playerGuestToken, {
+      payload: { action: 'join', name: playerName },
+    });
+    if (!playerJoin.response.ok || !playerJoin.payload?.token) {
+      throw new Error(`second browser join failed: HTTP ${playerJoin.response.status} ${playerJoin.payload?.error?.message || ''}`);
+    }
+
+    const hostRoom = await api(`/bs-api/rooms/${code}`, hostGuestToken, { bsToken: hostToken });
+    const roster = hostRoom.payload?.room?.roster || [];
+    if (!hostRoom.response.ok || roster.length !== 2 ||
+      !roster.some((player) => player.name === hostName) ||
+      !roster.some((player) => player.name === playerName)) {
+      throw new Error(`room roster did not synchronize across sessions: ${roster.map((p) => p.name).join(', ') || hostRoom.response.status}`);
+    }
+
+    const started = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, {
+      bsToken: hostToken, payload: { action: 'start' },
+    });
+    if (!started.response.ok || !started.payload?.room?.game) {
+      throw new Error(`host could not start battle: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+    }
+
+    const [hostView, playerView] = await Promise.all([
+      api(`/bs-api/rooms/${code}`, hostGuestToken, { bsToken: hostJoin.payload.token }),
+      api(`/bs-api/rooms/${code}`, playerGuestToken, { bsToken: playerJoin.payload.token }),
+    ]);
+    if (!hostView.response.ok || !hostView.payload?.room?.game?.me) {
+      throw new Error('host did not receive their own captain gameplay view');
+    }
+    if (!playerView.response.ok || !playerView.payload?.room?.game?.me) {
+      throw new Error('second browser did not receive its captain gameplay view');
+    }
+
+    await Promise.all([
+      api(`/bs-api/rooms/${code}/action`, hostGuestToken, { bsToken: hostJoin.payload.token, payload: { action: 'leave' } }),
+      api(`/bs-api/rooms/${code}/action`, playerGuestToken, { bsToken: playerJoin.payload.token, payload: { action: 'leave' } }),
+    ]).catch(() => {});
+    return `room ${code}: host + second guest joined, roster=2, start succeeded, both received playable captain views`;
+  });
+
   await check('unauthenticated API rejects protected profile', async () => {
     const { response } = await json(`${SERVICE_ORIGIN}/tng-api/profile`);
     if (![401, 403].includes(response.status)) {
