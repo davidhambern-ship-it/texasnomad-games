@@ -2,12 +2,9 @@ import health from './tng-api/health.js';
 import profile from './tng-api/profile.js';
 import deviceSession from './tng-api/device-session.js';
 import hostSession from './tng-api/host/session.js';
-import hostPairing from './tng-api/host/pairing.js';
 import hostRoom from './tng-api/host/room.js';
 import hostRoomState from './tng-api/host/room-state.js';
 import playerRoom from './tng-api/player/room.js';
-import displayPair from './tng-api/display/pair.js';
-import displayState from './tng-api/display/state.js';
 import spadesHost from './tng-api/spades/host.js';
 import spadesPlayer from './tng-api/spades/player.js';
 import hangmanPlayer from './tng-api/hangman/player.js';
@@ -26,12 +23,9 @@ const routes = new Map([
   ['/profile', profile],
   ['/device-session', deviceSession],
   ['/host/session', hostSession],
-  ['/host/pairing', hostPairing],
   ['/host/room', hostRoom],
   ['/host/room-state', hostRoomState],
   ['/player/room', playerRoom],
-  ['/display/pair', displayPair],
-  ['/display/state', displayState],
   ['/spades/host', spadesHost],
   ['/spades/player', spadesPlayer],
   ['/hangman/player', hangmanPlayer],
@@ -91,7 +85,7 @@ function isAllowedOrigin(origin) {
 function corsHeaders(request) {
   const origin = request.headers.get('origin');
   const headers = new Headers({
-    'Access-Control-Allow-Headers': 'authorization, content-type, x-tng-guest-token, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code',
+    'Access-Control-Allow-Headers': 'authorization, content-type, x-tng-guest-token, x-tng-device-id, x-tng-room-code',
     'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS',
     'Access-Control-Max-Age': '600',
     'Vary': 'Origin',
