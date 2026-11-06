@@ -4,7 +4,7 @@ import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { BSDisplay, BSHost, BSPlayer } from '@/components/battleSudoku/BSOnline';
 import { sfx } from '@/components/battleSudoku/bsSfx';
-import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/battleSudoku/bs.css';
 
 // BattleSudoku — /games/sudoku
@@ -15,8 +15,9 @@ export default function SudokuGame() {
   const display = (params.get('display') || '').toUpperCase();
   const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' ? 'host' : 'menu');
   const [code, setCode] = useState('');
-  const identity = useTngGameIdentity();
-  const name = identity.publicName;
+  // Live Sudoku uses the temporary guest identity only; never fetch a TNG profile.
+  const guestIdentity = getStoredGuestIdentity();
+  const name = guestIdentity?.name || 'Guest';
   const [muted, setMuted] = useState(sfx.muted);
   const [err, setErr] = useState('');
   const toMenu = () => { setScreen('menu'); setParams({}, { replace: true }); };
@@ -25,7 +26,7 @@ export default function SudokuGame() {
 
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
-  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
+  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <BSPlayer code={room} name={name} onExit={toMenu} />;
   else {
     const join = () => { const c = code.trim().toUpperCase(); if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; } setParams({ room: c }, { replace: true }); setScreen('join'); };
     body = (
@@ -44,11 +45,10 @@ export default function SudokuGame() {
             {err && <div className="bs-err">{err}</div>}
           </div>
           <div className="bs-card">
-            <div className="bs-label">TNG player</div>
+            <div className="bs-label">Guest player</div>
             <p className="bs-sub" style={{ marginTop: 8 }}>
-              Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || (identity.loading ? 'Loading profile…' : 'TNG profile unavailable')}</b>
+              Playing as <b style={{ color: 'var(--bs-brass)' }}>{name}</b>
             </p>
-            {identity.error && <div className="bs-err">{identity.error}</div>}
           </div>
           <div className="bs-modes">
             <button type="button" className="bs-mode" onClick={() => { sfx.unlock(); window.location.assign('/room?game=sudoku'); }}><div className="bs-h">Create Room</div><p>Open a shared live room. Players join with the room code — 2 to 8 human players.</p></button>
