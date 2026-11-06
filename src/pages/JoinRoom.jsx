@@ -6,6 +6,8 @@ import { resolveTngRoom } from '@/api/roomRegistry';
 import { useAuth } from '@/lib/AuthContext';
 import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 
+const ENGINE_ROOM_GAME_IDS = new Set(['out', 'see-that', 'word-wrangler', 'sudoku']);
+
 const GAME_PATHS = {
   bff: '/games/bff',
   'square-biz': '/games/square-biz',
@@ -162,7 +164,7 @@ export default function JoinRoom() {
 
         // Standalone rooms have their own player-seat screens. Core rooms
         // use the same short-lived guest identity and never require sign-in.
-        if (registeredRoom.kind === 'standalone') {
+        if (registeredRoom.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(registeredRoom.gameId)) {
           if (getStoredGuestIdentity()) {
             window.location.replace(registeredRoom.joinPath);
             return;
@@ -203,7 +205,7 @@ export default function JoinRoom() {
     try {
       const guestIdentity = getStoredGuestIdentity() || await createGuestIdentity(guestName);
 
-      if (roomInfo.kind === 'standalone') {
+      if (roomInfo.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(roomInfo.gameId)) {
         window.location.replace(roomInfo.joinPath);
         return;
       }
@@ -260,7 +262,7 @@ export default function JoinRoom() {
     try {
       if (!getStoredGuestIdentity()) await createGuestIdentity(guestName);
       window.location.replace(
-        roomInfo.kind === 'standalone'
+        (roomInfo.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(roomInfo.gameId))
           ? (roomInfo.spectatePath || roomInfo.joinPath)
           : (roomInfo.spectatePath || `/spectate/${roomCode}`),
       );
