@@ -354,6 +354,13 @@ async function main() {
       throw new Error(`room roster did not synchronize across sessions: ${roster.map((p) => p.name).join(', ') || hostRoom.response.status}`);
     }
 
+    // Set the shortest supported live phase lengths so the production test can
+    // observe a complete attack volley without waiting through default timers.
+    const settings = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostToken, {
+      action: 'settings', solveSec: 30, battleSec: 10, volleys: 6,
+    });
+    if (!settings.response.ok) throw new Error('host could not set test volley timings');
+
     const started = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostToken, { action: 'start' });
     if (!started.response.ok || !started.payload?.room?.game) {
       throw new Error(`host could not start battle: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
@@ -410,16 +417,9 @@ async function main() {
       }
     }
 
-    // Set the shortest supported live phase lengths so the production test can
-    // observe a complete attack volley without waiting through default timers.
-    const settings = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostToken, {
-      action: 'settings', solveSec: 30, battleSec: 10, volleys: 6,
-    });
-    if (!settings.response.ok) throw new Error('host could not set test volley timings');
-
     // Wait for the server-owned solve timer to advance into battle.
     let battleView = null;
-    const battleDeadline = Date.now() + 40000;
+    const battleDeadline = Date.now() + 38000;
     while (Date.now() < battleDeadline) {
       const [h, p] = await Promise.all([
         api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
