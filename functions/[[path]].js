@@ -14,7 +14,9 @@ export async function onRequest(context) {
     path === "/tng-rooms" ||
     path.startsWith("/tng-rooms/") ||
     path === "/nc-api" ||
-    path.startsWith("/nc-api/");
+    path.startsWith("/nc-api/") ||
+    path === "/bs-api" ||
+    path.startsWith("/bs-api/");
 
   if (!isApi) return next();
 
