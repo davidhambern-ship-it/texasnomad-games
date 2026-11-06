@@ -128,18 +128,7 @@ export function BSPlayer({ code, name, onExit }) {
     );
   }
   if (!room.game) {
-    const meR = room.roster.find(p => p.id === data.you.id);
-    return (
-      <div className="bs-wrap" style={{ maxWidth: 520 }}>
-        <div className="bs-card" style={{ textAlign: 'center' }}>
-          <span className="bs-chip" style={{ '--c': meR?.color, fontSize: 20 }}><span className="bs-dot" style={{ background: meR?.color }} />{data.you.name}</span>
-          <h2 className="bs-h" style={{ fontSize: 44, color: 'var(--bs-brass)', marginTop: 14 }}>You’re aboard!</h2>
-          <p className="bs-sub">Watch the big screen. When the battle starts you’ll hide your fleet, then solve the same Sudoku as everyone else. Correct numbers load your cannon; every volley you fire at rivals’ hidden fleets.</p>
-          <p className="bs-sub">{room.roster.length} captain{room.roster.length === 1 ? '' : 's'} in battle {code}</p>
-          <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={leave}>Leave</button>
-        </div>
-      </div>
-    );
+    return <BSLobby room={room} isHost={false} act={act} onExit={leave} joinUrl={`${TNG_PUBLIC_ORIGIN}/games/sudoku?room=${code}`} playerName={data.you.name} />;
   }
   return <BSPhone v={room.game} act={act} now={now + offset} onExit={leave} />;
 }
