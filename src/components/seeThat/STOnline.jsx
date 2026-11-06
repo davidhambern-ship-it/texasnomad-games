@@ -33,8 +33,8 @@ const TNG_PUBLIC_ORIGIN = String(
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN}/games/see-that`;
 
 /** The big screen. Creates a room (or resumes one) and shows lobby → rounds → podium. */
-export function STHost({ scenes, onExit }) {
-  const [seat, setSeat] = useState(() => { try { return JSON.parse(localStorage.getItem('st_host') || 'null'); } catch { return null; } });
+export function STHost({ scenes, onExit, initialCode = '' }) {
+  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('st_host') || 'null'); return initialCode && saved?.code !== initialCode ? null : saved; } catch { return null; } });
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState('');
   const { data, offset, error, apply } = useRoom(seat?.code, seat?.token, () => { try { localStorage.removeItem('st_host'); } catch { /* ignore */ } setSeat(null); });
@@ -42,7 +42,7 @@ export function STHost({ scenes, onExit }) {
   const create = useCallback(async () => {
     setCreating(true); setErr('');
     try {
-      const d = await stApi.createRoom();
+      const d = await stApi.createRoom(initialCode);
       const s = { code: d.roomCode, token: d.token };
       try { localStorage.setItem('st_host', JSON.stringify(s)); } catch { /* ignore */ }
       setSeat(s); apply(d);
