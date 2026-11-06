@@ -406,7 +406,7 @@ async function main() {
           move.payload?.result?.correct !== true ||
           move.payload?.room?.game?.me?.board?.[cell] !== digit ||
           move.payload?.room?.game?.me?.stats?.cells !== 1) {
-        throw new Error(`${label} Sudoku move failed validation or did not update that captain's board`);
+        throw new Error(`${label} Sudoku move failed: HTTP=${move.response.status} result=${JSON.stringify(move.payload?.result)} phase=${move.payload?.room?.game?.phase} cell=${cell} digit=${digit} board=${move.payload?.room?.game?.me?.board?.[cell]} cells=${move.payload?.room?.game?.me?.stats?.cells}`);
       }
     }
 
