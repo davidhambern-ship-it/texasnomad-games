@@ -27,7 +27,7 @@ export default function RodeoRumbleGame() {
   const identity = useTngGameIdentity();
   const toMenu = () => { setParams({}, { replace: true }); };
 
-  if (/^[A-Z]{5}$/.test(display)) {
+  if (/^TN[A-Z0-9]{4}$/.test(display)) {
     return <RRDisplay code={display} />;
   }
 
@@ -35,7 +35,7 @@ export default function RodeoRumbleGame() {
     return <RRHost onExit={() => window.location.assign(getStoredGuestIdentity() ? '/games' : '/host')} />;
   }
 
-  if (/^[A-Z]{5}$/.test(room)) {
+  if (/^TN[A-Z0-9]{4}$/.test(room)) {
     return (
       <RRController
         code={room}
@@ -48,7 +48,7 @@ export default function RodeoRumbleGame() {
 
   const join = () => {
     const c = code.trim().toUpperCase();
-    if (!/^[A-Z]{5}$/.test(c)) {
+    if (!/^TN[A-Z0-9]{4}$/.test(c)) {
       setErr('Room codes use TN followed by 4 letters or numbers.');
       return;
     }
