@@ -1,10 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { ALL_GAMES, RoomGameIcon } from '@/components/host/HostGameSelect';
+import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { useState } from 'react';
-import SharedGameBoard from '@/components/host/SharedGameBoard';
+import RoomGameBoard from '@/components/rooms/RoomGameBoard';
 
 export default function SharedGamePage({ gameId }) {
   const identity = useTngGameIdentity();
@@ -50,7 +50,7 @@ export default function SharedGamePage({ gameId }) {
             {guestError && <p className="mt-3 text-sm text-red-400">{guestError}</p>}
             <button disabled={creatingGuest || !guestName.trim()} className="mt-4 w-full rounded-xl bg-[#BC13FE] px-4 py-3 font-bold text-white disabled:opacity-40">{creatingGuest ? 'SETTING UP…' : 'CONTINUE AS GUEST'}</button>
           </form>
-        ) : <SharedGameBoard gameId={gameId} roomCode="" />}
+        ) : <RoomGameBoard gameId={gameId} roomCode="" />}
       </main>
     </div>
   );
