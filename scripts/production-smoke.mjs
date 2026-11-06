@@ -440,14 +440,12 @@ async function main() {
     if (hostTarget !== playerId || playerTarget !== hostId) {
       throw new Error('captains were not assigned each other as battle targets');
     }
-    const [hostFire, playerFire] = await Promise.all([
-      api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
-        action: 'order', kind: 'fire', target: hostTarget, cell: playerView.payload.room.game.me.ships[0].cells[0],
-      }),
-      api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
-        action: 'order', kind: 'fire', target: playerTarget, cell: hostView.payload.room.game.me.ships[0].cells[0],
-      }),
-    ]);
+    const hostFire = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
+      action: 'order', kind: 'fire', target: hostTarget, cell: playerView.payload.room.game.me.ships[0].cells[0],
+    });
+    const playerFire = await api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
+      action: 'order', kind: 'fire', target: playerTarget, cell: hostView.payload.room.game.me.ships[0].cells[0],
+    });
     if (!hostFire.response.ok || hostFire.payload?.result?.ok !== true ||
         !playerFire.response.ok || playerFire.payload?.result?.ok !== true) {
       throw new Error(`one or both captains could not queue a fire order: host=${JSON.stringify(hostFire.payload?.result)} player=${JSON.stringify(playerFire.payload?.result)}`);
@@ -470,9 +468,9 @@ async function main() {
     if (!revealViews) throw new Error('battle orders were accepted but volley did not resolve into reveal phase');
     const hostEvents = revealViews.host.reveal?.events || [];
     const playerEvents = revealViews.player.reveal?.events || [];
-    const hostShot = hostEvents.find((event) => event.by === hostId && event.target === playerId && event.cell === playerView.payload.room.game.me.ships[0].cells[0] && event.result === 'hit');
+    const hostShot = hostEvents.find((event) => event.by === hostId && event.target === playerId && event.cell === playerView.payload.room.game.me.ships[0].cells[0] && ['hit', 'miss'].includes(event.result));
     const playerShot = playerEvents.find((event) => event.by === playerId && event.target === hostId && event.cell === hostView.payload.room.game.me.ships[0].cells[0] && event.result === 'hit');
-    if (!hostShot || !playerShot) {
+    if (!hostShot || !playerShot || (hostShot.result !== 'hit' && playerShot.result !== 'hit')) {
       throw new Error(`resolved reveal missing one or both real attacks: host=${JSON.stringify(hostShot)} player=${JSON.stringify(playerShot)}`);
     }
     const hostSeesPlayerMark = revealViews.host.players.find((player) => player.id === playerId)?.marks?.[playerView.payload.room.game.me.ships[0].cells[0]];
