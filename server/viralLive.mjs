@@ -68,6 +68,7 @@ export function createViralLive({
       lastStateAt: Number(saved?.lastStateAt || 0),
       hostId: null,
       hostAccountId: saved?.hostAccountId || null,
+      hostGuestId: saved?.hostGuestId || null,
       playerAccounts:
         saved?.playerAccounts && typeof saved.playerAccounts === 'object'
           ? saved.playerAccounts
@@ -98,6 +99,7 @@ export function createViralLive({
       lastState: r.lastState || null,
       lastStateAt: Number(r.lastStateAt || 0),
       hostAccountId: r.hostAccountId || null,
+      hostGuestId: r.hostGuestId || null,
       playerAccounts: r.playerAccounts || {},
       gameSerial: Math.max(1, Number(r.gameSerial || 1)),
       updatedAt,
@@ -282,12 +284,16 @@ export function createViralLive({
           }
 
           const accountId = String(verified?.accountId || '');
-          const roomOwnedByAnotherAccount =
-            r.hostAccountId &&
-            accountId &&
-            String(r.hostAccountId) !== accountId;
+          const guestId = String(verified?.guestId || '');
+          const hasHostIdentity = Boolean(accountId || guestId);
+          const roomOwnedByAnotherAccount = Boolean(
+            r.hostAccountId && String(r.hostAccountId) !== accountId,
+          );
+          const roomOwnedByAnotherGuest = Boolean(
+            r.hostGuestId && String(r.hostGuestId) !== guestId,
+          );
 
-          if (!accountId || roomOwnedByAnotherAccount) {
+          if (!hasHostIdentity || roomOwnedByAnotherAccount || roomOwnedByAnotherGuest) {
             // A client may call itself "host", but without a verified active TNG
             // Host Controller it remains an ordinary peer and can never publish
             // authoritative game state.
@@ -297,7 +303,7 @@ export function createViralLive({
               topic: '__tng_host_auth',
               data: {
                 ok: false,
-                code: roomOwnedByAnotherAccount
+                code: (roomOwnedByAnotherAccount || roomOwnedByAnotherGuest)
                   ? 'ROOM_HOST_OWNED'
                   : 'HOST_AUTH_REQUIRED',
               },
@@ -333,7 +339,8 @@ export function createViralLive({
           }
 
           clean.role = 'host';
-          r.hostAccountId = accountId;
+          r.hostAccountId = accountId || null;
+          r.hostGuestId = guestId || null;
           r.hostId = id;
           r.updatedAt = now;
           me.presence = clean;
@@ -459,6 +466,7 @@ export function createViralLive({
             lastStateAt: Number(saved.lastStateAt || 0),
             hostId: null,
             hostAccountId: saved.hostAccountId || null,
+            hostGuestId: saved.hostGuestId || null,
             playerAccounts:
               saved.playerAccounts && typeof saved.playerAccounts === 'object'
                 ? saved.playerAccounts
