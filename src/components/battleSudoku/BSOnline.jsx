@@ -48,7 +48,7 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
       const joined = await bsApi.action(d.roomCode, d.token, 'join', { name: guest.name });
       const s = { code: d.roomCode, token: d.token, playerToken: joined.token };
       try { localStorage.setItem('bs_host', JSON.stringify(s)); } catch { /* ignore */ }
-      setSeat(s); apply(d); applyPlayer(joined);
+      setSeat(s); apply(joined); applyPlayer(joined);
     }
     catch (e) { setErr(e.message); } finally { setCreating(false); }
   }, [apply, applyPlayer]);
