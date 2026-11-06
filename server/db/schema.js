@@ -20,7 +20,6 @@ export const accountStatus = pgEnum('account_status', ['active', 'suspended', 'd
 export const connectionRole = pgEnum('connection_role', [
   'player',
   'host_controller',
-  'game_display',
   'spectator',
 ]);
 export const deviceStatus = pgEnum('device_status', ['pairing', 'connected', 'disconnected', 'revoked']);
@@ -73,8 +72,8 @@ export const deviceSessions = pgTable('device_sessions', {
   index('device_sessions_account_idx').on(table.accountId),
   uniqueIndex('device_sessions_token_hash_unique').on(table.tokenHash),
   check(
-    'device_sessions_display_identity',
-    sql`(${table.role} = 'game_display' AND ${table.accountId} IS NULL) OR (${table.role} <> 'game_display' AND ${table.accountId} IS NOT NULL)`,
+    'device_sessions_account_required',
+    sql`${table.accountId} IS NOT NULL`,
   ),
 ]);
 
@@ -82,7 +81,6 @@ export const hostSessions = pgTable('host_sessions', {
   id: uuid('id').primaryKey().defaultRandom(),
   hostAccountId: uuid('host_account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
   controllerDeviceId: uuid('controller_device_id').notNull().references(() => deviceSessions.id, { onDelete: 'restrict' }),
-  displayDeviceId: uuid('display_device_id').references(() => deviceSessions.id, { onDelete: 'set null' }),
   status: hostSessionStatus('status').notNull().default('pairing'),
   endedAt: timestamp('ended_at', { withTimezone: true }),
   ...timestamps,
@@ -94,23 +92,6 @@ export const hostSessions = pgTable('host_sessions', {
   uniqueIndex('host_sessions_one_active_per_controller')
     .on(table.controllerDeviceId)
     .where(sql`${table.status} IN ('pairing', 'ready', 'live')`),
-  uniqueIndex('host_sessions_one_active_per_display')
-    .on(table.displayDeviceId)
-    .where(sql`${table.displayDeviceId} IS NOT NULL AND ${table.status} IN ('ready', 'live')`),
-]);
-
-export const displayPairings = pgTable('display_pairings', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  hostSessionId: uuid('host_session_id').notNull().references(() => hostSessions.id, { onDelete: 'cascade' }),
-  codeHash: varchar('code_hash', { length: 128 }).notNull(),
-  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-  consumedAt: timestamp('consumed_at', { withTimezone: true }),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  uniqueIndex('display_pairings_code_hash_unique').on(table.codeHash),
-  uniqueIndex('display_pairings_one_pending_per_host')
-    .on(table.hostSessionId)
-    .where(sql`${table.consumedAt} IS NULL`),
 ]);
 
 export const gameRooms = pgTable('game_rooms', {
@@ -151,7 +132,7 @@ export const roomParticipants = pgTable('room_participants', {
   uniqueIndex('room_participants_seat_unique').on(table.roomId, table.seatNumber).where(sql`${table.seatNumber} IS NOT NULL`),
 ]);
 
-// Private cards/dominoes are never included in the Game Display projection.
+// Private cards and dominoes are stored separately from shared room state.
 export const participantPrivateState = pgTable('participant_private_state', {
   roomId: uuid('room_id').notNull().references(() => gameRooms.id, { onDelete: 'cascade' }),
   accountId: uuid('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
