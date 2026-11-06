@@ -395,6 +395,10 @@ export const tngApi = {
       return result;
     },
     getRoomState: (deviceId) => getHostLiveRoomState(deviceId),
+    getRoster: async (deviceId) => {
+      const payload = await getHostLiveRoomState(deviceId);
+      return { people: Array.isArray(payload?.people) ? payload.people : [] };
+    },
     updateRoomState: async (deviceId, statePatch) => {
       const result = await request('/api/host/room-state', {
         method:'PATCH',
