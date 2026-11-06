@@ -9,8 +9,6 @@ import '@/components/battleSudoku/bs.css';
 
 // BattleSudoku — /games/sudoku
 //   ?room=CODE     join on a phone
-//   ?display=CODE  read-only big screen (TNG Game Display / second TV)
-//   ?host=1        host directly from the TNG Host Panel
 export default function SudokuGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
