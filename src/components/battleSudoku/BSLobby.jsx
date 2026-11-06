@@ -11,7 +11,7 @@ function Setting({ label, value, options, field, act }) {
   </div>;
 }
 
-export default function BSLobby({ room, isHost, act, onExit, joinUrl, playerName = '' }) {
+export default function BSLobby({ room, isHost, act, onExit, joinUrl, playerName = '', selfPlayerId = '' }) {
   const settings = room.settings || {};
   const players = room.roster || [];
   return (
@@ -35,7 +35,7 @@ export default function BSLobby({ room, isHost, act, onExit, joinUrl, playerName
                 <span className="bs-dot" style={{ background: p.color }} />
                 <span className="bs-room-player-name">{p.name}{p.cpu ? ' · CPU' : ''}</span>
                 <span className={`bs-room-online ${p.online ? 'online' : ''}`}>{p.online ? 'Connected' : 'Reconnecting'}</span>
-                {isHost && !p.cpu && <button type="button" className="bs-btn ghost small" onClick={() => act('kick', { playerId: p.id })} aria-label={`Remove ${p.name}`}>Remove</button>}
+                {isHost && !p.cpu && p.id !== selfPlayerId && <button type="button" className="bs-btn ghost small" onClick={() => act('kick', { playerId: p.id })} aria-label={`Remove ${p.name}`}>Remove</button>}
               </div>
             )) : <div className="bs-room-empty">Waiting for the first captain to join…</div>}
           </div>
