@@ -18,7 +18,7 @@ function Shells({ have, spent = 0 }) {
 /**
  * BSPhone — one captain's screen. v = game view (with v.me), act(type, payload) → Promise<result>
  */
-export default function BSPhone({ v, act, now, onExit }) {
+export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom = null, hostAct = null }) {
   const me = v.me;
   const players = useMemo(() => Object.fromEntries(v.players.map(p => [p.id, p])), [v.players]);
   const [sel, setSel] = useState(null);
@@ -237,9 +237,29 @@ export default function BSPhone({ v, act, now, onExit }) {
   }
 
   return (
-    <div className="bs-phone">
+    <div className={`bs-phone${isHost ? ' host-mode' : ''}`}>
       {header}
-      <div className="bs-pbody">{body}</div>
+      <div className="bs-play-area">
+        <div className="bs-pbody">{body}</div>
+        {isHost && hostRoom && hostAct && (
+          <aside className="bs-host-room">
+            <h3>Game room</h3>
+            <div className="bs-host-code">{hostRoom.code}</div>
+            <div className="bs-host-stat">{hostRoom.roster.length} / 8 captains · {PHASE[v.phase]}</div>
+            <div className="bs-host-roster">
+              {hostRoom.roster.map(p => <div className="bs-host-player" key={p.id}>
+                <span className="bs-dot" style={{ background: p.color }} />
+                <span>{p.name}{p.cpu ? ' · CPU' : ''}</span>
+                {!p.cpu && <button type="button" className="bs-btn ghost small" onClick={() => hostAct('kick', { playerId: p.id })} aria-label={`Remove ${p.name}`}>×</button>}
+              </div>)}
+            </div>
+            {v.phase !== 'final'
+              ? <button type="button" className="bs-btn ghost small" onClick={() => { if (window.confirm('End this battle and return to the room?')) hostAct('lobby'); }}>End battle · Return to room</button>
+              : <><button type="button" className="bs-btn primary" onClick={() => hostAct('start')}>New battle</button><button type="button" className="bs-btn" onClick={() => hostAct('lobby')}>Back to room</button></>}
+            <button type="button" className="bs-btn ghost small" onClick={onExit}>Exit room</button>
+          </aside>
+        )}
+      </div>
       {toast && <div key={toast.k} className={`bs-toast ${toast.kind}`}>{toast.msg}</div>}
     </div>
   );
