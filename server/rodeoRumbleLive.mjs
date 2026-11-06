@@ -162,9 +162,11 @@ export function createRodeoRumbleLive({
     return COLORS.find((color) => !used.has(color)) || COLORS[room.players.size % COLORS.length];
   };
 
-  async function createRoom(hostIdentity) {
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      const code = 'TN' + Array.from(
+  async function createRoom(hostIdentity, requestedCode = '') {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) return null;
+    for (let attempt = 0; attempt < (requested ? 1 : 50); attempt += 1) {
+      const code = requested || 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
@@ -178,6 +180,7 @@ export function createRodeoRumbleLive({
         spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(code)}`,
         hostAccountId: hostIdentity.accountId || null,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       }).catch(() => false);
       if (!ok) continue;
       const room = {
@@ -275,7 +278,7 @@ export function createRodeoRumbleLive({
           ) {
             room = savedRoom;
           } else {
-            room = await createRoom(hostIdentity);
+            room = await createRoom(hostIdentity, code);
           }
           if (!room) {
             send(ws, { t: 'error', code: 'NO_CODE', message: 'TNG could not reserve a room code. Try again.' });
