@@ -545,20 +545,7 @@
   }
 
   function startHostDisplaySync() {
-    // Separate Game Display pairing has been retired; hosts and players share one screen.
-    return;
-    if (requestedDisplay || requestedJoin || displaySyncTimer) return;
-
-    const hostTab = document.getElementById('tHost');
-    hostTab?.addEventListener('click', () => {
-      hostModeActive = true;
-      syncHostDisplay();
-    });
-
-    syncHostDisplay();
-    displaySyncTimer = window.setInterval(() => {
-      syncHostDisplay();
-    }, 4000);
+    // Separate Game Display pairing has been retired.
   }
 
   function mountSessionBar() {
