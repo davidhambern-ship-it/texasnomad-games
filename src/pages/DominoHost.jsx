@@ -105,7 +105,7 @@ export default function DominoHost({ initialCode = '' }) {
     if (autoCreateStarted.current || identity.loading || !hostName || game || loading) return;
     autoCreateStarted.current = true;
     createRoom();
-  }, [identity.loading, hostName, game, loading]);
+  }, [identity.loading, hostName, game, loading, createRoom]);
 
   const resumeRoom = async () => {
     setLoading(true);
