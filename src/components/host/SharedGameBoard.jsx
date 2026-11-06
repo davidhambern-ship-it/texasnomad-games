@@ -31,15 +31,15 @@ export default function SharedGameBoard({ gameId, roomCode }) {
     return () => { active = false; };
   }, [gameId]);
 
-  if (gameId === 'out') return <NCHost initialCode={roomCode} onExit={() => {}} />;
+  if (gameId === 'out') return <NCHost initialCode={roomCode} freshRoom onExit={() => {}} />;
   if (gameId === 'dominoes') return <DominoHost initialCode={roomCode} />;
-  if (gameId === 'rodeo-rumble') return <RRHost initialCode={roomCode} onExit={() => {}} />;
+  if (gameId === 'rodeo-rumble') return <RRHost initialCode={roomCode} freshRoom onExit={() => {}} />;
   if (gameId === 'viral') return <iframe title="VIRAL! live game" src={`/viral/index.html?host=1&room=${encodeURIComponent(roomCode)}`} className="w-full rounded-xl border-0 bg-[#0a0916]" style={{ height: 'min(78vh, 900px)', minHeight: 620 }} allow="fullscreen; autoplay" />;
   if (gameId === 'see-that') {
     if (loadError) return <p className="p-4 text-red-400">{loadError}</p>;
-    return scenes.length ? <STHost initialCode={roomCode} scenes={scenes} onExit={() => {}} /> : <p className="p-4 text-white/50">Loading See That scenes…</p>;
+    return scenes.length ? <STHost initialCode={roomCode} freshRoom scenes={scenes} onExit={() => {}} /> : <p className="p-4 text-white/50">Loading See That scenes…</p>;
   }
-  if (gameId === 'sudoku') return <BSHost initialCode={roomCode} onExit={() => {}} />;
+  if (gameId === 'sudoku') return <BSHost initialCode={roomCode} freshRoom onExit={() => {}} />;
   if (gameId === 'word-wrangler') {
     if (loadError) return <p className="p-4 text-red-400">{loadError}</p>;
     if (!dict) return <p className="p-4 text-white/50">Loading Word Wrangler dictionary…</p>;
