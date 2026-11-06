@@ -75,7 +75,6 @@ const [
   guestAuth,
   guestAccount,
   dbSchema,
-  pairing,
   dbClient,
 ] = await Promise.all([
   text('src/App.jsx'),
@@ -131,7 +130,6 @@ const [
   text('server/auth/require-user.js'),
   text('server/auth/require-account.js'),
   text('server/db/schema.js'),
-  text('server/pairing.js'),
   text('server/db/client.js'),
 ]);
 
@@ -415,7 +413,7 @@ ok(
   'guest session persistence and API signing',
   server.includes('insert into public.tng_guest_sessions') &&
     server.includes('token_hash') &&
-    pairing.includes('process.env.TNG_GUEST_TOKEN_SECRET'),
+    server.includes('secret: process.env.TNG_GUEST_TOKEN_SECRET'),
   'Guest tokens are not persisted or room pairing lacks a guest-safe signing secret',
 );
 
@@ -493,6 +491,30 @@ ok(
     !(await exists('src/components/host/HostRoomConnect.jsx')) &&
     !(await exists('src/components/host/panels')),
   'Legacy Host Panel pages, console, controls, or Game Display code remain',
+);
+
+ok(
+  'paired Game Display backend and device architecture removed',
+  !tngDispatcher.includes('/display/pair') &&
+    !tngDispatcher.includes('/display/state') &&
+    !tngDispatcher.includes('/host/pairing') &&
+    !tngApi.includes('tngApi.display') &&
+    !tngApi.includes('createPairing') &&
+    !server.includes('display_device_id') &&
+    !server.includes('display_pairings') &&
+    !server.includes('game_display') &&
+    !dbSchema.includes('displayPairings') &&
+    !dbSchema.includes('displayDeviceId') &&
+    !dbSchema.includes('game_display') &&
+    !(await exists('server/tng-api/display/pair.js')) &&
+    !(await exists('server/tng-api/display/state.js')) &&
+    !(await exists('server/tng-api/host/pairing.js')) &&
+    !(await exists('server/pairing.js')) &&
+    !(await exists('src/api/standaloneDisplay.js')) &&
+    !(await exists('src/components/brawl/RRDisplay.jsx')) &&
+    !(await exists('src/hooks/useHostSession.js')) &&
+    await exists('supabase/migrations/20261105180000_remove_game_display_architecture.sql'),
+  'Legacy Game Display routes, pairing services, UI, or schema definitions remain',
 );
 
 ok(
