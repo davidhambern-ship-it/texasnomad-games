@@ -2,19 +2,17 @@ import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
-import { BSDisplay, BSHost, BSPlayer } from '@/components/battleSudoku/BSOnline';
+import { BSHost, BSPlayer } from '@/components/battleSudoku/BSOnline';
 import { sfx } from '@/components/battleSudoku/bsSfx';
 import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/battleSudoku/bs.css';
 
 // BattleSudoku — /games/sudoku
 //   ?room=CODE     join on a phone
-//   ?display=CODE  read-only big screen (TNG Game Display / second TV)
 //   ?host=1        host a standalone room
 export default function SudokuGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
-  const display = (params.get('display') || '').toUpperCase();
   const guestIdentity = getStoredGuestIdentity();
   const [screen, setScreen] = useState(room ? 'join' : params.get('host') === '1' && guestIdentity ? 'host' : 'menu');
   const [code, setCode] = useState('');
@@ -34,7 +32,6 @@ export default function SudokuGame() {
     }
   };
 
-  if (display) return <div className="bs-root"><BSDisplay code={display} /></div>;
 
   let body;
   if (screen === 'host') body = <BSHost onExit={toMenu} />;
@@ -49,7 +46,7 @@ export default function SudokuGame() {
         </div>
         <div className="bs-grid2">
           <div className="bs-card">
-            <div className="bs-label" style={{ marginBottom: 8 }}>Joining a battle? Enter the code from the big screen</div>
+            <div className="bs-label" style={{ marginBottom: 8 }}>Joining a battle? Enter the room code</div>
             <div className="bs-row">
               <input className="bs-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={6} placeholder="TNXXXX" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6))} onKeyDown={e => e.key === 'Enter' && join()} />
               <button type="button" className="bs-btn primary" style={{ padding: '12px 22px', fontSize: 18 }} onClick={join}>Join</button>
