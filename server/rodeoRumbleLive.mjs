@@ -185,7 +185,7 @@ export function createRodeoRumbleLive({
       }).catch(() => false);
       if (!ok) continue;
       const room = {
-        code,
+        code: candidate,
         hostToken: newToken(),
         hostAccountId: hostIdentity.accountId ? String(hostIdentity.accountId) : null,
         hostGuestId: hostIdentity.guestId ? String(hostIdentity.guestId) : null,
