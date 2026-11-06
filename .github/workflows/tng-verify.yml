@@ -74,5 +74,5 @@ jobs:
 
       - name: Wait for exact commit and smoke production
         env:
-          EXPECTED_COMMIT: ${{ github.sha }}
+          EXPECTED_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
         run: npm run smoke:production
