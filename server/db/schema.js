@@ -71,10 +71,6 @@ export const deviceSessions = pgTable('device_sessions', {
 }, (table) => [
   index('device_sessions_account_idx').on(table.accountId),
   uniqueIndex('device_sessions_token_hash_unique').on(table.tokenHash),
-  check(
-    'device_sessions_account_required',
-    sql`${table.accountId} IS NOT NULL`,
-  ),
 ]);
 
 export const hostSessions = pgTable('host_sessions', {
