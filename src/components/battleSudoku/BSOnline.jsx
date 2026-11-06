@@ -98,10 +98,10 @@ export function BSPlayer({ code, name, onExit }) {
         <div className="bs-card" style={{ textAlign: 'center' }}>
           <h1 className="bs-h bs-logo" style={{ fontSize: 60 }}>Battle<b>Sudoku</b></h1>
           <p className="bs-sub">Battle <b style={{ color: 'var(--bs-brass)', letterSpacing: '.15em' }}>{code}</b> · {room.roster.length} captain{room.roster.length === 1 ? '' : 's'}</p>
-          <p className="bs-sub" style={{ marginTop: 14 }}>
-            Playing as <b style={{ color: 'var(--bs-brass)' }}>{name || 'Guest'}</b>
-          </p>
-          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy} onClick={join}>Join the fleet</button>
+          <label className="bs-label" htmlFor="bs-player-name" style={{ display: 'block', textAlign: 'left', marginTop: 18 }}>Your player name</label>
+          <input id="bs-player-name" className="bs-input" style={{ width: '100%', marginTop: 6, fontSize: 18 }} maxLength={32} autoComplete="nickname" placeholder="Enter your name" value={displayName} onChange={e => setDisplayName(e.target.value)} onKeyDown={e => e.key === 'Enter' && join()} />
+          <p className="bs-sub" style={{ marginTop: 8 }}>No account needed. Your name appears on the battle screen.</p>
+          <button type="button" className="bs-btn primary" style={{ width: '100%', marginTop: 12, padding: 14, fontSize: 18 }} disabled={busy || !displayName.trim()} onClick={join}>Join the fleet</button>
           {err && <div className="bs-err">{err}</div>}
           <button type="button" className="bs-btn ghost small" style={{ marginTop: 12 }} onClick={onExit}>Back</button>
         </div>
