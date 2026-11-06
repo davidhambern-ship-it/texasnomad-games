@@ -279,13 +279,15 @@ ok(
 );
 
 ok(
-  'guest player cannot claim host privileges',
+  'guest player cannot claim another player’s host privileges',
   server.includes('async function verifyViralHostAuthorization') &&
     server.includes('if (!resolved.ok) return null;') &&
-    viralLiveModule.includes('if (!accountId || roomOwnedByAnotherAccount)') &&
+    viralLiveModule.includes('const guestId = String(verified?.guestId || \'\')') &&
+    viralLiveModule.includes('r.hostGuestId && String(r.hostGuestId) !== guestId') &&
+    viralLiveModule.includes('if (!hasHostIdentity || roomOwnedByAnotherAccount || roomOwnedByAnotherGuest)') &&
     rodeoLiveModule.includes('if (!hostIdentity?.accountId && !hostIdentity?.guestId)') &&
     rodeoLiveModule.includes('savedRoom.hostGuestId'),
-  'A guest player identity can reach a host authorization path',
+  'Guest hosts must be verified and cannot take over a room owned by another guest',
 );
 
 ok(
