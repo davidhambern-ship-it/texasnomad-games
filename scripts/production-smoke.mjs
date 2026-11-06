@@ -490,18 +490,89 @@ async function main() {
       ]);
       if (h.payload?.room?.game?.phase === 'solve' && p.payload?.room?.game?.phase === 'solve' &&
           h.payload.room.game.volley === 2 && p.payload.room.game.volley === 2) {
-        nextVolley = true;
+        nextVolley = { host: h.payload.room.game, player: p.payload.room.game };
         break;
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
     if (!nextVolley) throw new Error('both captains did not return to solve phase for volley 2 after reveal');
 
+    // In volley two, verify defensive repair + shield and a three-cell torpedo.
+    const puzzleSolution = solveSudoku(nextVolley.host.puzzle);
+    const hostCell2 = nextVolley.host.me.board.findIndex((digit) => !digit);
+    const playerCell2 = nextVolley.player.me.board.findIndex((digit) => !digit);
+    if (hostCell2 < 0 || playerCell2 < 0) throw new Error('no open Sudoku cells remained for volley two');
+    const hostMove2 = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
+      action: 'place', cell: hostCell2, digit: puzzleSolution[hostCell2],
+    });
+    const playerMove2 = await api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
+      action: 'place', cell: playerCell2, digit: puzzleSolution[playerCell2],
+    });
+    if (hostMove2.payload?.result?.correct !== true || playerMove2.payload?.result?.correct !== true) {
+      throw new Error('both captains could not solve a second Sudoku cell');
+    }
+
+    let battleTwo = null;
+    const battleTwoDeadline = Date.now() + 38000;
+    while (Date.now() < battleTwoDeadline) {
+      const [h, p] = await Promise.all([
+        api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+        api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+      ]);
+      if (h.payload?.room?.game?.phase === 'battle' && p.payload?.room?.game?.phase === 'battle' &&
+          h.payload.room.game.volley === 2 && p.payload.room.game.volley === 2) {
+        battleTwo = { host: h.payload.room.game, player: p.payload.room.game };
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!battleTwo) throw new Error('both captains did not reach battle phase in volley 2');
+
+    const carrierCells = battleTwo.player.me.ships[0].cells;
+    const torpedoDir = carrierCells[1] - carrierCells[0] === 1 ? 'h' : 'v';
+    const damagedPlayerCell = playerView.payload.room.game.me.ships[0].cells[0];
+    const repair = await api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
+      action: 'order', kind: 'repair', cell: damagedPlayerCell,
+    });
+    const shield = await api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, {
+      action: 'order', kind: 'shield', cell: carrierCells[1],
+    });
+    const torpedo = await api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, {
+      action: 'order', kind: 'torpedo', target: playerId, cell: carrierCells[0], dir: torpedoDir,
+    });
+    if (repair.payload?.result?.ok !== true || shield.payload?.result?.ok !== true || torpedo.payload?.result?.ok !== true) {
+      throw new Error(`repair/shield/torpedo orders failed: repair=${JSON.stringify(repair.payload?.result)} shield=${JSON.stringify(shield.payload?.result)} torpedo=${JSON.stringify(torpedo.payload?.result)}`);
+    }
+
+    let revealTwo = null;
+    const revealTwoDeadline = Date.now() + 16000;
+    while (Date.now() < revealTwoDeadline) {
+      const [h, p] = await Promise.all([
+        api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+        api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+      ]);
+      if (h.payload?.room?.game?.phase === 'reveal' && p.payload?.room?.game?.phase === 'reveal' &&
+          h.payload.room.game.volley === 2 && p.payload.room.game.volley === 2) {
+        revealTwo = { host: h.payload.room.game, player: p.payload.room.game };
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!revealTwo) throw new Error('volley two did not resolve into reveal phase');
+    const secondEvents = revealTwo.player.reveal?.events || [];
+    const torpedoEvents = secondEvents.filter((event) => event.by === hostId && event.target === playerId && event.torpedo);
+    if (torpedoEvents.length !== 3 || !torpedoEvents.some((event) => event.result === 'blocked') ||
+        torpedoEvents.filter((event) => event.result === 'hit').length < 2 ||
+        !secondEvents.some((event) => event.type === 'repair' && event.by === playerId && event.cell === damagedPlayerCell) ||
+        !secondEvents.some((event) => event.type === 'shield' && event.by === playerId)) {
+      throw new Error(`repair/shield/torpedo resolution mismatch: torpedo=${JSON.stringify(torpedoEvents)} defensive=${JSON.stringify(secondEvents.filter((event) => event.by === playerId && ['repair', 'shield'].includes(event.type))) }`);
+    }
+
     await Promise.all([
       api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'leave' }),
       api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'leave' }),
     ]).catch(() => {});
-    return `room ${code}: two guests joined, each solved a correct Sudoku cell, both entered battle, each fired at a known enemy ship cell and confirmed a hit on the opposing map, then both advanced through reveal into solve volley 2`;
+    return `room ${code}: two guests completed Sudoku solving, both landed confirmed ship hits, synchronized the volley reveal, then in volley two verified repair, shield, a three-cell torpedo (two hits + one blocked cell), and the next-phase game loop`;
   });
 
   await check('unauthenticated API rejects protected profile', async () => {
