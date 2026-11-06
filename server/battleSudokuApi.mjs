@@ -137,9 +137,13 @@ export function createBattleSudokuApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = 'TN' + Array.from(
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
+    for (let i = 0; i < (requested ? 1 : 50); i++) {
+      const c = requested || 'TN' + Array.from(
         { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
@@ -155,6 +159,7 @@ export function createBattleSudokuApi({
         spectatePath: '/games/sudoku?display=' + encodeURIComponent(c),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
       if (claimed) return c;
@@ -246,12 +251,13 @@ export function createBattleSudokuApi({
         });
       }
       if (req.method === 'POST' && path === '/rooms') {
+        const body = await readBody(req);
         const hostIdentity = await resolveIdentity(req);
         if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
           throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting BattleSudoku.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
-        const code = await newCode(hostIdentity.accountId || null);
+        const code = await newCode(hostIdentity.accountId || null, body?.roomCode);
         const room = {
           code,
           hostToken: newToken(),
