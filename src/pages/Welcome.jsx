@@ -10,7 +10,6 @@ import {
   Smartphone,
   UserCircle2,
   Crown,
-  Tv2,
   ArrowRight,
 } from 'lucide-react';
 
@@ -21,8 +20,8 @@ const ROLE_CARDS = [
     icon: <Crown className="w-7 h-7" />,
     eyebrow: 'HOST',
     title: 'Host A Game',
-    text: 'The Host Panel is your control center. Create the room, choose the game, manage players, control rounds, and run the action.',
-    note: 'The live game board can appear directly inside the Host Panel.',
+    text: 'Create a room, share its code, and start when everyone has joined. The game and host controls stay together on the same screen.',
+    note: 'No separate host screen or second device is needed.',
     color: '#BC13FE',
   },
   {
@@ -40,14 +39,6 @@ const ROLE_CARDS = [
     text: 'Want to watch without joining the competition? Choose Spectate when entering a room and follow the live board.',
     note: 'Spectators do not take a player seat.',
     color: '#3B82F6',
-  },
-  {
-    icon: <Tv2 className="w-7 h-7" />,
-    eyebrow: 'OPTIONAL DISPLAY',
-    title: 'Use A Big Screen',
-    text: 'A TV, projector, tablet, or second computer can still be used as a separate Game Display for the room.',
-    note: 'A second display is optional — Hosts can run TNG from one device.',
-    color: '#FFD700',
   },
 ];
 
@@ -74,7 +65,7 @@ const KNOW_CARDS = [
   {
     icon: <Crown className="w-5 h-5" />,
     title: 'Host Controls The Room',
-    text: 'The Host runs the game while player devices handle each player’s actions.',
+    text: 'The Host sees the playable board and room controls together; everyone plays in the same live room.',
     color: '#FF5F1F',
   },
   {
@@ -91,8 +82,8 @@ const KNOW_CARDS = [
   },
   {
     icon: <Monitor className="w-5 h-5" />,
-    title: 'One Screen Or Two',
-    text: 'Keep the board inside the Host Panel or send it to a separate display.',
+    title: 'One Shared Game Screen',
+    text: 'The playable board, player actions, room information, and host controls stay together in the live room.',
     color: '#f472b6',
   },
 ];
@@ -278,10 +269,9 @@ export default function Welcome() {
           </div>
 
           <div className="mt-5 rounded-2xl border border-[#3B82F6]/25 bg-[#3B82F6]/[.05] p-5 text-center">
-            <div className="font-heading text-2xl tracking-widest uppercase text-[#3B82F6]">ONE SCREEN OR TWO — YOUR CHOICE</div>
+            <div className="font-heading text-2xl tracking-widest uppercase text-[#3B82F6]">ONE SHARED ROOM SCREEN</div>
             <p className="mx-auto mt-2 max-w-3xl text-sm leading-6 text-white/50">
-              Keep the live game board inside the Host Panel, or move it to a separate Game Display on a TV,
-              projector, tablet, or another computer.
+              Hosts and players use the same live game room. The host controls appear beside the playable board — no separate Host Panel or Game Display.
             </p>
           </div>
         </div>
