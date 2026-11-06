@@ -58,7 +58,7 @@ jobs:
 
   production-smoke:
     name: Production release certification
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/migration/off-railway-guest-platform')
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 12
