@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom';
 import { Loader2, ShieldCheck, Unplug } from 'lucide-react';
 
 import { ALL_GAMES, RoomGameIcon } from '@/components/host/HostGameSelect';
-import HangmanHostPanel from '@/components/host/panels/HangmanHostPanel';
-import NeonSpadesHostPanel from '@/components/host/panels/NeonSpadesHostPanel';
-import NeonWordSearchHostPanel from '@/components/host/panels/NeonWordSearchHostPanel';
-import NeonSquareBizHostPanel from '@/components/host/panels/NeonSquareBizHostPanel';
-import NeonBFFHostPanel from '@/components/host/panels/NeonBFFHostPanel';
+import HangmanGameBoard from '@/components/games/HangmanGameBoard';
+import SpadesGameBoard from '@/components/games/SpadesGameBoard';
+import WordSearchGameBoard from '@/components/games/WordSearchGameBoard';
+import SquareBizGameBoard from '@/components/games/SquareBizGameBoard';
+import BFFGameBoard from '@/components/games/BFFGameBoard';
 import SharedGameBoard from '@/components/host/SharedGameBoard';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
@@ -941,11 +941,11 @@ export default function RoomPage() {
                       PLAYABLE HOST GAME · {roomGame?.title || activeRoom.gameId}
                     </span>
                   </div>
-                  {roomState?.gameId === 'hangman' && <HangmanHostPanel controllerId={controllerId} />}
-                  {roomState?.gameId === 'spades' && <NeonSpadesHostPanel controllerId={controllerId} />}
-                  {roomState?.gameId === 'word-search' && <NeonWordSearchHostPanel controllerId={controllerId} />}
-                  {roomState?.gameId === 'square-biz' && <NeonSquareBizHostPanel controllerId={controllerId} />}
-                  {roomState?.gameId === 'bff' && <NeonBFFHostPanel controllerId={controllerId} />}
+                  {roomState?.gameId === 'hangman' && <HangmanGameBoard controllerId={controllerId} />}
+                  {roomState?.gameId === 'spades' && <SpadesGameBoard controllerId={controllerId} />}
+                  {roomState?.gameId === 'word-search' && <WordSearchGameBoard controllerId={controllerId} />}
+                  {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
+                  {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
                   {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
                     <SharedGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
                   )}
