@@ -35,11 +35,22 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
   const { data, offset, error, apply } = useRoom(seat?.code, seat?.token, () => { try { localStorage.removeItem('bs_host'); } catch { /* ignore */ } setSeat(null); });
+  const { data: playerData, offset: playerOffset, apply: applyPlayer } = useRoom(seat?.code, seat?.playerToken);
   const create = useCallback(async () => {
     setCreating(true); setErr('');
-    try { const d = await bsApi.createRoom(initialCode); const s = { code: d.roomCode, token: d.token }; try { localStorage.setItem('bs_host', JSON.stringify(s)); } catch { /* ignore */ } setSeat(s); apply(d); }
+    try {
+      const d = await bsApi.createRoom(initialCode);
+      const guest = getStoredGuestIdentity();
+      if (!guest?.name) throw new Error('Choose your guest name before creating a room.');
+      // The host also takes a captain seat, so the host plays the same Sudoku
+      // interface as everyone else while retaining a separate host-control token.
+      const joined = await bsApi.action(d.roomCode, d.token, 'join', { name: guest.name });
+      const s = { code: d.roomCode, token: d.token, playerToken: joined.token };
+      try { localStorage.setItem('bs_host', JSON.stringify(s)); } catch { /* ignore */ }
+      setSeat(s); apply(d); applyPlayer(joined);
+    }
     catch (e) { setErr(e.message); } finally { setCreating(false); }
-  }, [apply]);
+  }, [apply, applyPlayer]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = useCallback(async (action, payload = {}) => {
@@ -53,7 +64,12 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
   if (!data) return <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>{err || error ? <><p>{err || error}</p><button type="button" className="bs-btn" onClick={() => { setErr(''); create(); }}>Try again</button> <button type="button" className="bs-btn ghost" onClick={onExit}>Back</button></> : 'Launching the fleet…'}</div></div>;
   return (
     <>
-      <BSBigScreen data={data} isHost act={act} offset={offset} onExit={exit} joinUrl={joinUrlFor()} />
+      {data.room.game && playerData?.room?.game?.me
+        ? <BSPhone v={playerData.room.game} act={async (type, payload = {}) => {
+            try { const d = await bsApi.action(seat.code, seat.playerToken, type, payload); applyPlayer(d); return d.result; }
+            catch (e) { return { ok: false, error: e.message }; }
+          }} now={Date.now() + playerOffset} onExit={exit} isHost hostRoom={data.room} hostAct={act} />
+        : <BSBigScreen data={data} isHost act={act} offset={offset} onExit={exit} joinUrl={joinUrlFor()} />}
       {err && <div className="bs-toast bad">{err}</div>}
     </>
   );
