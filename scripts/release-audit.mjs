@@ -513,7 +513,7 @@ ok(
     !(await exists('src/api/standaloneDisplay.js')) &&
     !(await exists('src/components/brawl/RRDisplay.jsx')) &&
     !(await exists('src/hooks/useHostSession.js')) &&
-    await exists('supabase/migrations/20261105180000_remove_game_display_architecture.sql'),
+    await exists('supabase/migrations/20261106010433_remove_game_display_architecture.sql'),
   'Legacy Game Display routes, pairing services, UI, or schema definitions remain',
 );
 
