@@ -3,7 +3,6 @@ import { NCHost } from '@/components/nomadCards/NCOnline';
 import { STHost } from '@/components/seeThat/STOnline';
 import { BSHost } from '@/components/battleSudoku/BSOnline';
 import WWOnline from '@/components/wordWrangler/WWOnline';
-import DominoHost from '@/pages/DominoHost';
 import RRHost from '@/components/brawl/RRHost';
 import { loadSceneList } from '@/api/seeThatApi';
 import { loadWordDict } from '@/lib/wordWranglerDict';
@@ -32,7 +31,6 @@ export default function RoomGameBoard({ gameId, roomCode }) {
   }, [gameId]);
 
   if (gameId === 'out') return <NCHost initialCode={roomCode} freshRoom onExit={() => {}} />;
-  if (gameId === 'dominoes') return <DominoHost initialCode={roomCode} />;
   if (gameId === 'rodeo-rumble') return <RRHost initialCode={roomCode} freshRoom onExit={() => {}} />;
   if (gameId === 'viral') return <iframe title="VIRAL! live game" src={`/viral/index.html?host=1&room=${encodeURIComponent(roomCode)}`} className="w-full rounded-xl border-0 bg-[#0a0916]" style={{ height: 'min(78vh, 900px)', minHeight: 620 }} allow="fullscreen; autoplay" />;
   if (gameId === 'see-that') {
