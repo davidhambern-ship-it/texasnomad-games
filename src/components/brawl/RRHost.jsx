@@ -120,8 +120,6 @@ export default function RRHost({ onExit, initialCode = '' }) {
     });
   }, [phase, stage, stocks, roster, code, lineup, conn]);
 
-;
-
   const remote = useMemo(() => ({
     read(id) {
       const current = inputs.current[id];
