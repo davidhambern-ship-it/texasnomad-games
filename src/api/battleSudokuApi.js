@@ -14,10 +14,11 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
-  else {
-    const guest = getStoredGuestIdentity();
-    if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
-  }
+  // BattleSudoku's live room service validates the shared TNG guest session.
+  // Send it even when a legacy Neon token is also present; the service does
+  // not use that legacy token to resolve a TNG player identity.
+  const guest = getStoredGuestIdentity();
+  if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
 
   let res;
   try { res = await fetch(`${BS_API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }
