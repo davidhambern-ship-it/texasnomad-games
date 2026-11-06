@@ -389,262 +389,6 @@ const rodeoRumbleLive = createRodeoRumbleLive({
   createRoomBridge,
 });
 
-const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
-const viralDisplayTargets = new Map();
-const seeThatDisplayTargets = new Map();
-const standaloneDisplayTargets = new Map();
-
-function getViralDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = viralDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    viralDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-function getSeeThatDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = seeThatDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    seeThatDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-function getStandaloneDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = standaloneDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    standaloneDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-async function handleStandaloneDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  const key = String(displayDeviceId);
-
-  if (req.method === 'DELETE') {
-    standaloneDisplayTargets.delete(key);
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const roomCode = String(body?.roomCode || '').trim().toUpperCase();
-  const gameId = String(body?.gameId || '').trim();
-
-  const room = await roomRegistry.resolve(roomCode);
-  if (
-    !room ||
-    room.kind !== 'standalone' ||
-    room.gameId !== gameId ||
-    (room.hostAccountId &&
-      String(room.hostAccountId) !== String(resolved.account.id))
-  ) {
-    sendJson(res, 403, {
-      error: {
-        code: 'DISPLAY_ROOM_NOT_OWNED',
-        message: 'That standalone room is not owned by this TNG Host.',
-      },
-    });
-    return;
-  }
-
-  viralDisplayTargets.delete(key);
-  seeThatDisplayTargets.delete(key);
-  standaloneDisplayTargets.set(key, {
-    accountId: resolved.account.id,
-    gameId,
-    roomCode,
-    updatedAt: Date.now(),
-  });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    gameId,
-    roomCode,
-  });
-}
-
-async function handleViralDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  if (req.method === 'DELETE') {
-    viralDisplayTargets.delete(String(displayDeviceId));
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
-  const incoming = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
-  // Sticky claim: a heartbeat without a readable code keeps the current room on screen.
-  const roomCode = incoming || viralDisplayTargets.get(String(displayDeviceId))?.roomCode || null;
-  // A paired screen can be owned by only one standalone game at a time.
-  seeThatDisplayTargets.delete(String(displayDeviceId));
-  standaloneDisplayTargets.delete(String(displayDeviceId));
-  viralDisplayTargets.set(String(displayDeviceId), { accountId: resolved.account.id, roomCode, updatedAt: Date.now() });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    roomCode,
-  });
-}
-
-async function handleSeeThatDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  const displayKey = String(displayDeviceId);
-
-  if (req.method === 'DELETE') {
-    seeThatDisplayTargets.delete(displayKey);
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
-  const incoming = /^[A-Z]{5}$/.test(requestedCode) ? requestedCode : null;
-  const roomCode = incoming || seeThatDisplayTargets.get(displayKey)?.roomCode || null;
-
-  // A paired screen can be owned by only one standalone game at a time.
-  viralDisplayTargets.delete(displayKey);
-  standaloneDisplayTargets.delete(displayKey);
-  seeThatDisplayTargets.set(displayKey, {
-    accountId: resolved.account.id,
-    roomCode,
-    updatedAt: Date.now(),
-  });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    roomCode,
-  });
-}
-
 // Standalone live-room snapshots survive serverless instance replacement.
 // The game modules still keep a hot in-process cache; Postgres is the recovery
 // source when a new container receives the next request for an active room.
@@ -695,12 +439,6 @@ async function runRoomMaintenance() {
     }
   });
 
-  const cutoff = Date.now() - VIRAL_DISPLAY_TARGET_TTL_MS;
-  for (const targets of [viralDisplayTargets, seeThatDisplayTargets, standaloneDisplayTargets]) {
-    for (const [key, target] of targets.entries()) {
-      if (Number(target?.updatedAt || 0) < cutoff) targets.delete(key);
-    }
-  }
 }
 
 const roomMaintenanceKickoff = setTimeout(() => {
@@ -1555,7 +1293,7 @@ async function handleTngSessionLifecycle(req, res) {
     }
 
     const hostResult = await client.query(
-      `select id, display_device_id
+      `select id
        from public.host_sessions
        where host_account_id = $1::uuid
          and controller_device_id = any($2::uuid[])
@@ -1589,9 +1327,6 @@ async function handleTngSessionLifecycle(req, res) {
       const hostSessionIds = hostResult.rows
         .map((row) => row.id)
         .filter((value) => isUuid(value));
-      const displayDeviceIds = hostResult.rows
-        .map((row) => row.display_device_id)
-        .filter((value) => isUuid(value));
 
       if (hostSessionIds.length) {
         await client.query(
@@ -1600,14 +1335,6 @@ async function handleTngSessionLifecycle(req, res) {
                updated_at = now()
            where host_session_id = any($1::uuid[])
              and status::text in ('lobby', 'live', 'paused')`,
-          [hostSessionIds],
-        );
-
-        await client.query(
-          `update public.display_pairings
-           set consumed_at = coalesce(consumed_at, now())
-           where host_session_id = any($1::uuid[])
-             and consumed_at is null`,
           [hostSessionIds],
         );
 
@@ -1621,15 +1348,6 @@ async function handleTngSessionLifecycle(req, res) {
         );
       }
 
-      if (displayDeviceIds.length) {
-        await client.query(
-          `update public.device_sessions
-           set status = 'disconnected',
-               updated_at = now()
-           where id = any($1::uuid[])`,
-          [displayDeviceIds],
-        );
-      }
     }
 
     await client.query('commit');
@@ -1647,171 +1365,6 @@ async function handleTngSessionLifecycle(req, res) {
   }
 }
 
-
-const WORD_SEARCH_DISPLAY_COLORS = {
-  1: '#BC13FE',
-  2: '#FF5F1F',
-  3: '#FFD700',
-  4: '#22D3EE',
-};
-
-function projectWordSearchDisplayState(rawState = {}, participants = []) {
-  const scores = rawState?.scores && typeof rawState.scores === 'object'
-    ? rawState.scores
-    : {};
-
-  return {
-    phase: rawState.phase || 'setup',
-    mode: rawState.mode || 'race',
-    difficulty: rawState.difficulty || 'simpleton',
-    category: rawState.category || 'random',
-    grid: Array.isArray(rawState.grid) ? rawState.grid : [],
-    words: Array.isArray(rawState.words)
-      ? rawState.words.map((word) => ({
-          word: word.word,
-          found: word.found === true,
-          foundBy: word.foundBy ?? null,
-          foundAt: word.foundAt ?? null,
-          cells: word.found === true && Array.isArray(word.cells) ? word.cells : [],
-          points: word.found === true ? (word.points ?? null) : null,
-          directionLabel: word.found === true ? (word.directionLabel ?? null) : null,
-          revealed: word.revealed === true,
-        }))
-      : [],
-    scores: { ...scores },
-    activeSeat: Number(rawState.active_seat || 0),
-    timeEnd: rawState.time_end || null,
-    paused: rawState.paused === true,
-    message: rawState.message || null,
-    winnerSeat: rawState.winner_seat || null,
-    lastAction: rawState.last_action || null,
-    roundNumber: Number(rawState.round_number || 0),
-    players: participants.map((player) => {
-      const seat = Number(player.seat_number || 0);
-      return {
-        playerId: player.account_id,
-        accountId: player.account_id,
-        seatNumber: seat,
-        role: player.role || 'player',
-        name: publicTngNameFromRecord(player, seat ? `Seat ${seat}` : 'Player'),
-        handle: player.handle || null,
-        color: WORD_SEARCH_DISPLAY_COLORS[seat] || '#FFFFFF',
-        score: Number(scores[String(seat)] || 0),
-      };
-    }),
-  };
-}
-
-async function handleTngDisplayState(req, res) {
-  if (req.method !== 'GET') {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
-    });
-    return;
-  }
-
-  const displayId = String(req.headers['x-tng-display-id'] || '');
-  const displayToken = String(req.headers['x-tng-display-token'] || '');
-
-  const upstream = await dispatchTngApi({
-    path: '/display/state',
-    method: 'GET',
-    headers: {
-      ...(displayId ? { 'x-tng-display-id': displayId } : {}),
-      ...(displayToken ? { 'x-tng-display-token': displayToken } : {}),
-    },
-  });
-
-  const payload = await upstream.json().catch(() => ({}));
-
-  if (!upstream.ok) {
-    sendJson(res, upstream.status, payload);
-    return;
-  }
-
-  const room = payload?.room || null;
-
-  if (!room) {
-    const viralTarget = getViralDisplayTarget(displayId);
-    const seeThatTarget = getSeeThatDisplayTarget(displayId);
-    const genericTarget = getStandaloneDisplayTarget(displayId);
-    const standaloneTarget = [
-      viralTarget ? { ...viralTarget, gameId: 'viral' } : null,
-      seeThatTarget ? { ...seeThatTarget, gameId: 'see-that' } : null,
-      genericTarget || null,
-    ]
-      .filter(Boolean)
-      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
-
-    if (standaloneTarget) {
-      const gameId = standaloneTarget.gameId;
-      const roomCode = standaloneTarget.roomCode || '';
-      sendJson(res, 200, {
-        ...payload,
-        status: roomCode ? 'connected' : 'waiting_for_room',
-        room: {
-          id: `${gameId}-display-${displayId}`,
-          gameId,
-          roomCode,
-          status: roomCode ? 'live' : 'lobby',
-          gameState: {
-            displayOnly: true,
-          },
-        },
-      });
-      return;
-    }
-  }
-
-  if (!room || room.gameId !== 'word-search' || !isUuid(room.id)) {
-    sendJson(res, 200, payload);
-    return;
-  }
-
-  const { rows: roomRows } = await bffPool.query(`
-    select id, display_state
-    from public.game_rooms
-    where id = $1::uuid
-      and game_id = 'word-search'
-      and status::text in ('lobby', 'live', 'paused')
-    limit 1
-  `, [room.id]);
-
-  const liveRoom = roomRows[0] || null;
-  if (!liveRoom) {
-    sendJson(res, 200, payload);
-    return;
-  }
-
-  const { rows: participants } = await bffPool.query(`
-    select
-      rp.account_id,
-      rp.role::text as role,
-      rp.seat_number,
-      pp.display_name,
-      pp.handle
-    from public.room_participants rp
-    left join public.player_profiles pp
-      on pp.account_id = rp.account_id
-    where rp.room_id = $1::uuid
-      and rp.left_at is null
-      and rp.seat_number in (1, 2, 3, 4)
-    order by rp.seat_number
-  `, [room.id]);
-
-  const rawState =
-    liveRoom.display_state?.gameState ||
-    liveRoom.display_state?.game_state ||
-    {};
-
-  sendJson(res, 200, {
-    ...payload,
-    room: {
-      ...room,
-      state: projectWordSearchDisplayState(rawState, participants),
-    },
-  });
-}
 
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
@@ -1863,10 +1416,9 @@ async function handleTngAccountRoute(req, res) {
     String(session.controller_device_id) === currentDeviceId;
 
   sendJson(res, 200, {
-    route: sameController ? 'host' : 'display',
-    activeHost: true,
+    route: sameController ? 'host' : 'default',
+    activeHost: sameController,
     sameController,
-    displayPaired: Boolean(session.display_device_id),
   });
 }
 
@@ -4082,249 +3634,6 @@ async function handleBffApi(req, res) {
     return;
   }
 
-  if (req.method === 'GET' && path === '/display') {
-    const roomCode = String(sourceUrl.searchParams.get('room') || '').toUpperCase();
-    if (!roomCode) {
-      sendJson(res, 400, {
-        error: { code: 'ROOM_REQUIRED', message: 'BFF display room code is required.' },
-      });
-      return;
-    }
-
-    let room = await loadBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    const internalState = extractBffGameState(room.display_state || {});
-    const players = await loadBffParticipants(room.id, internalState);
-    const gameState = sanitizeBffPlayerState(internalState, players, null);
-
-    sendJson(res, 200, {
-      room: {
-        id: room.id,
-        roomCode: room.room_code,
-        gameId: room.game_id,
-        status: room.status,
-        revision: room.revision,
-        gameState,
-        createdAt: room.created_at,
-        updatedAt: room.updated_at,
-      },
-    });
-    return;
-  }
-
-  if (req.method === 'GET' && path === '/player') {
-    const deviceId = String(req.headers['x-tng-device-id'] || '');
-    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
-
-    if (!deviceId || !roomCode) {
-      sendJson(res, 400, {
-        error: {
-          code: 'PLAYER_ROOM_REQUIRED',
-          message: 'Player device and room code are required.',
-        },
-      });
-      return;
-    }
-
-    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    let room = await loadBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-
-    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
-    internalState = assignmentResult.gameState;
-    const effectiveRoom = assignmentResult.room || room;
-    players = await loadBffParticipants(room.id, internalState);
-
-    const verifiedParticipant = verified.payload?.participant || null;
-    const participant = players.find((player) =>
-      String(player.deviceSessionId || '') === String(deviceId)
-      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
-    ) || verifiedParticipant;
-
-    if (!participant) {
-      sendJson(res, 404, {
-        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    const gameState = sanitizeBffPlayerState(internalState, players, participant);
-
-    sendJson(res, 200, {
-      room: {
-        id: effectiveRoom.id || room.id,
-        roomCode: effectiveRoom.room_code || room.room_code,
-        gameId: effectiveRoom.game_id || room.game_id,
-        status: effectiveRoom.status || room.status,
-        revision: effectiveRoom.revision || room.revision,
-        gameState,
-        createdAt: effectiveRoom.created_at || room.created_at,
-        updatedAt: effectiveRoom.updated_at || room.updated_at,
-      },
-      participant,
-    });
-    return;
-  }
-
-  if (req.method === 'POST' && path === '/player') {
-    const deviceId = String(req.headers['x-tng-device-id'] || '');
-    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
-
-    if (!deviceId || !roomCode) {
-      sendJson(res, 400, {
-        error: {
-          code: 'PLAYER_ROOM_REQUIRED',
-          message: 'Player device and room code are required.',
-        },
-      });
-      return;
-    }
-
-    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    let room = await loadBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-    const verifiedParticipant = verified.payload?.participant || null;
-    const participant = players.find((player) =>
-      String(player.deviceSessionId || '') === String(deviceId)
-      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
-    ) || verifiedParticipant;
-
-    if (!participant) {
-      sendJson(res, 404, {
-        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    const body = await readJsonBody(req).catch(() => ({}));
-
-    let nextGameState;
-    let savedRoom;
-
-    if (String(body?.action || '') === 'buzz') {
-      const claim = await claimBffBuzz(room, participant);
-      nextGameState = claim.gameState;
-      savedRoom = claim.room;
-    } else {
-      nextGameState = await applyBffPlayerAction(room, participant, body || {}, players);
-      savedRoom = await saveBffGameState(
-        room.id,
-        room.display_state || {},
-        nextGameState,
-      );
-    }
-
-    players = await loadBffParticipants(room.id, nextGameState);
-    const gameState = sanitizeBffPlayerState(nextGameState, players, participant);
-
-    sendJson(res, 200, {
-      room: {
-        id: savedRoom?.id || room.id,
-        roomCode: savedRoom?.room_code || room.room_code,
-        gameId: savedRoom?.game_id || room.game_id,
-        status: savedRoom?.status || room.status,
-        revision: savedRoom?.revision || room.revision,
-        gameState,
-        createdAt: savedRoom?.created_at || room.created_at,
-        updatedAt: savedRoom?.updated_at || room.updated_at,
-      },
-      participant,
-    });
-    return;
-  }
-
-  if (req.method === 'GET' && path === '/host') {
-    const controllerId = String(req.headers['x-tng-device-id'] || '');
-    if (!controllerId) {
-      sendJson(res, 400, { error: { code: 'CONTROLLER_REQUIRED', message: 'Host controller is missing.' } });
-      return;
-    }
-
-    const verified = await verifyBffHostWithTngApi(req, controllerId);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
-      });
-      return;
-    }
-
-    let room = await loadBffHostRoom(controllerId);
-    if (!room) {
-      sendJson(res, 404, {
-        error: {
-          code: 'ROOM_NOT_FOUND',
-          message: 'No active BFF room is attached to this Host Controller.',
-        },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    await assignBffSeats(room.id);
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-
-    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
-    internalState = assignmentResult.gameState;
-    const effectiveRoom = assignmentResult.room || room;
-    players = await loadBffParticipants(room.id, internalState);
-
-    const gameState = sanitizeBffHostState(internalState, players);
-
-    sendJson(res, 200, {
-      room: {
-        id: effectiveRoom.id || room.id,
-        roomCode: effectiveRoom.room_code || room.room_code,
-        gameId: effectiveRoom.game_id || room.game_id,
-        status: effectiveRoom.status || room.status,
-        revision: effectiveRoom.revision || room.revision,
-        gameState,
-        players,
-        createdAt: effectiveRoom.created_at || room.created_at,
-        updatedAt: effectiveRoom.updated_at || room.updated_at,
-      },
-    });
-    return;
-  }
-
   if (req.method === 'POST' && path === '/host') {
     const controllerId = String(req.headers['x-tng-device-id'] || '');
     if (!controllerId) {
@@ -5418,11 +4727,6 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    if ((req.url || '').startsWith('/tng-display/state')) {
-      await handleTngDisplayState(req, res);
-      return;
-    }
-
     if ((req.url || '').startsWith('/tng-spectator')) {
       await handleTngSpectator(req, res);
       return;
@@ -5461,21 +4765,6 @@ const server = http.createServer(async (req, res) => {
     if ((req.url || '').split('?')[0] === '/viral-live/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'viral-live', ...viralLive.stats() }));
-      return;
-    }
-
-    if ((req.url || '').startsWith('/viral-display')) {
-      await handleViralDisplayTarget(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/see-that-display')) {
-      await handleSeeThatDisplayTarget(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/standalone-display')) {
-      await handleStandaloneDisplayTarget(req, res);
       return;
     }
 
@@ -5561,8 +4850,6 @@ const server = http.createServer(async (req, res) => {
       '/tng-guest',
       '/tng-',
       '/viral-',
-      '/see-that-display',
-      '/standalone-display',
       '/test-feedback',
       '/bff-api',
       '/bs-api',
