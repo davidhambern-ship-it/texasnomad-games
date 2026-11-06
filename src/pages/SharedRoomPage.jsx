@@ -15,33 +15,6 @@ import { getNeonSession } from '@/lib/neonAuth';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
-function readEmbeddedDisplay() {
-  if (typeof window === 'undefined') return null;
-
-  const deviceId = localStorage.getItem('tng_host_embedded_display_id');
-  const token = localStorage.getItem('tng_host_embedded_display_token');
-  return deviceId && token ? { deviceId, token } : null;
-}
-
-function readHostDisplayMode() {
-  if (typeof window === 'undefined') return 'external';
-
-  const saved = localStorage.getItem('tng_host_display_mode');
-  if (saved === 'embedded' || saved === 'external') {
-    return saved;
-  }
-
-  // Migrate the old Host-only implementation away from the misleading
-  // player-test flag. Host-only is a normal production mode now.
-  if (localStorage.getItem('tng_player_test_mode') === '1') {
-    localStorage.setItem('tng_host_display_mode', 'embedded');
-    localStorage.removeItem('tng_player_test_mode');
-    return 'embedded';
-  }
-
-  return 'embedded';
-}
-
 function detectHostViewport() {
   if (typeof window === 'undefined') {
     return { kind: 'desktop', orientation: 'landscape', width: 1280, height: 800 };
@@ -67,8 +40,6 @@ export default function SharedRoomPage() {
   const { user, logout } = useAuth();
   const [phase, setPhase] = useState('loading');
   const [controllerId, setControllerId] = useState(null);
-  const [pairing, setPairing] = useState(null);
-  const [repairingDisplay, setRepairingDisplay] = useState(false);
   const [activeRoom, setActiveRoom] = useState(null);
   const [roomState, setRoomState] = useState(null);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -78,8 +49,6 @@ export default function SharedRoomPage() {
   const [rosterError, setRosterError] = useState('');
   const [busy, setBusy] = useState(false);
   const [recoveryRoute, setRecoveryRoute] = useState(null);
-  const [displayMode, setDisplayMode] = useState(readHostDisplayMode);
-  const [embeddedDisplay, setEmbeddedDisplay] = useState(readEmbeddedDisplay);
   const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
   const hostBoardRef = useRef(null);
@@ -154,49 +123,6 @@ export default function SharedRoomPage() {
       window.removeEventListener('orientationchange', updateViewport);
     };
   }, []);
-
-  function saveEmbeddedDisplay(display) {
-    if (!display?.deviceId || !display?.token) return;
-    localStorage.setItem('tng_host_embedded_display_id', display.deviceId);
-    localStorage.setItem('tng_host_embedded_display_token', display.token);
-    setEmbeddedDisplay(display);
-  }
-
-  function clearEmbeddedDisplay() {
-    localStorage.removeItem('tng_host_embedded_display_id');
-    localStorage.removeItem('tng_host_embedded_display_token');
-    setEmbeddedDisplay(null);
-  }
-
-  function setHostDisplayMode(mode) {
-    localStorage.setItem('tng_host_display_mode', mode);
-    localStorage.removeItem('tng_player_test_mode');
-    setDisplayMode(mode);
-  }
-
-  async function ensureEmbeddedDisplay(deviceId, replaceDisplay = false) {
-    const existing = readEmbeddedDisplay();
-
-    if (existing && !replaceDisplay) {
-      try {
-        await tngApi.display.getState(existing.deviceId, existing.token);
-        setEmbeddedDisplay(existing);
-        return existing;
-      } catch {
-        clearEmbeddedDisplay();
-      }
-    }
-
-    const pairingPayload = await tngApi.host.createPairing(deviceId, true);
-    const pairedPayload = await tngApi.display.pair(pairingPayload.pairing.code);
-    const display = {
-      deviceId: pairedPayload.display.deviceId,
-      token: pairedPayload.display.token,
-    };
-
-    saveEmbeddedDisplay(display);
-    return display;
-  }
 
   async function toggleHostBoardFullscreen() {
     const board = hostBoardRef.current;
@@ -343,17 +269,12 @@ export default function SharedRoomPage() {
             setPhase('stale-room');
             return;
           }
-
-          setPairing(null);
-          setRepairingDisplay(false);
           setPhase('room');
           return;
         }
 
         // A host session is ready to create rooms immediately. Game boards
         // are rendered from the live room API inside this host screen.
-        setPairing(null);
-        setRepairingDisplay(false);
         setError('');
         setPhase('ready');
       } catch (initializeError) {
@@ -370,46 +291,6 @@ export default function SharedRoomPage() {
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    if (phase !== 'pairing' || !controllerId) return undefined;
-
-    const interval = window.setInterval(async () => {
-      try {
-        const session = await tngApi.host.startSession(controllerId);
-
-        if (repairingDisplay) {
-          if (session.hostSession?.displayDeviceId) {
-            setPairing(null);
-            setRepairingDisplay(false);
-            setHostDisplayMode('external');
-            clearEmbeddedDisplay();
-            setActiveRoom(session.activeRoom || null);
-            setPhase(session.activeRoom ? 'room' : 'ready');
-          }
-          return;
-        }
-
-        if (session.activeRoom) {
-          setActiveRoom(session.activeRoom);
-          setPhase('room');
-          return;
-        }
-
-        if (session.hostSession?.displayDeviceId) {
-          setHostDisplayMode('external');
-          clearEmbeddedDisplay();
-          setPairing(null);
-          setPhase('ready');
-        }
-      } catch (pollError) {
-        if (await recoverExpiredPreviewSession(pollError)) return;
-        console.error('[SharedRoomPage] display pairing poll failed:', pollError);
-      }
-    }, 2500);
-
-    return () => window.clearInterval(interval);
-  }, [phase, controllerId, repairingDisplay]);
 
   useEffect(() => {
     if (phase !== 'room' || !controllerId) {
@@ -479,79 +360,6 @@ export default function SharedRoomPage() {
     };
   }, [phase, controllerId]);
 
-  async function replaceDisplay() {
-    if (!controllerId || busy) return;
-
-    setBusy(true);
-    setError('');
-
-    try {
-      const payload = await tngApi.host.createPairing(controllerId, true);
-      setHostDisplayMode('external');
-      clearEmbeddedDisplay();
-      setPairing(payload.pairing);
-      setRepairingDisplay(true);
-      setPhase('pairing');
-    } catch (pairingError) {
-      setError(pairingError.message || 'A new Game Display code could not be created.');
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function switchToHostOnly() {
-    if (!controllerId || busy) return;
-
-    setBusy(true);
-    setError('');
-
-    try {
-      setHostDisplayMode('embedded');
-      await ensureEmbeddedDisplay(controllerId, true);
-      setPairing(null);
-      setRepairingDisplay(false);
-      setPhase(activeRoom ? 'room' : 'ready');
-    } catch (switchError) {
-      setError(
-        switchError?.message ||
-          'TNG could not switch this Host to one-screen mode.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function continueWithoutDisplay() {
-    if (!pairing?.code || !controllerId || busy) return;
-
-    setBusy(true);
-    setError('');
-
-    try {
-      const pairedPayload = await tngApi.display.pair(pairing.code);
-      const display = {
-        deviceId: pairedPayload.display.deviceId,
-        token: pairedPayload.display.token,
-      };
-
-      saveEmbeddedDisplay(display);
-      setHostDisplayMode('embedded');
-      setPairing(null);
-      setRepairingDisplay(false);
-
-      const session = await tngApi.host.startSession(controllerId);
-      setActiveRoom(session.activeRoom || null);
-      setPhase(session.activeRoom ? 'room' : 'ready');
-    } catch (bypassError) {
-      setError(
-        bypassError?.message ||
-          'TNG could not start Room mode.',
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function reclaimHostController() {
     if (!controllerId || busy) return;
 
@@ -573,9 +381,6 @@ export default function SharedRoomPage() {
         }
         return;
       }
-
-      setPairing(null);
-      setRepairingDisplay(false);
       setPhase('ready');
     } catch (reclaimError) {
       setError(
@@ -585,13 +390,6 @@ export default function SharedRoomPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function continueAsDisplay() {
-    localStorage.setItem('tng_connection_role', 'display');
-    localStorage.removeItem('tng_display_device_id');
-    localStorage.removeItem('tng_display_token');
-    window.location.replace('/display');
   }
 
   async function createRoom(game) {
@@ -611,8 +409,8 @@ export default function SharedRoomPage() {
     }
   }
 
-  // The arcade can deep-link a core multiplayer game with /host?game=<id>.
-  // Wait until the Host Controller (and, when required, the Game Display) is
+  // The arcade can deep-link a core multiplayer game with /room?game=<id>.
+  // Wait until the room controller is ready before creating the live room.
   // actually ready before creating the Neon room. Consume the query once so a
   // reload/end-room cycle can never create duplicate rooms by accident.
   useEffect(() => {
@@ -677,9 +475,6 @@ export default function SharedRoomPage() {
       setRoomPeople([]);
       setRosterError('');
       setSelectedGame(null);
-
-      setPairing(null);
-      setRepairingDisplay(false);
       setPhase('ready');
     } catch (roomError) {
       setError(roomError.message || 'The room could not be disconnected.');
@@ -698,8 +493,6 @@ export default function SharedRoomPage() {
     localStorage.removeItem('tng_device_id');
     localStorage.removeItem('tng_connection_role');
     localStorage.removeItem('tng_player_test_mode');
-    localStorage.removeItem('tng_host_display_mode');
-    clearEmbeddedDisplay();
     logout(true);
   }
 
