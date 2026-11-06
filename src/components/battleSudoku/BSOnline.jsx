@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import BSBigScreen from './BSBigScreen';
 import BSPhone from './BSPhone';
+import BSLobby from './BSLobby';
 import { bsApi, bsSeat } from '@/api/battleSudokuApi';
 import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { sfx } from './bsSfx';
@@ -64,12 +65,14 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
   if (!data) return <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>{err || error ? <><p>{err || error}</p><button type="button" className="bs-btn" onClick={() => { setErr(''); create(); }}>Try again</button> <button type="button" className="bs-btn ghost" onClick={onExit}>Back</button></> : 'Launching the fleet…'}</div></div>;
   return (
     <>
-      {data.room.game && playerData?.room?.game?.me
-        ? <BSPhone v={playerData.room.game} act={async (type, payload = {}) => {
-            try { const d = await bsApi.action(seat.code, seat.playerToken, type, payload); applyPlayer(d); return d.result; }
-            catch (e) { return { ok: false, error: e.message }; }
-          }} now={Date.now() + playerOffset} onExit={exit} isHost hostRoom={data.room} hostAct={act} />
-        : <BSBigScreen data={data} isHost act={act} offset={offset} onExit={exit} joinUrl={joinUrlFor()} />}
+      {!data.room.game
+        ? <BSLobby room={data.room} isHost act={act} onExit={exit} joinUrl={`${TNG_PUBLIC_ORIGIN}/games/sudoku?room=${seat.code}`} playerName={getStoredGuestIdentity()?.name || ''} />
+        : playerData?.room?.game?.me
+          ? <BSPhone v={playerData.room.game} act={async (type, payload = {}) => {
+              try { const d = await bsApi.action(seat.code, seat.playerToken, type, payload); applyPlayer(d); return d.result; }
+              catch (e) { return { ok: false, error: e.message }; }
+            }} now={Date.now() + playerOffset} onExit={exit} isHost hostRoom={data.room} hostAct={act} />
+          : <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>Opening your captain screen…</div></div>}
       {err && <div className="bs-toast bad">{err}</div>}
     </>
   );
