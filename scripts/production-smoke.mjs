@@ -136,6 +136,42 @@ async function expectHtml(origin, path) {
   return body;
 }
 
+function solveSudoku(puzzle) {
+  const board = puzzle.slice();
+  const rows = Array.from({ length: 9 }, () => new Set());
+  const cols = Array.from({ length: 9 }, () => new Set());
+  const boxes = Array.from({ length: 9 }, () => new Set());
+  const boxOf = (i) => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
+  for (let i = 0; i < 81; i++) if (board[i]) {
+    const r = Math.floor(i / 9), c = i % 9, b = boxOf(i), d = board[i];
+    rows[r].add(d); cols[c].add(d); boxes[b].add(d);
+  }
+  function search() {
+    let best = -1, choices = null;
+    for (let i = 0; i < 81; i++) {
+      if (board[i]) continue;
+      const r = Math.floor(i / 9), c = i % 9, b = boxOf(i);
+      const candidates = [];
+      for (let d = 1; d <= 9; d++) {
+        if (!rows[r].has(d) && !cols[c].has(d) && !boxes[b].has(d)) candidates.push(d);
+      }
+      if (!choices || candidates.length < choices.length) { best = i; choices = candidates; }
+      if (choices.length === 1) break;
+    }
+    if (best < 0) return true;
+    if (!choices.length) return false;
+    const r = Math.floor(best / 9), c = best % 9, b = boxOf(best);
+    for (const d of choices) {
+      board[best] = d; rows[r].add(d); cols[c].add(d); boxes[b].add(d);
+      if (search()) return true;
+      board[best] = 0; rows[r].delete(d); cols[c].delete(d); boxes[b].delete(d);
+    }
+    return false;
+  }
+  if (!search()) throw new Error('could not solve the live Sudoku puzzle');
+  return board;
+}
+
 async function main() {
   console.log('\nTNG Production Release Certification');
   console.log('====================================');
@@ -334,11 +370,51 @@ async function main() {
       throw new Error('second browser did not receive its captain gameplay view');
     }
 
+    // Exercise the real setup and Sudoku-solving actions through two independent guest sessions.
+    if (hostView.payload.room.game.phase !== 'setup' || playerView.payload.room.game.phase !== 'setup') {
+      throw new Error('new game did not enter fleet setup phase');
+    }
+    const [hostReady, playerReady] = await Promise.all([
+      api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'ready' }),
+      api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'ready' }),
+    ]);
+    if (!hostReady.response.ok || hostReady.payload?.result?.ok !== true ||
+        !playerReady.response.ok || playerReady.payload?.result?.ok !== true) {
+      throw new Error('one or both captains could not lock in their fleet');
+    }
+    const [hostSolve, playerSolve] = await Promise.all([
+      api(`/bs-api/rooms/${code}`, hostGuestToken, hostJoin.payload.token),
+      api(`/bs-api/rooms/${code}`, playerGuestToken, playerJoin.payload.token),
+    ]);
+    if (hostSolve.payload?.room?.game?.phase !== 'solve' ||
+        playerSolve.payload?.room?.game?.phase !== 'solve') {
+      throw new Error('both Ready actions did not advance the room into Sudoku solve phase');
+    }
+
+    const solution = solveSudoku(hostSolve.payload.room.game.puzzle);
+    const cell = hostSolve.payload.room.game.puzzle.findIndex((digit) => digit === 0);
+    if (cell < 0 || solution[cell] < 1 || solution[cell] > 9) {
+      throw new Error('live Sudoku puzzle did not provide a valid empty cell and solution');
+    }
+    const digit = solution[cell];
+    const [hostMove, playerMove] = await Promise.all([
+      api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'place', cell, digit }),
+      api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'place', cell, digit }),
+    ]);
+    for (const [label, move] of [['host', hostMove], ['second guest', playerMove]]) {
+      if (!move.response.ok || move.payload?.result?.ok !== true ||
+          move.payload?.result?.correct !== true ||
+          move.payload?.room?.game?.me?.board?.[cell] !== digit ||
+          move.payload?.room?.game?.me?.stats?.cells !== 1) {
+        throw new Error(`${label} Sudoku move failed validation or did not update that captain's board`);
+      }
+    }
+
     await Promise.all([
       api(`/bs-api/rooms/${code}/action`, hostGuestToken, hostJoin.payload.token, { action: 'leave' }),
       api(`/bs-api/rooms/${code}/action`, playerGuestToken, playerJoin.payload.token, { action: 'leave' }),
     ]).catch(() => {});
-    return `room ${code}: host + second guest joined, roster=2, start succeeded, both received playable captain views`;
+    return `room ${code}: 2 guests joined; both locked fleets, entered solve phase, and each submitted a correct Sudoku move (cell ${cell + 1}, digit ${digit}) verified on their own board`;
   });
 
   await check('unauthenticated API rejects protected profile', async () => {
