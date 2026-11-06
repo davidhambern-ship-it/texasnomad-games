@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
 import NCCard from '@/components/nomadCards/NCCard';
-import { getStoredGuestIdentity } from '@/lib/guestIdentity';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
@@ -671,16 +671,8 @@ export default function Games() {
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
 
-  const handleCreateRoom = (gameId) => {
+  const handleCreateRoom = async (gameId) => {
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
-    const guest = getStoredGuestIdentity();
-    if (guest) {
-      navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
-      return;
-    }
-
-    // Signed-in multiplayer Host launches use the TNG Host Controller.
-    // Every multiplayer game uses the same shared room experience.
 
     const hostableGames = new Set([
       'bff',
@@ -697,12 +689,27 @@ export default function Games() {
       'out',
     ]);
 
-    if (hostableGames.has(hostGameId)) {
-      navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
+    if (!hostableGames.has(hostGameId)) {
+      console.warn('[TNG Games] No live host route is configured for', gameId);
       return;
     }
 
-    console.warn('[TNG Games] No live host route is configured for', gameId);
+    // Room creation uses a short-lived guest identity, never a player account.
+    // Without this step the shared room controller fails its first API call
+    // with GUEST_REQUIRED and no room code is ever created.
+    if (!getStoredGuestIdentity()) {
+      const enteredName = window.prompt('Choose your host name to create a room:');
+      if (!enteredName || !enteredName.trim()) return;
+
+      try {
+        await createGuestIdentity(enteredName);
+      } catch (identityError) {
+        window.alert(identityError?.message || 'TNG could not start guest play.');
+        return;
+      }
+    }
+
+    navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
   };
 
   const handleJoinRoom = (gameId, code) => {
