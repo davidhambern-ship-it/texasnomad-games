@@ -4,7 +4,6 @@ import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import RRHost from '@/components/brawl/RRHost';
 import RRController from '@/components/brawl/RRController';
-import RRDisplay from '@/components/brawl/RRDisplay';
 import RRPortrait from '@/components/brawl/RRPortrait';
 import { ROSTER } from '@/lib/brawl/fighters';
 import { rrSfx } from '@/components/brawl/rrSfx';
@@ -16,20 +15,14 @@ import '@/components/brawl/rr.css';
 //   /games/rodeo-rumble            join / learn-more landing
 //   /games/rodeo-rumble?host=1     guest or authenticated Host + live fight screen
 //   /games/rodeo-rumble?room=CODE  signed-in phone controller
-//   /games/rodeo-rumble?display=CODE read-only paired Game Display / spectator
 export default function RodeoRumbleGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
-  const display = (params.get('display') || '').toUpperCase();
   const isHost = params.get('host') === '1';
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const identity = useTngGameIdentity();
   const toMenu = () => { setParams({}, { replace: true }); };
-
-  if (/^TN[A-Z0-9]{4}$/.test(display)) {
-    return <RRDisplay code={display} />;
-  }
 
   if (isHost) {
     return <RRHost onExit={() => window.location.assign(getStoredGuestIdentity() ? '/games' : '/host')} />;
