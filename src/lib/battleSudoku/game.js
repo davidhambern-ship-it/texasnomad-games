@@ -390,7 +390,7 @@ export function view(g, pid = null, now = Date.now()) {
     sunk: P.ships.filter(s => s.hits.length >= s.size).map(s => ({ id: s.id, name: s.name, cells: s.cells })),
   });
   const out = {
-    phase: g.phase, phaseEndsAt: g.phaseEndsAt, paused: !!g.pausedAt, now, volley: g.volley, settings: g.settings, puzzle: g.puzzle,
+    phase: g.phase, phaseEndsAt: g.pausedAt ? now + Math.max(0, Number(g.pausedRemainingMs) || 0) : g.phaseEndsAt, paused: !!g.pausedAt, now, volley: g.volley, settings: g.settings, puzzle: g.puzzle,
     leader: g.leader, winner: g.winner, winReason: g.winReason,
     players: g.order.map(id => pub(g.players[id])), feed: g.feed.slice(-12), reveal: g.reveal,
   };
