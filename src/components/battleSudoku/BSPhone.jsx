@@ -29,6 +29,8 @@ export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom 
   const [tool, setTool] = useState('fire');
   const [dir, setDir] = useState('h');
   const [busy, setBusy] = useState(false);
+  const [selectedShip, setSelectedShip] = useState(null);
+  const [shipDir, setShipDir] = useState('h');
   const lastPhase = useRef(null);
   const lastIntel = useRef(null);
   const lastReveal = useRef(null);
@@ -85,13 +87,14 @@ export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom 
   const hitSet = new Set(me.ships.flatMap(s => s.hits));
   const spent = (me.orders || []).reduce((n, o) => n + COST[o.kind], 0);
   const frozen = now < me.frozenUntil;
+  const selectedShipId = selectedShip || me.ships.find(s => s.hits.length === 0)?.id || me.ships[0]?.id;
 
   // ── header ──
   const header = (
     <div className="bs-phead">
       <span className="nm"><span className="bs-dot" style={{ background: players[me.id]?.color }} /><span className="t">{players[me.id]?.name}{me.ghost ? ' 👻' : ''}</span></span>
       <Shells have={me.shells} spent={v.phase === 'battle' ? spent : 0} />
-      <span className={`bs-phase ${v.phase}`}><b>{v.phase === 'final' ? 'Done' : fmt(left)}</b><small>{PHASE[v.phase]}{v.volley ? ` · ${v.volley}/${v.settings.volleys}` : ''}</small></span>
+      <span className={`bs-phase ${v.phase}`}><b>{v.phase === 'final' ? 'Done' : fmt(left)}</b><small>{v.paused ? 'PAUSED' : PHASE[v.phase]}{v.volley ? ` · ${v.volley}/${v.settings.volleys}` : ''}</small></span>
       {onExit && <button type="button" className="bs-btn small ghost" onClick={onExit} aria-label="Leave">✕</button>}
     </div>
   );
@@ -101,8 +104,17 @@ export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom 
     body = (
       <>
         <div className="bs-banner"><b>Hide your fleet.</b> Rivals will fire at these squares — shuffle until you like it.</div>
-        <BSGrid ocean mine axis cell={(i) => ({ cls: shipAt[i] ? 'ship' : '' })} />
-        <div className="bs-fleetkey">{me.ships.map(s => <span key={s.id}>{s.name} ({s.size})</span>)}</div>
+        <BSGrid ocean mine axis cell={(i) => {
+          const ship = shipAt[i];
+          return { cls: ship ? 'ship' : '' , title: ship ? `${ship.name} · ${'ABCDEFGHI'[Math.floor(i / 9)]}${(i % 9) + 1}` : `${'ABCDEFGHI'[Math.floor(i / 9)]}${(i % 9) + 1}` };
+        }} onCell={(i) => {
+          if (!selectedShipId) return;
+          run('moveShip', { shipId: selectedShipId, cell: i, dir: shipDir }, (r) => { if (r.ok) say('Ship repositioned', 'ok'); });
+        }} />
+        <div className="bs-fleetkey bs-ship-picker">
+          {me.ships.map(s => <button key={s.id} type="button" disabled={me.ready} aria-pressed={selectedShipId === s.id} onClick={() => setSelectedShip(s.id)}>{s.name} ({s.size})</button>)}
+          <button type="button" className="bs-rotate" disabled={me.ready} onClick={() => setShipDir(d => d === 'h' ? 'v' : 'h')}>Rotate {shipDir === 'h' ? '↔ Horizontal' : '↕ Vertical'}</button>
+        </div>
         <div className="bs-row" style={{ justifyContent: 'center' }}>
           <button type="button" className="bs-btn" disabled={me.ready} onClick={() => run('shuffle')}>🔀 Shuffle fleet</button>
           <button type="button" className="bs-btn primary" disabled={me.ready} onClick={() => run('ready')}>{me.ready ? 'Ready ✓' : 'Ready!'}</button>
@@ -243,9 +255,10 @@ export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom 
         <div className="bs-pbody">{body}</div>
         {isHost && hostRoom && hostAct && (
           <aside className="bs-host-room">
-            <h3>Game room</h3>
+            <h3>Host controls</h3>
             <div className="bs-host-code">{hostRoom.code}</div>
-            <div className="bs-host-stat">{hostRoom.roster.length} / 8 captains · {PHASE[v.phase]}</div>
+            <div className="bs-host-stat">{hostRoom.roster.length} / 8 captains · {v.paused ? 'Paused' : PHASE[v.phase]}</div>
+            {v.phase !== 'final' && <button type="button" className={`bs-btn ${v.paused ? 'primary' : 'ghost'} small`} onClick={() => hostAct(v.paused ? 'resume' : 'pause')}>{v.paused ? 'Resume game' : 'Pause game'}</button>}
             <div className="bs-host-roster">
               {hostRoom.roster.map(p => <div className="bs-host-player" key={p.id}>
                 <span className="bs-dot" style={{ background: p.color }} />
