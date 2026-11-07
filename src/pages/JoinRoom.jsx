@@ -264,7 +264,7 @@ export default function JoinRoom() {
             <button
               type="button"
               onClick={spectate}
-              disabled={joining || (!getStoredGuestIdentity() && !guestName.trim())}
+              disabled={joining || guestName.trim().length < 2}
               className="rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/10 px-5 py-4 font-heading text-lg tracking-wider text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:opacity-40"
             >
               SPECTATE
