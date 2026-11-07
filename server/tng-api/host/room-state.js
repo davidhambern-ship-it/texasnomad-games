@@ -186,7 +186,22 @@ export default async function handler(request, response) {
       });
     }
 
-    if (room.gameId === 'hangman' || room.gameId === 'word-search') {
+    const current = room.displayState || {};
+    const statePatch =
+      request.body?.statePatch && typeof request.body.statePatch === 'object'
+        ? request.body.statePatch
+        : null;
+    const command =
+      request.body?.command && typeof request.body.command === 'object'
+        ? request.body.command
+        : null;
+
+    // Dedicated cabinets still own their game rules and board state, but the
+    // common room owns the lobby-to-game transition for every title.
+    if (
+      ['hangman', 'word-search'].includes(room.gameId) &&
+      command?.action !== 'start'
+    ) {
       const error = new Error(
         room.gameId === 'hangman'
           ? 'Hangman state is controlled by the dedicated Hangman API.'
@@ -199,15 +214,24 @@ export default async function handler(request, response) {
       throw error;
     }
 
-    const current = room.displayState || {};
-    const statePatch =
-      request.body?.statePatch && typeof request.body.statePatch === 'object'
-        ? request.body.statePatch
-        : null;
-    const command =
-      request.body?.command && typeof request.body.command === 'object'
-        ? request.body.command
-        : null;
+    if (command?.action === 'start') {
+      const participants = await db.select().from(roomParticipants).where(and(
+        eq(roomParticipants.roomId, room.id),
+        isNull(roomParticipants.leftAt),
+      ));
+      if (participants.length < 2) {
+        const error = new Error('At least one other player must join before the host can start the game.');
+        error.statusCode = 409;
+        error.code = 'ROOM_NEEDS_PLAYERS';
+        throw error;
+      }
+      if (room.status !== 'lobby') {
+        const error = new Error('This room has already left the waiting lobby.');
+        error.statusCode = 409;
+        error.code = 'ROOM_ALREADY_STARTED';
+        throw error;
+      }
+    }
 
     if (!statePatch && !command) {
       const error = new Error('Provide a state patch or command.');
@@ -232,7 +256,11 @@ export default async function handler(request, response) {
     };
 
     const nextStatus =
-      nextGameState.phase === 'setup' ? 'lobby' : 'live';
+      command?.action === 'start'
+        ? 'live'
+        : nextGameState.phase === 'setup'
+          ? 'lobby'
+          : 'live';
 
     const [updated] = await db.update(gameRooms).set({
       displayState: nextDisplayState,

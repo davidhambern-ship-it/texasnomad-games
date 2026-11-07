@@ -162,21 +162,9 @@ export default function JoinRoom() {
           return;
         }
 
-        // Standalone rooms have their own player-seat screens. Core rooms
-        // use the same short-lived guest identity and never require sign-in.
-        if (registeredRoom.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(registeredRoom.gameId)) {
-          if (getStoredGuestIdentity()) {
-            window.location.replace(registeredRoom.joinPath);
-            return;
-          }
-          setRoomInfo(registeredRoom);
-          setLoadingRoom(false);
-          return;
-        }
-
-        // A saved guest identity does not mean this browser has joined this
-        // room. Always show the room's join screen so the player explicitly
-        // registers through /api/player/room before opening the game.
+        // Every game uses the same explicit join step. This registers the
+        // guest in the shared room roster before the player enters that game's
+        // own cabinet and game-specific seat flow.
         setRoomInfo(registeredRoom);
         setLoadingRoom(false);
       } catch (roomError) {
@@ -204,11 +192,6 @@ export default function JoinRoom() {
 
     try {
       const guestIdentity = getStoredGuestIdentity() || await createGuestIdentity(guestName);
-
-      if (roomInfo.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(roomInfo.gameId)) {
-        window.location.replace(roomInfo.joinPath);
-        return;
-      }
 
       let deviceId = await ensurePlayerDevice(guestIdentity.id || user?.id || 'guest');
       let payload;
@@ -242,12 +225,15 @@ export default function JoinRoom() {
         }
       }
 
-      const gamePath = GAME_PATHS[payload?.room?.gameId || roomInfo.gameId];
+      const gameId = payload?.room?.gameId || roomInfo.gameId;
+      const gamePath = roomInfo.joinPath || GAME_PATHS[gameId];
       if (!gamePath) {
         throw new Error(`Unknown game type for room "${roomCode}".`);
       }
 
-      window.location.replace(`${gamePath}?room=${roomCode}`);
+      window.location.replace(
+        gamePath.includes('?') ? gamePath : `${gamePath}?room=${roomCode}`,
+      );
     } catch (joinError) {
       setError(
         joinError?.message ||

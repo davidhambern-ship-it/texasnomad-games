@@ -417,6 +417,15 @@ export const tngApi = {
       requestHostLiveRefresh();
       return result;
     },
+    startGame: async (deviceId) => {
+      const result = await request('/api/host/room-state', {
+        method:'PATCH',
+        deviceId,
+        body:{ command:{ action:'start' } },
+      });
+      requestHostLiveRefresh();
+      return result;
+    },
   },
   player: {
     joinRoom: (deviceId, roomCode) => request('/api/player/room', {

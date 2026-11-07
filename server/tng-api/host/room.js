@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto';
 
 import { requireController } from '../../auth/require-controller.js';
 import { db } from '../../db/client.js';
-import { gameRooms, hostSessions } from '../../db/schema.js';
+import { gameRooms, hostSessions, roomParticipants } from '../../db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
@@ -89,6 +89,17 @@ export default async function handler(request, response) {
             displayState: { screen: 'lobby', gameId },
           }).returning();
 
+          // The creator is a real participant in the shared room, not an
+          // out-of-band controller. Seat 1 is reserved for the host.
+          await transaction.insert(roomParticipants).values({
+            roomId: created.id,
+            accountId: hostSession.hostAccountId,
+            deviceSessionId: hostSession.controllerDeviceId,
+            role: 'host_player',
+            seatNumber: 1,
+            lastHeartbeatAt: new Date(),
+          });
+
           await transaction.update(hostSessions).set({ status: 'live', updatedAt: new Date() })
             .where(eq(hostSessions.id, hostSession.id));
           return created;
@@ -103,7 +114,7 @@ export default async function handler(request, response) {
     if (error.code === '23505') {
       error.statusCode = 409;
       error.code = 'HOST_ROOM_ALREADY_ACTIVE';
-      error.message = 'This Host Panel is already connected to a live room.';
+      error.message = 'This room controller is already connected to a live room.';
     }
     return sendError(response, error);
   }

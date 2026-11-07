@@ -6,6 +6,7 @@ import TXDDomino from '@/components/domino/TXDDomino';
 export const ALL_GAMES = [
   {
     id: 'out',
+    lobbyRules: 'Play cards from your hand and be the first player to get rid of every card.',
     title: 'OUT!',
     subtitle: 'LAST CARD WINS',
     color: '#FFD700',
@@ -14,6 +15,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'bff',
+    lobbyRules: 'Answer the prompts and compete with the room in this BIGO Family Feud-style game.',
     title: 'BFF',
     subtitle: 'BIGO FAMILY FEUD',
     color: '#BC13FE',
@@ -22,6 +24,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'square-biz',
+    lobbyRules: 'Answer trivia questions and use strategy to claim squares on the board.',
     title: 'SQUARE BIZ!',
     subtitle: 'TRIVIA + TACTICS',
     color: '#FF5F1F',
@@ -30,6 +33,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'hangman',
+    lobbyRules: 'Guess the hidden word one letter at a time before you run out of attempts.',
     title: 'HANGMAN',
     subtitle: 'GUESS THE WORD',
     color: '#FFD700',
@@ -38,6 +42,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'spades',
+    lobbyRules: 'Bid the tricks your team expects to take, then play hands to reach the target score.',
     title: 'SPADES',
     subtitle: 'CARD GAME',
     color: '#4ade80',
@@ -46,6 +51,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'word-search',
+    lobbyRules: 'Find the hidden words in the letter grid and compete to discover them first.',
     title: 'WORD SEARCH',
     subtitle: 'HUNT EVERY LETTER',
     color: '#00c875',
@@ -54,6 +60,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'viral',
+    lobbyRules: 'Play through the creator journey and its challenges together.',
     title: 'VIRAL!',
     subtitle: 'CREATOR JOURNEY',
     color: '#BC13FE',
@@ -62,6 +69,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'dominoes',
+    lobbyRules: 'Match domino ends, take turns placing tiles, and score according to the table rules.',
     title: 'DOMINOES',
     subtitle: 'TEXAS DOMINO SHOWDOWN',
     color: '#FFD700',
@@ -70,6 +78,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'see-that',
+    lobbyRules: 'Search each scene for the hidden objects before the other players.',
     title: 'SEE THAT?!',
     subtitle: 'HIDDEN OBJECT PARTY',
     color: '#4ade80',
@@ -78,6 +87,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'word-wrangler',
+    lobbyRules: 'Race to build valid words from the available letters and earn points.',
     title: 'WORD WRANGLER',
     subtitle: 'LIVE WORD RACE',
     color: '#BC13FE',
@@ -86,6 +96,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'sudoku',
+    lobbyRules: 'Solve Sudoku puzzles to earn battle actions, then fire at your opponent’s fleet.',
     title: 'BATTLESUDOKU',
     subtitle: 'SOLVE · FIRE · SINK',
     color: '#22d3ee',
@@ -94,6 +105,7 @@ export const ALL_GAMES = [
   },
   {
     id: 'rodeo-rumble',
+    lobbyRules: 'Battle in the arena, use your fighter’s moves, and avoid getting knocked out.',
     title: 'RODEO RUMBLE',
     subtitle: 'PARTY BRAWLER · 8 PLAYERS',
     color: '#ff7a3d',
