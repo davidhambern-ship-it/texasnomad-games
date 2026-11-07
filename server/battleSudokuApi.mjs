@@ -223,12 +223,25 @@ export function createBattleSudokuApi({
         need(isHost, 'Only the host can do that.');
         room.game = null; return {};
       }
+      case 'pause': {
+        need(isHost, 'Only the host can pause the game.');
+        need(room.game && room.game.phase !== 'final', 'There is no active game.', 'NO_GAME', 409);
+        if (!room.game.pausedAt) { room.game.pausedAt = now; room.game.pausedRemainingMs = Math.max(0, room.game.phaseEndsAt - now); }
+        return { paused: true };
+      }
+      case 'resume': {
+        need(isHost, 'Only the host can resume the game.');
+        need(room.game && room.game.pausedAt, 'The game is not paused.', 'NOT_PAUSED', 409);
+        room.game.phaseEndsAt = now + Math.max(0, Number(room.game.pausedRemainingMs) || 0);
+        delete room.game.pausedAt; delete room.game.pausedRemainingMs;
+        return { paused: false };
+      }
       case 'leave': {
         if (me && !room.game) room.players = room.players.filter(p => p.id !== me.id);
         else if (me) me.token = null;
         return {};
       }
-      case 'shuffle': case 'ready': case 'place': case 'order': case 'cancel': {
+      case 'shuffle': case 'ready': case 'moveShip': case 'place': case 'order': case 'cancel': {
         need(me, 'Join the game first.', 'NO_SEAT');
         need(room.game, 'The game hasn’t started.', 'NO_GAME', 409);
         need(room.game.players[me.id], 'You joined after this game started — you’re in the next one.', 'NOT_IN_GAME', 409);
