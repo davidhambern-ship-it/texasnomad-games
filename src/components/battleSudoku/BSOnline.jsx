@@ -65,7 +65,8 @@ const TNG_PUBLIC_ORIGIN = String(
 ).replace(/\/+$/, '');
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, '')}/games/sudoku`;
 
-export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
+export function BSHost({ onExit, sharedRoomCode = '', initialCode = '', freshRoom = false }) {
+  const roomCode = String(sharedRoomCode || initialCode || '').trim().toUpperCase();
   const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('bs_host') || 'null'); return freshRoom || (initialCode && saved?.code !== initialCode) ? null : saved; } catch { return null; } });
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
@@ -74,7 +75,8 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
   const create = useCallback(async () => {
     setCreating(true); setErr('');
     try {
-      const d = await bsApi.createRoom(initialCode);
+      if (!/^TN[A-Z0-9]{4}$/.test(roomCode)) throw new Error('The shared room code is missing or invalid. Return to Create Room and try again.');
+      const d = await bsApi.createRoom(roomCode);
       if (!d.playerToken) throw new Error('The room was created, but your captain seat was not issued. Please try again.');
       // The server creates the host as the first captain atomically with the
       // room, preventing the creator from appearing as a spectator or a
@@ -87,7 +89,7 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
       applyPlayer(playerView);
     }
     catch (e) { setErr(e.message); } finally { setCreating(false); }
-  }, [apply, applyPlayer]);
+  }, [apply, applyPlayer, roomCode]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = useCallback(async (action, payload = {}) => {
