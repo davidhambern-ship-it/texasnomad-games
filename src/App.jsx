@@ -55,10 +55,11 @@ function RoomRoute() {
     'sudoku', 'rodeo-rumble',
   ]);
 
-  // OUT! has its own persistent Nomad Cards room service. Route its host
-  // entry to that service instead of the core registry, which cannot resolve
-  // OUT! room codes and otherwise reports "Room Not Found".
+  // OUT! and Battle Sudoku each own their native guest-room flows. Do not
+  // wrap either game in SharedRoomPage: that creates a second, nested room
+  // setup and a duplicate room lifecycle.
   if (gameId === 'out') return <Navigate to="/games/out?host=1" replace />;
+  if (gameId === 'sudoku') return <Navigate to="/games/sudoku?host=1" replace />;
 
   // All core games use the shared host room experience.
   return roomGames.has(gameId) ? <SharedRoomPage /> : <Navigate to="/games" replace />;
