@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 
 import { requireAccount } from '../../auth/require-account.js';
 import { db } from '../../db/client.js';
@@ -48,7 +48,7 @@ async function requirePlayerDevice(request, accountId) {
 
 async function findRoom(roomCode) {
   const [room] = await db.select().from(gameRooms).where(and(
-    eq(gameRooms.roomCode, roomCode),
+    sql`upper(${gameRooms.roomCode}) = ${roomCode}`,
     inArray(gameRooms.status, ACTIVE_ROOM_STATUSES),
   )).limit(1);
 
