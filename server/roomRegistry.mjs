@@ -12,6 +12,13 @@ const CORE_GAME_PATHS = {
   hangman: '/games/hangman',
   spades: '/games/spades',
   'word-search': '/games/word-search',
+  out: '/games/out',
+  viral: '/games/viral',
+  dominoes: '/games/dominoes',
+  'see-that': '/games/see-that',
+  'word-wrangler': '/games/word-wrangler',
+  sudoku: '/games/sudoku',
+  'rodeo-rumble': '/games/rodeo-rumble',
 };
 
 function cleanCode(value) {
@@ -145,7 +152,7 @@ export function createRoomRegistry(pool) {
       game_id: row.game_id,
       service: 'core',
       room_kind: 'core',
-      join_path: `${basePath}?room=${encodeURIComponent(row.room_code)}&neon=1`,
+      join_path: `${basePath}?room=${encodeURIComponent(row.room_code)}`,
       spectate_path: `/spectate/${encodeURIComponent(row.room_code)}`,
       host_account_id: row.host_account_id || null,
       status: 'live',
@@ -266,7 +273,7 @@ export function createRoomRegistry(pool) {
           game_id: 'viral',
           service,
           room_kind: 'standalone',
-          join_path: `/viral/index.html?join=${encodeURIComponent(code)}`,
+          join_path: `/games/viral?room=${encodeURIComponent(code)}`,
           spectate_path: `/viral/index.html?display=${encodeURIComponent(code)}`,
           host_account_id: hostAccountId,
           expires_at: row.expires_at,
@@ -331,7 +338,7 @@ export function createRoomRegistry(pool) {
         game_id: gameId,
         service: 'core',
         room_kind: 'core',
-        join_path: `${basePath}?room=${encodeURIComponent(code)}&neon=1`,
+        join_path: `${basePath}?room=${encodeURIComponent(code)}`,
         spectate_path: `/spectate/${encodeURIComponent(code)}`,
         host_account_id: hostAccountId || null,
         expires_at: null,
@@ -382,7 +389,10 @@ export function createRoomRegistry(pool) {
       await cleanupCode(code);
 
       const core = await loadCoreRoom(code);
-      if (core) return false;
+      const matchingCoreReservation = Boolean(
+        allowExisting && core && String(core.game_id || '') === String(gameId || ''),
+      );
+      if (core && !matchingCoreReservation) return false;
 
       let existing = await loadRegistry(code);
 
@@ -390,6 +400,9 @@ export function createRoomRegistry(pool) {
       // core room is still active before letting it block code reuse.
       if (existing?.service === 'core') {
         const activeCore = await loadCoreRoom(code);
+        if (activeCore && allowExisting && String(activeCore.game_id || '') === String(gameId || '')) {
+          return true;
+        }
         if (!activeCore) {
           await pool.query(
             `delete from public.tng_room_registry

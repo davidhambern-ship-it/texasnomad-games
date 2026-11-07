@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { useNavigate } from 'react-router-dom';
 import {
   Home,
@@ -9,7 +10,6 @@ import {
   Smartphone,
   UserCircle2,
   Crown,
-  Tv2,
   ArrowRight,
 } from 'lucide-react';
 
@@ -20,8 +20,8 @@ const ROLE_CARDS = [
     icon: <Crown className="w-7 h-7" />,
     eyebrow: 'HOST',
     title: 'Host A Game',
-    text: 'The Host Panel is your control center. Create the room, choose the game, manage players, control rounds, and run the action.',
-    note: 'The live game board can appear directly inside the Host Panel.',
+    text: 'Create a room, share its code, and start when everyone has joined. The game and host controls stay together on the same screen.',
+    note: 'No separate host screen or second device is needed.',
     color: '#BC13FE',
   },
   {
@@ -39,14 +39,6 @@ const ROLE_CARDS = [
     text: 'Want to watch without joining the competition? Choose Spectate when entering a room and follow the live board.',
     note: 'Spectators do not take a player seat.',
     color: '#3B82F6',
-  },
-  {
-    icon: <Tv2 className="w-7 h-7" />,
-    eyebrow: 'OPTIONAL DISPLAY',
-    title: 'Use A Big Screen',
-    text: 'A TV, projector, tablet, or second computer can still be used as a separate Game Display for the room.',
-    note: 'A second display is optional — Hosts can run TNG from one device.',
-    color: '#FFD700',
   },
 ];
 
@@ -66,14 +58,14 @@ const KNOW_CARDS = [
   },
   {
     icon: <UserCircle2 className="w-5 h-5" />,
-    title: 'One TNG Profile',
-    text: 'Your TNG profile follows your games and keeps your play history and stats together.',
+    title: 'Play As A Guest',
+    text: 'Choose a display name and jump in. No account, password, or sign-in is needed.',
     color: '#FFD700',
   },
   {
     icon: <Crown className="w-5 h-5" />,
     title: 'Host Controls The Room',
-    text: 'The Host runs the game while player devices handle each player’s actions.',
+    text: 'The Host sees the playable board and room controls together; everyone plays in the same live room.',
     color: '#FF5F1F',
   },
   {
@@ -90,8 +82,8 @@ const KNOW_CARDS = [
   },
   {
     icon: <Monitor className="w-5 h-5" />,
-    title: 'One Screen Or Two',
-    text: 'Keep the board inside the Host Panel or send it to a separate display.',
+    title: 'One Shared Game Screen',
+    text: 'The playable board, player actions, room information, and host controls stay together in the live room.',
     color: '#f472b6',
   },
 ];
@@ -106,13 +98,35 @@ const GAMES = [
 
 export default function Welcome() {
   const navigate = useNavigate();
+  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || 'Guest');
+  const [guestError, setGuestError] = useState('');
+  const [guestLoading, setGuestLoading] = useState(false);
+
+
+  const enterAsGuest = async () => {
+    setGuestLoading(true);
+    setGuestError('');
+    try {
+      await createGuestIdentity(guestName);
+      try {
+        sessionStorage.setItem('tng_welcome_complete', '1');
+        sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
+      } catch {}
+      window.location.replace('/games');
+    } catch (error) {
+      setGuestError(error?.message || 'Guest play is not available right now.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const enterTng = () => {
+    if (!getStoredGuestIdentity()) { enterAsGuest(); return; }
     try {
       sessionStorage.setItem('tng_welcome_complete', '1');
       sessionStorage.setItem('tng_last_activity_at', String(Date.now()));
     } catch {}
-    navigate('/', { replace: true });
+    window.location.replace('/');
   };
 
   return (
@@ -255,10 +269,9 @@ export default function Welcome() {
           </div>
 
           <div className="mt-5 rounded-2xl border border-[#3B82F6]/25 bg-[#3B82F6]/[.05] p-5 text-center">
-            <div className="font-heading text-2xl tracking-widest uppercase text-[#3B82F6]">ONE SCREEN OR TWO — YOUR CHOICE</div>
+            <div className="font-heading text-2xl tracking-widest uppercase text-[#3B82F6]">ONE SHARED ROOM SCREEN</div>
             <p className="mx-auto mt-2 max-w-3xl text-sm leading-6 text-white/50">
-              Keep the live game board inside the Host Panel, or move it to a separate Game Display on a TV,
-              projector, tablet, or another computer.
+              Hosts and players use the same live game room. Host controls appear beside the playable board.
             </p>
           </div>
         </div>
@@ -327,6 +340,35 @@ export default function Welcome() {
             GO TO TNG HOME
             <ArrowRight className="h-4 w-4" />
           </button>
+          <div className="mt-7 border-t border-white/10 pt-6">
+            <div className="font-heading text-xl tracking-widest uppercase text-[#FF5F1F]">PLAY WITHOUT AN ACCOUNT</div>
+            <p className="mx-auto mt-2 max-w-xl text-xs leading-5 text-white/45">
+              Pick a player name, create a temporary guest session, and jump into supported live games.
+            </p>
+            <div className="mx-auto mt-4 flex max-w-xl flex-col gap-3 sm:flex-row">
+              <input
+                value={guestName}
+                onChange={(event) => { setGuestName(event.target.value); setGuestError(''); }}
+                onKeyDown={(event) => event.key === 'Enter' && enterAsGuest()}
+                maxLength={32}
+                placeholder="YOUR PLAYER NAME"
+                aria-label="Guest player name"
+                className="min-w-0 flex-1 rounded-xl border border-[#FF5F1F]/40 bg-black/70 px-4 py-3 text-center text-sm text-white outline-none focus:border-[#FF5F1F]"
+              />
+              <button
+                type="button"
+                onClick={enterAsGuest}
+                disabled={guestLoading || !guestName.trim()}
+                className="rounded-xl border-2 border-[#FF5F1F] bg-[#FF5F1F]/15 px-6 py-3 text-[#FF8A52] transition-all hover:bg-[#FF5F1F] hover:text-black disabled:cursor-not-allowed disabled:opacity-40"
+                style={{ ...PS2, fontSize: 8 }}
+              >
+                {guestLoading ? 'STARTING…' : 'PLAY AS GUEST'}
+              </button>
+            </div>
+            {guestError && <p role="alert" className="mt-3 text-xs text-red-400">{guestError}</p>}
+
+          </div>
+
         </div>
       </section>
 

@@ -1,17 +1,23 @@
 import http from 'node:http';
-import { createHash, createHmac, randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import pg from 'pg';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createViralLive } from './server/viralLive.mjs';
 import { createRodeoRumbleLive } from './server/rodeoRumbleLive.mjs';
 import { createSeeThatApi } from './server/seeThatApi.mjs';
 import { createWordWranglerApi } from './server/wordWranglerApi.mjs';
 import { createBattleSudokuApi } from './server/battleSudokuApi.mjs';
+import { createNomadCardsApi } from './server/nomadCardsApi.mjs';
 import { createLiveRoomStore } from './server/liveRoomStore.mjs';
 import { createRoomRegistry } from './server/roomRegistry.mjs';
+import { issueGuestIdentity, verifyGuestIdentity } from './server/guestIdentity.mjs';
+import { handleTngApi, dispatchTngApi } from './server/tngApi.mjs';
+import { pool as bffPool } from './server/db/client.js';
+import { requireUser } from './server/auth/require-user.js';
+import { findAccountForIdentity } from './server/auth/require-account.js';
+import { createRoomBridge } from './server/roomCoordinator.mjs';
 import { applyPass as applyDominoPass, applyPlay as applyDominoPlay } from './src/lib/dominoEngine.js';
 
 const root = fileURLToPath(new URL('./dist/', import.meta.url));
@@ -68,890 +74,31 @@ async function sendFile(res, filePath) {
   res.end(body);
 }
 
-const TNG_API_ORIGIN =
-  process.env.TNG_API_ORIGIN ||
-  'https://br-spring-moon-avh3z3j8-tngapi.compute.c-11.us-east-1.aws.neon.tech';
-
-const NEON_AUTH_ORIGIN =
-  process.env.NEON_AUTH_ORIGIN ||
-  'https://ep-little-base-aveev14q.neonauth.c-11.us-east-1.aws.neon.tech/tng/auth';
 
 const LIVE_BROWSER_ORIGINS = new Set(
   (process.env.TNG_LIVE_ALLOWED_ORIGINS ||
-    'https://texasnomadgames.com,https://www.texasnomadgames.com,https://bernaverse.hireberna.app')
+    'https://texasnomadgames.com,https://www.texasnomadgames.com')
     .split(',')
     .map((value) => value.trim())
     .filter(Boolean),
 );
 
 function isAllowedBrowserOrigin(origin) {
-  return Boolean(origin && LIVE_BROWSER_ORIGINS.has(origin));
+  if (!origin) return false;
+  if (LIVE_BROWSER_ORIGINS.has(origin)) return true;
+
+  let host = '';
+  try { host = new URL(origin).host.toLowerCase(); } catch { return false; }
+  const vercelHosts = [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL]
+    .map((value) => String(value || '').replace('https://', '').replace('http://', '').split('/')[0].toLowerCase())
+    .filter(Boolean);
+  return vercelHosts.includes(host);
 }
 
 async function readRawBody(req) {
   const chunks = [];
   for await (const chunk of req) chunks.push(chunk);
   return chunks.length ? Buffer.concat(chunks) : null;
-}
-
-function rewriteAuthCookie(cookie) {
-  const raw = String(cookie || '');
-  if (!raw) return raw;
-
-  const cookieName = raw.split('=', 1)[0].trim();
-  let next = raw
-    .replace(/;\s*Domain=[^;]+/ig, '')
-    .replace(/;\s*Path=[^;]+/ig, '; Path=/')
-    .replace(/;\s*Expires=[^;]+/ig, '')
-    .replace(/;\s*Max-Age=[^;]+/ig, '');
-
-  if (!/;\s*Path=/i.test(next)) {
-    next += '; Path=/';
-  }
-
-  // Safari is strict about cross-origin cookie storage. Scope Neon Auth's
-  // session cookie to the shared TNG parent domain so requests from
-  // texasnomadgames.com to auth.texasnomadgames.com remain first-party.
-  // __Host- cookies are not allowed to carry Domain=, so preserve their
-  // host-only semantics if Neon ever emits one.
-  if (!cookieName.startsWith('__Host-')) {
-    next += '; Domain=texasnomadgames.com';
-  }
-
-  return next;
-}
-
-function authCookieNames(req) {
-  return String(req.headers.cookie || '')
-    .split(';')
-    .map((part) => part.trim().split('=', 1)[0])
-    .filter(Boolean);
-}
-
-const AUTH_SESSION_PROXY_CACHE_TTL_MS = 30 * 1000;
-const authSessionProxyCache = new Map();
-
-function authSessionProxyKey(req) {
-  const cookie = String(req.headers.cookie || '');
-  const origin = String(req.headers.origin || req.headers.referer || '');
-  return `${origin}\n${cookie}`;
-}
-
-function clearAuthSessionProxyCache() {
-  authSessionProxyCache.clear();
-}
-
-function pruneAuthSessionProxyCache(now = Date.now()) {
-  for (const [key, entry] of authSessionProxyCache.entries()) {
-    if (now - entry.cachedAt >= AUTH_SESSION_PROXY_CACHE_TTL_MS) {
-      authSessionProxyCache.delete(key);
-    }
-  }
-}
-
-function sendCachedAuthSession(res, entry) {
-  for (const [name, value] of Object.entries(entry.headers || {})) {
-    if (value) res.setHeader(name, value);
-  }
-  if (entry.setCookies?.length) {
-    res.setHeader('Set-Cookie', entry.setCookies);
-  }
-  res.writeHead(entry.status);
-  res.end(entry.payload);
-}
-
-async function proxyNeonAuth(req, res) {
-  const sourceUrl = new URL(req.url || '/', 'http://localhost');
-  const suffix = sourceUrl.pathname.replace(/^\/neon-auth/, '') || '/';
-  const targetUrl = `${NEON_AUTH_ORIGIN}${suffix}${sourceUrl.search}`;
-
-  const method = String(req.method || 'GET').toUpperCase();
-  const isSessionRead =
-    method === 'GET' && sourceUrl.pathname.endsWith('/get-session');
-
-  // Old/open Host tabs can still contain a high-frequency auth loop. Absorb
-  // those repeated session reads at the first-party proxy so they cannot
-  // rate-limit Neon Auth. This works immediately without refreshing the Host.
-  if (isSessionRead) {
-    const now = Date.now();
-    pruneAuthSessionProxyCache(now);
-
-    const cacheKey = authSessionProxyKey(req);
-    const cached = authSessionProxyCache.get(cacheKey);
-
-    if (cached && now - cached.cachedAt < AUTH_SESSION_PROXY_CACHE_TTL_MS) {
-      sendCachedAuthSession(res, cached);
-      return;
-    }
-  } else if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
-    // Sign-in/sign-out/account mutations can change the cookie-backed session.
-    clearAuthSessionProxyCache();
-  }
-
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (value == null) continue;
-    const lower = key.toLowerCase();
-
-    // Neon Auth validates the hostname it is serving. Never forward Railway or
-    // TexasNomadGames proxy host metadata upstream; fetch() must present Neon's
-    // own hostname while the browser Origin remains texasnomadgames.com for
-    // Better Auth trusted-origin validation.
-    if ([
-      'host',
-      'content-length',
-      'connection',
-      'forwarded',
-      'x-forwarded-host',
-      'x-forwarded-proto',
-      'x-forwarded-port',
-    ].includes(lower)) continue;
-
-    headers.set(key, Array.isArray(value) ? value.join(', ') : String(value));
-  }
-
-  const body =
-    ['GET', 'HEAD'].includes(String(req.method || 'GET').toUpperCase())
-      ? undefined
-      : await readRawBody(req);
-
-  // BERNAverse is the global signup front door. For the one supported
-  // cross-site provisioning call, present TNG's own origin upstream so Neon
-  // Auth accepts the request while our proxy still enforces the browser origin.
-  const browserOrigin = String(req.headers.origin || '');
-  if (
-    browserOrigin === 'https://bernaverse.hireberna.app'
-    && sourceUrl.pathname.endsWith('/sign-up/email')
-  ) {
-    headers.set('origin', 'https://texasnomadgames.com');
-    headers.set('referer', 'https://texasnomadgames.com/');
-  }
-
-  const response = await fetch(targetUrl, {
-    method: req.method || 'GET',
-    headers,
-    body,
-    redirect: 'manual',
-  });
-
-  const passthroughHeaders = [
-    'content-type',
-    'cache-control',
-    'location',
-    'etag',
-    'last-modified',
-  ];
-
-  for (const name of passthroughHeaders) {
-    const value = response.headers.get(name);
-    if (value) res.setHeader(name, value);
-  }
-
-  const setCookies =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : (response.headers.get('set-cookie') ? [response.headers.get('set-cookie')] : []);
-
-  if (setCookies.length) {
-    const rewrittenCookies = setCookies.map(rewriteAuthCookie);
-    res.setHeader('Set-Cookie', rewrittenCookies);
-
-    console.info('[TNG auth proxy] upstream set-cookie', {
-      path: sourceUrl.pathname,
-      status: response.status,
-      cookieNames: rewrittenCookies
-        .map((value) => String(value || '').split('=', 1)[0].trim())
-        .filter(Boolean),
-    });
-  }
-
-  if (sourceUrl.pathname.endsWith('/get-session')) {
-    console.info('[TNG auth proxy] get-session cookie names', {
-      cookieNames: authCookieNames(req),
-    });
-  }
-
-  const payload = Buffer.from(await response.arrayBuffer());
-
-  if (isSessionRead && response.status === 200) {
-    const cacheKey = authSessionProxyKey(req);
-    const cachedHeaders = {};
-
-    for (const name of passthroughHeaders) {
-      const value = response.headers.get(name);
-      if (value) cachedHeaders[name] = value;
-    }
-
-    const rewrittenSetCookies = setCookies.length
-      ? setCookies.map(rewriteAuthCookie)
-      : [];
-
-    authSessionProxyCache.set(cacheKey, {
-      cachedAt: Date.now(),
-      status: response.status,
-      headers: cachedHeaders,
-      setCookies: rewrittenSetCookies,
-      payload,
-    });
-  }
-
-  if (sourceUrl.pathname.endsWith('/sign-in/social')) {
-    let socialShape = 'non-json';
-    let socialKeys = [];
-    let redirectHost = null;
-    let redirectPath = null;
-    let oauthRedirectHost = null;
-
-    try {
-      const parsed = JSON.parse(payload.toString('utf8'));
-      socialShape = parsed === null
-        ? 'null'
-        : Array.isArray(parsed)
-          ? 'array'
-          : typeof parsed;
-      socialKeys = parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? Object.keys(parsed)
-        : [];
-
-      const candidateUrl =
-        parsed?.url ||
-        parsed?.data?.url ||
-        parsed?.redirectURL ||
-        parsed?.data?.redirectURL ||
-        null;
-
-      if (candidateUrl) {
-        const redirect = new URL(candidateUrl);
-        redirectHost = redirect.hostname;
-        redirectPath = redirect.pathname;
-
-        const redirectUri = redirect.searchParams.get('redirect_uri');
-        if (redirectUri) {
-          try {
-            oauthRedirectHost = new URL(redirectUri).hostname;
-          } catch {}
-        }
-      }
-    } catch {}
-
-    console.info('[TNG auth proxy] social sign-in response shape', {
-      status: response.status,
-      contentType: response.headers.get('content-type') || null,
-      socialShape,
-      socialKeys,
-      redirectHost,
-      redirectPath,
-      oauthRedirectHost,
-    });
-  }
-
-  if (sourceUrl.pathname.endsWith('/get-session')) {
-    let payloadShape = 'non-json';
-    try {
-      const parsed = JSON.parse(payload.toString('utf8'));
-      if (parsed === null) payloadShape = 'null';
-      else if (Array.isArray(parsed)) payloadShape = 'array';
-      else if (parsed && typeof parsed === 'object') payloadShape = 'object';
-      else payloadShape = typeof parsed;
-
-      console.info('[TNG auth proxy] get-session response keys', {
-        topLevelKeys: parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-          ? Object.keys(parsed)
-          : [],
-        hasUser: Boolean(parsed?.user),
-        hasSession: Boolean(parsed?.session),
-        sessionKeys: parsed?.session && typeof parsed.session === 'object'
-          ? Object.keys(parsed.session)
-          : [],
-      });
-    } catch {}
-
-    console.info('[TNG auth proxy] get-session response shape', {
-      status: response.status,
-      contentType: response.headers.get('content-type') || null,
-      payloadShape,
-      payloadBytes: payload.length,
-    });
-  }
-
-  res.writeHead(response.status);
-  res.end(payload);
-}
-
-const { Pool } = pg;
-
-function normalizePgConnectionString(value) {
-  const raw = String(value || '').trim();
-  if (!raw) return raw;
-
-  try {
-    const url = new URL(raw);
-    const sslMode = String(url.searchParams.get('sslmode') || '').toLowerCase();
-
-    // pg 8 currently treats these modes as verify-full, but pg 9 will adopt
-    // weaker libpq semantics. Make the existing secure behavior explicit now.
-    if (['prefer', 'require', 'verify-ca'].includes(sslMode)) {
-      url.searchParams.set('sslmode', 'verify-full');
-    }
-
-    return url.toString();
-  } catch {
-    return raw;
-  }
-}
-
-const bffPool = new Pool({
-  connectionString: normalizePgConnectionString(process.env.DATABASE_URL),
-  max: 5,
-  idleTimeoutMillis: 30000,
-});
-
-const BERNAVERSE_BRIDGE_URL =
-  process.env.BERNAVERSE_BRIDGE_URL ||
-  'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-bridge';
-const BERNAVERSE_SSO_URL =
-  process.env.BERNAVERSE_SSO_URL ||
-  'https://emexrsuuazbowxxwvalj.supabase.co/functions/v1/bernaverse-sso';
-const BERNAVERSE_APP_KEY = String(process.env.BERNAVERSE_APP_KEY || '').trim();
-const BERNAVERSE_SSO_LOCAL_SECRET =
-  String(process.env.BERNAVERSE_SSO_LOCAL_SECRET || '').trim();
-const BERNAVERSE_SSO_ADMIN_EMAIL =
-  String(process.env.BERNAVERSE_SSO_ADMIN_EMAIL || '').trim().toLowerCase();
-const BERNAVERSE_SSO_ADMIN_PASSWORD =
-  String(process.env.BERNAVERSE_SSO_ADMIN_PASSWORD || '').trim();
-
-let bernaverseSsoAdminCookie = '';
-let bernaverseSsoAdminCookieAt = 0;
-const BERNAVERSE_SSO_ADMIN_COOKIE_TTL_MS = 45 * 60 * 1000;
-
-function safeTngSsoReturn(rawReturn) {
-  const fallback = 'https://texasnomadgames.com/login?sso=1';
-
-  try {
-    const candidate = new URL(String(rawReturn || fallback));
-    const host = candidate.hostname.toLowerCase();
-
-    if (
-      candidate.protocol === 'https:' &&
-      (host === 'texasnomadgames.com' || host === 'www.texasnomadgames.com')
-    ) {
-      return candidate.toString();
-    }
-  } catch {}
-
-  return fallback;
-}
-
-function redirectTngSso(res, location, cookies = []) {
-  res.statusCode = 302;
-  res.setHeader('Location', location);
-  res.setHeader('Cache-Control', 'no-store');
-  if (cookies.length) res.setHeader('Set-Cookie', cookies);
-  res.end();
-}
-
-function tngSsoFailureUrl(code) {
-  const target = new URL('https://texasnomadgames.com/login');
-  target.searchParams.set('sso', String(code || 'error'));
-  return target.toString();
-}
-
-function deriveTngSsoPassword(memberId) {
-  if (!BERNAVERSE_SSO_LOCAL_SECRET) {
-    throw new Error('BERNAverse SSO local secret is not configured.');
-  }
-
-  const digest = createHmac('sha256', BERNAVERSE_SSO_LOCAL_SECRET)
-    .update(`tng:${memberId}`)
-    .digest('base64url');
-
-  // Better Auth receives an app-private password that the user never sees.
-  // BERNAverse remains the user's authentication authority.
-  return `Bv!${digest}9a`;
-}
-
-async function consumeBernaverseSsoTicket(ticket) {
-  if (!BERNAVERSE_APP_KEY) {
-    throw new Error('BERNAverse app credential is not configured.');
-  }
-
-  const response = await fetch(BERNAVERSE_SSO_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
-    },
-    body: JSON.stringify({
-      action: 'consume',
-      ticket,
-    }),
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok || !payload?.data?.email || !payload?.data?.member_id) {
-    const error = new Error(
-      payload?.error || 'BERNAverse SSO ticket could not be verified.',
-    );
-    error.status = response.status;
-    throw error;
-  }
-
-  return payload.data;
-}
-
-async function callNeonEmailAuth(path, body) {
-  const response = await fetch(`${NEON_AUTH_ORIGIN}${path}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Origin: 'https://texasnomadgames.com',
-      Referer: 'https://texasnomadgames.com/',
-    },
-    body: JSON.stringify(body),
-    redirect: 'manual',
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  const setCookies =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : (response.headers.get('set-cookie')
-          ? [response.headers.get('set-cookie')]
-          : []);
-
-  const rawSetCookies = setCookies.filter(Boolean);
-
-  return {
-    response,
-    payload,
-    rawSetCookies,
-    cookieHeader: rawSetCookies
-      .map((value) => String(value || '').split(';', 1)[0])
-      .filter(Boolean)
-      .join('; '),
-    setCookies: rawSetCookies.map(rewriteAuthCookie),
-  };
-}
-
-async function promoteBernaverseSsoAdmin() {
-  if (!BERNAVERSE_SSO_ADMIN_EMAIL) {
-    throw new Error('BERNAverse SSO admin email is not configured.');
-  }
-
-  const { rows: columns } = await bffPool.query(
-    `
-      select column_name
-      from information_schema.columns
-      where table_schema = 'neon_auth'
-        and table_name = 'user'
-    `,
-  );
-
-  const names = new Set(columns.map((row) => String(row.column_name || '')));
-  if (!names.has('role')) {
-    throw new Error('Neon Auth admin role column is unavailable.');
-  }
-
-  const assignments = ["role = 'admin'"];
-  if (names.has('emailVerified')) assignments.push('"emailVerified" = true');
-
-  const result = await bffPool.query(
-    `
-      update neon_auth."user"
-      set ${assignments.join(', ')}
-      where lower(trim(email)) = lower(trim($1))
-    `,
-    [BERNAVERSE_SSO_ADMIN_EMAIL],
-  );
-
-  if (!result.rowCount) {
-    throw new Error('BERNAverse SSO admin account could not be found.');
-  }
-}
-
-async function getBernaverseSsoAdminCookie({ force = false } = {}) {
-  if (!BERNAVERSE_SSO_ADMIN_EMAIL || !BERNAVERSE_SSO_ADMIN_PASSWORD) {
-    throw new Error('BERNAverse SSO admin credentials are not configured.');
-  }
-
-  if (
-    !force &&
-    bernaverseSsoAdminCookie &&
-    Date.now() - bernaverseSsoAdminCookieAt < BERNAVERSE_SSO_ADMIN_COOKIE_TTL_MS
-  ) {
-    return bernaverseSsoAdminCookie;
-  }
-
-  let signIn = await callNeonEmailAuth('/sign-in/email', {
-    email: BERNAVERSE_SSO_ADMIN_EMAIL,
-    password: BERNAVERSE_SSO_ADMIN_PASSWORD,
-  });
-
-  if (!signIn.response.ok) {
-    const signUp = await callNeonEmailAuth('/sign-up/email', {
-      email: BERNAVERSE_SSO_ADMIN_EMAIL,
-      password: BERNAVERSE_SSO_ADMIN_PASSWORD,
-      name: 'BERNAverse SSO',
-    });
-
-    if (!signUp.response.ok) {
-      const message = String(
-        signUp.payload?.message ||
-        signUp.payload?.error?.message ||
-        '',
-      );
-
-      if (!/already|exist|registered|email/i.test(message)) {
-        throw new Error(
-          message || `BERNAverse SSO admin provisioning failed (${signUp.response.status}).`,
-        );
-      }
-    }
-  }
-
-  await promoteBernaverseSsoAdmin();
-
-  // Re-authenticate after promotion so the admin plugin sees the current role.
-  signIn = await callNeonEmailAuth('/sign-in/email', {
-    email: BERNAVERSE_SSO_ADMIN_EMAIL,
-    password: BERNAVERSE_SSO_ADMIN_PASSWORD,
-  });
-
-  if (!signIn.response.ok || !signIn.cookieHeader) {
-    const message = String(
-      signIn.payload?.message ||
-      signIn.payload?.error?.message ||
-      '',
-    );
-    throw new Error(
-      message || `BERNAverse SSO admin sign-in failed (${signIn.response.status}).`,
-    );
-  }
-
-  bernaverseSsoAdminCookie = signIn.cookieHeader;
-  bernaverseSsoAdminCookieAt = Date.now();
-  return bernaverseSsoAdminCookie;
-}
-
-async function callNeonAdmin(path, body, cookieHeader) {
-  const response = await fetch(`${NEON_AUTH_ORIGIN}${path}`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Cookie: cookieHeader,
-      Origin: 'https://texasnomadgames.com',
-      Referer: 'https://texasnomadgames.com/',
-    },
-    body: JSON.stringify(body),
-    redirect: 'manual',
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  const setCookies =
-    typeof response.headers.getSetCookie === 'function'
-      ? response.headers.getSetCookie()
-      : (response.headers.get('set-cookie')
-          ? [response.headers.get('set-cookie')]
-          : []);
-
-  return {
-    response,
-    payload,
-    setCookies: setCookies.filter(Boolean).map(rewriteAuthCookie),
-  };
-}
-
-async function impersonateTngAccount(userId) {
-  let adminCookie = await getBernaverseSsoAdminCookie();
-  let result = await callNeonAdmin(
-    '/admin/impersonate-user',
-    { userId },
-    adminCookie,
-  );
-
-  if ([401, 403].includes(result.response.status)) {
-    bernaverseSsoAdminCookie = '';
-    bernaverseSsoAdminCookieAt = 0;
-    adminCookie = await getBernaverseSsoAdminCookie({ force: true });
-    result = await callNeonAdmin(
-      '/admin/impersonate-user',
-      { userId },
-      adminCookie,
-    );
-  }
-
-  if (!result.response.ok || !result.setCookies.length) {
-    const message = String(
-      result.payload?.message ||
-      result.payload?.error?.message ||
-      result.payload?.error ||
-      '',
-    );
-    const error = new Error(
-      message || `TNG SSO session creation failed (${result.response.status}).`,
-    );
-    error.status = result.response.status;
-    throw error;
-  }
-
-  return result;
-}
-
-async function findTngAccountByEmail(email) {
-  const { rows } = await bffPool.query(
-    `
-      select
-        a.id::text as external_user_id,
-        pp.handle as external_handle
-      from public.accounts a
-      left join public.player_profiles pp
-        on pp.account_id = a.id
-      where lower(trim(a.email)) = lower(trim($1))
-      order by a.created_at asc nulls first
-      limit 1
-    `,
-    [email],
-  );
-
-  return rows[0] || null;
-}
-
-async function ensureTngSsoIdentity(email) {
-  if (!BERNAVERSE_APP_KEY) return;
-
-  let account = null;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    account = await findTngAccountByEmail(email);
-    if (account?.external_user_id) break;
-    if (attempt < 4) {
-      await new Promise((resolve) => setTimeout(resolve, 200 + attempt * 150));
-    }
-  }
-
-  if (!account?.external_user_id) return;
-
-  const response = await fetch(BERNAVERSE_BRIDGE_URL, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
-    },
-    body: JSON.stringify({
-      action: 'ensure_free',
-      payload: {
-        external_user_id: account.external_user_id,
-        external_handle: account.external_handle || null,
-        email,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    throw new Error(
-      payload?.error || `BERNAverse TNG identity sync failed (${response.status}).`,
-    );
-  }
-}
-
-async function handleBernaverseSso(req, res) {
-  if (req.method !== 'GET') {
-    res.writeHead(405, { Allow: 'GET', 'Cache-Control': 'no-store' });
-    res.end();
-    return;
-  }
-
-  const url = new URL(req.url || '/bernaverse-sso', 'https://auth.texasnomadgames.com');
-  const ticket = String(url.searchParams.get('ticket') || '').trim();
-  const returnUrl = safeTngSsoReturn(url.searchParams.get('return'));
-
-  if (!ticket) {
-    redirectTngSso(res, tngSsoFailureUrl('invalid'));
-    return;
-  }
-
-  let identity;
-  try {
-    identity = await consumeBernaverseSsoTicket(ticket);
-  } catch (error) {
-    console.warn('[TNG BERNAverse SSO] ticket rejected:', error?.message || error);
-    redirectTngSso(res, tngSsoFailureUrl('invalid'));
-    return;
-  }
-
-  const email = String(identity.email || '').trim().toLowerCase();
-  const memberId = String(identity.member_id || '').trim();
-  const name = String(identity.display_name || email.split('@')[0] || 'Nomad').slice(0, 120);
-
-  let password;
-  try {
-    password = deriveTngSsoPassword(memberId);
-  } catch (error) {
-    console.error('[TNG BERNAverse SSO] configuration error:', error?.message || error);
-    redirectTngSso(res, tngSsoFailureUrl('unavailable'));
-    return;
-  }
-
-  // First try the app-private credential. This succeeds for accounts created
-  // by BERNAverse SSO on prior visits.
-  let signIn = await callNeonEmailAuth('/sign-in/email', { email, password });
-
-  if (!signIn.response.ok) {
-    // Existing pre-SSO accounts keep their original password untouched.
-    // BERNAverse creates a short-lived TNG session through Neon Auth's Admin
-    // impersonation API, so legacy credentials remain valid while SSO works.
-    const existingAccount = await findTngAccountByEmail(email).catch(() => null);
-    if (existingAccount?.external_user_id) {
-      try {
-        const impersonation = await impersonateTngAccount(
-          existingAccount.external_user_id,
-        );
-
-        clearAuthSessionProxyCache();
-
-        try {
-          await ensureTngSsoIdentity(email);
-        } catch (identityError) {
-          console.warn(
-            '[TNG BERNAverse SSO] existing identity sync deferred:',
-            identityError?.message || identityError,
-          );
-        }
-
-        redirectTngSso(res, returnUrl, impersonation.setCookies);
-        return;
-      } catch (impersonationError) {
-        console.error(
-          '[TNG BERNAverse SSO] existing-account handoff failed:',
-          impersonationError?.message || impersonationError,
-        );
-        redirectTngSso(res, tngSsoFailureUrl('legacy'));
-        return;
-      }
-    }
-
-    const signUp = await callNeonEmailAuth('/sign-up/email', {
-      email,
-      password,
-      name,
-    });
-
-    if (!signUp.response.ok) {
-      const message = String(
-        signUp.payload?.message ||
-        signUp.payload?.error?.message ||
-        '',
-      );
-
-      console.warn('[TNG BERNAverse SSO] account creation failed:', {
-        status: signUp.response.status,
-        message: message.slice(0, 180),
-      });
-
-      redirectTngSso(
-        res,
-        tngSsoFailureUrl(/already|exist|registered|email/i.test(message) ? 'legacy' : 'setup'),
-      );
-      return;
-    }
-
-    // Sign in after provisioning so the browser receives a normal TNG session
-    // cookie scoped to texasnomadgames.com.
-    signIn = await callNeonEmailAuth('/sign-in/email', { email, password });
-  }
-
-  if (!signIn.response.ok) {
-    console.warn('[TNG BERNAverse SSO] internal sign-in failed:', {
-      status: signIn.response.status,
-    });
-    redirectTngSso(res, tngSsoFailureUrl('setup'));
-    return;
-  }
-
-  clearAuthSessionProxyCache();
-
-  try {
-    await ensureTngSsoIdentity(email);
-  } catch (error) {
-    // Identity linking is idempotent and can retry at normal TNG login.
-    console.warn('[TNG BERNAverse SSO] identity sync deferred:', error?.message || error);
-  }
-
-  redirectTngSso(res, returnUrl, signIn.setCookies);
-}
-
-async function syncTngAccountsToBernaverseFree() {
-  if (!BERNAVERSE_APP_KEY) {
-    console.info('[BERNAverse sync] skipped: app credential is not configured');
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `
-      select
-        a.id::text as external_user_id,
-        lower(trim(a.email)) as email,
-        pp.handle as external_handle
-      from public.accounts a
-      left join public.player_profiles pp
-        on pp.account_id = a.id
-      where nullif(trim(a.email), '') is not null
-        and (
-          $1 = ''
-          or lower(trim(a.email)) <> lower(trim($1))
-        )
-      order by a.created_at asc nulls first, a.id
-    `,
-    [BERNAVERSE_SSO_ADMIN_EMAIL],
-  );
-
-  let synced = 0;
-  let failed = 0;
-
-  for (let index = 0; index < rows.length; index += 5) {
-    const batch = rows.slice(index, index + 5);
-
-    const results = await Promise.allSettled(
-      batch.map(async (account) => {
-        const response = await fetch(BERNAVERSE_BRIDGE_URL, {
-          method: 'POST',
-          headers: {
-            Accept: 'application/json',
-            'Content-Type': 'application/json',
-            'X-BERNAverse-Key': BERNAVERSE_APP_KEY,
-          },
-          body: JSON.stringify({
-            action: 'ensure_free',
-            payload: {
-              external_user_id: account.external_user_id,
-              external_handle: account.external_handle || null,
-              email: account.email,
-            },
-          }),
-        });
-
-        const payload = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          throw new Error(payload?.error || `BERNAverse sync failed (${response.status}).`);
-        }
-      }),
-    );
-
-    for (const result of results) {
-      if (result.status === 'fulfilled') synced += 1;
-      else failed += 1;
-    }
-  }
-
-  console.info('[BERNAverse sync] TNG FREE membership pass complete', {
-    accounts: rows.length,
-    synced,
-    failed,
-  });
 }
 
 // Spectators intentionally do not take a room_participants seat. Track their
@@ -1036,30 +183,30 @@ function getLiveSpectators(roomCode) {
   return live;
 }
 
+async function verifyRodeoHostAuthorization({ token, deviceId }) {
+  const accountHost = await verifyViralHostAuthorization({ token, deviceId }).catch(() => null);
+  if (accountHost?.accountId) return accountHost;
+  return resolveStandaloneGameIdentity({
+    headers: { 'x-tng-guest-token': String(token || '').trim() },
+  }).catch(() => null);
+}
+
 const hostLiveWss = new WebSocketServer({ noServer: true });
 
 async function verifyViralHostAuthorization({ token, deviceId }) {
   const cleanToken = String(token || '').trim();
   const cleanDeviceId = String(deviceId || '').trim();
-
   if (!cleanToken || !isUuid(cleanDeviceId)) return null;
 
   const resolved = await resolveAuthenticatedTngIdentity({
-    headers: {
-      authorization: `Bearer ${cleanToken}`,
-    },
+    headers: { authorization: `Bearer ${cleanToken}` },
   });
-
   if (!resolved.ok) return null;
 
   const { rows } = await bffPool.query(
-    `select
-       hs.id,
-       hs.host_account_id,
-       hs.controller_device_id
+    `select hs.id, hs.host_account_id, hs.controller_device_id
      from public.host_sessions hs
-     join public.device_sessions ds
-       on ds.id = hs.controller_device_id
+     join public.device_sessions ds on ds.id = hs.controller_device_id
      where hs.host_account_id = $1::uuid
        and hs.controller_device_id = $2::uuid
        and hs.ended_at is null
@@ -1071,12 +218,12 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
      limit 1`,
     [resolved.account.id, cleanDeviceId],
   );
-
   const session = rows[0] || null;
   if (!session) return null;
-
   return {
     accountId: String(resolved.account.id),
+    guestId: resolved.identity?.guestId || null,
+    isGuest: true,
     publicName: resolved.identity?.publicName || null,
     handle: resolved.identity?.handle || null,
     hostSessionId: String(session.id),
@@ -1086,15 +233,13 @@ async function verifyViralHostAuthorization({ token, deviceId }) {
 
 async function resolveViralPlayerIdentity({ token }) {
   const cleanToken = String(token || '').trim();
-  if (!cleanToken) return null;
-
   const resolved = await resolveAuthenticatedTngIdentity({
-    headers: {
-      authorization: `Bearer ${cleanToken}`,
-    },
+    headers: { authorization: `Bearer ${cleanToken}` },
   }).catch(() => null);
-
-  return resolved?.ok ? resolved.identity : null;
+  if (resolved?.ok) return resolved.identity;
+  return resolveStandaloneGameIdentity({
+    headers: { 'x-tng-guest-token': cleanToken },
+  }).catch(() => null);
 }
 
 // One public room-code namespace across every TNG game. Standalone games
@@ -1217,16 +362,21 @@ const viralRoomStore = createLiveRoomStore(bffPool, {
 });
 const viralLive = createViralLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
-  verifyHostAuthorization: verifyViralHostAuthorization,
+  verifyHostAuthorization: verifyRodeoHostAuthorization,
   resolvePlayerIdentity: resolveViralPlayerIdentity,
   recordResults: recordStandaloneGameResults,
   claimRoomCode: (options) => roomRegistry.claim(options),
   touchRoomCode: (code, options) => roomRegistry.touch(code, options),
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
   store: viralRoomStore,
+  createRoomBridge,
 });
 
 // Rodeo Rumble — human-only phone-controller party brawler (/rr-live + /rr-api)
+const rodeoRoomStore = createLiveRoomStore(bffPool, {
+  service: 'rodeo-rumble',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
 const rodeoRumbleLive = createRodeoRumbleLive({
   isAllowedOrigin: (origin) => isAllowedBrowserOrigin(origin),
   verifyHostAuthorization: verifyViralHostAuthorization,
@@ -1235,265 +385,11 @@ const rodeoRumbleLive = createRodeoRumbleLive({
   claimRoomCode: (options) => roomRegistry.claim(options),
   touchRoomCode: (code, options) => roomRegistry.touch(code, options),
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+  store: rodeoRoomStore,
+  createRoomBridge,
 });
 
-const VIRAL_DISPLAY_TARGET_TTL_MS = 90000; // survives background-tab timer throttling (timers can slow to ~1/min)
-const viralDisplayTargets = new Map();
-const seeThatDisplayTargets = new Map();
-const standaloneDisplayTargets = new Map();
-
-function getViralDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = viralDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    viralDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-function getSeeThatDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = seeThatDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    seeThatDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-function getStandaloneDisplayTarget(displayDeviceId) {
-  const key = String(displayDeviceId || '').trim();
-  if (!key) return null;
-
-  const target = standaloneDisplayTargets.get(key);
-  if (!target) return null;
-
-  if (Date.now() - Number(target.updatedAt || 0) > VIRAL_DISPLAY_TARGET_TTL_MS) {
-    standaloneDisplayTargets.delete(key);
-    return null;
-  }
-
-  return target;
-}
-
-async function handleStandaloneDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  const key = String(displayDeviceId);
-
-  if (req.method === 'DELETE') {
-    standaloneDisplayTargets.delete(key);
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const roomCode = String(body?.roomCode || '').trim().toUpperCase();
-  const gameId = String(body?.gameId || '').trim();
-
-  const room = await roomRegistry.resolve(roomCode);
-  if (
-    !room ||
-    room.kind !== 'standalone' ||
-    room.gameId !== gameId ||
-    (room.hostAccountId &&
-      String(room.hostAccountId) !== String(resolved.account.id))
-  ) {
-    sendJson(res, 403, {
-      error: {
-        code: 'DISPLAY_ROOM_NOT_OWNED',
-        message: 'That standalone room is not owned by this TNG Host.',
-      },
-    });
-    return;
-  }
-
-  viralDisplayTargets.delete(key);
-  seeThatDisplayTargets.delete(key);
-  standaloneDisplayTargets.set(key, {
-    accountId: resolved.account.id,
-    gameId,
-    roomCode,
-    updatedAt: Date.now(),
-  });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    gameId,
-    roomCode,
-  });
-}
-
-async function handleViralDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  if (req.method === 'DELETE') {
-    viralDisplayTargets.delete(String(displayDeviceId));
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
-  const incoming = /^[A-Z]{4}$/.test(requestedCode) ? requestedCode : null;
-  // Sticky claim: a heartbeat without a readable code keeps the current room on screen.
-  const roomCode = incoming || viralDisplayTargets.get(String(displayDeviceId))?.roomCode || null;
-  // A paired screen can be owned by only one standalone game at a time.
-  seeThatDisplayTargets.delete(String(displayDeviceId));
-  standaloneDisplayTargets.delete(String(displayDeviceId));
-  viralDisplayTargets.set(String(displayDeviceId), { accountId: resolved.account.id, roomCode, updatedAt: Date.now() });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    roomCode,
-  });
-}
-
-async function handleSeeThatDisplayTarget(req, res) {
-  if (!['POST', 'DELETE'].includes(req.method || '')) {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'POST or DELETE required.' },
-    });
-    return;
-  }
-
-  const resolved = await resolveAuthenticatedTngAccount(req);
-  if (!resolved.ok) {
-    sendJson(res, resolved.status, resolved.payload);
-    return;
-  }
-
-  const { rows } = await bffPool.query(
-    `select display_device_id
-     from public.host_sessions
-     where host_account_id = $1::uuid
-       and ended_at is null
-       and status::text in ('pairing', 'ready', 'live')
-       and display_device_id is not null
-     order by updated_at desc
-     limit 1`,
-    [resolved.account.id],
-  );
-
-  const displayDeviceId = rows[0]?.display_device_id || null;
-  if (!displayDeviceId) {
-    sendJson(res, 200, {
-      ok: true,
-      displayAttached: false,
-      roomCode: null,
-    });
-    return;
-  }
-
-  const displayKey = String(displayDeviceId);
-
-  if (req.method === 'DELETE') {
-    seeThatDisplayTargets.delete(displayKey);
-    sendJson(res, 200, { ok: true, displayAttached: true, cleared: true });
-    return;
-  }
-
-  const body = await readJsonBody(req).catch(() => ({}));
-  const requestedCode = String(body?.roomCode || '').trim().toUpperCase();
-  const incoming = /^[A-Z]{5}$/.test(requestedCode) ? requestedCode : null;
-  const roomCode = incoming || seeThatDisplayTargets.get(displayKey)?.roomCode || null;
-
-  // A paired screen can be owned by only one standalone game at a time.
-  viralDisplayTargets.delete(displayKey);
-  standaloneDisplayTargets.delete(displayKey);
-  seeThatDisplayTargets.set(displayKey, {
-    accountId: resolved.account.id,
-    roomCode,
-    updatedAt: Date.now(),
-  });
-
-  sendJson(res, 200, {
-    ok: true,
-    displayAttached: true,
-    roomCode,
-  });
-}
-
-// Standalone live-room snapshots survive Railway container replacement.
+// Standalone live-room snapshots survive serverless instance replacement.
 // The game modules still keep a hot in-process cache; Postgres is the recovery
 // source when a new container receives the next request for an active room.
 const seeThatRoomStore = createLiveRoomStore(bffPool, {
@@ -1509,6 +405,11 @@ const battleSudokuRoomStore = createLiveRoomStore(bffPool, {
   ttlMs: 3 * 60 * 60 * 1000,
 });
 
+const outRoomStore = createLiveRoomStore(bffPool, {
+  service: 'out',
+  ttlMs: 3 * 60 * 60 * 1000,
+});
+
 
 // A longer cleanup cadence avoids waking the free-tier database constantly.
 // Room expiry is enforced by each game store; this is stale-record cleanup.
@@ -1518,9 +419,11 @@ async function runRoomMaintenance() {
   const jobs = [
     ['registry', () => roomRegistry.cleanup()],
     ['viral', () => viralRoomStore.cleanup()],
+    ['rodeo-rumble', () => rodeoRoomStore.cleanup()],
     ['see-that', () => seeThatRoomStore.cleanup()],
     ['word-wrangler', () => wordWranglerRoomStore.cleanup()],
     ['battle-sudoku', () => battleSudokuRoomStore.cleanup()],
+    ['out', () => outRoomStore.cleanup()],
   ];
 
   const results = await Promise.allSettled(
@@ -1536,12 +439,6 @@ async function runRoomMaintenance() {
     }
   });
 
-  const cutoff = Date.now() - VIRAL_DISPLAY_TARGET_TTL_MS;
-  for (const targets of [viralDisplayTargets, seeThatDisplayTargets, standaloneDisplayTargets]) {
-    for (const [key, target] of targets.entries()) {
-      if (Number(target?.updatedAt || 0) < cutoff) targets.delete(key);
-    }
-  }
 }
 
 const roomMaintenanceKickoff = setTimeout(() => {
@@ -1588,6 +485,16 @@ const handleBattleSudokuApi = createBattleSudokuApi({
   releaseRoomCode: (code, service) => roomRegistry.release(code, service),
 });
 
+// OUT! party card game (/nc-api), with guest display-name identities.
+const handleOutApi = createNomadCardsApi({
+  store: outRoomStore,
+  resolveIdentity: resolveStandaloneGameIdentity,
+  recordResults: recordStandaloneGameResults,
+  claimRoomCode: (options) => roomRegistry.claim(options),
+  touchRoomCode: (code, options) => roomRegistry.touch(code, options),
+  releaseRoomCode: (code, service) => roomRegistry.release(code, service),
+});
+
 const HOST_LIVE_GAME_PATHS = {
   spades: '/spades/host',
   hangman: '/hangman/host',
@@ -1595,47 +502,32 @@ const HOST_LIVE_GAME_PATHS = {
   'square-biz': '/square-biz/host',
 };
 
-async function fetchHostLiveJson(url, token, controllerId) {
-  const response = await fetch(url, {
+async function fetchHostLiveJson(path, token, controllerId) {
+  const response = await dispatchTngApi({
+    path,
     method: 'GET',
     headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${token}`,
-      'X-TNG-Device-Id': controllerId,
+      authorization: `Bearer ${token}`,
+      'x-tng-device-id': controllerId,
     },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { response, payload };
 }
 
 async function loadHostLiveRoom(token, controllerId) {
-  return fetchHostLiveJson(
-    `${TNG_API_ORIGIN}/host/room-state`,
-    token,
-    controllerId,
-  );
+  return fetchHostLiveJson('/host/room-state', token, controllerId);
 }
 
 async function loadHostLiveGame(token, controllerId, gameId) {
   if (!gameId) return null;
-
   if (gameId === 'bff') {
-    return fetchHostLiveJson(
-      `http://127.0.0.1:${port}/bff-api/host`,
-      token,
-      controllerId,
-    );
+    // BFF state is served by its dedicated same-origin REST endpoint.
+    return null;
   }
-
   const path = HOST_LIVE_GAME_PATHS[gameId];
   if (!path) return null;
-
-  return fetchHostLiveJson(
-    `${TNG_API_ORIGIN}${path}`,
-    token,
-    controllerId,
-  );
+  return fetchHostLiveJson(path, token, controllerId);
 }
 
 function hostLiveSend(ws, payload) {
@@ -1829,88 +721,49 @@ function publicTngNameFromRecord(record, fallback = 'Player') {
 }
 
 async function resolveAuthenticatedTngAccount(req) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
-    return {
-      ok: false,
-      status: 401,
-      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
-    };
-  }
-
-  const response = await fetch(`${TNG_API_ORIGIN}/profile`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
-  });
-
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    return {
-      ok: false,
-      status: response.status,
-      payload: payload?.error
-        ? payload
-        : { error: { code: 'PROFILE_LOOKUP_FAILED', message: 'TNG could not identify this signed-in account.' } },
-    };
-  }
-
-  const profile = payload?.profile || {};
-  let accountId =
-    profile.id ||
-    profile.accountId ||
-    profile.account_id ||
-    payload.accountId ||
-    payload.account_id ||
-    null;
-
-  if (!accountId) {
-    const handle = String(
-      profile.handle ||
-      profile.normalizedHandle ||
-      profile.normalized_handle ||
-      ''
-    ).replace(/^@/, '').trim().toLowerCase();
-
-    if (handle) {
-      const { rows } = await bffPool.query(
-        `select account_id from public.player_profiles
-         where normalized_handle = $1 or lower(handle) = $1
-         limit 1`,
-        [handle],
-      );
-      accountId = rows[0]?.account_id || null;
+  try {
+    const identity = await requireUser(req);
+    const account = await findAccountForIdentity(identity);
+    if (!account || account.status !== 'active') {
+      const error = new Error('Your guest profile is unavailable. Choose a player name again.');
+      error.statusCode = 401;
+      error.code = 'GUEST_PROFILE_UNAVAILABLE';
+      throw error;
     }
-  }
 
-  if (!accountId || !isUuid(accountId)) {
+    const profileResult = await bffPool.query(
+      `select display_name, handle, normalized_handle
+       from public.player_profiles
+       where account_id = $1::uuid
+       limit 1`,
+      [account.id],
+    );
+    const stored = profileResult.rows[0] || {};
+    const profile = {
+      id: account.id,
+      accountId: account.id,
+      account_id: account.id,
+      email: account.email,
+      name: stored.display_name || identity.displayName || 'Guest',
+      displayName: stored.display_name || identity.displayName || 'Guest',
+      display_name: stored.display_name || null,
+      handle: stored.handle || '',
+      normalizedHandle: stored.normalized_handle || '',
+      normalized_handle: stored.normalized_handle || '',
+    };
+    return { ok: true, account, profile, guestIdentity: identity };
+  } catch (error) {
     return {
       ok: false,
-      status: 404,
-      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'Create your TNG profile first.' } },
+      status: Number(error?.statusCode) || 401,
+      payload: {
+        error: {
+          code: error?.code || 'GUEST_REQUIRED',
+          message: error?.message || 'Choose a player name to continue.',
+        },
+      },
     };
   }
-
-  const { rows } = await bffPool.query(
-    `select id, lower(email) as email
-     from public.accounts
-     where id = $1::uuid
-     limit 1`,
-    [accountId],
-  );
-
-  const account = rows[0] || null;
-  if (!account) {
-    return {
-      ok: false,
-      status: 404,
-      payload: { error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'TNG account record was not found.' } },
-    };
-  }
-
-  return { ok: true, account, profile };
 }
 
 const TNG_IDENTITY_CACHE_TTL_MS = 30 * 1000;
@@ -1924,7 +777,7 @@ function pruneTngIdentityCache(now = Date.now()) {
 }
 
 async function resolveAuthenticatedTngIdentity(req) {
-  const authKey = String(req?.headers?.authorization || '').trim();
+  const authKey = String(req?.headers?.['x-tng-guest-token'] || req?.headers?.authorization || '').trim();
   const now = Date.now();
 
   if (authKey) {
@@ -1975,6 +828,8 @@ async function resolveAuthenticatedTngIdentity(req) {
     profile: mergedProfile,
     identity: {
       accountId: String(resolved.account.id),
+      guestId: resolved.guestIdentity?.guestId || null,
+      isGuest: true,
       handle: rawHandle ? `@${rawHandle}` : '',
       publicName,
     },
@@ -1992,6 +847,23 @@ async function resolveAuthenticatedTngIdentity(req) {
 }
 
 async function resolveStandaloneGameIdentity(req) {
+  // Standalone party games use signed, temporary guest identities directly.
+  // Do not route these guests through TNG account/profile resolution: a name
+  // plus a valid guest token is sufficient to host or join a room.
+  const guestToken = String(req?.headers?.['x-tng-guest-token'] || '').trim();
+  const guest = verifyGuestIdentity(guestToken, {
+    secret: process.env.TNG_GUEST_TOKEN_SECRET,
+  });
+  if (guest) {
+    return {
+      guestId: guest.guestId,
+      isGuest: true,
+      publicName: guest.publicName,
+      handle: '',
+    };
+  }
+
+  // Preserve compatibility for any existing authenticated TNG sessions.
   const resolved = await resolveAuthenticatedTngIdentity(req);
   return resolved.ok ? resolved.identity : null;
 }
@@ -2423,8 +1295,7 @@ async function handleTngSessionLifecycle(req, res) {
              updated_at = now()
          where account_id = $1::uuid
            and id = any($2::uuid[])
-           and role::text <> 'game_display'
-         returning id`,
+                    returning id`,
         [resolved.account.id, deviceIds],
       );
 
@@ -2438,7 +1309,7 @@ async function handleTngSessionLifecycle(req, res) {
     }
 
     const hostResult = await client.query(
-      `select id, display_device_id
+      `select id
        from public.host_sessions
        where host_account_id = $1::uuid
          and controller_device_id = any($2::uuid[])
@@ -2472,9 +1343,6 @@ async function handleTngSessionLifecycle(req, res) {
       const hostSessionIds = hostResult.rows
         .map((row) => row.id)
         .filter((value) => isUuid(value));
-      const displayDeviceIds = hostResult.rows
-        .map((row) => row.display_device_id)
-        .filter((value) => isUuid(value));
 
       if (hostSessionIds.length) {
         await client.query(
@@ -2483,14 +1351,6 @@ async function handleTngSessionLifecycle(req, res) {
                updated_at = now()
            where host_session_id = any($1::uuid[])
              and status::text in ('lobby', 'live', 'paused')`,
-          [hostSessionIds],
-        );
-
-        await client.query(
-          `update public.display_pairings
-           set consumed_at = coalesce(consumed_at, now())
-           where host_session_id = any($1::uuid[])
-             and consumed_at is null`,
           [hostSessionIds],
         );
 
@@ -2504,15 +1364,6 @@ async function handleTngSessionLifecycle(req, res) {
         );
       }
 
-      if (displayDeviceIds.length) {
-        await client.query(
-          `update public.device_sessions
-           set status = 'disconnected',
-               updated_at = now()
-           where id = any($1::uuid[])`,
-          [displayDeviceIds],
-        );
-      }
     }
 
     await client.query('commit');
@@ -2531,171 +1382,6 @@ async function handleTngSessionLifecycle(req, res) {
 }
 
 
-const WORD_SEARCH_DISPLAY_COLORS = {
-  1: '#BC13FE',
-  2: '#FF5F1F',
-  3: '#FFD700',
-  4: '#22D3EE',
-};
-
-function projectWordSearchDisplayState(rawState = {}, participants = []) {
-  const scores = rawState?.scores && typeof rawState.scores === 'object'
-    ? rawState.scores
-    : {};
-
-  return {
-    phase: rawState.phase || 'setup',
-    mode: rawState.mode || 'race',
-    difficulty: rawState.difficulty || 'simpleton',
-    category: rawState.category || 'random',
-    grid: Array.isArray(rawState.grid) ? rawState.grid : [],
-    words: Array.isArray(rawState.words)
-      ? rawState.words.map((word) => ({
-          word: word.word,
-          found: word.found === true,
-          foundBy: word.foundBy ?? null,
-          foundAt: word.foundAt ?? null,
-          cells: word.found === true && Array.isArray(word.cells) ? word.cells : [],
-          points: word.found === true ? (word.points ?? null) : null,
-          directionLabel: word.found === true ? (word.directionLabel ?? null) : null,
-          revealed: word.revealed === true,
-        }))
-      : [],
-    scores: { ...scores },
-    activeSeat: Number(rawState.active_seat || 0),
-    timeEnd: rawState.time_end || null,
-    paused: rawState.paused === true,
-    message: rawState.message || null,
-    winnerSeat: rawState.winner_seat || null,
-    lastAction: rawState.last_action || null,
-    roundNumber: Number(rawState.round_number || 0),
-    players: participants.map((player) => {
-      const seat = Number(player.seat_number || 0);
-      return {
-        playerId: player.account_id,
-        accountId: player.account_id,
-        seatNumber: seat,
-        role: player.role || 'player',
-        name: publicTngNameFromRecord(player, seat ? `Seat ${seat}` : 'Player'),
-        handle: player.handle || null,
-        color: WORD_SEARCH_DISPLAY_COLORS[seat] || '#FFFFFF',
-        score: Number(scores[String(seat)] || 0),
-      };
-    }),
-  };
-}
-
-async function handleTngDisplayState(req, res) {
-  if (req.method !== 'GET') {
-    sendJson(res, 405, {
-      error: { code: 'METHOD_NOT_ALLOWED', message: 'GET required.' },
-    });
-    return;
-  }
-
-  const displayId = String(req.headers['x-tng-display-id'] || '');
-  const displayToken = String(req.headers['x-tng-display-token'] || '');
-
-  const upstream = await fetch(`${TNG_API_ORIGIN}/display/state`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      ...(displayId ? { 'X-TNG-Display-Id': displayId } : {}),
-      ...(displayToken ? { 'X-TNG-Display-Token': displayToken } : {}),
-    },
-  });
-
-  const payload = await upstream.json().catch(() => ({}));
-
-  if (!upstream.ok) {
-    sendJson(res, upstream.status, payload);
-    return;
-  }
-
-  const room = payload?.room || null;
-
-  if (!room) {
-    const viralTarget = getViralDisplayTarget(displayId);
-    const seeThatTarget = getSeeThatDisplayTarget(displayId);
-    const genericTarget = getStandaloneDisplayTarget(displayId);
-    const standaloneTarget = [
-      viralTarget ? { ...viralTarget, gameId: 'viral' } : null,
-      seeThatTarget ? { ...seeThatTarget, gameId: 'see-that' } : null,
-      genericTarget || null,
-    ]
-      .filter(Boolean)
-      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0))[0];
-
-    if (standaloneTarget) {
-      const gameId = standaloneTarget.gameId;
-      const roomCode = standaloneTarget.roomCode || '';
-      sendJson(res, 200, {
-        ...payload,
-        status: roomCode ? 'connected' : 'waiting_for_room',
-        room: {
-          id: `${gameId}-display-${displayId}`,
-          gameId,
-          roomCode,
-          status: roomCode ? 'live' : 'lobby',
-          gameState: {
-            displayOnly: true,
-          },
-        },
-      });
-      return;
-    }
-  }
-
-  if (!room || room.gameId !== 'word-search' || !isUuid(room.id)) {
-    sendJson(res, 200, payload);
-    return;
-  }
-
-  const { rows: roomRows } = await bffPool.query(`
-    select id, display_state
-    from public.game_rooms
-    where id = $1::uuid
-      and game_id = 'word-search'
-      and status::text in ('lobby', 'live', 'paused')
-    limit 1
-  `, [room.id]);
-
-  const liveRoom = roomRows[0] || null;
-  if (!liveRoom) {
-    sendJson(res, 200, payload);
-    return;
-  }
-
-  const { rows: participants } = await bffPool.query(`
-    select
-      rp.account_id,
-      rp.role::text as role,
-      rp.seat_number,
-      pp.display_name,
-      pp.handle
-    from public.room_participants rp
-    left join public.player_profiles pp
-      on pp.account_id = rp.account_id
-    where rp.room_id = $1::uuid
-      and rp.left_at is null
-      and rp.seat_number in (1, 2, 3, 4)
-    order by rp.seat_number
-  `, [room.id]);
-
-  const rawState =
-    liveRoom.display_state?.gameState ||
-    liveRoom.display_state?.game_state ||
-    {};
-
-  sendJson(res, 200, {
-    ...payload,
-    room: {
-      ...room,
-      state: projectWordSearchDisplayState(rawState, participants),
-    },
-  });
-}
-
 async function handleTngAccountRoute(req, res) {
   if (req.method !== 'GET') {
     sendJson(res, 405, {
@@ -2704,87 +1390,9 @@ async function handleTngAccountRoute(req, res) {
     return;
   }
 
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
-    sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
-    });
-    return;
-  }
-
-  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
-    method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
-  });
-
-  if (!profileResponse.ok) {
-    const payload = await profileResponse.json().catch(() => ({}));
-    sendJson(res, profileResponse.status, payload?.error
-      ? payload
-      : {
-          error: {
-            code: 'PROFILE_LOOKUP_FAILED',
-            message: 'TNG could not identify this signed-in account.',
-          },
-        });
-    return;
-  }
-
-  const payload = await profileResponse.json().catch(() => ({}));
-  const profile = payload?.profile || {};
-  let accountId =
-    profile.accountId ||
-    profile.account_id ||
-    payload.accountId ||
-    payload.account_id ||
-    null;
-
-  if (!accountId) {
-    const handle = String(
-      profile.handle ||
-      profile.normalizedHandle ||
-      profile.normalized_handle ||
-      ''
-    ).replace(/^@/, '').trim().toLowerCase();
-
-    if (handle) {
-      const { rows } = await bffPool.query(`
-        select account_id
-        from public.player_profiles
-        where normalized_handle = $1
-           or lower(handle) = $1
-        limit 1
-      `, [handle]);
-      accountId = rows[0]?.account_id || null;
-    }
-  }
-
-  if (!accountId) {
-    const email = String(
-      profile.email ||
-      payload.email ||
-      ''
-    ).trim().toLowerCase();
-
-    if (email) {
-      const { rows } = await bffPool.query(`
-        select id
-        from public.accounts
-        where lower(email) = $1
-        limit 1
-      `, [email]);
-      accountId = rows[0]?.id || null;
-    }
-  }
-
-  if (!accountId || !isUuid(accountId)) {
-    sendJson(res, 200, {
-      route: 'default',
-      activeHost: false,
-    });
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
     return;
   }
 
@@ -2795,7 +1403,6 @@ async function handleTngAccountRoute(req, res) {
       hs.id,
       hs.status::text as status,
       hs.controller_device_id,
-      hs.display_device_id,
       hs.updated_at
     from public.host_sessions hs
     join public.device_sessions ds
@@ -2808,7 +1415,7 @@ async function handleTngAccountRoute(req, res) {
       and (ds.expires_at is null or ds.expires_at > now())
     order by hs.updated_at desc
     limit 1
-  `, [accountId]);
+  `, [resolved.account.id]);
 
   const session = rows[0] || null;
   if (!session) {
@@ -2824,49 +1431,118 @@ async function handleTngAccountRoute(req, res) {
     String(session.controller_device_id) === currentDeviceId;
 
   sendJson(res, 200, {
-    route: sameController ? 'host' : 'display',
-    activeHost: true,
+    route: sameController ? 'host' : 'default',
+    activeHost: sameController,
     sameController,
-    displayPaired: Boolean(session.display_device_id),
+  });
+}
+
+async function handleTngProfile(req, res) {
+  const resolved = await resolveAuthenticatedTngAccount(req);
+  if (!resolved.ok) {
+    sendJson(res, resolved.status, resolved.payload);
+    return;
+  }
+
+  if (req.method === 'GET') {
+    const { rows } = await bffPool.query(
+      `select display_name, handle, normalized_handle, onboarding_completed_at,
+              created_at, updated_at
+       from public.player_profiles
+       where account_id = $1::uuid
+       limit 1`,
+      [resolved.account.id],
+    );
+    const row = rows[0] || null;
+    if (!row) {
+      sendJson(res, 404, {
+        error: { code: 'PROFILE_NOT_FOUND', message: 'Create your TNG profile first.' },
+      });
+      return;
+    }
+
+    sendJson(res, 200, {
+      profile: {
+        id: resolved.account.id,
+        accountId: resolved.account.id,
+        account_id: resolved.account.id,
+        email: resolved.account.email,
+        displayName: row.display_name,
+        display_name: row.display_name,
+        handle: row.handle,
+        normalizedHandle: row.normalized_handle,
+        normalized_handle: row.normalized_handle,
+        onboardingCompletedAt: row.onboarding_completed_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      },
+    });
+    return;
+  }
+
+  if (req.method === 'POST') {
+    const body = await readJsonBody(req).catch(() => ({}));
+    const displayName = String(body?.displayName || body?.display_name || '').trim().slice(0, 50);
+    const handle = String(body?.handle || '').trim().replace(/^@/, '').toLowerCase();
+
+    if (displayName.length < 2 || !/^[a-z0-9_]{3,24}$/.test(handle)) {
+      sendJson(res, 400, {
+        error: { code: 'INVALID_PROFILE', message: 'Enter a display name and a 3–24 character handle using letters, numbers, or underscores.' },
+      });
+      return;
+    }
+
+    try {
+      const { rows } = await bffPool.query(
+        `insert into public.player_profiles
+           (account_id, display_name, handle, normalized_handle)
+         values ($1::uuid, $2, $3, $4)
+         returning display_name, handle, normalized_handle,
+                   onboarding_completed_at, created_at, updated_at`,
+        [resolved.account.id, displayName, handle, handle],
+      );
+      const row = rows[0];
+      sendJson(res, 201, {
+        profile: {
+          id: resolved.account.id,
+          accountId: resolved.account.id,
+          account_id: resolved.account.id,
+          email: resolved.account.email,
+          displayName: row.display_name,
+          display_name: row.display_name,
+          handle: row.handle,
+          normalizedHandle: row.normalized_handle,
+          normalized_handle: row.normalized_handle,
+          onboardingCompletedAt: row.onboarding_completed_at,
+          createdAt: row.created_at,
+          updatedAt: row.updated_at,
+        },
+      });
+    } catch (error) {
+      if (error?.code === '23505') {
+        sendJson(res, 409, {
+          error: { code: 'HANDLE_TAKEN', message: 'That TNG handle is already in use. Choose another one.' },
+        });
+        return;
+      }
+      if (error?.code === '23503') {
+        sendJson(res, 404, {
+          error: { code: 'TNG_ACCOUNT_NOT_FOUND', message: 'Your TNG account record was not found.' },
+        });
+        return;
+      }
+      throw error;
+    }
+    return;
+  }
+
+  sendJson(res, 405, {
+    error: { code: 'METHOD_NOT_ALLOWED', message: 'GET or POST required.' },
   });
 }
 
 async function proxyTngApi(req, res) {
-  const sourceUrl = new URL(req.url || '/', 'http://localhost');
-  const targetPath = sourceUrl.pathname.replace(/^\/tng-api/, '') || '/';
-  const targetUrl = `${TNG_API_ORIGIN}${targetPath}${sourceUrl.search}`;
-
-  const headers = new Headers();
-  for (const [key, value] of Object.entries(req.headers)) {
-    if (
-      value !== undefined &&
-      !['host', 'connection', 'content-length'].includes(key.toLowerCase())
-    ) {
-      headers.set(key, Array.isArray(value) ? value.join(', ') : value);
-    }
-  }
-
-  const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
-  const body = chunks.length ? Buffer.concat(chunks) : undefined;
-
-  const response = await fetch(targetUrl, {
-    method: req.method,
-    headers,
-    body: ['GET', 'HEAD'].includes(req.method || 'GET') ? undefined : body,
-    redirect: 'manual',
-  });
-
-  const responseHeaders = {};
-  response.headers.forEach((value, key) => {
-    if (!['content-encoding', 'transfer-encoding', 'connection'].includes(key.toLowerCase())) {
-      responseHeaders[key] = value;
-    }
-  });
-
-  const responseBody = Buffer.from(await response.arrayBuffer());
-  res.writeHead(response.status, responseHeaders);
-  res.end(responseBody);
+  await handleTngApi(req, res);
 }
 
 async function readJsonBody(req) {
@@ -2886,23 +1562,16 @@ function sendJson(res, status, payload) {
 }
 
 async function verifyBffHostWithTngApi(req, controllerId) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) return { ok: false, status: 401, payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } } };
-
-  const response = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+  const response = await dispatchTngApi({
+    path: '/host/room-state',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': controllerId,
-    },
+    headers: { ...req.headers, 'x-tng-device-id': controllerId },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, payload };
 }
 
-async function loadRailwayBffHostRoom(controllerId) {
+async function loadBffHostRoom(controllerId) {
   const { rows } = await bffPool.query(`
     select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
            gr.created_at, gr.updated_at, hs.id as host_session_id
@@ -3170,20 +1839,19 @@ async function handleTngSpectator(req, res) {
     return;
   }
 
+  const guestToken = String(req.headers['x-tng-guest-token'] || '').trim();
   const auth = String(req.headers.authorization || '');
-  if (!auth) {
+  if (!guestToken && !auth) {
     sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in to spectate.' },
+      error: { code: 'GUEST_REQUIRED', message: 'Choose a player name to spectate.' },
     });
     return;
   }
 
-  const profileResponse = await fetch(`${TNG_API_ORIGIN}/profile`, {
+  const profileResponse = await dispatchTngApi({
+    path: '/profile',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-    },
+    headers: req.headers,
   });
 
   if (!profileResponse.ok) {
@@ -3301,22 +1969,19 @@ async function handleTngHostRoster(req, res) {
     return;
   }
 
+  const guestToken = String(req.headers['x-tng-guest-token'] || '').trim();
   const auth = String(req.headers.authorization || '');
-  if (!auth) {
+  if (!guestToken && !auth) {
     sendJson(res, 401, {
-      error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
+      error: { code: 'GUEST_REQUIRED', message: 'Choose a player name to continue.' },
     });
     return;
   }
 
-  // Let the authoritative TNG API verify this signed-in Host/controller pair.
-  const verified = await fetch(`${TNG_API_ORIGIN}/host/room-state`, {
+  const verified = await dispatchTngApi({
+    path: '/host/room-state',
     method: 'GET',
-    headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': controllerId,
-    },
+    headers: { ...req.headers, 'x-tng-device-id': controllerId },
   });
 
   if (!verified.ok) {
@@ -4576,30 +3241,20 @@ async function applyBffHostAction(room, body = {}, players = []) {
 
 
 async function verifyBffPlayerWithTngApi(req, deviceId, roomCode) {
-  const auth = String(req.headers.authorization || '');
-  if (!auth) {
-    return {
-      ok: false,
-      status: 401,
-      payload: { error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' } },
-    };
-  }
-
-  const response = await fetch(`${TNG_API_ORIGIN}/player/room`, {
+  const response = await dispatchTngApi({
+    path: '/player/room',
     method: 'GET',
     headers: {
-      Accept: 'application/json',
-      Authorization: auth,
-      'X-TNG-Device-Id': deviceId,
-      'X-TNG-Room-Code': roomCode,
+      ...req.headers,
+      'x-tng-device-id': deviceId,
+      'x-tng-room-code': roomCode,
     },
   });
-
   const payload = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, payload };
 }
 
-async function loadRailwayBffPlayerRoom(roomCode) {
+async function loadBffPlayerRoom(roomCode) {
   const { rows } = await bffPool.query(`
     select gr.id, gr.room_code, gr.game_id, gr.status, gr.revision, gr.display_state,
            gr.created_at, gr.updated_at
@@ -4990,250 +3645,7 @@ async function handleBffApi(req, res) {
   const path = sourceUrl.pathname.replace(/^\/bff-api/, '') || '/';
 
   if (req.method === 'GET' && path === '/health') {
-    sendJson(res, 200, { ok: true, service: 'railway-bff-api' });
-    return;
-  }
-
-  if (req.method === 'GET' && path === '/display') {
-    const roomCode = String(sourceUrl.searchParams.get('room') || '').toUpperCase();
-    if (!roomCode) {
-      sendJson(res, 400, {
-        error: { code: 'ROOM_REQUIRED', message: 'BFF display room code is required.' },
-      });
-      return;
-    }
-
-    let room = await loadRailwayBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    const internalState = extractBffGameState(room.display_state || {});
-    const players = await loadBffParticipants(room.id, internalState);
-    const gameState = sanitizeBffPlayerState(internalState, players, null);
-
-    sendJson(res, 200, {
-      room: {
-        id: room.id,
-        roomCode: room.room_code,
-        gameId: room.game_id,
-        status: room.status,
-        revision: room.revision,
-        gameState,
-        createdAt: room.created_at,
-        updatedAt: room.updated_at,
-      },
-    });
-    return;
-  }
-
-  if (req.method === 'GET' && path === '/player') {
-    const deviceId = String(req.headers['x-tng-device-id'] || '');
-    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
-
-    if (!deviceId || !roomCode) {
-      sendJson(res, 400, {
-        error: {
-          code: 'PLAYER_ROOM_REQUIRED',
-          message: 'Player device and room code are required.',
-        },
-      });
-      return;
-    }
-
-    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    let room = await loadRailwayBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-
-    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
-    internalState = assignmentResult.gameState;
-    const effectiveRoom = assignmentResult.room || room;
-    players = await loadBffParticipants(room.id, internalState);
-
-    const verifiedParticipant = verified.payload?.participant || null;
-    const participant = players.find((player) =>
-      String(player.deviceSessionId || '') === String(deviceId)
-      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
-    ) || verifiedParticipant;
-
-    if (!participant) {
-      sendJson(res, 404, {
-        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    const gameState = sanitizeBffPlayerState(internalState, players, participant);
-
-    sendJson(res, 200, {
-      room: {
-        id: effectiveRoom.id || room.id,
-        roomCode: effectiveRoom.room_code || room.room_code,
-        gameId: effectiveRoom.game_id || room.game_id,
-        status: effectiveRoom.status || room.status,
-        revision: effectiveRoom.revision || room.revision,
-        gameState,
-        createdAt: effectiveRoom.created_at || room.created_at,
-        updatedAt: effectiveRoom.updated_at || room.updated_at,
-      },
-      participant,
-    });
-    return;
-  }
-
-  if (req.method === 'POST' && path === '/player') {
-    const deviceId = String(req.headers['x-tng-device-id'] || '');
-    const roomCode = String(req.headers['x-tng-room-code'] || '').toUpperCase();
-
-    if (!deviceId || !roomCode) {
-      sendJson(res, 400, {
-        error: {
-          code: 'PLAYER_ROOM_REQUIRED',
-          message: 'Player device and room code are required.',
-        },
-      });
-      return;
-    }
-
-    const verified = await verifyBffPlayerWithTngApi(req, deviceId, roomCode);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'PLAYER_SESSION_INVALID', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    let room = await loadRailwayBffPlayerRoom(roomCode);
-    if (!room) {
-      sendJson(res, 404, {
-        error: { code: 'ROOM_NOT_FOUND', message: 'This BFF room is no longer active.' },
-      });
-      return;
-    }
-
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-    const verifiedParticipant = verified.payload?.participant || null;
-    const participant = players.find((player) =>
-      String(player.deviceSessionId || '') === String(deviceId)
-      || String(player.accountId || '') === String(verifiedParticipant?.accountId || '')
-    ) || verifiedParticipant;
-
-    if (!participant) {
-      sendJson(res, 404, {
-        error: { code: 'PLAYER_NOT_IN_ROOM', message: 'Rejoin this BFF room.' },
-      });
-      return;
-    }
-
-    const body = await readJsonBody(req).catch(() => ({}));
-
-    let nextGameState;
-    let savedRoom;
-
-    if (String(body?.action || '') === 'buzz') {
-      const claim = await claimBffBuzz(room, participant);
-      nextGameState = claim.gameState;
-      savedRoom = claim.room;
-    } else {
-      nextGameState = await applyBffPlayerAction(room, participant, body || {}, players);
-      savedRoom = await saveBffGameState(
-        room.id,
-        room.display_state || {},
-        nextGameState,
-      );
-    }
-
-    players = await loadBffParticipants(room.id, nextGameState);
-    const gameState = sanitizeBffPlayerState(nextGameState, players, participant);
-
-    sendJson(res, 200, {
-      room: {
-        id: savedRoom?.id || room.id,
-        roomCode: savedRoom?.room_code || room.room_code,
-        gameId: savedRoom?.game_id || room.game_id,
-        status: savedRoom?.status || room.status,
-        revision: savedRoom?.revision || room.revision,
-        gameState,
-        createdAt: savedRoom?.created_at || room.created_at,
-        updatedAt: savedRoom?.updated_at || room.updated_at,
-      },
-      participant,
-    });
-    return;
-  }
-
-  if (req.method === 'GET' && path === '/host') {
-    const controllerId = String(req.headers['x-tng-device-id'] || '');
-    if (!controllerId) {
-      sendJson(res, 400, { error: { code: 'CONTROLLER_REQUIRED', message: 'Host controller is missing.' } });
-      return;
-    }
-
-    const verified = await verifyBffHostWithTngApi(req, controllerId);
-    if (!verified.ok) {
-      sendJson(res, verified.status || 401, verified.payload || {
-        error: { code: 'AUTH_REQUIRED', message: 'Sign in again.' },
-      });
-      return;
-    }
-
-    let room = await loadRailwayBffHostRoom(controllerId);
-    if (!room) {
-      sendJson(res, 404, {
-        error: {
-          code: 'ROOM_NOT_FOUND',
-          message: 'No active BFF room is attached to this Host Controller.',
-        },
-      });
-      return;
-    }
-
-    room = await reconcileBffTimers(room);
-    await assignBffSeats(room.id);
-    let internalState = extractBffGameState(room.display_state || {});
-    let players = await loadBffParticipants(room.id, internalState);
-
-    const assignmentResult = await ensureBffTeamAssignments(room, internalState, players);
-    internalState = assignmentResult.gameState;
-    const effectiveRoom = assignmentResult.room || room;
-    players = await loadBffParticipants(room.id, internalState);
-
-    const gameState = sanitizeBffHostState(internalState, players);
-
-    sendJson(res, 200, {
-      room: {
-        id: effectiveRoom.id || room.id,
-        roomCode: effectiveRoom.room_code || room.room_code,
-        gameId: effectiveRoom.game_id || room.game_id,
-        status: effectiveRoom.status || room.status,
-        revision: effectiveRoom.revision || room.revision,
-        gameState,
-        players,
-        createdAt: effectiveRoom.created_at || room.created_at,
-        updatedAt: effectiveRoom.updated_at || room.updated_at,
-      },
-    });
+    sendJson(res, 200, { ok: true, service: 'tng-bff-api' });
     return;
   }
 
@@ -5252,7 +3664,7 @@ async function handleBffApi(req, res) {
       return;
     }
 
-    let room = await loadRailwayBffHostRoom(controllerId);
+    let room = await loadBffHostRoom(controllerId);
     if (!room) {
       sendJson(res, 404, {
         error: {
@@ -5429,8 +3841,11 @@ function sanitizeDominoStateForViewer(state, access = null) {
           revealAll ||
           (access?.role === 'player' && access.seat === seat);
 
+        const safePlayer = { ...player };
+        if (access?.role !== 'host') delete safePlayer.guestId;
+
         return {
-          ...player,
+          ...safePlayer,
           hand: canSeeHand
             ? hand
             : hand.map((_, index) => ({
@@ -5479,16 +3894,21 @@ async function verifyDominoHostRequest(req, row = null) {
     deviceId,
   }).catch(() => null);
 
-  if (!verified) return null;
-
-  if (
-    row?.host_account_id &&
-    String(row.host_account_id) !== String(verified.accountId)
-  ) {
-    return null;
+  if (verified?.accountId) {
+    if (
+      row?.host_account_id &&
+      String(row.host_account_id) !== String(verified.accountId)
+    ) return null;
+    return verified;
   }
 
-  return verified;
+  const guest = await resolveStandaloneGameIdentity(req).catch(() => null);
+  if (!guest?.guestId) return null;
+
+  const storedGuestId = String(row?.game_state?.players?.[0]?.guestId || '');
+  if (row && (!storedGuestId || storedGuestId !== String(guest.guestId))) return null;
+
+  return guest;
 }
 
 const DOMINO_ROOM_TTL_MS = 24 * 60 * 60 * 1000;
@@ -5651,8 +4071,9 @@ async function handleDominoApi(req, res) {
       kind: 'standalone',
       joinPath: `/games/dominoes?room=${encodeURIComponent(roomCode)}`,
       spectatePath: `/games/dominoes?display=${encodeURIComponent(roomCode)}`,
-      hostAccountId: verifiedHost.accountId,
+      hostAccountId: verifiedHost.accountId || null,
       ttlMs: DOMINO_ROOM_TTL_MS,
+      allowExisting: Boolean(data?.sharedRoom),
     });
 
     if (!registryClaimed) {
@@ -5676,7 +4097,8 @@ async function handleDominoApi(req, res) {
             seat === 0
               ? {
                   ...player,
-                  accountId: verifiedHost.accountId,
+                  accountId: verifiedHost.accountId || null,
+                  guestId: verifiedHost.guestId || null,
                   playerName: hostPublicName,
                   isHost: true,
                   isAI: false,
@@ -5701,7 +4123,7 @@ async function handleDominoApi(req, res) {
           id,
           roomCode,
           JSON.stringify(gameState),
-          verifiedHost.accountId,
+          verifiedHost.accountId || null,
           hashDominoToken(hostToken),
         ],
       );
@@ -5727,15 +4149,13 @@ async function handleDominoApi(req, res) {
   }
 
   if (req.method === 'POST' && pathname === '/domino-api/join') {
-    const identityResult = await resolveAuthenticatedTngIdentity(req);
-    if (!identityResult.ok || !identityResult.identity?.accountId) {
-      sendJson(res, identityResult.status || 401, identityResult.payload || {
-        error: { code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Dominoes.' },
+    const identity = await resolveStandaloneGameIdentity(req).catch(() => null);
+    if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+      sendJson(res, 401, {
+        error: { code: 'AUTH_REQUIRED', message: 'Choose a guest name or sign in to TNG before joining Dominoes.' },
       });
       return;
     }
-
-    const identity = identityResult.identity;
     const body = await readJsonBody(req).catch(() => null);
     const roomCode = String(body?.roomCode || '').trim().toUpperCase();
     const requestedSeat = Number(body?.seat);
@@ -5769,7 +4189,11 @@ async function handleDominoApi(req, res) {
         return;
       }
 
-      if (String(row.host_account_id || '') === String(identity.accountId)) {
+      const state = cleanDominoGameState(row.game_state, row.room_code);
+      if (
+        (identity.accountId && String(row.host_account_id || '') === String(identity.accountId)) ||
+        (identity.guestId && String(state.players?.[0]?.guestId || '') === String(identity.guestId))
+      ) {
         await client.query('rollback');
         sendJson(res, 409, {
           error: {
@@ -5779,13 +4203,14 @@ async function handleDominoApi(req, res) {
         });
         return;
       }
-
-      const state = cleanDominoGameState(row.game_state, row.room_code);
       const existingSeat = Array.isArray(state.players)
         ? state.players.findIndex((player, index) =>
             index > 0 &&
             !player?.isAI &&
-            String(player?.accountId || '') === String(identity.accountId)
+            (
+              (identity.accountId && String(player?.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(player?.guestId || '') === String(identity.guestId))
+            )
           )
         : -1;
 
@@ -5797,7 +4222,8 @@ async function handleDominoApi(req, res) {
           index === existingSeat
             ? {
                 ...player,
-                accountId: identity.accountId,
+                accountId: identity.accountId || null,
+                guestId: identity.guestId || null,
                 playerName: publicName,
                 connected: true,
               }
@@ -5809,7 +4235,8 @@ async function handleDominoApi(req, res) {
           [String(existingSeat)]: {
             hash: hashDominoToken(seatToken),
             playerId: players[existingSeat].playerId,
-            accountId: identity.accountId,
+            accountId: identity.accountId || null,
+            guestId: identity.guestId || null,
           },
         };
 
@@ -5876,7 +4303,8 @@ async function handleDominoApi(req, res) {
         index === requestedSeat
           ? {
               ...player,
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               playerId,
               playerName: publicName,
               isAI: false,
@@ -5892,7 +4320,8 @@ async function handleDominoApi(req, res) {
         [String(requestedSeat)]: {
           hash: hashDominoToken(seatToken),
           playerId,
-          accountId: identity.accountId,
+          accountId: identity.accountId || null,
+          guestId: identity.guestId || null,
         },
       };
 
@@ -6214,6 +4643,12 @@ async function handleTestFeedback(req, res) {
 }
 
 const server = http.createServer(async (req, res) => {
+  // Vercel mounts the shared Node server under /api/tng; restore the original
+  // first-party service path before dispatching HTTP and WebSocket requests.
+  if (process.env.VERCEL && typeof req.url === 'string' && req.url.startsWith('/api/tng')) {
+    req.url = req.url.slice('/api/tng'.length) || '/';
+  }
+
   const origin = String(req.headers.origin || '');
   if (isAllowedBrowserOrigin(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
@@ -6222,7 +4657,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader(
       'Access-Control-Allow-Headers',
       String(req.headers['access-control-request-headers'] ||
-        'authorization, content-type, x-tng-device-id, x-tng-display-id, x-tng-display-token, x-tng-room-code, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
+        'authorization, content-type, x-tng-device-id, x-tng-room-code, x-tng-guest-token, x-ww-token, x-st-token, x-bs-token, x-domino-token'),
     );
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
   }
@@ -6252,29 +4687,58 @@ const server = http.createServer(async (req, res) => {
       service: 'tng-live',
       database,
       uptimeSeconds: Math.round(process.uptime()),
-      commit: process.env.RAILWAY_GIT_COMMIT_SHA || null,
+      commit: process.env.VERCEL_GIT_COMMIT_SHA || process.env.GITHUB_SHA || null,
     });
     return;
   }
 
   try {
-    if ((req.url || '').startsWith('/bernaverse-sso')) {
-      await handleBernaverseSso(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/neon-auth')) {
-      await proxyNeonAuth(req, res);
+    if ((req.url || '').startsWith('/tng-guest/identity')) {
+      if (req.method !== 'POST') {
+        sendJson(res, 405, { error: { code: 'METHOD_NOT_ALLOWED', message: 'Use POST to create a guest identity.' } });
+        return;
+      }
+      const body = await readJsonBody(req).catch(() => ({}));
+      try {
+        const issued = issueGuestIdentity({
+          name: body?.name,
+          secret: process.env.TNG_GUEST_TOKEN_SECRET,
+        });
+        const tokenHash = createHash('sha256').update(issued.token).digest('hex');
+        await bffPool.query(
+          `insert into public.tng_guest_sessions
+            (guest_id, token_hash, display_name, expires_at, last_seen_at, revoked_at)
+           values ($1, $2, $3, to_timestamp($4), now(), null)
+           on conflict (guest_id) do update set
+             token_hash = excluded.token_hash,
+             display_name = excluded.display_name,
+             expires_at = excluded.expires_at,
+             last_seen_at = now(),
+             revoked_at = null`,
+          [issued.identity.sub, tokenHash, issued.identity.name, issued.identity.exp],
+        );
+        sendJson(res, 200, {
+          token: issued.token,
+          guest: {
+            id: issued.identity.sub,
+            name: issued.identity.name,
+            expiresAt: issued.identity.exp,
+          },
+        });
+      } catch (error) {
+        const status = error?.code === 'GUEST_NAME_REQUIRED' ? 400 : 503;
+        sendJson(res, status, {
+          error: {
+            code: error?.code || 'GUEST_IDENTITY_UNAVAILABLE',
+            message: status === 400 ? error.message : 'Guest play is not configured on this server yet.',
+          },
+        });
+      }
       return;
     }
 
     if ((req.url || '').startsWith('/tng-session')) {
       await handleTngSessionLifecycle(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/tng-display/state')) {
-      await handleTngDisplayState(req, res);
       return;
     }
 
@@ -6290,6 +4754,11 @@ const server = http.createServer(async (req, res) => {
 
     if ((req.url || '').startsWith('/tng-api/account-route')) {
       await handleTngAccountRoute(req, res);
+      return;
+    }
+
+    if ((req.url || '').split('?')[0] === '/tng-api/profile') {
+      await handleTngProfile(req, res);
       return;
     }
 
@@ -6311,21 +4780,6 @@ const server = http.createServer(async (req, res) => {
     if ((req.url || '').split('?')[0] === '/viral-live/health') {
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ ok: true, service: 'viral-live', ...viralLive.stats() }));
-      return;
-    }
-
-    if ((req.url || '').startsWith('/viral-display')) {
-      await handleViralDisplayTarget(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/see-that-display')) {
-      await handleSeeThatDisplayTarget(req, res);
-      return;
-    }
-
-    if ((req.url || '').startsWith('/standalone-display')) {
-      await handleStandaloneDisplayTarget(req, res);
       return;
     }
 
@@ -6352,8 +4806,13 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
+    if ((req.url || '').startsWith('/nc-api')) {
+      await handleOutApi(req, res);
+      return;
+    }
+
     if ((req.url || '').startsWith('/rr-api')) {
-      rodeoRumbleLive.handleHttp(req, res);
+      await rodeoRumbleLive.handleHttp(req, res);
       return;
     }
 
@@ -6403,16 +4862,15 @@ const server = http.createServer(async (req, res) => {
     }
 
     const apiPrefixes = [
-      '/bernaverse-sso',
-      '/neon-auth',
+      '/tng-guest',
       '/tng-',
       '/viral-',
-      '/see-that-display',
-      '/standalone-display',
       '/test-feedback',
       '/bff-api',
       '/bs-api',
+      '/nc-api',
       '/rr-api',
+      '/rr-live',
       '/st-api',
       '/ww-api',
       '/domino-api',
@@ -6468,20 +4926,10 @@ server.on('upgrade', async (request, socket, head) => {
   }
 });
 
-server.listen(port, '0.0.0.0', () => {
-  console.log(`TNG frontend listening on port ${port}`);
-
-  // Idempotent production backfill: every existing TNG account gets a
-  // BERNAverse FREE membership. Future sign-ins also call ensure_free.
-  windowlessTimeout(syncTngAccountsToBernaverseFree, 1500);
-});
-
-function windowlessTimeout(task, delayMs) {
-  setTimeout(() => {
-    Promise.resolve()
-      .then(task)
-      .catch((error) => {
-        console.error('[BERNAverse sync] TNG FREE membership pass failed', error);
-      });
-  }, delayMs);
+if (!process.env.VERCEL) {
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`TNG frontend listening on port ${port}`);
+  });
 }
+
+export default server;

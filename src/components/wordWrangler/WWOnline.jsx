@@ -3,7 +3,6 @@ import WWPlay from './WWPlay';
 import { Avatar, Confetti, Countdown, RIVALS, colorFor } from './WWShared';
 import { createGame } from '@/lib/wordWranglerEngine';
 import { wwApi, wwSeat } from '@/api/wordWranglerApi';
-import { claimStandaloneDisplay, releaseStandaloneDisplay } from '@/api/standaloneDisplay';
 import { soundManager } from '@/lib/wordWranglerSound';
 
 const DURS = [[90, '1:30'], [150, '2:30'], [240, '4:00']];
@@ -120,7 +119,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     if (!identityReady) { setError('Loading your TNG player profile…'); return; }
     setBusy(true); setError('');
     try {
-      const d = await wwApi.createRoom();
+      const d = await wwApi.createRoom(name, initialCode);
       const s = { token: d.token, playerId: d.playerId };
       wwSeat.set(d.roomCode, s);
       setSeat(s); setCode(d.roomCode); onCode && onCode(d.roomCode); apply(d);
@@ -141,29 +140,9 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
     host();
   }, [autoHost, identityReady, code, seat, data, busy]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ownsRoom = Boolean(data?.you?.isHost);
-  useEffect(() => {
-    if (!ownsRoom || !code) return undefined;
-
-    let alive = true;
-    const sync = async () => {
-      const result = await claimStandaloneDisplay('word-wrangler', code).catch(() => null);
-      if (!alive || !result?.ok) return;
-    };
-
-    sync();
-    const timer = window.setInterval(sync, 30000);
-
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-      releaseStandaloneDisplay().catch(() => {});
-    };
-  }, [ownsRoom, code]);
-
   const join = async (c) => {
     const cc = String(c || '').trim().toUpperCase();
-    if (!/^[A-Z]{5}$/.test(cc)) { setError('Room codes are 5 letters.'); return; }
+    if (!/^TN[A-Z0-9]{4}$/.test(cc)) { setError('Room codes use TN followed by 4 letters or numbers.'); return; }
     if (!identityReady) { setError('Loading your TNG player profile…'); return; }
     setBusy(true); setError('');
     try {
@@ -195,7 +174,7 @@ export default function WWOnline({ dict, code: initialCode, name, identityReady 
           <div className="ww-row" style={{ marginTop: 14 }}>
             <button type="button" className="ww-btn primary" disabled={busy || !identityReady} onClick={host}>Host a race</button>
             <span style={{ color: 'var(--ww-dim)' }}>or</span>
-            <input className="ww-input" style={{ width: 150, textTransform: 'uppercase', letterSpacing: '.2em' }} maxLength={5} placeholder="CODE" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join(joinCode)} />
+            <input className="ww-input" style={{ width: 150, textTransform: 'uppercase', letterSpacing: '.2em' }} maxLength={6} placeholder="CODE" value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && join(joinCode)} />
             <button type="button" className="ww-btn" disabled={busy || !identityReady} onClick={() => join(joinCode)}>Join</button>
           </div>
           {error && <div className="ww-err">{error}</div>}

@@ -83,11 +83,67 @@ if (!sourceHtml.includes(legacyRelay)) {
   throw new Error('VIRAL HTML relay bootstrap changed; refusing to apply an unverified TNG relay patch.');
 }
 
+// The restored vendor ZIP is immutable and hash-verified above. Patch only its
+// known relay bootstrap so Vercel preview/production and custom domains use
+// their own same-origin WebSocket endpoint instead of Railway or a fixed host.
 const tngRelayHtml = sourceHtml.replace(
   legacyRelay,
-  "return 'wss://auth.texasnomadgames.com';",
+  "return (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host;",
 );
-const deployedHtml = tngRelayHtml.replace('</body>', `${bridgeTag}</body>`);
+const roomCodePatches = [
+  [
+    "const newCode=()=>Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ'[rand(24)]).join('');",
+    "const newCode=()=> 'TN'+Array.from({length:4},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[rand(32)]).join('');",
+  ],
+  [
+    "return /^[A-Z]{4}$/.test(c)?c:'';",
+    "return /^TN[A-Z0-9]{4}$/.test(c)?c:'';",
+  ],
+  [
+    'maxlength="4" placeholder="ABCD"',
+    'maxlength="6" placeholder="TNXXXX"',
+  ],
+  [
+    "if(!/^[A-Z]{4}$/.test(c))",
+    "if(!/^TN[A-Z0-9]{4}$/.test(c))",
+  ],
+  [
+    "Codes are 4 letters.",
+    "Codes must be TN plus four characters.",
+  ],
+  [
+    "Enter the 4-letter code from the host’s screen.",
+    "Enter the TN room code from the host’s screen.",
+  ],
+];
+
+let roomCodeHtml = tngRelayHtml;
+for (const [before, after] of roomCodePatches) {
+  if (!roomCodeHtml.includes(before)) {
+    throw new Error(`VIRAL room-code source changed; expected patch target not found: ${before}`);
+  }
+  roomCodeHtml = roomCodeHtml.replace(before, after);
+}
+
+const hostModePatches = [
+  [
+    "let setupTab=ROOM_PARAM?'join':'local';",
+    "const HOST_PARAM=(()=>{try{return new URLSearchParams(location.search).get('host')==='1';}catch(e){return false;}})();\nlet setupTab=HOST_PARAM?'host':ROOM_PARAM?'join':'local';",
+  ],
+  [
+    "let code=ROOMCODE||newCode();",
+    "let code=ROOMCODE||ROOM_PARAM||newCode();",
+  ],
+];
+
+for (const [before, after] of hostModePatches) {
+  if (!roomCodeHtml.includes(before)) {
+    throw new Error(`VIRAL host-mode source changed; expected patch target not found: ${before}`);
+  }
+  roomCodeHtml = roomCodeHtml.replace(before, after);
+}
+
+const deployedHtml = roomCodeHtml.replace('</body>', `${bridgeTag}</body>`);
 
 fs.mkdirSync(outputDir, { recursive: true });
 fs.writeFileSync(outputPath, deployedHtml);

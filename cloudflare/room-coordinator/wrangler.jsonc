@@ -1,0 +1,16 @@
+{
+  "$schema": "https://developers.cloudflare.com/workers/wrangler/schema.json",
+  "name": "tng-room-coordinator",
+  "main": "index.mjs",
+  "workers_dev": true,
+  "compatibility_date": "2026-11-04",
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "RoomCoordinator" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["RoomCoordinator"] }
+  ],
+  "observability": { "enabled": true }
+}

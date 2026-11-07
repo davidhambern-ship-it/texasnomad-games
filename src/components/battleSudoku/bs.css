@@ -169,3 +169,255 @@
 @keyframes bs-toast { 0% { opacity: 0; transform: translate(-50%, -8px); } 10%, 80% { opacity: 1; transform: translate(-50%, 0); } 100% { opacity: 0; } }
 @keyframes bs-banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.5); } 15% { opacity: 1; transform: translate(-50%, -50%) scale(1.08); } 80% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -60%) scale(1); } }
 @keyframes bs-count { from { transform: scale(1.8); opacity: 0; } 40% { opacity: 1; } to { transform: scale(1); } }
+
+
+.bs-play-area { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 12px; flex: 1; min-height: 0; }
+.bs-play-area .bs-pbody { min-width: 0; }
+.bs-phone.host-mode .bs-pbody > * { max-width: 760px; }
+.bs-host-room { min-height: 0; overflow: auto; display: flex; flex-direction: column; gap: 10px; padding: 14px; background: #0a1730; border: 1px solid var(--bs-line); border-radius: 14px; color: var(--bs-text); }
+.bs-host-room h3 { margin: 0; font: 800 18px system-ui,sans-serif; }
+.bs-host-code { font: 900 30px/1 system-ui,sans-serif; letter-spacing: .18em; color: var(--bs-brass); }
+.bs-host-stat { color: var(--bs-dim); font-size: 13px; }
+.bs-host-roster { display: flex; flex-direction: column; gap: 7px; }
+.bs-host-player { display: flex; align-items: center; gap: 8px; padding: 7px 9px; border-radius: 9px; background: #10213d; font-size: 13px; }
+.bs-host-player > span:nth-child(2) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.bs-host-room > button { width: 100%; }
+@media (max-width: 900px) {
+  .bs-play-area { grid-template-columns: 1fr; }
+  .bs-host-room { order: 2; margin: 0 10px 12px; }
+  .bs-phone.host-mode .bs-pbody { overflow: auto; }
+}
+
+/* OUT!-style shared room lobby */
+.bs-room-lobby { position: fixed; inset: 0; z-index: 40; overflow: auto; padding: 14px; background: radial-gradient(ellipse at 42% 0%, #12345a 0%, #071426 58%, var(--bs-bg) 90%); }
+.bs-room-top { display: flex; align-items: center; gap: 14px; max-width: 1320px; margin: 0 auto 14px; }
+.bs-room-brand { font-size: 42px; color: var(--bs-brass); }
+.bs-room-brand b { color: #5fc8ff; font-weight: inherit; }
+.bs-room-state { margin-left: auto; color: var(--bs-dim); font-size: 13px; font-weight: 800; }
+.bs-room-columns { max-width: 1320px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(320px, .85fr); gap: 12px; align-items: stretch; }
+.bs-room-main, .bs-room-controls { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.bs-room-main { text-align: center; }
+.bs-room-kicker { color: var(--bs-brass); text-transform: uppercase; letter-spacing: .16em; font-size: 11px; font-weight: 900; }
+.bs-room-title { color: var(--bs-text); font-size: clamp(34px, 5vw, 58px); }
+.bs-room-control-title { color: var(--bs-text); font-size: 34px; }
+.bs-room-code { font-family: 'Teko', Impact, sans-serif; font-size: clamp(72px, 10vw, 126px); line-height: .9; letter-spacing: .16em; color: var(--bs-brass); text-shadow: 0 5px 0 #5a3a10; margin: 8px 0 0 .16em; }
+.bs-room-link { color: var(--bs-dim); font-size: 13px; overflow-wrap: anywhere; }
+.bs-room-roster-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--bs-line); padding: 12px 0 8px; text-align: left; }
+.bs-room-roster-head span { color: var(--bs-dim); font-size: 13px; font-weight: 800; }
+.bs-room-roster { display: grid; gap: 7px; }
+.bs-room-player { display: flex; align-items: center; gap: 9px; text-align: left; padding: 9px 11px; border-radius: 11px; background: rgba(5, 15, 30, .58); border: 1px solid var(--bs-line); min-width: 0; }
+.bs-room-player-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-weight: 800; }
+.bs-room-online { color: #ffcc91; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.bs-room-online.online { color: var(--bs-green); }
+.bs-room-empty { padding: 18px; border: 1px dashed var(--bs-line); border-radius: 12px; color: var(--bs-dim); }
+.bs-room-how { display: grid; gap: 4px; margin-top: auto; padding: 12px; border-radius: 12px; background: rgba(95, 200, 255, .07); color: var(--bs-dim); text-align: left; font-size: 13px; }
+.bs-room-how b { color: var(--bs-text); }
+.bs-room-controls { align-content: start; }
+.bs-room-setting { display: grid; gap: 6px; }
+.bs-room-setting .bs-seg { width: fit-content; max-width: 100%; }
+.bs-room-start { min-height: 54px; font-size: 19px; }
+.bs-room-note { text-align: center; }
+.bs-room-wait { display: flex; align-items: center; gap: 9px; padding: 14px; border-radius: 12px; background: rgba(62, 240, 138, .08); color: var(--bs-dim); font-size: 13px; font-weight: 800; }
+.bs-room-pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--bs-green); box-shadow: 0 0 0 0 rgba(62,240,138,.5); animation: bs-room-pulse 1.5s infinite; }
+@keyframes bs-room-pulse { 70% { box-shadow: 0 0 0 9px rgba(62,240,138,0); } 100% { box-shadow: 0 0 0 0 rgba(62,240,138,0); } }
+@media (max-width: 820px) {
+  .bs-room-lobby { padding: 10px; }
+  .bs-room-columns { grid-template-columns: 1fr; }
+  .bs-room-top { gap: 8px; }
+  .bs-room-brand { font-size: 34px; }
+  .bs-room-state { font-size: 11px; text-align: right; }
+  .bs-room-main, .bs-room-controls { padding: 14px; }
+  .bs-room-code { font-size: clamp(68px, 19vw, 100px); }
+  .bs-room-setting .bs-seg { width: 100%; }
+  .bs-room-setting .bs-seg button { flex: 1; padding: 8px 6px; }
+}
+
+
+/* Battle Sudoku: stable, board-left / controls-right captain layout.
+   The game board is never followed by its controls underneath. */
+.bs-play-area:has(> .bs-pbody:only-child) { grid-template-columns: minmax(0, 1fr); }
+.bs-pbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-auto-rows: min-content;
+  align-content: start;
+  align-items: start;
+  gap: 10px 14px;
+  width: 100%;
+  max-width: none;
+  overflow: auto;
+}
+.bs-pbody > * { max-width: none; min-width: 0; }
+.bs-pbody:has(.bs-numpad) > .bs-banner:first-child,
+.bs-pbody:has(.bs-tools) > .bs-targets,
+.bs-pbody:has(.bs-tools) > .bs-banner:nth-child(2),
+.bs-pbody:has(.bs-list) > .bs-banner:first-child {
+  grid-column: 1 / -1;
+}
+.bs-pbody:has(.bs-numpad) > div:nth-child(2),
+.bs-pbody:has(.bs-tools) > div:nth-child(3),
+.bs-pbody:has(.bs-list) > .bs-axis,
+.bs-pbody:has(.bs-list) > .bs-board {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+  align-self: start;
+}
+.bs-pbody:has(.bs-numpad) > .bs-numpad,
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey,
+.bs-pbody:has(.bs-tools) > .bs-tools,
+.bs-pbody:has(.bs-list) > .bs-list {
+  grid-column: 2;
+}
+.bs-pbody:has(.bs-numpad) > .bs-numpad { grid-row: 2; align-self: start; }
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+.bs-pbody:has(.bs-tools) > .bs-tools { grid-row: 3; align-self: start; }
+.bs-pbody:has(.bs-tools) > .bs-banner:last-child { grid-column: 1 / -1; }
+.bs-pbody:has(.bs-fleetkey) > .bs-row { grid-column: 2; grid-row: 3; }
+.bs-pbody:has(.bs-fleetkey) > .bs-banner:last-child { grid-column: 1 / -1; }
+.bs-pbody:has(.bs-fleetkey) > .bs-fleetkey { grid-column: 2; grid-row: 2; }
+.bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+.bs-phone.host-mode .bs-pbody { display: contents; }
+.bs-phone.host-mode .bs-pbody > * { max-width: none; }
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-banner:first-child,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-targets,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-banner:nth-child(2),
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-banner:first-child {
+  grid-column: 1 / -1;
+}
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > div:nth-child(2),
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > div:nth-child(3),
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-axis,
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-board {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+}
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-numpad,
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-tools,
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-list,
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-row,
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-fleetkey {
+  grid-column: 2;
+}
+.bs-phone.host-mode .bs-host-room { grid-column: 2; grid-row: 5; }
+@media (max-width: 700px) {
+  .bs-pbody { grid-template-columns: minmax(0, 1fr) minmax(190px, 42%); gap: 8px; padding: 8px; }
+  .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(220px, 42%); }
+  .bs-host-room { padding: 10px; }
+}
+
+/* Keep Sudoku digit/ship controls stacked in the sidebar, not below the grid. */
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+
+
+/* Battle Sudoku viewport layout: board is always the centered primary surface.
+   All phase controls stay in the right rail; the board is bounded by viewport height. */
+.bs-phone { width: 100vw; height: 100dvh; min-height: 0; overflow: hidden; }
+.bs-play-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 12px 12px;
+}
+.bs-pbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 290px);
+  grid-auto-rows: min-content;
+  align-content: center;
+  align-items: center;
+  justify-items: stretch;
+  gap: 10px 14px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+}
+.bs-pbody > * { min-width: 0; max-width: none; }
+.bs-pbody > .bs-banner { grid-column: 1 / -1; }
+.bs-pbody > .bs-board,
+.bs-pbody > .bs-axis,
+.bs-pbody > div:has(> .bs-board) {
+  grid-column: 1;
+  grid-row: 2 / span 5;
+  justify-self: center;
+  align-self: center;
+  width: min(100%, calc(100dvh - 160px));
+  max-width: calc(100dvh - 160px);
+  min-width: 0;
+}
+.bs-pbody > .bs-board { height: auto; }
+.bs-pbody > .bs-axis {
+  grid-template-columns: 14px minmax(0, 1fr);
+  width: min(100%, calc(100dvh - 160px));
+}
+.bs-pbody > div:has(> .bs-board) { display: grid; place-items: center; }
+.bs-pbody > .bs-fleetkey,
+.bs-pbody > .bs-row,
+.bs-pbody > .bs-numpad,
+.bs-pbody > .bs-tools,
+.bs-pbody > .bs-targets,
+.bs-pbody > .bs-list {
+  grid-column: 2;
+  width: 100%;
+  align-self: start;
+}
+.bs-pbody > .bs-numpad { grid-row: 2; }
+.bs-pbody > .bs-fleetkey { grid-row: 3; }
+.bs-pbody > .bs-row { grid-row: 2; justify-content: stretch !important; }
+.bs-pbody > .bs-row .bs-btn { flex: 1; }
+.bs-pbody > .bs-tools { grid-row: 3; }
+.bs-pbody > .bs-list { grid-row: 2 / span 4; }
+.bs-pbody > .bs-targets { grid-row: 2; }
+.bs-phone.host-mode .bs-play-area {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+.bs-phone.host-mode .bs-pbody { display: contents; }
+.bs-phone.host-mode .bs-pbody > .bs-banner { grid-column: 1 / -1; }
+.bs-phone.host-mode .bs-pbody > .bs-board,
+.bs-phone.host-mode .bs-pbody > .bs-axis,
+.bs-phone.host-mode .bs-pbody > div:has(> .bs-board) {
+  grid-column: 1;
+  grid-row: 2 / span 5;
+  justify-self: center;
+  align-self: center;
+  width: min(100%, calc(100dvh - 160px));
+  max-width: calc(100dvh - 160px);
+}
+.bs-phone.host-mode .bs-pbody > .bs-fleetkey,
+.bs-phone.host-mode .bs-pbody > .bs-row,
+.bs-phone.host-mode .bs-pbody > .bs-numpad,
+.bs-phone.host-mode .bs-pbody > .bs-tools,
+.bs-phone.host-mode .bs-pbody > .bs-targets,
+.bs-phone.host-mode .bs-pbody > .bs-list {
+  grid-column: 2;
+  width: 100%;
+  align-self: start;
+}
+.bs-phone.host-mode .bs-pbody > .bs-numpad { grid-row: 2; }
+.bs-phone.host-mode .bs-pbody > .bs-fleetkey { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody > .bs-row { grid-row: 2; }
+.bs-phone.host-mode .bs-pbody > .bs-tools { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody > .bs-list { grid-row: 2 / span 4; }
+.bs-phone.host-mode .bs-host-room { grid-column: 2; grid-row: 5; }
+@media (max-width: 760px) {
+  .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(190px, 38%); gap: 8px; padding: 0 6px 6px; }
+  .bs-pbody { grid-template-columns: minmax(0, 1fr) minmax(180px, 38%); gap: 8px; padding: 4px; }
+  .bs-pbody > .bs-board,
+  .bs-pbody > .bs-axis,
+  .bs-pbody > div:has(> .bs-board),
+  .bs-phone.host-mode .bs-pbody > .bs-board,
+  .bs-phone.host-mode .bs-pbody > .bs-axis,
+  .bs-phone.host-mode .bs-pbody > div:has(> .bs-board) {
+    width: min(100%, calc(100dvh - 140px));
+    max-width: calc(100dvh - 140px);
+  }
+  .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(190px, 38%); }
+  .bs-host-room { padding: 8px; }
+}

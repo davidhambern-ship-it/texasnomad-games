@@ -77,7 +77,7 @@ export default function BSBigScreen({ data, isHost, act, offset = 0, onExit, joi
               <div className="bs-row"><span className="bs-label" style={{ width: 120 }}>Volleys</span><div className="bs-seg">{VOLLEYS.map(n => <button key={n} type="button" aria-pressed={S.volleys === n} onClick={() => act('settings', { volleys: n })}>{n}</button>)}</div></div>
               <div className="bs-row"><button type="button" className="bs-btn" disabled={room.roster.length >= 8} onClick={() => act('addCpu')}>+ Add CPU captain</button><span className="bs-sub" style={{ margin: 0 }}>2–8 captains</span></div>
               <button type="button" className="bs-btn primary" style={{ padding: 16, fontSize: 20 }} disabled={room.roster.length < 2} onClick={() => { sfx.unlock(); act('start'); }}>{room.roster.length < 2 ? 'Need 2+ captains' : 'Start the battle'}</button>
-              <div className="bs-row"><button type="button" className="bs-btn ghost small" onClick={onExit}>← Exit</button><span className="bs-sub" style={{ margin: 0 }}>Put this screen on the TV.</span></div>
+              <div className="bs-row"><button type="button" className="bs-btn ghost small" onClick={onExit}>← Exit</button><span className="bs-sub" style={{ margin: 0 }}>Manage your live room here.</span></div>
             </div>
           ) : <div className="bs-card"><p className="bs-sub">Waiting for the host to start the battle…</p></div>}
         </div>
@@ -134,15 +134,31 @@ export default function BSBigScreen({ data, isHost, act, offset = 0, onExit, joi
           })}
         </div>
         <div className="bs-side">
+          {isHost && (
+            <div className="bs-panel bs-host-controls">
+              <h4>Game room · Host controls</h4>
+              <div className="bs-list">
+                <div><b>Room code:</b> <span style={{ color: "var(--bs-brass)", letterSpacing: ".12em" }}>{room.code}</span></div>
+                <div><b>Players:</b> {players.length} / 8</div>
+                <div><b>Phase:</b> {PH[g.phase]}</div>
+                <div><b>Round:</b> {g.volley || 0} / {g.settings.volleys}</div>
+              </div>
+              <div className="bs-lb" style={{ marginTop: 10 }}>
+                {players.map((p) => <div key={p.id} className="bs-lbrow"><span className="bs-dot" style={{ background: p.color }} /><span>{p.name}{p.cpu ? " · CPU" : ""}</span><span className="pts">{p.score}</span></div>)}
+              </div>
+              {g.phase !== "final" && <button type="button" className="bs-btn ghost small" style={{ width: "100%", marginTop: 10 }} onClick={() => { if (window.confirm("End this battle and return to the lobby?")) act("lobby"); }}>End battle · Return to lobby</button>}
+              {g.phase === "final" && <div className="bs-row" style={{ marginTop: 10 }}><button type="button" className="bs-btn primary" onClick={() => act("start")}>New battle</button><button type="button" className="bs-btn" onClick={() => act("lobby")}>Back to lobby</button></div>}
+              <button type="button" className="bs-btn ghost small" style={{ width: "100%", marginTop: 8 }} onClick={onExit}>Exit room</button>
+            </div>
+          )}
           <div className="bs-panel">
             <h4>Battle log</h4>
-            <div className="bs-feed">{g.feed.slice().reverse().map((f, i) => <div key={`${f.t}-${i}`} className={f.kind}>{f.text}</div>)}</div>
+            <div className="bs-feed">{g.feed.slice().reverse().map((f, i) => <div key={String(f.t) + "-" + i} className={f.kind}>{f.text}</div>)}</div>
           </div>
-          <div className="bs-panel">
+          {!isHost && <div className="bs-panel">
             <h4>Leaderboard</h4>
-            <div className="bs-lb">{ranked.map((p, i) => <div key={p.id} className="bs-lbrow"><span>{i + 1}</span><span style={{ display: 'flex', gap: 8, alignItems: 'center' }}><span className="bs-dot" style={{ background: p.color }} />{p.name}{p.ghost ? ' 👻' : ''}</span><span className="pts">{p.score}</span></div>)}</div>
-          </div>
-          {isHost && g.phase !== 'final' && <button type="button" className="bs-btn ghost small" onClick={() => { if (window.confirm('End this battle?')) act('lobby'); }}>End battle</button>}
+            <div className="bs-lb">{ranked.map((p, i) => <div key={p.id} className="bs-lbrow"><span>{i + 1}</span><span style={{ display: "flex", gap: 8, alignItems: "center" }}><span className="bs-dot" style={{ background: p.color }} />{p.name}{p.ghost ? " 👻" : ""}</span><span className="pts">{p.score}</span></div>)}</div>
+          </div>}
         </div>
       </div>
       {banner && <div key={banner.k} className="bs-bigbanner" style={{ '--c': banner.c }}>{banner.text}</div>}

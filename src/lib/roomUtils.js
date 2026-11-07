@@ -9,7 +9,7 @@ const GAME_PATHS = {
 export function generateRoomCode(prefix = 'TN') {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code = prefix;
-  for (let i = 0; i < 3; i++) code += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < 4; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
 }
 

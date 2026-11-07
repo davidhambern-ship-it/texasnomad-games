@@ -2,12 +2,13 @@ import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import React, { Suspense, lazy, useEffect, useState } from 'react';
-import { BrowserRouter as Router, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Navigate, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import { getTngProfile } from '@/lib/tngProfile';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { isNeonStaging } from '@/lib/neonAuth';
 
 const Home = lazy(() => import('@/pages/Home'));
@@ -18,7 +19,7 @@ const HangmanGame = lazy(() => import('@/pages/HangmanGame'));
 const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
-const HostPanel = lazy(() => import('@/pages/HostPanel'));
+const SharedRoomPage = lazy(() => import('@/pages/SharedRoomPage'));
 const Games = lazy(() => import('@/pages/Games'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -28,15 +29,9 @@ const SudokuGame = lazy(() => import('@/pages/SudokuGame'));
 const RodeoRumbleGame = lazy(() => import('@/pages/RodeoRumbleGame'));
 const SeeThatGame = lazy(() => import('@/pages/SeeThatGame'));
 const WordWranglerGame = lazy(() => import('@/pages/WordWranglerGame'));
-const DominoHost = lazy(() => import('@/pages/DominoHost'));
 const DominoGame = lazy(() => import('@/pages/DominoGame'));
+const OutGame = lazy(() => import('@/pages/OutGame'));
 const NeonPlayerProfile = lazy(() => import('@/pages/NeonPlayerProfile'));
-const Register = lazy(() => import('@/pages/Register'));
-const Login = lazy(() => import('@/pages/Login'));
-const ForgotPassword = lazy(() => import('@/pages/ForgotPassword'));
-const ResetPassword = lazy(() => import('@/pages/ResetPassword'));
-const TngOnboarding = lazy(() => import('@/pages/TngOnboarding'));
-const GameDisplay = lazy(() => import('@/pages/GameDisplay'));
 
 function RouteFallback() {
   return (
@@ -47,13 +42,26 @@ function RouteFallback() {
 }
 
 function HomeGate() {
-  let welcomeComplete = false;
-  try {
-    welcomeComplete = sessionStorage.getItem('tng_welcome_complete') === '1';
-  } catch {}
-
-  if (!welcomeComplete) return <Navigate to="/welcome" replace />;
+  // The public home page must never require a welcome flag or player session.
   return <Home />;
+}
+
+function RoomRoute() {
+  const [params] = useSearchParams();
+  const gameId = String(params.get('game') || '').trim().toLowerCase();
+  const roomGames = new Set([
+    'bff', 'square-biz', 'hangman', 'spades', 'word-search',
+    'out', 'viral', 'dominoes', 'see-that', 'word-wrangler',
+    'sudoku', 'rodeo-rumble',
+  ]);
+
+  // OUT! has its own persistent Nomad Cards room service. Route its host
+  // entry to that service instead of the core registry, which cannot resolve
+  // OUT! room codes and otherwise reports "Room Not Found".
+  if (gameId === 'out') return <Navigate to="/games/out?host=1" replace />;
+
+  // All core games use the shared host room experience.
+  return roomGames.has(gameId) ? <SharedRoomPage /> : <Navigate to="/games" replace />;
 }
 
 const AuthenticatedApp = () => {
@@ -127,20 +135,61 @@ const AuthenticatedApp = () => {
   const onboardingExemptPaths = new Set([
     '/login',
     '/register',
+    '/welcome',
     '/onboarding',
     '/forgot-password',
     '/reset-password',
   ]);
 
   const publicUnauthenticatedPaths = new Set([
+    '/',
+    '/welcome',
     '/login',
     '/register',
     '/forgot-password',
     '/reset-password',
-    '/display',
   ]);
 
-  if (!isAuthenticated && !publicUnauthenticatedPaths.has(location.pathname)) {
+  let hasGuestIdentity = false;
+  try {
+    hasGuestIdentity = Boolean(getStoredGuestIdentity());
+  } catch {}
+
+  const guestHostGameIds = new Set([
+    'bff',
+    'square-biz',
+    'hangman',
+    'spades',
+    'word-search',
+    'out',
+    'dominoes',
+    'viral',
+    'see-that',
+    'word-wrangler',
+    'sudoku',
+    'rodeo-rumble',
+  ]);
+  const requestedHostGameId = new URLSearchParams(location.search).get('game');
+  const isGuestHostRoute =
+    (location.pathname === '/room' || location.pathname === '/host') &&
+    guestHostGameIds.has(String(requestedHostGameId || '').trim().toLowerCase());
+
+  const isGuestEntryRoute =
+    location.pathname === '/games' ||
+    location.pathname.startsWith('/games/') ||
+    location.pathname.startsWith('/join/') ||
+    isGuestHostRoute ||
+    (hasGuestIdentity && (
+      location.pathname === '/' ||
+      location.pathname === '/games' ||
+      location.pathname.startsWith('/games/')
+    ));
+
+  if (
+    !isAuthenticated &&
+    !publicUnauthenticatedPaths.has(location.pathname) &&
+    !isGuestEntryRoute
+  ) {
     return <Navigate to="/login" replace />;
   }
 
@@ -181,13 +230,11 @@ const AuthenticatedApp = () => {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/welcome" element={<Welcome />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/onboarding" element={<TngOnboarding />} />
-      <Route path="/display" element={<GameDisplay />} />
-      <Route path="/spectate/:roomCode" element={<GameDisplay spectator />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
+      <Route path="/register" element={<Navigate to="/welcome" replace />} />
+      <Route path="/login" element={<Navigate to="/welcome" replace />} />
+      <Route path="/onboarding" element={<Navigate to="/welcome" replace />} />
+      <Route path="/forgot-password" element={<Navigate to="/welcome" replace />} />
+      <Route path="/reset-password" element={<Navigate to="/welcome" replace />} />
       <Route path="/" element={<HomeGate />} />
       <Route path="/games" element={<Games />} />
       <Route path="/games/bff" element={<BFFGame />} />
@@ -204,10 +251,11 @@ const AuthenticatedApp = () => {
       <Route path="/games/rodeo-rumble" element={<RodeoRumbleGame />} />
       <Route path="/games/see-that" element={<SeeThatGame />} />
       <Route path="/games/word-wrangler" element={<WordWranglerGame />} />
-      <Route path="/games/dominoes/host" element={<DominoHost />} />
       <Route path="/games/dominoes" element={<DominoGame />} />
+      <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
-      <Route path="/host" element={<HostPanel />} />
+      <Route path="/room" element={<RoomRoute />} />
+      <Route path="/host" element={<Navigate to="/games" replace />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </Suspense>

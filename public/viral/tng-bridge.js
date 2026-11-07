@@ -1,15 +1,13 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
-  const requestedJoin = String(params.get('join') || '').trim().toUpperCase();
-  const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   const requestedHost = params.get('host') === '1';
+  const requestedJoin = requestedHost ? '' : String(params.get('room') || params.get('join') || '').trim().toUpperCase();
+  const requestedDisplay = String(params.get('display') || '').trim().toUpperCase();
   let hostModeActive = requestedHost;
   let viralPeerCount = 0;
   let viralDisplayAttached = false;
 
-  const RELAY_ORIGIN = window.location.hostname.endsWith('.up.railway.app')
-    ? window.location.origin
-    : 'https://auth.texasnomadgames.com';
+  const RELAY_ORIGIN = window.location.origin;
 
   const API_BASE = RELAY_ORIGIN === window.location.origin ? '' : RELAY_ORIGIN;
   const WS_BASE = RELAY_ORIGIN.replace(/^http/i, 'ws');
@@ -19,7 +17,7 @@
 
     function createRoomConnection(roomName) {
       const normalized = String(roomName || '').trim().toLowerCase();
-      if (!/^viral-[a-z]{4}$/.test(normalized)) {
+      if (!/^viral-tn[a-z0-9]{4}$/.test(normalized)) {
         return Promise.reject(new Error('Invalid VIRAL room name.'));
       }
 
@@ -262,33 +260,40 @@
 
                   if (payload.role !== 'host') {
                     if (typeof payload.seat === 'string' && payload.seat) {
-                      const token = await getHostAuthToken().catch(() => '');
+                      let guestToken = '';
+                      try {
+                        guestToken = String(
+                          window.localStorage.getItem('tng_guest_token') || '',
+                        ).trim();
+                      } catch {}
+
+                      const token = guestToken || await getHostAuthToken().catch(() => '');
                       if (!token) {
-                        throw new Error('Sign in to TNG before taking a VIRAL seat.');
+                        throw new Error('Choose a player name to join as a guest, or sign in to TNG.');
                       }
-                      payload._tngPlayerAuth = { token };
+                      payload._tngPlayerAuth = { token, guest: Boolean(guestToken) };
                     }
                     return originalPresence(payload);
                   }
 
                   window.TNG_VIRAL_HOST_AUTH = 'verifying';
 
-                  const token = await getHostAuthToken().catch(() => '');
+                  let guestToken = '';
                   let deviceId = '';
                   try {
-                    deviceId = String(
-                      window.localStorage.getItem('tng_device_id') || '',
-                    ).trim();
+                    guestToken = String(window.localStorage.getItem('tng_guest_token') || '').trim();
+                    deviceId = String(window.localStorage.getItem('tng_device_id') || '').trim();
                   } catch {}
+                  const token = guestToken || await getHostAuthToken().catch(() => '');
 
-                  if (!token || !deviceId) {
+                  if (!token || (!guestToken && !deviceId)) {
                     window.TNG_VIRAL_HOST_AUTH = 'denied';
                     throw new Error(
-                      'VIRAL Host mode requires an active TNG Host Controller.',
+                      'Choose a guest player name or connect your TNG Host Controller.',
                     );
                   }
 
-                  payload._tngHostAuth = { token, deviceId };
+                  payload._tngHostAuth = { token, deviceId, guest: Boolean(guestToken) };
 
                   return new Promise((resolve, reject) => {
                     let settled = false;
@@ -398,7 +403,7 @@
   }
 
   function autoDisplayJoin() {
-    if (!/^[A-Z]{4}$/.test(requestedDisplay)) return;
+    if (!/^TN[A-Z0-9]{4}$/.test(requestedDisplay)) return;
 
     let attempts = 0;
     let submitted = false;
@@ -441,7 +446,7 @@
   }
 
   function autoJoin() {
-    if (!/^[A-Z]{4}$/.test(requestedJoin)) return;
+    if (!/^TN[A-Z0-9]{4}$/.test(requestedJoin)) return;
 
     let attempts = 0;
     const timer = window.setInterval(() => {
@@ -468,12 +473,12 @@
   }
 
   function currentRoomCode() {
-    const fromJoin = String(params.get('join') || '').trim().toUpperCase();
-    if (/^[A-Z]{4}$/.test(fromJoin)) return fromJoin;
-    if (/^[A-Z]{4}$/.test(requestedDisplay)) return requestedDisplay;
+    const fromJoin = String(params.get('room') || params.get('join') || '').trim().toUpperCase();
+    if (/^TN[A-Z0-9]{4}$/.test(fromJoin)) return fromJoin;
+    if (/^TN[A-Z0-9]{4}$/.test(requestedDisplay)) return requestedDisplay;
 
     const tag = String(document.getElementById('roomTag')?.textContent || '');
-    const match = tag.match(/ROOM\s+([A-Z]{4})/i);
+    const match = tag.match(/ROOM\s+(TN[A-Z0-9]{4})/i);
     return match ? match[1].toUpperCase() : '';
   }
 
@@ -540,26 +545,13 @@
   }
 
   function startHostDisplaySync() {
-    // A VIRAL display iframe uses ?display=ROOM and a player uses ?join=ROOM.
-    // Neither should run host verification/claim heartbeats.
-    if (requestedDisplay || requestedJoin || displaySyncTimer) return;
-
-    const hostTab = document.getElementById('tHost');
-    hostTab?.addEventListener('click', () => {
-      hostModeActive = true;
-      syncHostDisplay();
-    });
-
-    syncHostDisplay();
-    displaySyncTimer = window.setInterval(() => {
-      syncHostDisplay();
-    }, 4000);
+    // Separate Game Display pairing has been retired.
   }
 
   function mountSessionBar() {
     if (requestedDisplay || document.getElementById('tng-viral-session-root')) return;
 
-    const playerMode = /^[A-Z]{4}$/.test(requestedJoin);
+    const playerMode = /^TN[A-Z0-9]{4}$/.test(requestedJoin);
     const hostMode = !playerMode && detectHostMode();
     if (!playerMode && !hostMode) return;
 

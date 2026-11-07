@@ -8,12 +8,11 @@ import { STDisplay, STHost, STPlayer } from '@/components/seeThat/STOnline';
 import { sfx } from '@/components/seeThat/stSfx';
 import { loadScene, loadSceneList } from '@/api/seeThatApi';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/seeThat/st.css';
 
 // /games/see-that              menu
 // /games/see-that?room=CODE    join on a phone
-// /games/see-that?host=1      host directly from the TNG Host Panel
-// /games/see-that?display=CODE read-only big screen (TNG Game Display / second TV)
 // /games/see-that?editor=1     scene editor
 export default function SeeThatGame() {
   const [params, setParams] = useSearchParams();
@@ -35,7 +34,7 @@ export default function SeeThatGame() {
   const toMenu = () => { setScreen('menu'); setPractice(null); setParams({}, { replace: true }); };
   const leaveHost = () => {
     if (directHost) {
-      window.location.replace('/host');
+      window.location.replace(getStoredGuestIdentity() ? '/games' : '/host');
       return;
     }
     toMenu();
@@ -45,7 +44,7 @@ export default function SeeThatGame() {
 
   let body;
   if (screen === 'host') body = <STHost scenes={scenes} onExit={leaveHost} />;
-  else if (screen === 'join' && /^[A-Z]{5}$/.test(room)) body = <STPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
+  else if (screen === 'join' && /^TN[A-Z0-9]{4}$/.test(room)) body = <STPlayer code={room} name={name} identityReady={!identity.loading && Boolean(name)} onExit={toMenu} />;
   else if (screen === 'editor') body = <STEditor onExit={toMenu} />;
   else if (screen === 'practice' && practice) body = <STPractice key={practice.k} scene={practice.scene} imageUrl={practice.scene.__img} count={10} seconds={120} name={name || 'You'} onExit={toMenu} />;
   else if (screen === 'pickscene') {
@@ -65,7 +64,7 @@ export default function SeeThatGame() {
   } else {
     const join = () => {
       const c = code.trim().toUpperCase();
-      if (!/^[A-Z]{5}$/.test(c)) { setErr('Game codes are 5 letters.'); return; }
+      if (!/^TN[A-Z0-9]{4}$/.test(c)) { setErr('Room codes use TN followed by 4 letters or numbers.'); return; }
       setParams({ room: c }, { replace: true }); setScreen('join');
     };
     body = (
@@ -78,7 +77,7 @@ export default function SeeThatGame() {
           <div className="st-card">
             <div className="st-label-sm" style={{ marginBottom: 8 }}>Joining a game? Enter the code from the big screen</div>
             <div className="st-row">
-              <input className="st-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={5} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
+              <input className="st-input" style={{ flex: '1 1 160px', textTransform: 'uppercase', letterSpacing: '.25em', fontSize: 22 }} maxLength={6} placeholder="CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))} onKeyDown={e => e.key === 'Enter' && join()} />
               <button type="button" className="st-btn primary" style={{ padding: '12px 22px', fontSize: 18 }} onClick={join}>Join</button>
             </div>
             {err && <div className="st-err">{err}</div>}
@@ -91,8 +90,8 @@ export default function SeeThatGame() {
             {identity.error && <div className="st-err">{identity.error}</div>}
           </div>
           <div className="st-modes">
-            <button type="button" className="st-mode" onClick={() => { sfx.unlock(); setScreen('host'); }}>
-              <div className="st-h">Host a game</div>
+            <button type="button" className="st-mode" onClick={() => { sfx.unlock(); window.location.assign('/room?game=see-that'); }}>
+              <div className="st-h">Create Room</div>
               <p>Open this on the TV or a laptop. You pick the scene, players join with the code, and the hunt plays out on the big screen.</p>
             </button>
             <button type="button" className="st-mode" onClick={() => setScreen('pickscene')}>

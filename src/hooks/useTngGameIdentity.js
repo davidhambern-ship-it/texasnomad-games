@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getPublicTngName } from '@/lib/publicTngName';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 let cachedIdentity = null;
 let cachedIdentityUserId = '';
@@ -73,13 +74,27 @@ export function useTngGameIdentity() {
     if (isLoadingAuth) return () => { alive = false; };
 
     if (!isAuthenticated) {
-      setState({
-        loading: false,
-        error: 'Sign in to TNG to play online.',
-        profile: null,
-        publicName: '',
-        handle: '',
-      });
+      const guest = getStoredGuestIdentity();
+      if (guest) {
+        const identity = {
+          profile: { isGuest: true },
+          publicName: guest.name,
+          handle: '',
+        };
+        setState({
+          loading: false,
+          error: '',
+          ...identity,
+        });
+      } else {
+        setState({
+          loading: false,
+          error: 'Choose a player name to continue as a guest.',
+          profile: null,
+          publicName: '',
+          handle: '',
+        });
+      }
       return () => { alive = false; };
     }
 

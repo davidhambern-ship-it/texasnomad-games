@@ -1,5 +1,6 @@
 // Rodeo Rumble — client side of the /rr-live party relay.
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl, tngWebSocketUrl } from '@/lib/tngServiceOrigin';
 
 const WS_URL = () => (import.meta.env && import.meta.env.VITE_RR_LIVE_URL) || tngWebSocketUrl('/rr-live');
@@ -24,7 +25,7 @@ export function rrConnect({ hello, onMessage, onStatus }) {
       retry = 0;
       onStatus?.('open');
       try {
-        const authToken = await getNeonAuthToken().catch(() => '');
+        const authToken = await getNeonAuthToken().catch(() => '') || getStoredGuestIdentity()?.token || '';
         const first = await hello?.({ authToken });
         if (first && ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(first));
       } catch {
@@ -63,7 +64,7 @@ export function rrConnect({ hello, onMessage, onStatus }) {
 
 export async function resolveRodeoRumbleRoom(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{5}$/.test(c)) return null;
+  if (!/^TN[A-Z0-9]{4}$/.test(c)) return null;
   try {
     const response = await fetch(tngServiceUrl(`/rr-api/resolve?code=${encodeURIComponent(c)}`), {
       headers: { Accept: 'application/json' },

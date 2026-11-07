@@ -3,11 +3,11 @@ import React, { useEffect } from 'react';
 export default function ViralGame() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const joinCode = String(params.get('join') || '').trim().toUpperCase();
+    const joinCode = String(params.get('room') || params.get('join') || '').trim().toUpperCase();
     const launch = new URLSearchParams();
 
-    if (/^[A-Z]{4}$/.test(joinCode)) {
-      launch.set('join', joinCode);
+    if (/^TN[A-Z0-9]{4}$/.test(joinCode)) {
+      launch.set('room', joinCode);
     } else if (params.get('host') === '1') {
       launch.set('host', '1');
     }

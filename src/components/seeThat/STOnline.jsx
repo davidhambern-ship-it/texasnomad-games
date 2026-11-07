@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import STBigScreen from './STBigScreen';
 import STPhone from './STPhone';
-import { claimSeeThatDisplay, releaseSeeThatDisplay, stApi, stSeat } from '@/api/seeThatApi';
+import { stApi, stSeat } from '@/api/seeThatApi';
 import { sfx } from './stSfx';
 
 // Poll a room. Faster while a round is live.
@@ -33,8 +33,8 @@ const TNG_PUBLIC_ORIGIN = String(
 const joinUrlFor = () => `${TNG_PUBLIC_ORIGIN}/games/see-that`;
 
 /** The big screen. Creates a room (or resumes one) and shows lobby → rounds → podium. */
-export function STHost({ scenes, onExit }) {
-  const [seat, setSeat] = useState(() => { try { return JSON.parse(localStorage.getItem('st_host') || 'null'); } catch { return null; } });
+export function STHost({ scenes, onExit, initialCode = '', freshRoom = false }) {
+  const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('st_host') || 'null'); return freshRoom || (initialCode && saved?.code !== initialCode) ? null : saved; } catch { return null; } });
   const [creating, setCreating] = useState(false);
   const [err, setErr] = useState('');
   const { data, offset, error, apply } = useRoom(seat?.code, seat?.token, () => { try { localStorage.removeItem('st_host'); } catch { /* ignore */ } setSeat(null); });
@@ -42,7 +42,7 @@ export function STHost({ scenes, onExit }) {
   const create = useCallback(async () => {
     setCreating(true); setErr('');
     try {
-      const d = await stApi.createRoom();
+      const d = await stApi.createRoom(initialCode);
       const s = { code: d.roomCode, token: d.token };
       try { localStorage.setItem('st_host', JSON.stringify(s)); } catch { /* ignore */ }
       setSeat(s); apply(d);
@@ -50,32 +50,11 @@ export function STHost({ scenes, onExit }) {
   }, [apply]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Keep the already-paired TNG Game Display attached to this See That room.
-  // This runs only in STHost; player and read-only display clients never claim ownership.
-  useEffect(() => {
-    if (!seat?.code) return undefined;
-
-    let alive = true;
-    const sync = async () => {
-      const result = await claimSeeThatDisplay(seat.code).catch(() => null);
-      if (!alive || !result) return;
-    };
-
-    sync();
-    const timer = window.setInterval(sync, 10000);
-
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-    };
-  }, [seat?.code]);
-
   const act = useCallback(async (action, payload = {}) => {
     try { const d = await stApi.action(seat.code, seat.token, action, payload); apply(d); return d; }
     catch (e) { setErr(e.message); return null; }
   }, [seat, apply]);
   const exit = async () => {
-    await releaseSeeThatDisplay().catch(() => null);
     try { localStorage.removeItem('st_host'); } catch { /* ignore */ }
     onExit();
   };

@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "installCommand": "npm install",
+  "installCommand": "npm ci --legacy-peer-deps",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "headers": [
@@ -176,6 +176,10 @@
     {
       "source": "/viral/",
       "destination": "/viral/index.html"
+    },
+    {
+      "source": "/(healthz|tng-guest|neon-auth|tng-session|tng-display|tng-spectator|tng-host-stage|tng-api|tng-stats|tng-rooms|nc-api|viral-live|viral-display|see-that-display|standalone-display|test-feedback|bff-api|bs-api|rr-api|rr-live|st-api|ww-api|domino-api|host-live)(.*)",
+      "destination": "https://ngzrthwhjwtayhhwintc.supabase.co/functions/v1/tng-edge-api/$1$2"
     },
     {
       "source": "/(.*)",
