@@ -13,6 +13,7 @@ import SharedRoomLobby from '@/components/rooms/SharedRoomLobby';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getNeonSession } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -49,6 +50,8 @@ export default function SharedRoomPage() {
   const [roomPeople, setRoomPeople] = useState([]);
   const [rosterError, setRosterError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [hostName, setHostName] = useState(() => getStoredGuestIdentity()?.name || '');
+  const [pendingGame, setPendingGame] = useState(null);
   const [recoveryRoute, setRecoveryRoute] = useState(null);
   const [hostViewport, setHostViewport] = useState(detectHostViewport);
   const authRecoveryStartedRef = useRef(false);
@@ -392,12 +395,18 @@ export default function SharedRoomPage() {
   }
 
   async function createRoom(game) {
+    setPendingGame(game);
+    setError('');
+  }
+
+  async function confirmCreateRoom() {
+    if (!pendingGame || !controllerId || hostName.trim().length < 2 || busy) return;
     setBusy(true);
     setError('');
-
     try {
-      const { room } = await tngApi.host.createRoom(controllerId, game.id);
-      setSelectedGame(game);
+      const { room } = await tngApi.host.createRoom(controllerId, pendingGame.id, hostName.trim());
+      setSelectedGame(pendingGame);
+      setPendingGame(null);
       setActiveRoom(room);
       setRoomState(null);
       setPhase('room');
@@ -635,10 +644,20 @@ export default function SharedRoomPage() {
         )}
 
         {phase === 'ready' && (
-          <div className="flex min-h-[65vh] items-center justify-center text-center">
-            <div>
-              <Loader2 className="mx-auto mb-4 h-9 w-9 animate-spin text-[#BC13FE]" />
-              <p className="text-sm text-white/60">Opening your game room…</p>
+          <div className="flex min-h-[65vh] items-center justify-center px-4">
+            <div className="w-full max-w-lg rounded-2xl border border-[#BC13FE]/35 bg-black/70 p-6 text-left">
+              <div className="text-[8px] uppercase tracking-[0.2em] text-[#BC13FE]" style={PS2}>PLAYER IDENTITY</div>
+              <h2 className="mt-3 text-2xl font-black text-white">What name should players see?</h2>
+              <p className="mt-2 text-sm text-white/50">This name appears beside you in the room roster. No account or sign-in is required.</p>
+              <label className="mt-5 block text-xs font-semibold uppercase tracking-widest text-white/60">
+                Host display name
+                <input value={hostName} onChange={(event) => setHostName(event.target.value)} maxLength={32} autoComplete="nickname" placeholder="Enter your player name" className="mt-2 w-full rounded-xl border border-white/15 bg-black/50 px-4 py-3 text-base text-white outline-none focus:border-[#BC13FE]" />
+              </label>
+              {pendingGame && <p className="mt-3 text-xs text-white/45">Creating a room for {pendingGame.title}.</p>}
+              {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+              <button type="button" onClick={confirmCreateRoom} disabled={!pendingGame || hostName.trim().length < 2 || busy} className="mt-5 w-full rounded-xl border border-[#BC13FE]/60 bg-[#BC13FE]/20 px-5 py-3 text-sm font-bold tracking-widest text-white disabled:opacity-40">
+                {busy ? 'CREATING ROOM…' : 'CREATE ROOM'}
+              </button>
             </div>
           </div>
         )}
