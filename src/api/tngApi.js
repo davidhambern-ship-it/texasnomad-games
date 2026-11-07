@@ -433,7 +433,7 @@ export const tngApi = {
       method:'POST',
       deviceId,
       roomCode,
-      body:{ roomCode },
+      body:{ roomCode, displayName },
     }),
     getRoom: (deviceId, roomCode) => request('/api/player/room', {
       deviceId,
