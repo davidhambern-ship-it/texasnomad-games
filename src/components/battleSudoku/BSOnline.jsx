@@ -12,14 +12,48 @@ function useRoom(code, token, onGone) {
   const [error, setError] = useState('');
   const tokenRef = useRef(token); tokenRef.current = token;
   const liveRef = useRef(false); liveRef.current = !!data?.room?.game && data.room.game.phase !== 'final';
-  const apply = useCallback((d) => { if (d?.room) { setData(d); setOffset(d.room.now - Date.now()); } }, []);
+  const apply = useCallback((incoming) => {
+    if (!incoming?.room) return;
+    setData((previous) => {
+      // A transient identity/token miss must never unmount an already joined
+      // captain. Keep that captain's last private game view while polling recovers.
+      if (previous?.you && !incoming.you) {
+        const next = { ...incoming, you: previous.you };
+        if (previous.room?.game?.me && next.room?.game && !next.room.game.me) {
+          next.room = { ...next.room, game: { ...next.room.game, me: previous.room.game.me } };
+        }
+        return next;
+      }
+      return incoming;
+    });
+    setOffset(incoming.room.now - Date.now());
+  }, []);
   useEffect(() => {
     if (!code) return undefined;
-    let alive = true, timer = null;
+    let alive = true, timer = null, failures = 0;
     const tick = async () => {
-      try { const d = await bsApi.getRoom(code, tokenRef.current); if (!alive) return; apply(d); setError(''); }
-      catch (e) { if (!alive) return; if (e.code === 'ROOM_NOT_FOUND') { setError(e.message); onGone && onGone(); return; } setError(e.message); }
-      if (alive) timer = setTimeout(tick, liveRef.current ? 650 : 1500);
+      try {
+        const d = await bsApi.getRoom(code, tokenRef.current);
+        if (!alive) return;
+        failures = 0;
+        apply(d);
+        setError('');
+      } catch (e) {
+        if (!alive) return;
+        if (e.code === 'ROOM_NOT_FOUND') {
+          setError(e.message);
+          onGone && onGone();
+          return;
+        }
+        failures += 1;
+        // Keep the last successful room/game mounted during brief network
+        // interruptions; retry progressively instead of flashing a join screen.
+        setError(e.message);
+      }
+      if (alive) {
+        const retryDelay = failures ? Math.min(8000, 1000 * (2 ** Math.min(failures - 1, 3))) : (liveRef.current ? 1100 : 1800);
+        timer = setTimeout(tick, retryDelay);
+      }
     };
     tick();
     return () => { alive = false; clearTimeout(timer); };
