@@ -102,7 +102,7 @@ export default async function handler(request, response) {
 
           await transaction.update(hostSessions).set({ status: 'live', updatedAt: new Date() })
             .where(eq(hostSessions.id, hostSession.id));
-          return created;
+          return [created];
         });
       } catch (error) {
         if (error.code !== '23505' || attempt === 4) throw error;
