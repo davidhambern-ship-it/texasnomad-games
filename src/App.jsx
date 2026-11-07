@@ -52,7 +52,7 @@ function RoomRoute() {
   const roomGames = new Set([
     'bff', 'square-biz', 'hangman', 'spades', 'word-search',
     'out', 'viral', 'dominoes', 'see-that', 'word-wrangler',
-    'sudoku', 'rodeo-rumble',
+    'rodeo-rumble',
   ]);
 
   // OUT! and Battle Sudoku each own their native guest-room flows. Do not
