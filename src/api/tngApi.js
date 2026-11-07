@@ -346,13 +346,13 @@ export const tngApi = {
           '',
         ).trim().toUpperCase();
 
-        if (!roomCode || gameId === 'out') {
-          // OUT! owns its room registration in the Nomad Cards service.
-          // Do not send its code through the core-game registry, which
-          // intentionally accepts only the five core multiplayer game IDs.
+        if (!roomCode) {
           requestHostLiveRefresh();
           return result;
         }
+
+        // Every title, including OUT!, registers the same shared lobby code.
+        // Its native cabinet attaches its own game state after the host starts.
 
         try {
           await request('/register-core', {

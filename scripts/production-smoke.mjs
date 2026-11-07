@@ -356,7 +356,7 @@ async function main() {
         throw new Error(`host session failed: HTTP ${hostSession.response.status} ${hostSession.payload?.error?.message || ''}`);
       }
 
-      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, { gameId: 'sudoku' });
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, { gameId: 'out' });
       roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
       if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
         throw new Error(`shared room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
@@ -364,10 +364,14 @@ async function main() {
 
       const registered = await postJson('/tng-rooms/register-core', '', '', {
         roomCode,
-        gameId: 'sudoku',
+        gameId: 'out',
       });
       if (!registered.response.ok || registered.payload?.registered !== true) {
         throw new Error(`room registry registration failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+      const resolved = await json(`${SERVICE_ORIGIN}/tng-rooms/resolve?code=${encodeURIComponent(roomCode)}`);
+      if (!resolved.response.ok || resolved.payload?.room?.gameId !== 'out') {
+        throw new Error(`OUT! lobby code did not resolve before the cabinet started: HTTP ${resolved.response.status}`);
       }
 
       const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, { roomCode }, roomCode);
