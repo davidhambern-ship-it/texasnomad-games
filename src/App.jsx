@@ -50,13 +50,18 @@ function RoomRoute() {
   const [params] = useSearchParams();
   const gameId = String(params.get('game') || '').trim().toLowerCase();
   const roomGames = new Set([
-    'out', 'bff', 'square-biz', 'hangman', 'spades', 'word-search',
-    'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku',
+    'bff', 'square-biz', 'hangman', 'spades', 'word-search',
+    'out', 'viral', 'dominoes', 'see-that', 'word-wrangler',
     'rodeo-rumble',
   ]);
 
-  // Every game enters through the exact same room creator and lobby.
-  // Game-specific screens are mounted only after this shared room starts.
+  // OUT! and Battle Sudoku each own their native guest-room flows. Do not
+  // wrap either game in SharedRoomPage: that creates a second, nested room
+  // setup and a duplicate room lifecycle.
+  if (gameId === 'out') return <Navigate to="/games/out?host=1" replace />;
+  if (gameId === 'sudoku') return <Navigate to="/games/sudoku?host=1" replace />;
+
+  // All core games use the shared host room experience.
   return roomGames.has(gameId) ? <SharedRoomPage /> : <Navigate to="/games" replace />;
 }
 
