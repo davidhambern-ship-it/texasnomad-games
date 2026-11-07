@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Unplug } from 'lucide-react';
+import { Loader2, Unplug, ShieldCheck } from 'lucide-react';
 
 import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
 import HangmanGameBoard from '@/components/games/HangmanGameBoard';
@@ -714,7 +714,7 @@ export default function SharedRoomPage() {
                   {roomState?.gameId === 'word-search' && <WordSearchGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
-                  {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'rodeo-rumble'].includes(roomState?.gameId) && (
+                  {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
                     <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
                   )}
                 </section>
