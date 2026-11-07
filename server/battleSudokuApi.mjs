@@ -278,13 +278,24 @@ export function createBattleSudokuApi({
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
         const code = await newCode(hostIdentity.accountId || null, body?.roomCode);
+        const hostPlayer = {
+          id: newId(),
+          accountId: hostIdentity.accountId || null,
+          guestId: hostIdentity.guestId || null,
+          name: clean(hostIdentity.publicName || 'Host', 32),
+          token: newToken(),
+          color: COLORS[0],
+          lastSeen: now,
+        };
         const room = {
           code,
           hostToken: newToken(),
           hostAccountId: hostIdentity.accountId || null,
           hostGuestId: hostIdentity.guestId || null,
           hostName: hostIdentity.publicName || 'Host',
-          players: [],
+          // The creator is a real captain from the instant the room exists.
+          // Keep the host-control token separate from the playable seat token.
+          players: [hostPlayer],
           game: null,
           settings: { ...G.DEFAULTS },
           createdAt: now,
@@ -297,7 +308,7 @@ export function createBattleSudokuApi({
           throw error;
         }
         const v = view(room, null, now); v.you = { isHost: true };
-        return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
+        return send(res, 200, { roomCode: code, token: room.hostToken, playerToken: hostPlayer.token, playerId: hostPlayer.id, ...v });
       }
       const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
