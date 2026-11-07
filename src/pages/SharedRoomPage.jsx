@@ -9,6 +9,7 @@ import WordSearchGameBoard from '@/components/games/WordSearchGameBoard';
 import SquareBizGameBoard from '@/components/games/SquareBizGameBoard';
 import BFFGameBoard from '@/components/games/BFFGameBoard';
 import RoomGameBoard from '@/components/rooms/RoomGameBoard';
+import SharedRoomLobby from '@/components/rooms/SharedRoomLobby';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { useAuth } from '@/lib/AuthContext';
 import { getNeonSession } from '@/lib/neonAuth';
@@ -708,87 +709,16 @@ export default function SharedRoomPage() {
             )}
 
             {roomState && roomState.status === 'lobby' && (
-              <section className="mx-auto max-w-5xl space-y-4 rounded-2xl border border-[#BC13FE]/35 bg-[#09060d] p-4 shadow-[0_0_35px_rgba(188,19,254,.08)] sm:p-6">
-                <div className="flex flex-wrap items-center gap-3 border-b border-white/10 pb-4">
-                  <RoomGameIcon game={roomGame} size="lg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-[8px] uppercase tracking-[0.2em] text-[#BC13FE]" style={PS2}>GAME ROOM LOBBY</div>
-                    <h1 className="mt-2 truncate text-2xl font-black uppercase sm:text-3xl">{roomGame?.title || activeRoom.gameId}</h1>
-                    <p className="mt-1 text-sm text-white/45">{roomGame?.subtitle || 'Multiplayer game'}</p>
-                  </div>
-                  <span className="rounded-full border border-green-400/30 bg-green-400/10 px-3 py-1 text-xs text-green-300">WAITING FOR PLAYERS</span>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-[1.05fr_.95fr]">
-                  <div className="space-y-4">
-                    <div className="rounded-xl border border-[#FFD700]/30 bg-[#FFD700]/[0.06] p-4">
-                      <div className="text-[8px] uppercase tracking-[0.18em] text-[#FFD700]" style={PS2}>SHARE ROOM CODE</div>
-                      <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <div className="font-mono text-3xl font-bold tracking-[0.2em] text-[#FFD700]">{activeRoom.roomCode}</div>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard?.writeText(activeRoom.roomCode)}
-                          className="rounded-lg border border-[#FFD700]/35 px-3 py-2 text-xs text-[#FFD700] hover:bg-[#FFD700]/10"
-                        >COPY CODE</button>
-                        <button
-                          type="button"
-                          onClick={() => navigator.clipboard?.writeText(`${window.location.origin}/join/${activeRoom.roomCode}`)}
-                          className="rounded-lg border border-white/15 px-3 py-2 text-xs text-white/75 hover:bg-white/5"
-                        >COPY INVITE LINK</button>
-                      </div>
-                      <p className="mt-2 text-xs text-white/45">Players can enter this code on the Join Room screen or open your invite link.</p>
-                    </div>
-
-                    <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                      <div className="text-[8px] uppercase tracking-[0.18em] text-[#BC13FE]" style={PS2}>GAME INFORMATION</div>
-                      <p className="mt-3 text-sm leading-relaxed text-white/75">{roomGame?.lobbyRules || roomGame?.subtitle || 'Game instructions are provided in the game cabinet.'}</p>
-                      <p className="mt-3 text-xs leading-relaxed text-white/40">The original {roomGame?.title || 'game'} cabinet and its full controls open when the host starts the game.</p>
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-white/10 bg-black/40 p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-[8px] uppercase tracking-[0.18em] text-green-300" style={PS2}>PLAYERS IN ROOM</div>
-                      <span className="rounded-full border border-green-400/25 px-2 py-1 text-xs text-green-300">{roomPeople.length}</span>
-                    </div>
-                    {rosterError ? (
-                      <p className="mt-4 text-sm text-red-400">{rosterError}</p>
-                    ) : roomPeople.length ? (
-                      <div className="mt-4 space-y-2">
-                        {roomPeople.map((person, index) => {
-                          const isHost = ['host', 'host_player'].includes(String(person.role || '').toLowerCase()) || Number(person.seatNumber) === 1;
-                          return (
-                            <div key={person.accountId || person.handle || `${person.role}-${index}`} className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-3">
-                              <span className={isHost ? 'text-[#FFD700]' : 'text-[#BC13FE]'}>{isHost ? '★' : '●'}</span>
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-semibold text-white">{person.displayName || person.name || person.handle || (isHost ? 'Host' : 'Player')}</div>
-                                <div className={isHost ? 'mt-1 text-[9px] tracking-widest text-[#FFD700]' : 'mt-1 text-[9px] tracking-widest text-[#BC13FE]'}>{isHost ? 'HOST · PLAYER 1' : `PLAYER${person.seatNumber ? ` · SEAT ${person.seatNumber}` : ''}`}</div>
-                              </div>
-                              <span className="text-[10px] text-green-300">JOINED</span>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <p className="mt-4 text-sm text-white/40">Waiting for the host and players to appear…</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-center justify-between gap-3 border-t border-white/10 pt-4 sm:flex-row">
-                  <p className="text-center text-xs text-white/45 sm:text-left">
-                    {roomPeople.some((person) => !['host', 'host_player'].includes(String(person.role || '').toLowerCase()) && Number(person.seatNumber) !== 1)
-                      ? 'Players are in. The host can start the game.'
-                      : 'Waiting for at least one other player to join before the host can start.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={startGame}
-                    disabled={busy || !roomPeople.some((person) => !['host', 'host_player'].includes(String(person.role || '').toLowerCase()) && Number(person.seatNumber) !== 1)}
-                    className="w-full rounded-xl border border-[#BC13FE]/60 bg-[#BC13FE]/15 px-6 py-3 text-sm font-bold tracking-widest text-white transition hover:bg-[#BC13FE]/25 disabled:cursor-not-allowed disabled:opacity-35 sm:w-auto"
-                  >{busy ? 'STARTING…' : 'START GAME'}</button>
-                </div>
-              </section>
+              <SharedRoomLobby
+                room={activeRoom}
+                game={roomGame}
+                people={roomPeople}
+                isHost
+                busy={busy}
+                onStart={startGame}
+                rosterError={rosterError}
+                error={error}
+              />
             )}
 
             {roomState && roomState.status !== 'lobby' && (
