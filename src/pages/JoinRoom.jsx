@@ -142,7 +142,7 @@ export default function JoinRoom() {
 
       try {
         payload = validatePlayerJoin(
-          await tngApi.player.joinRoom(deviceId, roomCode),
+          await tngApi.player.joinRoom(deviceId, roomCode, guestName.trim()),
           roomCode,
         );
 
@@ -154,7 +154,7 @@ export default function JoinRoom() {
           localStorage.removeItem('tng_player_device_id');
           deviceId = await ensurePlayerDevice(user?.id);
           payload = validatePlayerJoin(
-            await tngApi.player.joinRoom(deviceId, roomCode),
+            await tngApi.player.joinRoom(deviceId, roomCode, guestName.trim()),
             roomCode,
           );
 
@@ -234,7 +234,7 @@ export default function JoinRoom() {
             Join takes a player seat. Spectate opens a read-only live view and does not take a seat or let you make game moves.
           </p>
 
-          {!getStoredGuestIdentity() && (
+          {(
             <label className="mt-6 block text-left text-xs font-semibold uppercase tracking-widest text-white/60">
               Your player name
               <input
@@ -255,7 +255,7 @@ export default function JoinRoom() {
             <button
               type="button"
               onClick={joinGame}
-              disabled={joining || (!getStoredGuestIdentity() && !guestName.trim())}
+              disabled={joining || guestName.trim().length < 2}
               className="rounded-xl border-2 border-[#BC13FE] bg-[#BC13FE]/15 px-5 py-4 font-heading text-lg tracking-wider text-[#BC13FE] transition hover:bg-[#BC13FE]/25 disabled:opacity-40"
             >
               {joining ? 'JOINING…' : 'JOIN GAME'}
