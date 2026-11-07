@@ -75,14 +75,16 @@ export function BSHost({ onExit, initialCode = '', freshRoom = false }) {
     setCreating(true); setErr('');
     try {
       const d = await bsApi.createRoom(initialCode);
-      const guest = getStoredGuestIdentity();
-      if (!guest?.name) throw new Error('Choose your guest name before creating a room.');
-      // The host also takes a captain seat, so the host plays the same Sudoku
-      // interface as everyone else while retaining a separate host-control token.
-      const joined = await bsApi.action(d.roomCode, d.token, 'join', { name: guest.name });
-      const s = { code: d.roomCode, token: d.token, playerToken: joined.token };
+      if (!d.playerToken) throw new Error('The room was created, but your captain seat was not issued. Please try again.');
+      // The server creates the host as the first captain atomically with the
+      // room, preventing the creator from appearing as a spectator or a
+      // second browser from filling the only playable seat.
+      const s = { code: d.roomCode, token: d.token, playerToken: d.playerToken };
       try { localStorage.setItem('bs_host', JSON.stringify(s)); } catch { /* ignore */ }
-      setSeat(s); apply(joined); applyPlayer(joined);
+      setSeat(s);
+      apply(d);
+      const playerView = await bsApi.getRoom(d.roomCode, d.playerToken);
+      applyPlayer(playerView);
     }
     catch (e) { setErr(e.message); } finally { setCreating(false); }
   }, [apply, applyPlayer]);
