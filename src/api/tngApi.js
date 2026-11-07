@@ -96,6 +96,7 @@ async function request(path, {
     method,
     headers,
     body: requestBody,
+    ...(method === 'GET' || method === 'HEAD' ? { cache: 'no-store' } : {}),
   };
 
   const allowRetry = method === 'GET' || method === 'HEAD';
@@ -309,7 +310,7 @@ export const tngApi = {
       method:'POST',
       roomCode,
       apiBase:STATS_API_BASE,
-      body:{ roomCode },
+      body:{ roomCode, displayName },
     }),
   },
   devices: {
@@ -330,14 +331,14 @@ export const tngApi = {
       closeHostLiveConnection();
       return result;
     },
-    createRoom: async (deviceId, gameId) => {
+    createRoom: async (deviceId, gameId, displayName) => {
       let lastCollision = null;
 
       for (let attempt = 0; attempt < 5; attempt += 1) {
         const result = await request('/api/host/room', {
           method:'POST',
           deviceId,
-          body:{ gameId },
+          body:{ gameId, displayName },
         });
 
         const roomCode = String(
@@ -428,7 +429,7 @@ export const tngApi = {
     },
   },
   player: {
-    joinRoom: (deviceId, roomCode) => request('/api/player/room', {
+    joinRoom: (deviceId, roomCode, displayName) => request('/api/player/room', {
       method:'POST',
       deviceId,
       roomCode,
