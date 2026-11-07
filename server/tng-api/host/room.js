@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto';
 
 import { requireController } from '../../auth/require-controller.js';
 import { db } from '../../db/client.js';
-import { gameRooms, hostSessions, roomParticipants } from '../../db/schema.js';
+import { gameRooms, hostSessions, playerProfiles, roomParticipants } from '../../db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 
 const GAME_ID_PATTERN = /^[a-z0-9-]{2,64}$/;
@@ -18,7 +18,7 @@ export default async function handler(request, response) {
   if (!['POST', 'DELETE'].includes(request.method)) return methodNotAllowed(response, ['POST', 'DELETE']);
 
   try {
-    const { hostSession } = await requireController(request, { hostSessionRequired: true });
+    const { account, hostSession } = await requireController(request, { hostSessionRequired: true });
 
     if (request.method === 'DELETE') {
       const [existingRoom] = await db.select().from(gameRooms).where(and(
@@ -49,6 +49,13 @@ export default async function handler(request, response) {
     }
 
     const gameId = typeof request.body?.gameId === 'string' ? request.body.gameId.trim().toLowerCase() : '';
+    const displayName = typeof request.body?.displayName === 'string'
+      ? request.body.displayName.replace(/[\\u0000-\\u001f<>]/g, '').trim().slice(0, 50)
+      : '';
+    if (displayName.length >= 2) {
+      await db.update(playerProfiles).set({ displayName, updatedAt: new Date() })
+        .where(eq(playerProfiles.accountId, account.id));
+    }
 
     if (!GAME_ID_PATTERN.test(gameId)) {
       const error = new Error('Choose a valid community game.');
