@@ -81,7 +81,7 @@ export default async function handler(request, response) {
     for (let attempt = 0; attempt < 5 && !room; attempt += 1) {
       try {
         [room] = await db.transaction(async (transaction) => {
-          const created = await transaction.insert(gameRooms).values({
+          const [created] = await transaction.insert(gameRooms).values({
             roomCode: createRoomCode(),
             gameId,
             hostSessionId: hostSession.id,
