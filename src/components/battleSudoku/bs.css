@@ -309,3 +309,115 @@
 /* Keep Sudoku digit/ship controls stacked in the sidebar, not below the grid. */
 .bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
 .bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+
+
+/* Battle Sudoku viewport layout: board is always the centered primary surface.
+   All phase controls stay in the right rail; the board is bounded by viewport height. */
+.bs-phone { width: 100vw; height: 100dvh; min-height: 0; overflow: hidden; }
+.bs-play-area {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 14px;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0 12px 12px;
+}
+.bs-pbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 290px);
+  grid-auto-rows: min-content;
+  align-content: center;
+  align-items: center;
+  justify-items: stretch;
+  gap: 10px 14px;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px;
+}
+.bs-pbody > * { min-width: 0; max-width: none; }
+.bs-pbody > .bs-banner { grid-column: 1 / -1; }
+.bs-pbody > .bs-board,
+.bs-pbody > .bs-axis,
+.bs-pbody > div:has(> .bs-board) {
+  grid-column: 1;
+  grid-row: 2 / span 5;
+  justify-self: center;
+  align-self: center;
+  width: min(100%, calc(100dvh - 160px));
+  max-width: calc(100dvh - 160px);
+  min-width: 0;
+}
+.bs-pbody > .bs-board { height: auto; }
+.bs-pbody > .bs-axis {
+  grid-template-columns: 14px minmax(0, 1fr);
+  width: min(100%, calc(100dvh - 160px));
+}
+.bs-pbody > div:has(> .bs-board) { display: grid; place-items: center; }
+.bs-pbody > .bs-fleetkey,
+.bs-pbody > .bs-row,
+.bs-pbody > .bs-numpad,
+.bs-pbody > .bs-tools,
+.bs-pbody > .bs-targets,
+.bs-pbody > .bs-list {
+  grid-column: 2;
+  width: 100%;
+  align-self: start;
+}
+.bs-pbody > .bs-numpad { grid-row: 2; }
+.bs-pbody > .bs-fleetkey { grid-row: 3; }
+.bs-pbody > .bs-row { grid-row: 2; justify-content: stretch !important; }
+.bs-pbody > .bs-row .bs-btn { flex: 1; }
+.bs-pbody > .bs-tools { grid-row: 3; }
+.bs-pbody > .bs-list { grid-row: 2 / span 4; }
+.bs-pbody > .bs-targets { grid-row: 2; }
+.bs-phone.host-mode .bs-play-area {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+}
+.bs-phone.host-mode .bs-pbody { display: contents; }
+.bs-phone.host-mode .bs-pbody > .bs-banner { grid-column: 1 / -1; }
+.bs-phone.host-mode .bs-pbody > .bs-board,
+.bs-phone.host-mode .bs-pbody > .bs-axis,
+.bs-phone.host-mode .bs-pbody > div:has(> .bs-board) {
+  grid-column: 1;
+  grid-row: 2 / span 5;
+  justify-self: center;
+  align-self: center;
+  width: min(100%, calc(100dvh - 160px));
+  max-width: calc(100dvh - 160px);
+}
+.bs-phone.host-mode .bs-pbody > .bs-fleetkey,
+.bs-phone.host-mode .bs-pbody > .bs-row,
+.bs-phone.host-mode .bs-pbody > .bs-numpad,
+.bs-phone.host-mode .bs-pbody > .bs-tools,
+.bs-phone.host-mode .bs-pbody > .bs-targets,
+.bs-phone.host-mode .bs-pbody > .bs-list {
+  grid-column: 2;
+  width: 100%;
+  align-self: start;
+}
+.bs-phone.host-mode .bs-pbody > .bs-numpad { grid-row: 2; }
+.bs-phone.host-mode .bs-pbody > .bs-fleetkey { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody > .bs-row { grid-row: 2; }
+.bs-phone.host-mode .bs-pbody > .bs-tools { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody > .bs-list { grid-row: 2 / span 4; }
+.bs-phone.host-mode .bs-host-room { grid-column: 2; grid-row: 5; }
+@media (max-width: 760px) {
+  .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(190px, 38%); gap: 8px; padding: 0 6px 6px; }
+  .bs-pbody { grid-template-columns: minmax(0, 1fr) minmax(180px, 38%); gap: 8px; padding: 4px; }
+  .bs-pbody > .bs-board,
+  .bs-pbody > .bs-axis,
+  .bs-pbody > div:has(> .bs-board),
+  .bs-phone.host-mode .bs-pbody > .bs-board,
+  .bs-phone.host-mode .bs-pbody > .bs-axis,
+  .bs-phone.host-mode .bs-pbody > div:has(> .bs-board) {
+    width: min(100%, calc(100dvh - 140px));
+    max-width: calc(100dvh - 140px);
+  }
+  .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(190px, 38%); }
+  .bs-host-room { padding: 8px; }
+}
