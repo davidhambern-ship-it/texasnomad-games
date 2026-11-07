@@ -421,3 +421,52 @@
   .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(190px, 38%); }
   .bs-host-room { padding: 8px; }
 }
+
+
+/* Host rail and manual fleet-placement controls */
+.bs-host-room {
+  overflow: visible !important;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+  flex: 0 0 auto;
+  align-self: start;
+  gap: 8px;
+}
+.bs-host-room h3 { font-size: 16px; }
+.bs-host-code { font-size: 26px; }
+.bs-host-roster { gap: 5px; }
+.bs-host-player { padding: 5px 7px; }
+.bs-host-room > button { flex: 0 0 auto; }
+.bs-ship-picker { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bs-ship-picker button {
+  appearance: none;
+  border: 1px solid var(--bs-line);
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #13294a;
+  color: var(--bs-text);
+  font: 800 12px system-ui,sans-serif;
+  cursor: pointer;
+}
+.bs-ship-picker button[aria-pressed="true"] {
+  border-color: var(--bs-brass);
+  background: #29486e;
+  box-shadow: inset 0 0 0 1px var(--bs-brass);
+}
+.bs-ship-picker button:disabled { opacity: .45; cursor: not-allowed; }
+.bs-ship-picker .bs-rotate { border-color: #5fc8ff; color: #bde8ff; }
+.bs-phone.host-mode .bs-host-room {
+  grid-column: 2;
+  grid-row: 4 / span 4;
+  overflow: visible !important;
+  max-height: none;
+}
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-row { grid-column: 2; grid-row: 4; }
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-fleetkey { grid-column: 2; grid-row: 2; }
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+.bs-phone.host-mode .bs-play-area { align-items: start; }
+@media (max-height: 760px) {
+  .bs-host-room { gap: 5px; padding: 8px; }
+  .bs-host-roster { max-height: 22vh; overflow: auto; }
+}
