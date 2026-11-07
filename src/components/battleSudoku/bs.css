@@ -305,3 +305,7 @@
   .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(220px, 42%); }
   .bs-host-room { padding: 10px; }
 }
+
+/* Keep Sudoku digit/ship controls stacked in the sidebar, not below the grid. */
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
