@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull } from 'drizzle-orm';
 
 import { requireAccount } from '../../auth/require-account.js';
 import { db } from '../../db/client.js';
@@ -91,6 +91,16 @@ export default async function handler(request, response) {
     }
 
     const room = await findRoom(roomCode);
+
+    if (request.method === 'POST') {
+      const displayName = typeof request.body?.displayName === 'string'
+        ? request.body.displayName.replace(/[\\u0000-\\u001f<>]/g, '').trim().slice(0, 50)
+        : '';
+      if (displayName.length >= 2) {
+        await db.update(playerProfiles).set({ displayName, updatedAt: new Date() })
+          .where(eq(playerProfiles.accountId, account.id));
+      }
+    }
 
     if (request.method === 'GET') {
       const [participant] = await db.select().from(roomParticipants).where(and(
