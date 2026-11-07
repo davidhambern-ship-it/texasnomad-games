@@ -240,6 +240,7 @@ async function main() {
     '/games/see-that',
     '/games/word-wrangler',
     '/games/dominoes',
+    '/room/join/TN7K4P?game=sudoku&next=%2Fgames%2Fsudoku%3Froom%3DTN7K4P',
     '/host',
   ];
 

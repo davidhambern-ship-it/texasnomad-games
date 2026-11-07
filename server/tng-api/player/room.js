@@ -98,9 +98,37 @@ export default async function handler(request, response) {
         eq(roomParticipants.accountId, account.id),
       )).limit(1);
 
+      const participants = await db.select().from(roomParticipants).where(and(
+        eq(roomParticipants.roomId, room.id),
+        isNull(roomParticipants.leftAt),
+      ));
+      const accountIds = [...new Set(participants.map((person) => person.accountId))];
+      const profiles = accountIds.length > 0
+        ? await db.select({
+            accountId: playerProfiles.accountId,
+            displayName: playerProfiles.displayName,
+            handle: playerProfiles.handle,
+          }).from(playerProfiles).where(inArray(playerProfiles.accountId, accountIds))
+        : [];
+      const profileByAccount = new Map(profiles.map((profile) => [profile.accountId, profile]));
+      const people = participants.map((person) => {
+        const profile = profileByAccount.get(person.accountId);
+        return {
+          playerId: person.accountId,
+          accountId: person.accountId,
+          seatNumber: person.seatNumber == null ? null : Number(person.seatNumber),
+          role: person.role,
+          playerType: 'human',
+          name: profile?.displayName || profile?.handle ||
+            (person.role === 'host_player' ? 'HOST' : 'Player'),
+          handle: profile?.handle || null,
+        };
+      }).sort((left, right) => (left.seatNumber || 99) - (right.seatNumber || 99));
+
       return sendJson(response, 200, {
         room: roomSummary(room),
         participant: participant || null,
+        people,
       });
     }
 

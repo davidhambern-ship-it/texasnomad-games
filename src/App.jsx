@@ -20,6 +20,7 @@ const SpadesGame = lazy(() => import('@/pages/SpadesGame'));
 const JoinRoom = lazy(() => import('@/pages/JoinRoom'));
 const PlaceholderPage = lazy(() => import('@/pages/PlaceholderPage'));
 const SharedRoomPage = lazy(() => import('@/pages/SharedRoomPage'));
+const SharedRoomJoinPage = lazy(() => import('@/pages/SharedRoomJoinPage'));
 const Games = lazy(() => import('@/pages/Games'));
 const About = lazy(() => import('@/pages/About'));
 const Contact = lazy(() => import('@/pages/Contact'));
@@ -250,6 +251,7 @@ const AuthenticatedApp = () => {
       <Route path="/games/dominoes" element={<DominoGame />} />
       <Route path="/games/out" element={<OutGame />} />
       <Route path="/profile" element={<NeonPlayerProfile />} />
+      <Route path="/room/join/:roomCode" element={<SharedRoomJoinPage />} />
       <Route path="/room" element={<RoomRoute />} />
       <Route path="/host" element={<Navigate to="/games" replace />} />
         <Route path="*" element={<PageNotFound />} />

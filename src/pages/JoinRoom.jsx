@@ -14,6 +14,15 @@ const GAME_PATHS = {
   hangman: '/games/hangman',
   spades: '/games/spades',
   'word-search': '/games/word-search',
+  viral: '/games/viral',
+  dominoes: '/games/dominoes',
+  'see-that': '/games/see-that',
+  'word-wrangler': '/games/word-wrangler',
+  sudoku: '/games/sudoku',
+  'rodeo-rumble': '/games/rodeo-rumble',
+  out: '/games/out',
+  spades: '/games/spades',
+  'word-search': '/games/word-search',
   sudoku: '/games/sudoku',
   'see-that': '/games/see-that',
   viral: '/games/viral',
@@ -65,66 +74,6 @@ function gameTitle(gameId) {
     .split('-')
     .map((part) => part ? part[0].toUpperCase() + part.slice(1) : '')
     .join(' ');
-}
-
-async function claimSpadesSeat(deviceId, roomCode, joinedPayload) {
-  const existingSeat = Number(joinedPayload?.participant?.seatNumber || 0);
-  if ([2, 3, 4].includes(existingSeat)) return joinedPayload;
-
-  const statePayload = await tngApi.spades.getPlayerState(deviceId, roomCode);
-  const gameState = statePayload?.room?.gameState || {};
-  const players = Array.isArray(gameState.players) ? gameState.players : [];
-
-  const candidates = [2, 3, 4]
-    .map((seatNumber) => {
-      const occupant = players.find((player) => Number(player?.seatNumber) === seatNumber);
-      return {
-        seatNumber,
-        priority: occupant?.playerType === 'cpu' ? 0 : occupant ? 2 : 1,
-      };
-    })
-    .filter((candidate) => candidate.priority < 2)
-    .sort((a, b) => a.priority - b.priority || a.seatNumber - b.seatNumber);
-
-  if (candidates.length === 0) {
-    throw new TngApiError(
-      'This Spades table has no open or CPU-controlled seats available.',
-      {
-        code: 'SPADES_TABLE_FULL',
-        status: 409,
-      },
-    );
-  }
-
-  let lastSeatError = null;
-
-  for (const candidate of candidates) {
-    try {
-      return await tngApi.spades.playerAction(
-        deviceId,
-        roomCode,
-        'sit',
-        { seatNumber: candidate.seatNumber },
-      );
-    } catch (seatError) {
-      if (
-        seatError instanceof TngApiError &&
-        seatError.code === 'SPADES_SEAT_TAKEN'
-      ) {
-        lastSeatError = seatError;
-        continue;
-      }
-      throw seatError;
-    }
-  }
-
-  throw lastSeatError || new TngApiError(
-    'The available Spades seats were claimed before you could join.',
-    {
-      code: 'SPADES_TABLE_FULL',
-      status: 409,
-    },
-  );
 }
 
 export default function JoinRoom() {
@@ -202,9 +151,6 @@ export default function JoinRoom() {
           roomCode,
         );
 
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
       } catch (joinError) {
         if (
           joinError instanceof TngApiError &&
@@ -217,9 +163,6 @@ export default function JoinRoom() {
             roomCode,
           );
 
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
         } else {
           throw joinError;
         }
@@ -231,8 +174,11 @@ export default function JoinRoom() {
         throw new Error(`Unknown game type for room "${roomCode}".`);
       }
 
+      const cabinetPath = gamePath.includes('?')
+        ? gamePath
+        : `${gamePath}?room=${roomCode}`;
       window.location.replace(
-        gamePath.includes('?') ? gamePath : `${gamePath}?room=${roomCode}`,
+        `/room/join/${roomCode}?game=${encodeURIComponent(gameId)}&next=${encodeURIComponent(cabinetPath)}`,
       );
     } catch (joinError) {
       setError(
