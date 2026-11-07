@@ -27,7 +27,8 @@ function useRoom(code, token, onGone) {
 const TNG_PUBLIC_ORIGIN = String((import.meta.env && import.meta.env.VITE_TNG_PUBLIC_ORIGIN) || 'https://www.texasnomadgames.com').replace(/\/+$/, '');
 const joinUrlFor = (roomCode) => `${TNG_PUBLIC_ORIGIN.replace(/^https?:\/\//, "")}/join/${encodeURIComponent(roomCode)}`;
 
-export function NCHost({ onExit, initialCode = '', freshRoom = false }) {
+export function NCHost({ onExit, sharedRoomCode = '', initialCode = '', freshRoom = false }) {
+  const roomCode = String(sharedRoomCode || initialCode || '').trim().toUpperCase();
   const [seat, setSeat] = useState(() => { try { const saved = JSON.parse(localStorage.getItem('nc_host') || 'null'); return freshRoom || (initialCode && saved?.code !== initialCode) ? null : saved; } catch { return null; } });
   const [err, setErr] = useState('');
   const [creating, setCreating] = useState(false);
@@ -36,9 +37,9 @@ export function NCHost({ onExit, initialCode = '', freshRoom = false }) {
   const { data, offset, error, apply } = useRoom(seat?.code, seat?.token, () => { try { localStorage.removeItem('nc_host'); } catch { /* ignore */ } setSeat(null); });
   const create = useCallback(async () => {
     setCreating(true); setErr('');
-    try { const d = await ncApi.createRoom(initialCode); const s = { code: d.roomCode, token: d.token }; try { localStorage.setItem('nc_host', JSON.stringify(s)); } catch { /* ignore */ } setSeat(s); apply(d); }
+    try { if (!/^TN[A-Z0-9]{4}$/.test(roomCode)) throw new Error('The shared room code is missing or invalid. Return to Create Room and try again.'); const d = await ncApi.createRoom(roomCode); const s = { code: d.roomCode, token: d.token }; try { localStorage.setItem('nc_host', JSON.stringify(s)); } catch { /* ignore */ } setSeat(s); apply(d); }
     catch (e) { setErr(e.message); } finally { setCreating(false); }
-  }, [apply]);
+  }, [apply, roomCode]);
   useEffect(() => { if (!seat && !creating && !err) create(); }, [seat]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const act = useCallback(async (action, payload = {}) => {
