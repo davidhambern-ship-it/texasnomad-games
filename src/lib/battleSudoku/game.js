@@ -23,7 +23,7 @@ export const SHIPS = [
   { id: 'submarine', name: 'Submarine', size: 3 },
   { id: 'destroyer', name: 'Destroyer', size: 2 },
 ];
-export const DEFAULTS = { difficulty: 'normal', setupSec: 20, solveSec: 40, battleSec: 15, revealSec: 7, volleys: 8 };
+export const DEFAULTS = { difficulty: 'normal', setupSec: 60, solveSec: 40, battleSec: 15, revealSec: 7, volleys: 8 };
 export const MAX_SHELLS = 8;
 export const START_SHELLS = 2;
 export const COST = { fire: 1, torpedo: 3, repair: 1, shield: 1 };
