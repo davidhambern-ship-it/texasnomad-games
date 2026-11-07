@@ -21,11 +21,6 @@ const GAME_PATHS = {
   sudoku: '/games/sudoku',
   'rodeo-rumble': '/games/rodeo-rumble',
   out: '/games/out',
-  spades: '/games/spades',
-  'word-search': '/games/word-search',
-  sudoku: '/games/sudoku',
-  'see-that': '/games/see-that',
-  viral: '/games/viral',
 };
 
 async function ensurePlayerDevice(accountId) {
