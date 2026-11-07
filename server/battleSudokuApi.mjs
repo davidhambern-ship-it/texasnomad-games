@@ -148,7 +148,11 @@ export function createBattleSudokuApi({
     // every reservation attempt to collide with an existing room.
     const makeCandidate = () => {
       const bytes = randomBytes(4);
-      return 'TN' + Array.from(bytes, (byte) => CODE_CHARS[byte % CODE_CHARS.length]).join('');
+      const c = 'TN' + Array.from(
+        { length: 4 },
+        (_, index) => CODE_CHARS[bytes[index] % CODE_CHARS.length],
+      ).join('');
+      return c;
     };
 
     const attempts = requested ? 1 : 128;

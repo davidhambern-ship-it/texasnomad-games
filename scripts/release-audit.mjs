@@ -312,7 +312,9 @@ ok(
   dominoStore.includes("headers['X-TNG-Guest-Token']") &&
     server.includes('const guest = await resolveStandaloneGameIdentity(req)') &&
     server.includes('guestId: verifiedHost.guestId || null') &&
-    games.includes("dominoes: '/games/dominoes/host'"),
+    games.includes("id: 'txd'") &&
+    games.includes("path: '/games/dominoes'") &&
+    games.includes("const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;"),
   'Dominoes guest host identity is not wired end to end',
 );
 
