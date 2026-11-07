@@ -231,3 +231,77 @@
   .bs-room-setting .bs-seg { width: 100%; }
   .bs-room-setting .bs-seg button { flex: 1; padding: 8px 6px; }
 }
+
+
+/* Battle Sudoku: stable, board-left / controls-right captain layout.
+   The game board is never followed by its controls underneath. */
+.bs-play-area:has(> .bs-pbody:only-child) { grid-template-columns: minmax(0, 1fr); }
+.bs-pbody {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  grid-auto-rows: min-content;
+  align-content: start;
+  align-items: start;
+  gap: 10px 14px;
+  width: 100%;
+  max-width: none;
+  overflow: auto;
+}
+.bs-pbody > * { max-width: none; min-width: 0; }
+.bs-pbody:has(.bs-numpad) > .bs-banner:first-child,
+.bs-pbody:has(.bs-tools) > .bs-targets,
+.bs-pbody:has(.bs-tools) > .bs-banner:nth-child(2),
+.bs-pbody:has(.bs-list) > .bs-banner:first-child {
+  grid-column: 1 / -1;
+}
+.bs-pbody:has(.bs-numpad) > div:nth-child(2),
+.bs-pbody:has(.bs-tools) > div:nth-child(3),
+.bs-pbody:has(.bs-list) > .bs-axis,
+.bs-pbody:has(.bs-list) > .bs-board {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+  align-self: start;
+}
+.bs-pbody:has(.bs-numpad) > .bs-numpad,
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey,
+.bs-pbody:has(.bs-tools) > .bs-tools,
+.bs-pbody:has(.bs-list) > .bs-list {
+  grid-column: 2;
+}
+.bs-pbody:has(.bs-numpad) > .bs-numpad { grid-row: 2; align-self: start; }
+.bs-pbody:has(.bs-numpad) > .bs-fleetkey { grid-row: 3; }
+.bs-pbody:has(.bs-tools) > .bs-tools { grid-row: 3; align-self: start; }
+.bs-pbody:has(.bs-tools) > .bs-banner:last-child { grid-column: 1 / -1; }
+.bs-pbody:has(.bs-fleetkey) > .bs-row { grid-column: 2; grid-row: 3; }
+.bs-pbody:has(.bs-fleetkey) > .bs-banner:last-child { grid-column: 1 / -1; }
+.bs-pbody:has(.bs-fleetkey) > .bs-fleetkey { grid-column: 2; grid-row: 2; }
+.bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(280px, 340px); }
+.bs-phone.host-mode .bs-pbody { display: contents; }
+.bs-phone.host-mode .bs-pbody > * { max-width: none; }
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-banner:first-child,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-targets,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-banner:nth-child(2),
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-banner:first-child {
+  grid-column: 1 / -1;
+}
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > div:nth-child(2),
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > div:nth-child(3),
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-axis,
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-board {
+  grid-column: 1;
+  grid-row: 2 / span 3;
+}
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-numpad,
+.bs-phone.host-mode .bs-pbody:has(.bs-numpad) > .bs-fleetkey,
+.bs-phone.host-mode .bs-pbody:has(.bs-tools) > .bs-tools,
+.bs-phone.host-mode .bs-pbody:has(.bs-list) > .bs-list,
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-row,
+.bs-phone.host-mode .bs-pbody:has(.bs-fleetkey) > .bs-fleetkey {
+  grid-column: 2;
+}
+.bs-phone.host-mode .bs-host-room { grid-column: 2; grid-row: 5; }
+@media (max-width: 700px) {
+  .bs-pbody { grid-template-columns: minmax(0, 1fr) minmax(190px, 42%); gap: 8px; padding: 8px; }
+  .bs-phone.host-mode .bs-play-area { grid-template-columns: minmax(0, 1fr) minmax(220px, 42%); }
+  .bs-host-room { padding: 10px; }
+}
