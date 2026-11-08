@@ -23,7 +23,7 @@ export default function WordSearchTurnEffects({
     [activeSeat, players],
   );
 
-  const activeColor = activePlayer?.color || '#FFD700';
+  const activeColor = activePlayer?.color || '#f2c14e';
   const isViewerTurn = Number(viewerSeat) === Number(activeSeat);
   const countdown = Math.max(0, Math.ceil(Number(timeRemaining || 0) / 1000));
   const showCountdown =
@@ -123,14 +123,14 @@ export default function WordSearchTurnEffects({
           aria-live="polite"
         >
           <div
-            className="rounded-2xl border-2 bg-[#070311]/96 px-7 py-5 text-center backdrop-blur-md"
+            className="rounded-2xl border-2 bg-[#0d1f17]/96 px-7 py-5 text-center backdrop-blur-md"
             style={{
               borderColor: activeColor,
               boxShadow: `0 0 42px ${activeColor}77, inset 0 0 26px ${activeColor}1f`,
             }}
           >
             <div
-              className="text-[7px] tracking-[0.28em] text-white/50 uppercase"
+              className="text-[7px] tracking-[0.28em] text-[#b8c9bd] uppercase"
               style={PS2}
             >
               {splashKind === 'round' ? `ROUND ${roundNumber} START` : 'NEXT PLAYER'}
@@ -145,7 +145,7 @@ export default function WordSearchTurnEffects({
             >
               {turnName}
             </div>
-            <div className="mt-2 text-[9px] text-white/45">
+            <div className="mt-2 text-[9px] text-[#b8c9bd]">
               Seat {activeSeat} · 60 seconds
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function WordSearchTurnEffects({
           aria-live="assertive"
         >
           <div
-            className="ws-count-shell relative flex h-[92px] w-[92px] items-center justify-center rounded-full border-2 bg-[#070311]/94 backdrop-blur-md sm:h-[108px] sm:w-[108px]"
+            className="ws-count-shell relative flex h-[92px] w-[92px] items-center justify-center rounded-full border-2 bg-[#0d1f17]/94 backdrop-blur-md sm:h-[108px] sm:w-[108px]"
             style={{
               borderColor: activeColor,
               boxShadow: `0 0 30px ${activeColor}77, inset 0 0 22px ${activeColor}24`,
