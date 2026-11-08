@@ -61,7 +61,9 @@ function wordList(category, difficulty, count) {
     ? (WORD_POOL[poolKey]?.[difficulty] || WORD_POOL.general[difficulty] || [])
     : Object.values(WORD_POOL).flatMap((group) => group[difficulty] || []);
 
-  return shuffle([...new Set(source.map(clean).filter(Boolean))]).slice(0, count);
+  // Keep a few extra candidates so a word that cannot be placed does not
+  // silently reduce the advertised word count for the round.
+  return shuffle([...new Set(source.map(clean).filter(Boolean))]).slice(0, count * 3);
 }
 
 function canPlace(grid, word, x, y, direction) {
@@ -123,6 +125,7 @@ export function buildWordSearchPuzzle(difficulty = 'simpleton', category = 'rand
     .sort((a, b) => b.length - a.length);
 
   for (const word of candidates) {
+    if (placed.length >= cfg.words) break;
     const result = placeWord(grid, word, cfg.difficultyBonus);
     if (result) placed.push(result);
   }
