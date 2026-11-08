@@ -174,15 +174,15 @@ export default function NeonWordSearchPlayer({ roomCode }) {
         <section className="grid grid-cols-3 gap-2 lg:hidden">
           <div className="nc-panel p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
-            <div className="mt-1 text-base" style={{ ...PS2, color: "var(--nc-gold)" }} style={PS2}>
+            <div className="mt-1 text-base" style={{ ...PS2, color: "var(--nc-gold)" }}>
               {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
             </div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+          <div className="nc-panel rounded-lg p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
             <div className="mt-1 text-base" style={{ ...PS2, color: "#8ee0a9" }} style={PS2}>{foundCount}/{words.length || 0}</div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+          <div className="nc-panel rounded-lg p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>YOU</div>
             <div className="mt-1 text-base" style={{ ...PS2, color: myColor }}>{myScore}</div>
           </div>
@@ -223,7 +223,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
             ) : (
               <div className="text-center">
                 <div className="text-6xl mb-4">🔍</div>
-                <div className="text-lg text-[#BC13FE]">Waiting for the Host to start Word Search…</div>
+                <div className="text-lg text-[#f2c14e]">Waiting for the Host to start Word Search…</div>
               </div>
             )}
           </section>
@@ -231,17 +231,17 @@ export default function NeonWordSearchPlayer({ roomCode }) {
           <aside className="min-h-0 flex flex-col gap-2">
 
             <section className="hidden lg:grid shrink-0 grid-cols-3 gap-2">
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
                 <div className="mt-1 text-xl text-[#FFD700]" style={PS2}>
                   {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
                 </div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
-                <div className="mt-1 text-xl text-[#4ade80]" style={PS2}>{foundCount}/{words.length || 0}</div>
+                <div className="mt-1 text-xl text-[#8ee0a9]" style={PS2}>{foundCount}/{words.length || 0}</div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>YOU</div>
                 <div className="mt-1 text-xl" style={{ ...PS2, color: myColor }}>{myScore}</div>
               </div>
