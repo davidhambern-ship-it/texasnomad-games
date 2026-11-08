@@ -33,7 +33,8 @@ test('all category and difficulty puzzles have a square board and valid word pat
       const { grid, words } = buildWordSearchPuzzle(difficulty, category);
       assert.equal(grid.length, size, `${category} / ${difficulty} board height`);
       assert.ok(grid.every((row) => row.length === size && row.every((cell) => /^[A-Z]$/.test(cell))));
-      assert.ok(words.length > 0, `${category} / ${difficulty} must place words`);
+      const expectedWords = difficulty === 'simpleton' ? 10 : difficulty === 'reader' ? 15 : 25;
+      assert.equal(words.length, expectedWords, `${category} / ${difficulty} must place the full word list`);
 
       for (const word of words) {
         assert.equal(wordText(grid, word.cells), word.word);
