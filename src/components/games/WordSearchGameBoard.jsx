@@ -9,6 +9,7 @@ import {
   GameControlCard,
 } from '@/components/games/GameWorkspaceLayout';
 import { getPublicTngName } from '@/lib/publicTngName';
+import '@/components/nomadCards/nc.css';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -49,7 +50,7 @@ function Select({ label, value, onChange, options }) {
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        className="w-full rounded-lg border border-[#00c875]/30 bg-[#07040d] px-3 py-2.5 text-xs text-white outline-none"
+        className="w-full rounded-lg border border-[var(--nc-line)] bg-[#0f1a14] px-3 py-2.5 text-xs text-white outline-none"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
@@ -73,7 +74,7 @@ function ZoomControls({ zoom, setZoom }) {
         <Minus className="h-4 w-4" />
       </button>
       <div
-        className="min-w-[72px] rounded-lg border border-[#BC13FE]/30 bg-[#BC13FE]/5 px-2 py-2 text-center text-[6px] text-[#BC13FE]"
+        className="min-w-[72px] rounded-lg border border-[var(--nc-line)] bg-[#1a2620] px-2 py-2 text-center text-[6px] text-[#f2c14e]"
         style={PS2}
       >
         {percent}%
@@ -89,7 +90,7 @@ function ZoomControls({ zoom, setZoom }) {
       <button
         type="button"
         onClick={() => setZoom(1)}
-        className="rounded-lg border border-[#FFD700]/25 bg-[#FFD700]/5 px-2.5 py-2 text-[6px] text-[#FFD700]"
+        className="rounded-lg border border-[#f2c14e]/25 bg-[#FFD700]/5 px-2.5 py-2 text-[6px] text-[#f2c14e]"
         style={PS2}
       >
         RESET
@@ -189,7 +190,7 @@ export default function WordSearchGameBoard({ controllerId }) {
   if (!room && !error) {
     return (
       <div className="py-16 text-center">
-        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#00c875]" />
+        <Loader2 className="mx-auto mb-4 h-8 w-8 animate-spin text-[#8ee0a9]" />
         <span className="text-sm text-white/40">Loading Word Search controls…</span>
       </div>
     );
@@ -203,7 +204,7 @@ export default function WordSearchGameBoard({ controllerId }) {
         </div>
       )}
 
-      <div className="relative rounded-xl border border-[#00c875]/25 bg-black/60 px-2.5 py-2">
+      <div className="relative rounded-xl border border-[var(--nc-line)] bg-[#1f2a22] px-2.5 py-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex min-w-0 items-center gap-2">
             <div className="text-[7px] uppercase tracking-widest text-[#00c875]" style={PS2}>
@@ -222,7 +223,7 @@ export default function WordSearchGameBoard({ controllerId }) {
               <button
                 type="button"
                 onClick={() => setWordListOpen((open) => !open)}
-                className="flex items-center gap-1.5 rounded-lg border border-[#BC13FE]/45 bg-[#BC13FE]/10 px-2.5 py-2 text-[#BC13FE]"
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--nc-line)] bg-[#1a2620] px-2.5 py-2 text-[#BC13FE]"
               >
                 <List className="h-4 w-4" />
                 <span className="text-[6px]" style={PS2}>WORDS {foundCount}/{words.length}</span>
@@ -234,7 +235,7 @@ export default function WordSearchGameBoard({ controllerId }) {
         </div>
 
         {phase !== 'setup' && wordListOpen && (
-          <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-xl border border-[#BC13FE]/45 bg-[#090512]/[.98] p-2 shadow-2xl backdrop-blur-xl">
+          <div className="absolute left-0 right-0 top-full z-40 mt-1 rounded-xl border border-[var(--nc-line)] bg-[#1a2620] p-2 shadow-2xl backdrop-blur-xl">
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[6px] uppercase tracking-[.18em] text-[#BC13FE]" style={PS2}>
                 WORD LIST
@@ -274,7 +275,7 @@ export default function WordSearchGameBoard({ controllerId }) {
       </div>
 
       {phase === 'setup' && (
-        <section className="grid gap-2 rounded-xl border border-[#00c875]/25 bg-black/55 p-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
+        <section className="grid gap-2 rounded-xl border border-[var(--nc-line)] bg-[#1f2a22] p-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
           <Select label="MODE" value={mode} onChange={setMode} options={MODES} />
           <Select label="DIFFICULTY" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES} />
           <Select label="CATEGORY" value={category} onChange={setCategory} options={CATEGORIES} />
@@ -282,7 +283,7 @@ export default function WordSearchGameBoard({ controllerId }) {
             type="button"
             disabled={busy || players.length < 1}
             onClick={() => act('start_game', { mode, difficulty, category })}
-            className="self-end rounded-lg border-2 border-[#00c875] bg-[#00c875]/10 px-5 py-3 text-[#00c875] disabled:opacity-40"
+            className="self-end rounded-lg border-2 border-[#63c98a] bg-[#63c98a]/15 px-5 py-3 text-[#00c875] disabled:opacity-40"
             style={{ ...PS2, fontSize: 7 }}
           >
             {busy ? 'STARTING…' : 'START GAME'}
@@ -292,7 +293,7 @@ export default function WordSearchGameBoard({ controllerId }) {
 
       {phase !== 'setup' && (
         <>
-          <section className="relative overflow-hidden rounded-xl border border-[#BC13FE]/20 bg-black/45">
+          <section className="relative overflow-hidden rounded-xl border border-[var(--nc-line)] bg-[#1f2a22]">
             <div className="relative flex items-start justify-center overflow-auto p-2 sm:p-3">
               <WordSearchTurnEffects
                 mode={currentMode}
@@ -324,7 +325,7 @@ export default function WordSearchGameBoard({ controllerId }) {
           <GameControlDeck>
             <GameControlCard
               title="MATCH STATUS"
-              accent="#FFD700"
+              accent="#f2c14e"
               value={phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
               className="min-[680px]:col-span-1"
             >
@@ -349,7 +350,7 @@ export default function WordSearchGameBoard({ controllerId }) {
               </div>
             </GameControlCard>
 
-            <GameControlCard title="PLAYER SCORES" accent="#BC13FE" className="col-span-2 min-[680px]:col-span-2">
+            <GameControlCard title="PLAYER SCORES" accent="#f2c14e" className="col-span-2 min-[680px]:col-span-2">
               <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">
                 {players.map((player) => {
                   const seat = Number(player.seatNumber);
@@ -381,7 +382,7 @@ export default function WordSearchGameBoard({ controllerId }) {
               </div>
             </GameControlCard>
 
-            <GameControlCard title="GAME CONTROLS" accent="#FF5F1F" className="min-[680px]:col-span-1">
+            <GameControlCard title="GAME CONTROLS" accent="#63c98a" className="min-[680px]:col-span-1">
               <div className="mt-2 grid grid-cols-3 gap-1.5">
                 <button
                   type="button"
@@ -427,7 +428,7 @@ export default function WordSearchGameBoard({ controllerId }) {
               <button
                 type="button"
                 onClick={() => act('reset_match')}
-                className="mt-3 rounded-lg border border-[#00c875]/50 px-4 py-2 text-[#00c875]"
+                className="mt-3 rounded-lg border border-[#63c98a]/50 px-4 py-2 text-[#8ee0a9]"
               >
                 NEW BOARD
               </button>
