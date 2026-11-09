@@ -185,7 +185,7 @@ export function SquareBizBoard({
           <div className="absolute -inset-[4%] rounded-[28px] border border-[#ff781f]/35 opacity-60" />
           <div className="relative grid h-full w-full grid-cols-3 grid-rows-3 gap-[2.8%]">
             {board.map((mark, index) => {
-              const canClick = interactive && gameState.canSelectSquare && !mark;
+              const canClick = interactive && !mark;
               return (
                 <button
                   type="button"
@@ -351,7 +351,7 @@ export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), b
                     key={letter}
                     letter={letter}
                     text={text}
-                    disabled={busy || result || gameState.canAnswer !== true}
+                    disabled={busy || result || !gameState.myMark || gameState.myMark !== gameState.currentMark || !['question_read', 'answering'].includes(phase)}
                     selected={!result && selected}
                     correct={correct}
                     wrong={wrong}
