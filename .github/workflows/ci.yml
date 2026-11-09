@@ -8,6 +8,10 @@ on:
     branches:
       - migration/off-railway-guest-platform
 
+concurrency:
+  group: tng-production-verification
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
