@@ -274,27 +274,16 @@ export default function WordSearchGameBoard({ controllerId }) {
         )}
       </div>
 
-      {phase === 'setup' && (
-        <section className="grid gap-2 rounded-xl border border-[var(--nc-line)] bg-[#1f2a22] p-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_auto]">
-          <Select label="MODE" value={mode} onChange={setMode} options={MODES} />
-          <Select label="DIFFICULTY" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES} />
-          <Select label="CATEGORY" value={category} onChange={setCategory} options={CATEGORIES} />
-          <button
-            type="button"
-            disabled={busy || players.length < 1}
-            onClick={() => act('start_game', { mode, difficulty, category })}
-            className="self-end rounded-lg border-2 border-[#63c98a] bg-[#63c98a]/15 px-5 py-3 text-[#00c875] disabled:opacity-40"
-            style={{ ...PS2, fontSize: 7 }}
-          >
-            {busy ? 'STARTING…' : 'START GAME'}
-          </button>
-        </section>
-      )}
-
-      {phase !== 'setup' && (
-        <>
-          <section className="relative overflow-hidden rounded-xl border border-[var(--nc-line)] bg-[#1f2a22]">
-            <div className="relative flex items-start justify-center overflow-auto p-2 sm:p-3">
+      <main className="grid min-h-0 gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
+        <section className="nc-panel relative flex min-h-[420px] min-w-0 items-center justify-center overflow-hidden p-2 sm:p-3">
+          {phase === 'setup' ? (
+            <div className="text-center">
+              <div className="mb-4 text-5xl">🔍</div>
+              <div className="text-sm text-[#f2c14e]" style={PS2}>WORD SEARCH</div>
+              <div className="mt-3 text-xs text-white/40">Configure the match in the host panel, then start the game.</div>
+            </div>
+          ) : (
+            <>
               <WordSearchTurnEffects
                 mode={currentMode}
                 phase={phase}
@@ -305,8 +294,7 @@ export default function WordSearchGameBoard({ controllerId }) {
                 timeRemaining={timeRemaining}
                 roundNumber={gameState.roundNumber || 1}
               />
-
-              <div className="flex min-w-max items-start justify-center">
+              <div className="flex min-w-0 items-center justify-center">
                 <NeonWordSearchBoard
                   grid={grid}
                   words={words}
@@ -315,107 +303,127 @@ export default function WordSearchGameBoard({ controllerId }) {
                   myColor={myColor}
                   canInteract={canInteract && !busy}
                   onSubmit={submitSelection}
-                  maxBoardPx={920}
+                  maxBoardPx={720}
                   zoom={zoom}
                 />
               </div>
-            </div>
-          </section>
+            </>
+          )}
+        </section>
 
-          <GameControlDeck>
-            <GameControlCard
-              title="MATCH STATUS"
-              accent="#f2c14e"
-              value={phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
-              className="min-[680px]:col-span-1"
-            >
-              <div className="mt-2 grid grid-cols-2 gap-2 text-center">
-                <div className="rounded-lg border border-white/10 bg-white/[.02] p-2">
-                  <div className="text-[5px] text-white/25" style={PS2}>FOUND</div>
-                  <div className="mt-1 text-lg text-[#4ade80]" style={PS2}>{foundCount}/{words.length}</div>
+        <aside className="flex min-w-0 flex-col gap-2">
+          {phase === 'setup' ? (
+            <section className="nc-panel shrink-0 p-3">
+              <div className="mb-3 text-[7px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>HOST SETUP</div>
+              <div className="flex flex-col gap-3">
+                <Select label="MODE" value={mode} onChange={setMode} options={MODES} />
+                <Select label="DIFFICULTY" value={difficulty} onChange={setDifficulty} options={DIFFICULTIES} />
+                <Select label="CATEGORY" value={category} onChange={setCategory} options={CATEGORIES} />
+                <button
+                  type="button"
+                  disabled={busy || players.length < 1}
+                  onClick={() => act('start_game', { mode, difficulty, category })}
+                  className="w-full rounded-lg border border-[#8ee0a9]/50 bg-[#8ee0a9]/10 px-4 py-3 text-[#8ee0a9] disabled:opacity-40"
+                  style={{ ...PS2, fontSize: 7 }}
+                >
+                  {busy ? 'STARTING…' : 'START GAME'}
+                </button>
+              </div>
+            </section>
+          ) : (
+            <>
+              <section className="nc-panel shrink-0 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[6px] uppercase tracking-widest text-white/35" style={PS2}>MATCH STATUS</span>
+                  <span className="text-[6px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>{currentMode === 'race' ? 'RACE MODE' : 'TURN MODE'}</span>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-white/[.02] p-2">
-                  <div className="text-[5px] text-white/25" style={PS2}>MODE</div>
-                  <div className="mt-1 text-[8px] text-[#00c875]" style={PS2}>
-                    {currentMode === 'race' ? 'RACE' : 'TURN'}
+                <div className="text-center text-xl text-[#FFD700]" style={PS2}>
+                  {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSED' : '—'}
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <div className="rounded-lg border border-white/10 bg-white/[.02] p-2 text-center">
+                    <div className="text-[5px] text-white/30" style={PS2}>FOUND</div>
+                    <div className="mt-1 text-base text-[#8ee0a9]" style={PS2}>{foundCount}/{words.length}</div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-white/[.02] p-2 text-center">
+                    <div className="text-[5px] text-white/30" style={PS2}>PLAYERS</div>
+                    <div className="mt-1 text-base text-[#8ee0a9]" style={PS2}>{players.length}</div>
                   </div>
                 </div>
-              </div>
-              <div className="mt-2 text-[9px] leading-relaxed text-white/35">
-                {currentMode === 'turn' && phase === 'playing'
-                  ? canInteract
-                    ? 'Seat 1 live — drag across one word.'
-                    : `Waiting for ${getPublicTngName(activePlayer, `Seat ${activeSeat}`)}.`
-                  : 'All active players are searching.'}
-              </div>
-            </GameControlCard>
+                <div className="mt-2 text-[9px] leading-relaxed text-white/40">
+                  {currentMode === 'turn' && phase === 'playing'
+                    ? canInteract ? 'Host seat active — drag across one word.' : `Waiting for ${getPublicTngName(activePlayer, `Seat ${activeSeat}`)}.`
+                    : 'All active players are searching.'}
+                </div>
+              </section>
 
-            <GameControlCard title="PLAYER SCORES" accent="#f2c14e" className="col-span-2 min-[680px]:col-span-2">
-              <div className="mt-2 grid grid-cols-2 gap-1.5 md:grid-cols-3 xl:grid-cols-4">
-                {players.map((player) => {
-                  const seat = Number(player.seatNumber);
-                  const active = currentMode === 'race' ? phase === 'playing' : activeSeat === seat;
-
-                  return (
-                    <div
-                      key={player.playerId}
-                      className={`rounded-lg border px-2 py-2 ${currentMode === 'turn' && active ? 'ws-active-turn-card' : ''}`}
-                      style={{
-                        '--ws-active-color': player.color,
-                        borderColor: active ? player.color : 'rgba(255,255,255,.1)',
-                        background: active ? `${player.color}0b` : 'rgba(255,255,255,.015)',
-                      }}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: player.color }} />
-                            <span className="truncate text-[10px] text-white/70">{getPublicTngName(player)}</span>
-                          </div>
-                          <div className="mt-1 text-[5px] uppercase text-white/25" style={PS2}>SEAT {seat}</div>
+              <section className="nc-panel shrink-0 p-3">
+                <div className="mb-2 text-[6px] uppercase tracking-widest text-white/35" style={PS2}>PLAYERS</div>
+                <div className="flex flex-col gap-1.5">
+                  {players.map((player) => {
+                    const seat = Number(player.seatNumber);
+                    const active = currentMode === 'race' ? phase === 'playing' : activeSeat === seat;
+                    return (
+                      <div key={player.playerId} className="flex items-center justify-between gap-2 rounded-lg border px-2.5 py-2"
+                        style={{ borderColor: active ? `${player.color}99` : 'rgba(255,255,255,.10)', background: active ? `${player.color}0b` : 'rgba(255,255,255,.015)' }}>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: player.color }} />
+                          <span className="truncate text-[10px] text-white/70">{getPublicTngName(player)}</span>
+                          <span className="text-[5px] text-white/25" style={PS2}>SEAT {seat}</span>
                         </div>
-                        <div className="text-lg" style={{ ...PS2, color: player.color }}>{player.score || 0}</div>
+                        <span className="text-sm" style={{ ...PS2, color: player.color }}>{player.score || 0}</span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </GameControlCard>
+                    );
+                  })}
+                </div>
+              </section>
 
-            <GameControlCard title="GAME CONTROLS" accent="#63c98a" className="min-[680px]:col-span-1">
-              <div className="mt-2 grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  disabled={busy || phase !== 'playing'}
-                  onClick={() => act(paused ? 'resume' : 'pause')}
-                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FF5F1F]/50 bg-[#FF5F1F]/5 px-2 py-2 text-[9px] text-[#FF5F1F] disabled:opacity-30"
-                >
-                  {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
-                  {paused ? 'Resume' : 'Pause'}
-                </button>
-                <button
-                  type="button"
-                  disabled={busy || phase !== 'playing' || foundCount >= words.length}
-                  onClick={() => act('reveal_word')}
-                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2 py-2 text-[9px] text-[#FFD700] disabled:opacity-30"
-                >
-                  <Lightbulb className="h-4 w-4" />
-                  Reveal
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => act('reset_match')}
-                  className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-red-500/50 bg-red-500/5 px-2 py-2 text-[9px] text-red-400 disabled:opacity-30"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  Reset
-                </button>
-              </div>
-            </GameControlCard>
+              <section className="nc-panel min-h-0 flex-1 p-3">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-[6px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>WORDS</span>
+                  <span className="text-[6px] text-[#FFD700]" style={PS2}>{foundCount}/{words.length}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {words.map((word) => {
+                    const finder = players.find((player) => String(player.seatNumber) === String(word.foundBy));
+                    const color = word.revealed ? '#777777' : finder?.color || '#8ee0a9';
+                    return (
+                      <div key={word.word} className="rounded-md border px-2 py-2 text-center"
+                        style={{ borderColor: word.found ? `${color}70` : 'rgba(255,255,255,.08)', background: word.found ? `${color}10` : 'rgba(255,255,255,.02)', color: word.found ? color : 'rgba(255,255,255,.45)', textDecoration: word.found ? 'line-through' : 'none' }}>
+                        <div className="text-[7px] tracking-wide" style={PS2}>{word.word}</div>
+                        {word.found && word.points != null && <div className="mt-1 text-[5px] opacity-70" style={PS2}>{word.revealed ? 'REVEALED' : `+${word.points}`}</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </section>
 
+              <section className="nc-panel shrink-0 p-3">
+                <div className="mb-2 text-[6px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>HOST CONTROLS</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  <button type="button" disabled={busy || phase !== 'playing'} onClick={() => act(paused ? 'resume' : 'pause')}
+                    className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FF5F1F]/50 bg-[#FF5F1F]/5 px-2 py-2 text-[9px] text-[#FF8a55] disabled:opacity-30">
+                    {paused ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}{paused ? 'Resume' : 'Pause'}
+                  </button>
+                  <button type="button" disabled={busy || phase !== 'playing' || foundCount >= words.length} onClick={() => act('reveal_word')}
+                    className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-[#FFD700]/50 bg-[#FFD700]/5 px-2 py-2 text-[9px] text-[#FFD700] disabled:opacity-30">
+                    <Lightbulb className="h-4 w-4" />Reveal
+                  </button>
+                  <button type="button" disabled={busy} onClick={() => act('reset_match')}
+                    className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-red-500/50 bg-red-500/5 px-2 py-2 text-[9px] text-red-400 disabled:opacity-30">
+                    <RotateCcw className="h-4 w-4" />Reset
+                  </button>
+                </div>
+              </section>
 
-          </GameControlDeck>
+              <section className="nc-panel shrink-0 p-3">
+                <div className="text-[5px] uppercase tracking-widest text-[#FFD700]/60" style={PS2}>SCORING</div>
+                <div className="mt-1 text-[10px] leading-relaxed text-white/40">10 pts per letter + placement bonus + difficulty bonus. Wrong selection −20. Turn timeout −10.</div>
+              </section>
+            </>
+          )}
+        </aside>
+      </main>
 
           {phase === 'finished' && (
             <section className="rounded-xl border border-green-400/30 bg-green-400/5 p-3 text-center">
