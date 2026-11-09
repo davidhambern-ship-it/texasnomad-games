@@ -27,3 +27,6 @@ jobs:
         run: npm install --legacy-peer-deps --no-audit --no-fund
       - name: Build, lint, typecheck, and game simulations
         run: npm run ci:verify
+      - name: Certify live production rooms and Word Search
+        if: github.event_name == 'push'
+        run: npm run smoke:production
