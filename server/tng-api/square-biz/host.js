@@ -226,7 +226,7 @@ export default async function handler(request, response) {
           account.id,
         );
         participants = await activeParticipants(lockedRoom.id, transaction);
-        state = startSquareBizRound(state, assigned);
+        state = startSquareBizRound(state, assigned, account.id);
       } else if (action === 'replay_question') {
         state = replaySquareBizQuestion(state);
       } else if (action === 'reset_board') {
