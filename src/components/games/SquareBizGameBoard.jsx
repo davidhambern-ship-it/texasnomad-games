@@ -166,7 +166,7 @@ export default function SquareBizGameBoard({ controllerId }) {
           <SquareBizBoard
             compact
             gameState={gameState}
-            interactive={gameState.canSelectSquare === true}
+            interactive={phase === 'board' && Boolean(gameState.myMark) && gameState.myMark === gameState.currentMark}
             onSquareClick={(squareIndex) => act('select_square', { squareIndex })}
             hostLabel="GAME BOARD"
           />
