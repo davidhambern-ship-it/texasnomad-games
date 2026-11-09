@@ -82,8 +82,8 @@ export async function assignSquareBizPlayers(roomId, participants, executor = db
   const active = participants
     .filter((player) => !player.leftAt)
     .sort((a, b) => {
-      if (preferredAccountId && a.accountId === preferredAccountId) return -1;
-      if (preferredAccountId && b.accountId === preferredAccountId) return 1;
+      if (preferredAccountId && String(a.accountId) === String(preferredAccountId)) return -1;
+      if (preferredAccountId && String(b.accountId) === String(preferredAccountId)) return 1;
       return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
     });
 
@@ -179,7 +179,7 @@ export function startSquareBizRound(rawState, participants, preferredAccountId =
       return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
     });
 
-  if (preferredAccountId && !players.some((player) => player.accountId === preferredAccountId)) {
+  if (preferredAccountId && !players.some((player) => String(player.accountId) === String(preferredAccountId))) {
     const error = new Error('The host is not enrolled as a Square Biz contestant. Recreate the room and try again.');
     error.statusCode = 409;
     error.code = 'SQUARE_BIZ_HOST_NOT_ENROLLED';
