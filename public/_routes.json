@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "include": [
+    "/healthz",
+    "/tng-guest",
+    "/tng-guest/*",
+    "/tng-api",
+    "/tng-api/*",
+    "/tng-rooms",
+    "/tng-rooms/*",
+    "/nc-api",
+    "/nc-api/*",
+    "/bs-api",
+    "/bs-api/*"
+  ],
+  "exclude": []
+}
