@@ -131,6 +131,8 @@ const [
   text('server/db/client.js'),
 ]);
 
+const productionSmoke = await text('scripts/production-smoke.mjs');
+
 const pkg = JSON.parse(pkgRaw);
 
 const liveRoutes = [
@@ -211,6 +213,16 @@ ok(
     viralBridge.includes('viral-tn[a-z0-9]{4}') &&
     viralLiveModule.includes('viral-tn[a-z0-9]{4}'),
   'Every core and standalone room generator must create TN plus four characters',
+);
+
+ok(
+  'Word Search production multiplayer smoke is mandatory',
+  productionSmoke.includes("'Word Search live host + player API lifecycle'") &&
+    productionSmoke.includes('/tng-api/word-search/host') &&
+    productionSmoke.includes('/tng-api/word-search/player') &&
+    productionSmoke.includes("action: 'start_game'") &&
+    productionSmoke.includes("action: 'submit_selection'"),
+  'Production certification must create a guest Word Search room, start it, load both clients, and submit a move',
 );
 
 ok(
