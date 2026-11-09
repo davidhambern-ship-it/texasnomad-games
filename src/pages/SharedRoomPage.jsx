@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import '@/components/nomadCards/nc.css';
 import { Link } from 'react-router-dom';
 import { Loader2, Unplug, ShieldCheck } from 'lucide-react';
 
@@ -648,63 +649,7 @@ export default function SharedRoomPage() {
         )}
 
         {phase === 'room' && activeRoom && (
-          <div className="mx-auto max-w-[1650px]">
-            {roomState?.gameId !== 'word-search' && (
-              <>
-              <div className="fixed inset-x-2 top-14 z-40 sm:inset-x-3">
-                <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="flex h-7 w-10 items-center justify-center">
-                      <RoomGameIcon game={roomGame} size="sm" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-black uppercase sm:text-base">
-                          {roomGame?.title || activeRoom.gameId}
-                        </span>
-                        <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
-                          {activeRoom.roomCode}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 flex items-center gap-2">
-                        <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
-                          LIVE HOST
-                        </span>
-                        <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
-                          ROOM OWNER
-                        </span>
-                        <span
-                          className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
-                          style={PS2}
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                          {roomPeople.length} IN ROOM
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-  
-                  <div className="flex shrink-0 items-center gap-1.5">
-                    <button
-                      onClick={endRoom}
-                      disabled={busy}
-                      className="rounded-lg border border-red-500/50 bg-red-500/5 px-2.5 py-2 text-red-400 disabled:opacity-40"
-                      title="Disconnect room"
-                    >
-                      <Unplug className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                      <span className="hidden text-[9px] sm:inline">END</span>
-                    </button>
-                  </div>
-                </div>
-                </div>
-              </div>
-  
-              <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
-              </>
-            )}
-
-
+          <div className="nc-root mx-auto min-h-screen max-w-[1650px] px-2 py-2 sm:px-3">
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
               <p className="text-red-400 mb-4 text-center">{roomPollError}</p>
@@ -731,7 +676,7 @@ export default function SharedRoomPage() {
             )}
 
             {roomState && roomState.status !== 'lobby' && roomState.gameId === 'word-search' && (
-              <div ref={hostBoardRef} className="min-w-0 w-full" style={{ minHeight: hostBoardHeight }}>
+              <div ref={hostBoardRef} className="nc-panel min-w-0 w-full p-3" style={{ minHeight: hostBoardHeight }}>
                 <WordSearchGameBoard
                   controllerId={controllerId}
                   roomCode={activeRoom.roomCode}
@@ -747,13 +692,13 @@ export default function SharedRoomPage() {
               <div
                 className={
                   hostBoardSideBySide
-                    ? 'grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(340px,.85fr)] items-start gap-3'
+                    ? 'grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)] items-start gap-3'
                     : 'min-w-0 space-y-3'
                 }
               >
                 <section
                   ref={hostBoardRef}
-                  className="min-w-0 overflow-hidden rounded-2xl border border-[#BC13FE]/30 bg-[#030207] p-3 shadow-[0_0_35px_rgba(188,19,254,.08)]"
+                  className="nc-panel min-w-0 overflow-hidden p-3"
                   style={{ minHeight: hostBoardHeight }}
                 >
                   <div className="mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
@@ -772,7 +717,7 @@ export default function SharedRoomPage() {
                 </section>
 
                 <section className="min-w-0 space-y-3">
-                  <div className="rounded-xl border border-[#BC13FE]/30 bg-black/70 px-3 py-3">
+                  <div className="nc-panel px-3 py-3">
                     <div className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>ROOM INFORMATION</div>
                     <div className="mt-2 flex items-center justify-between gap-2">
                       <span className="text-xs text-white/45">Share this code</span>
@@ -780,7 +725,7 @@ export default function SharedRoomPage() {
                     </div>
                     <div className="mt-2 text-xs text-white/35">{roomGame?.title || activeRoom.gameId} · {roomPeople.length} connected</div>
                   </div>
-                              <section className="mb-3 rounded-xl border border-white/10 bg-black/55 px-3 py-3">
+                              <section className="nc-panel mb-3 px-3 py-3">
                                 <div className="flex flex-wrap items-center justify-between gap-2">
                                   <div className="flex items-center gap-2">
                                     <div className="text-[7px] uppercase tracking-[0.16em] text-green-400" style={PS2}>
@@ -847,6 +792,15 @@ export default function SharedRoomPage() {
                                   </div>
                                 )}
                               </section>
+                  <section className="nc-panel p-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[7px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>HOST CONTROLS</span>
+                      <button type="button" onClick={endRoom} disabled={busy}
+                        className="rounded-lg border border-red-500/45 px-3 py-2 text-[7px] tracking-widest text-red-300 disabled:opacity-40" style={PS2}>
+                        {busy ? 'ENDING…' : 'DISCONNECT'}
+                      </button>
+                    </div>
+                  </section>
                   {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
                     <div className="rounded-xl border border-white/10 bg-black/50 p-4 text-sm text-white/40">
                       {roomGame?.title || roomState.gameId} host controls are not yet available in this shared console.
