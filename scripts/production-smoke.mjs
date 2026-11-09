@@ -49,6 +49,10 @@ async function json(url, options = {}) {
   return { response, payload };
 }
 
+function responseDebug(response) {
+  return `url=${response.url} type=${response.headers.get('content-type') || 'missing'} proxy=${response.headers.get('x-tng-pages-proxy') || 'no-header'} path=${response.headers.get('x-tng-pages-path') || 'no-header'}`;
+}
+
 function pass(name, detail = '') {
   passes.push({ name, detail });
   console.log(`PASS  ${name}${detail ? ` — ${detail}` : ''}`);
@@ -194,7 +198,7 @@ async function main() {
   await check('service health + database', async () => {
     const { response, payload } = await json(`${SERVICE_ORIGIN}/healthz`);
     if (!response.ok || payload?.ok !== true) {
-      throw new Error(`healthz returned ${response.status}`);
+      throw new Error(`healthz returned ${response.status} ${responseDebug(response)}`);
     }
     if (payload?.database !== 'ok') {
       throw new Error(`database is ${payload?.database || 'unknown'}`);
@@ -452,7 +456,7 @@ async function main() {
         body: JSON.stringify({ name }),
       });
       if (!response.ok || !payload?.token) {
-        throw new Error(`guest identity failed: HTTP ${response.status} ${payload?.error?.message || ''}`);
+        throw new Error(`guest identity failed: HTTP ${response.status} ${payload?.error?.message || ''} ${responseDebug(response)}`);
       }
       return payload.token;
     };
