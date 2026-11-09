@@ -99,7 +99,7 @@ function ZoomControls({ zoom, setZoom }) {
   );
 }
 
-export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople = [], rosterError = '' }) {
+export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople = [], rosterError = '', onEndRoom, endRoomBusy = false }) {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -318,7 +318,13 @@ export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople
               <span className="text-[10px] text-white/45">Share this code</span>
               <span className="font-mono text-lg tracking-[0.16em] text-[#FFD700]">{roomCode || room?.roomCode || '—'}</span>
             </div>
-            <div className="mt-2 text-[9px] text-white/35">WORD SEARCH · {roomPeople.length} connected</div>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-[9px] text-white/35">WORD SEARCH · {roomPeople.length} connected</span>
+              <button type="button" onClick={onEndRoom} disabled={!onEndRoom || endRoomBusy}
+                className="rounded-lg border border-red-500/45 px-3 py-1.5 text-[8px] tracking-widest text-red-300 disabled:opacity-40" style={PS2}>
+                {endRoomBusy ? 'ENDING…' : 'DISCONNECT'}
+              </button>
+            </div>
           </section>
 
           <section className="nc-panel shrink-0 p-3">
