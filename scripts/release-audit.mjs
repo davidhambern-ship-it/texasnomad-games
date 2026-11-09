@@ -236,7 +236,7 @@ ok(
 
 ok(
   'Cloudflare Pages has explicit handlers for each TNG API namespace',
-  pagesFunctionRoutes.every((source) => source.includes('export { onRequest }')),
+  pagesFunctionRoutes.every((source) => source.includes('export async function onRequest')),
   'Every API prefix must have a concrete Pages Function route so it cannot fall through to the SPA',
 );
 
