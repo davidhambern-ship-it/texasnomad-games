@@ -19,7 +19,6 @@ const WIN_LINES = [
   [0,4,8], [2,4,6],
 ];
 
-const INTRO_DURATION_MS = 15_000;
 const QUESTION_READ_MS = 5_000;
 const ANSWER_WINDOW_MS = 12_000;
 const RESULT_HOLD_MS = 2_000;
@@ -162,9 +161,7 @@ function clearQuestion(state) {
   };
 }
 
-export function startSquareBizRound(rawState, participants, {
-  introDurationMs = INTRO_DURATION_MS,
-} = {}) {
+export function startSquareBizRound(rawState, participants) {
   const state = normalizeSquareBizState(rawState);
   const players = [...participants]
     .filter((player) => !player.leftAt)
@@ -180,12 +177,10 @@ export function startSquareBizRound(rawState, participants, {
   const now = Date.now();
   return {
     ...defaultSquareBizState(),
-    phase: 'intro',
+    phase: 'board',
     x_account_id: players[0].accountId,
     o_account_id: players[1].accountId,
     queue_account_ids: players.slice(2).map((player) => player.accountId),
-    intro_started_at: now,
-    intro_ends_at: now + Math.max(1_000, Number(introDurationMs || INTRO_DURATION_MS)),
     round_number: Number(state.round_number || 0) + 1,
     last_action: {
       type: 'round_started',
