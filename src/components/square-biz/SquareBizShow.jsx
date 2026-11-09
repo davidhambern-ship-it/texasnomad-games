@@ -419,7 +419,6 @@ export function SquareBizShowStyles() {
       .sb-open-square { animation: sb-board-hit 2.4s ease-in-out infinite; }
       .sb-current-player { animation: sb-player-pulse 1.4s ease-in-out infinite; }
       .sb-result-pop { animation: sb-result 520ms cubic-bezier(.12,.85,.22,1.25) both; }
-      .sb-intro-slide { animation: sb-intro 760ms cubic-bezier(.2,.8,.2,1) both; }
       .sb-win-line { filter: drop-shadow(0 0 6px currentColor); animation: sb-win 650ms ease-out both; }
       .sb-countdown-hot { animation: sb-hot 750ms ease-in-out infinite; }
       @media (prefers-reduced-motion: reduce) {
