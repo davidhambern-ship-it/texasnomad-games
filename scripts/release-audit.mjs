@@ -116,7 +116,7 @@ const [
   text('src/api/rodeoRumbleLive.js'),
   text('server/viralLive.mjs'),
   text('server/rodeoRumbleLive.mjs'),
-  text('functions/[[path]].js'),
+  text('src/lib/cloudflarePagesProxy.js'),
   text('src/pages/Welcome.jsx'),
   text('src/api/seeThatApi.js'),
   text('src/api/wordWranglerApi.js'),
@@ -437,8 +437,8 @@ ok(
   tngDispatcher.includes("['/word-search/host', wordSearchHost]") &&
     tngDispatcher.includes("['/word-search/player', wordSearchPlayer]") &&
     pagesProxy.includes('EDGE_API') &&
-    pagesProxy.includes('tng-api') &&
-    pagesProxy.includes('tng-guest') &&
+    pagesRoutes.include.includes('/tng-api/*') &&
+    pagesRoutes.include.includes('/tng-guest/*') &&
     guestAuth.includes('verifyGuestIdentity') &&
     guestAuth.includes('public.tng_guest_sessions') &&
     guestAccount.includes("provider !== 'guest'") &&
@@ -462,13 +462,16 @@ ok(
 );
 
 ok(
-  'Cloudflare Pages single API proxy',
-  await exists('functions/[[path]].js') &&
-    pagesProxy.includes('path === "/tng-api"') &&
-    pagesProxy.includes('path.startsWith("/tng-api/")') &&
-    pagesProxy.includes('path.startsWith("/tng-rooms/")') &&
-    pagesProxy.includes('path.startsWith("/tng-guest/")'),
-  'Cloudflare Pages must proxy guest, room-registry, and game API requests to the TNG Edge gateway',
+  'Cloudflare Pages explicit API routes use one shared proxy',
+  await exists('functions/healthz.js') &&
+    await exists('functions/tng-guest/[[path]].js') &&
+    await exists('functions/tng-api/[[path]].js') &&
+    await exists('functions/tng-rooms/[[path]].js') &&
+    await exists('functions/nc-api/[[path]].js') &&
+    await exists('functions/bs-api/[[path]].js') &&
+    pagesProxy.includes('EDGE_API') &&
+    pagesProxy.includes('upstreamUrl.pathname += path'),
+  'Every TNG API namespace must use the shared Pages proxy helper',
 );
 
 ok(
