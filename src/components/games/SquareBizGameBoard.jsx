@@ -154,7 +154,7 @@ export default function SquareBizGameBoard({ controllerId }) {
       <header className="flex items-center justify-between gap-3 rounded-xl border border-[#ff781f]/25 bg-black/55 px-3 py-2.5">
         <div>
           <div className="text-[7px] uppercase tracking-[.22em] text-[#ff781f]" style={MONO}>SQUARE BIZ! · HOST CONTROL</div>
-          <div className="mt-1 text-xs text-white/35">You run the show. Player X and Player O play the board.</div>
+          <div className="mt-1 text-xs text-white/35">You are Player X or O. Play directly on this board.</div>
         </div>
         <div className="rounded-lg border border-[#ffd633]/45 px-3 py-2 text-[7px] uppercase tracking-widest text-[#ffd633]" style={MONO}>
           {status}
