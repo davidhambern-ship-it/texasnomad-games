@@ -99,7 +99,7 @@ function ZoomControls({ zoom, setZoom }) {
   );
 }
 
-export default function WordSearchGameBoard({ controllerId }) {
+export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople = [], rosterError = '' }) {
   const [room, setRoom] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -312,6 +312,42 @@ export default function WordSearchGameBoard({ controllerId }) {
         </section>
 
         <aside className="flex min-w-0 flex-col gap-2">
+          <section className="nc-panel shrink-0 p-3">
+            <div className="mb-2 text-[6px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>ROOM INFORMATION</div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] text-white/45">Share this code</span>
+              <span className="font-mono text-lg tracking-[0.16em] text-[#FFD700]">{roomCode || room?.roomCode || '—'}</span>
+            </div>
+            <div className="mt-2 text-[9px] text-white/35">WORD SEARCH · {roomPeople.length} connected</div>
+          </section>
+
+          <section className="nc-panel shrink-0 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[6px] uppercase tracking-widest text-[#8ee0a9]" style={PS2}>PEOPLE IN ROOM</span>
+              <span className="rounded-full border border-[#8ee0a9]/25 px-2 py-1 text-[9px] text-[#8ee0a9]">{roomPeople.length}</span>
+            </div>
+            {rosterError ? (
+              <div className="text-[10px] text-red-400">{rosterError}</div>
+            ) : roomPeople.length ? (
+              <div className="flex flex-wrap gap-1.5">
+                {roomPeople.map((person, index) => {
+                  const isHost = ['host', 'host_player'].includes(person.role);
+                  const label = isHost ? 'HOST' : person.role === 'spectator' ? 'SPECTATOR' : person.seatNumber ? `SEAT ${person.seatNumber}` : 'PLAYER';
+                  const accent = isHost ? '#FFD700' : person.role === 'spectator' ? '#8DEEFF' : '#BC13FE';
+                  return (
+                    <div key={person.accountId || person.handle || `${person.role}-${index}`} className="min-w-0 flex-1 rounded-lg border px-2.5 py-2"
+                      style={{ borderColor: `${accent}55`, background: `${accent}0b` }}>
+                      <div className="truncate text-[10px] text-white/80">{person.displayName || person.name || person.handle || 'Player'}</div>
+                      <div className="mt-1 text-[5px] tracking-widest" style={{ ...PS2, color: accent }}>{label}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="text-[10px] text-white/35">Waiting for players to join.</div>
+            )}
+          </section>
+
           {phase === 'setup' ? (
             <section className="nc-panel shrink-0 p-3">
               <div className="mb-3 text-[7px] uppercase tracking-widest text-[#f2c14e]" style={PS2}>HOST SETUP</div>
