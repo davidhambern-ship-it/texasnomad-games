@@ -14,6 +14,8 @@ import {
   publicSquareBizState,
   replaySquareBizQuestion,
   resetSquareBizBoard,
+  selectSquareBizSquare,
+  answerSquareBizQuestion,
   startSquareBizRound,
   syncSquareBizRoster,
 } from '../../games/square-biz.js';
@@ -136,7 +138,7 @@ async function refreshRoomState(room) {
   };
 }
 
-async function responsePayload(room) {
+async function responsePayload(room, viewerAccountId) {
   const refreshed = await refreshRoomState(room);
   return {
     room: {
@@ -149,7 +151,7 @@ async function responsePayload(room) {
       gameState: publicSquareBizState(
         refreshed.room.displayState?.gameState || {},
         refreshed.participants,
-        null,
+        viewerAccountId,
         { host: true },
       ),
     },
@@ -162,14 +164,14 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { hostSession } = await requireController(request, {
+    const { account, hostSession } = await requireController(request, {
       hostSessionRequired: true,
     });
 
     const room = await findRoom(hostSession.id);
 
     if (request.method === 'GET') {
-      return sendJson(response, 200, await responsePayload(room));
+      return sendJson(response, 200, await responsePayload(room, account.id));
     }
 
     const action = String(request.body?.action || '').trim();
@@ -178,6 +180,8 @@ export default async function handler(request, response) {
       'replay_question',
       'reset_board',
       'next_turn',
+      'select_square',
+      'answer',
     ]);
 
     if (!allowed.has(action)) {
@@ -219,12 +223,24 @@ export default async function handler(request, response) {
         state = resetSquareBizBoard(state);
       } else if (action === 'next_turn') {
         state = forceNextSquareBizTurn(state);
+      } else if (action === 'select_square') {
+        state = await selectSquareBizSquare(state, {
+          actorAccountId: account.id,
+          squareIndex: request.body?.squareIndex,
+          executor: transaction,
+        });
+      } else if (action === 'answer') {
+        state = await answerSquareBizQuestion(state, {
+          actorAccountId: account.id,
+          answer: request.body?.answer,
+          executor: transaction,
+        });
       }
 
       return persistProjectedState(lockedRoom, state, transaction);
     });
 
-    return sendJson(response, 200, await responsePayload(updatedRoom));
+    return sendJson(response, 200, await responsePayload(updatedRoom, account.id));
   } catch (error) {
     return sendError(response, error);
   }
