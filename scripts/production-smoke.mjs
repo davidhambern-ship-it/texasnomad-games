@@ -197,8 +197,8 @@ async function main() {
 
   await check('service health + database', async () => {
     const { response, payload } = await json(`${SERVICE_ORIGIN}/healthz`);
-    if (!response.ok || payload?.ok !== true) {
-      throw new Error(`healthz returned ${response.status} ${responseDebug(response)}`);
+    if (!response.ok || payload?.ok !== true || response.headers.get('x-tng-pages-proxy') !== 'forwarded') {
+      throw new Error(`healthz returned HTTP ${response.status} or bypassed Pages Functions: ${responseDebug(response)}`);
     }
     if (payload?.database !== 'ok') {
       throw new Error(`database is ${payload?.database || 'unknown'}`);
