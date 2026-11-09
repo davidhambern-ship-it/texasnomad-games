@@ -87,9 +87,9 @@ export default function SquareBizGameBoard({ controllerId }) {
     try {
       const payload = await tngApi.squareBiz.getHostState(controllerId);
       setRoom(payload.room || null);
-      setError('');
     } catch (refreshError) {
-      setError(refreshError?.message || 'Could not load Square Biz Host state.');
+      // Keep action errors visible; background polling must not erase them.
+      setError((current) => current || refreshError?.message || 'Could not load Square Biz Host state.');
     }
   }, [controllerId]);
 
@@ -105,7 +105,14 @@ export default function SquareBizGameBoard({ controllerId }) {
   }, []);
 
   const act = useCallback(async (action, payload = {}) => {
-    if (!controllerId || busy) return false;
+    if (!controllerId) {
+      setError('Host controller is not connected. Reopen the host room and try again.');
+      return false;
+    }
+    if (busy) {
+      setError('The previous move is still syncing. Please try again in a moment.');
+      return false;
+    }
 
     setBusy(true);
     setError('');
