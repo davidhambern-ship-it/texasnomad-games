@@ -514,7 +514,14 @@ export default function SharedRoomPage() {
     setError('');
 
     try {
-      const payload = await tngApi.host.startGame(controllerId);
+      // Square Biz owns its own phase and player assignment. Starting it
+      // through the generic room endpoint leaves an empty gameState, which
+      // the Square Biz state refresh correctly normalizes back to the lobby.
+      // Start the first round through its dedicated API instead.
+      const isSquareBiz = (roomState?.gameId || activeRoom?.gameId) === 'square-biz';
+      const payload = isSquareBiz
+        ? await tngApi.squareBiz.hostAction(controllerId, 'start_round')
+        : await tngApi.host.startGame(controllerId);
       setRoomState(payload.room);
       setActiveRoom((current) => ({ ...current, ...payload.room }));
     } catch (startError) {
