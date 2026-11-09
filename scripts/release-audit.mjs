@@ -243,6 +243,7 @@ ok(
 ok(
   'Word Search production multiplayer smoke is mandatory',
   productionSmoke.includes("'Word Search live host + player API lifecycle'") &&
+    productionSmoke.includes('process.env.TNG_SERVICE_ORIGIN || PUBLIC_ORIGIN') &&
     productionSmoke.includes('/tng-api/word-search/host') &&
     productionSmoke.includes('/tng-api/word-search/player') &&
     productionSmoke.includes("action: 'start_game'") &&
