@@ -123,7 +123,6 @@ export default function SquareBizGameBoard({ controllerId }) {
 
   const status = useMemo(() => {
     if (phase === 'lobby') return players.length >= 2 ? 'READY TO START' : 'WAITING FOR PLAYERS';
-    if (phase === 'intro') return 'SHOW OPEN';
     if (phase === 'board') return `PLAYER ${gameState.currentMark} PICKS`;
     if (phase === 'question_read') return 'QUESTION ON SCREEN';
     if (phase === 'answering') return `PLAYER ${gameState.currentMark} ANSWERING`;
@@ -273,23 +272,9 @@ export default function SquareBizGameBoard({ controllerId }) {
           <Control
             tone="#4ade80"
             disabled={busy || players.length < 2 || !['lobby','finished'].includes(phase)}
-            onClick={() => act('start_round', { introDurationMs: 30_800 })}
+            onClick={() => act('start_round')}
           >
             ▶ START ROUND
-          </Control>
-          <Control
-            tone="#ff781f"
-            disabled={busy || phase !== 'intro'}
-            onClick={() => act('skip_intro')}
-          >
-            ⏭ SKIP INTRO
-          </Control>
-          <Control
-            tone="#9f45ff"
-            disabled={busy || !gameState.roundNumber}
-            onClick={() => act('replay_intro', { introDurationMs: 30_800 })}
-          >
-            ↻ REPLAY INTRO
           </Control>
           <Control
             tone="#ffd633"
