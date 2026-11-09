@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Minus, Plus, RotateCcw, Pause, Play, Lightbulb, ChevronDown, ChevronUp, List } from 'lucide-react';
 
 import { tngApi } from '@/api/tngApi';
@@ -105,6 +105,8 @@ export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople
   const [clock, setClock] = useState(Date.now());
   const [zoom, setZoom] = useState(1);
   const [wordListOpen, setWordListOpen] = useState(false);
+  const refreshInFlightRef = useRef(false);
+  const actionErrorRef = useRef(false);
 
   const gameState = room?.gameState || {};
   const phase = gameState.phase || 'setup';
@@ -123,20 +125,23 @@ export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople
     (currentMode === 'race' || activeSeat === 1);
 
   const refresh = useCallback(async () => {
-    if (!controllerId) return;
+    if (!controllerId || busy || refreshInFlightRef.current) return;
 
+    refreshInFlightRef.current = true;
     try {
       const payload = await tngApi.wordSearch.getHostState(controllerId);
       setRoom(payload.room || null);
-      setError('');
+      if (!actionErrorRef.current) setError('');
     } catch (refreshError) {
       setError(refreshError?.message || 'Could not load Word Search Host state.');
+    } finally {
+      refreshInFlightRef.current = false;
     }
-  }, [controllerId]);
+  }, [busy, controllerId]);
 
   useEffect(() => {
     refresh();
-    const interval = window.setInterval(refresh, 800);
+    const interval = window.setInterval(refresh, 1200);
     return () => window.clearInterval(interval);
   }, [refresh]);
 
@@ -149,6 +154,7 @@ export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople
     if (!controllerId || busy) return false;
 
     setBusy(true);
+    actionErrorRef.current = false;
     setError('');
 
     try {
@@ -156,6 +162,7 @@ export default function WordSearchGameBoard({ controllerId, roomCode, roomPeople
       setRoom(result.room || null);
       return true;
     } catch (actionError) {
+      actionErrorRef.current = true;
       setError(actionError?.message || 'That Word Search action could not be completed.');
       return false;
     } finally {
