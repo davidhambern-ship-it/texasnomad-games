@@ -288,7 +288,7 @@ function AnswerButton({ letter, text, disabled, selected, correct, wrong, onClic
   );
 }
 
-export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), busy = false }) {
+export function SquareBizCueCard({ gameState = {}, viewerMark = gameState.myMark, onAnswer, now = Date.now(), busy = false }) {
   const phase = gameState.phase;
   const question = gameState.currentQuestion;
   if (!question || !['question_read', 'answering', 'result'].includes(phase)) return null;
@@ -351,7 +351,7 @@ export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), b
                     key={letter}
                     letter={letter}
                     text={text}
-                    disabled={busy || result || !gameState.myMark || gameState.myMark !== gameState.currentMark || !['question_read', 'answering'].includes(phase)}
+                    disabled={busy || result || !viewerMark || viewerMark !== gameState.currentMark || !['question_read', 'answering'].includes(phase)}
                     selected={!result && selected}
                     correct={correct}
                     wrong={wrong}
