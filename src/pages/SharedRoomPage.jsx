@@ -649,56 +649,59 @@ export default function SharedRoomPage() {
 
         {phase === 'room' && activeRoom && (
           <div className="mx-auto max-w-[1650px]">
-            <div className="fixed inset-x-2 top-14 z-40 sm:inset-x-3">
-              <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="flex h-7 w-10 items-center justify-center">
-                    <RoomGameIcon game={roomGame} size="sm" />
-                  </span>
-                  <div className="min-w-0">
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span className="truncate text-sm font-black uppercase sm:text-base">
-                        {roomGame?.title || activeRoom.gameId}
-                      </span>
-                      <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
-                        {activeRoom.roomCode}
-                      </span>
-                    </div>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
-                        LIVE HOST
-                      </span>
-                      <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
-                        ROOM OWNER
-                      </span>
-                      <span
-                        className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
-                        style={PS2}
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
-                        {roomPeople.length} IN ROOM
-                      </span>
+            {roomState?.gameId !== 'word-search' && (
+              <div className="fixed inset-x-2 top-14 z-40 sm:inset-x-3">
+                <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="flex h-7 w-10 items-center justify-center">
+                      <RoomGameIcon game={roomGame} size="sm" />
+                    </span>
+                    <div className="min-w-0">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-black uppercase sm:text-base">
+                          {roomGame?.title || activeRoom.gameId}
+                        </span>
+                        <span className="shrink-0 font-mono text-sm tracking-[0.14em] text-[#FFD700] sm:text-base">
+                          {activeRoom.roomCode}
+                        </span>
+                      </div>
+                      <div className="mt-0.5 flex items-center gap-2">
+                        <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
+                          LIVE HOST
+                        </span>
+                        <span className="text-[6px] uppercase tracking-widest text-[#BC13FE]" style={PS2}>
+                          ROOM OWNER
+                        </span>
+                        <span
+                          className="inline-flex items-center gap-1 text-[6px] uppercase tracking-widest text-green-400"
+                          style={PS2}
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-green-400" />
+                          {roomPeople.length} IN ROOM
+                        </span>
+                      </div>
                     </div>
                   </div>
+  
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <button
+                      onClick={endRoom}
+                      disabled={busy}
+                      className="rounded-lg border border-red-500/50 bg-red-500/5 px-2.5 py-2 text-red-400 disabled:opacity-40"
+                      title="Disconnect room"
+                    >
+                      <Unplug className="h-4 w-4 sm:mr-1.5 sm:inline" />
+                      <span className="hidden text-[9px] sm:inline">END</span>
+                    </button>
+                  </div>
                 </div>
-
-                <div className="flex shrink-0 items-center gap-1.5">
-                  <button
-                    onClick={endRoom}
-                    disabled={busy}
-                    className="rounded-lg border border-red-500/50 bg-red-500/5 px-2.5 py-2 text-red-400 disabled:opacity-40"
-                    title="Disconnect room"
-                  >
-                    <Unplug className="h-4 w-4 sm:mr-1.5 sm:inline" />
-                    <span className="hidden text-[9px] sm:inline">END</span>
-                  </button>
                 </div>
               </div>
-              </div>
-            </div>
+  
+              <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
+            )}
 
-            <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
 
             {error && <p className="text-red-400 mb-4 text-center">{error}</p>}
             {!roomState && roomPollError && (
@@ -732,6 +735,8 @@ export default function SharedRoomPage() {
                   roomCode={activeRoom.roomCode}
                   roomPeople={roomPeople}
                   rosterError={rosterError}
+                  onEndRoom={endRoom}
+                  endRoomBusy={busy}
                 />
               </div>
             )}
