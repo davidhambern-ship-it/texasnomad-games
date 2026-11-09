@@ -534,9 +534,12 @@ export function publicSquareBizState(rawState, participants = [], viewerAccountI
     roundNumber: state.round_number,
     players,
     currentPlayerAccountId: currentAccountId,
-    myMark: participants.find((participant) => participant.accountId === viewerAccountId)?.accountId === state.x_account_id
+    // Resolve the viewer's mark from the round's authoritative player IDs.
+    // Do not require a matching roster row: the host controller is authenticated
+    // independently and may not be represented in a freshly refreshed roster.
+    myMark: String(viewerAccountId || '') === String(state.x_account_id || '')
       ? 'X'
-      : participants.find((participant) => participant.accountId === viewerAccountId)?.accountId === state.o_account_id
+      : String(viewerAccountId || '') === String(state.o_account_id || '')
         ? 'O'
         : null,
     myQueuePosition: (() => {
@@ -545,10 +548,12 @@ export function publicSquareBizState(rawState, participants = [], viewerAccountI
     })(),
     canSelectSquare:
       state.phase === 'board' &&
-      String(viewerAccountId || '') === String(currentAccountId || ''),
+      Boolean(viewerAccountId) &&
+      String(viewerAccountId) === String(currentAccountId || ''),
     canAnswer:
       ['question_read', 'answering'].includes(state.phase) &&
-      String(viewerAccountId || '') === String(currentAccountId || ''),
+      Boolean(viewerAccountId) &&
+      String(viewerAccountId) === String(currentAccountId || ''),
     lastAction: state.last_action,
   };
 }
