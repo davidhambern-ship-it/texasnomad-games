@@ -18,7 +18,17 @@ export async function onRequest(context) {
     path === "/bs-api" ||
     path.startsWith("/bs-api/");
 
-  if (!isApi) return next();
+  if (!isApi) {
+    const response = await next();
+    const responseHeaders = new Headers(response.headers);
+    responseHeaders.set("X-TNG-Pages-Proxy", "bypass");
+    responseHeaders.set("X-TNG-Pages-Path", path);
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+    });
+  }
 
   const upstreamUrl = new URL(EDGE_API);
   upstreamUrl.pathname += path;
@@ -37,7 +47,15 @@ export async function onRequest(context) {
   });
 
   try {
-    return await fetch(upstreamRequest);
+    const upstreamResponse = await fetch(upstreamRequest);
+    const responseHeaders = new Headers(upstreamResponse.headers);
+    responseHeaders.set("X-TNG-Pages-Proxy", "forwarded");
+    responseHeaders.set("X-TNG-Pages-Path", path);
+    return new Response(upstreamResponse.body, {
+      status: upstreamResponse.status,
+      statusText: upstreamResponse.statusText,
+      headers: responseHeaders,
+    });
   } catch (error) {
     console.error("[TNG Pages API proxy]", error);
     return Response.json({
@@ -45,6 +63,10 @@ export async function onRequest(context) {
         code: "UPSTREAM_UNAVAILABLE",
         message: "The TNG game service is temporarily unavailable.",
       },
-    }, { status: 503, headers: { "Cache-Control": "no-store" } });
+    }, { status: 503, headers: {
+      "Cache-Control": "no-store",
+      "X-TNG-Pages-Proxy": "upstream-error",
+      "X-TNG-Pages-Path": path,
+    } });
   }
 }
