@@ -735,7 +735,9 @@ export default function SharedRoomPage() {
               <div
                 className={
                   hostBoardSideBySide
-                    ? 'grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)] items-start gap-3'
+                    ? roomState?.gameId === 'square-biz'
+                      ? 'grid min-w-0 grid-cols-[minmax(0,1.8fr)_minmax(240px,.5fr)] items-start gap-3'
+                      : 'grid min-w-0 grid-cols-[minmax(0,1.15fr)_minmax(320px,.85fr)] items-start gap-3'
                     : 'min-w-0 space-y-3'
                 }
               >
