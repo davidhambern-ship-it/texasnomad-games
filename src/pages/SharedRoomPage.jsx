@@ -740,7 +740,18 @@ export default function SharedRoomPage() {
               />
             )}
 
-            {roomState && roomState.status !== 'lobby' && (
+            {roomState && roomState.status !== 'lobby' && roomState.gameId === 'word-search' && (
+              <div ref={hostBoardRef} className="min-w-0 w-full" style={{ minHeight: hostBoardHeight }}>
+                <WordSearchGameBoard
+                  controllerId={controllerId}
+                  roomCode={activeRoom.roomCode}
+                  roomPeople={roomPeople}
+                  rosterError={rosterError}
+                />
+              </div>
+            )}
+
+            {roomState && roomState.status !== 'lobby' && roomState.gameId !== 'word-search' && (
               <div
                 className={
                   hostBoardSideBySide
@@ -761,7 +772,6 @@ export default function SharedRoomPage() {
                   </div>
                   {roomState?.gameId === 'hangman' && <HangmanGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'spades' && <SpadesGameBoard controllerId={controllerId} />}
-                  {roomState?.gameId === 'word-search' && <WordSearchGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
                   {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
