@@ -422,28 +422,22 @@ export default function WordSearchGameBoard({ controllerId }) {
               </section>
             </>
           )}
-        </aside>
-      </main>
-
           {phase === 'finished' && (
-            <section className="rounded-xl border border-green-400/30 bg-green-400/5 p-3 text-center">
-              <div className="text-[7px] uppercase tracking-widest text-green-400" style={PS2}>GAME OVER</div>
+            <section className="nc-panel shrink-0 p-3 text-center">
+              <div className="text-[7px] uppercase tracking-widest text-[#8ee0a9]" style={PS2}>GAME OVER</div>
               <div className="mt-2 text-xs text-white/50">
                 {gameState.winnerSeat
                   ? `Seat ${gameState.winnerSeat} wins with ${scores[String(gameState.winnerSeat)] || 0} points.`
                   : gameState.message || 'Word Search complete.'}
               </div>
-              <button
-                type="button"
-                onClick={() => act('reset_match')}
-                className="mt-3 rounded-lg border border-[#63c98a]/50 px-4 py-2 text-[#8ee0a9]"
-              >
+              <button type="button" onClick={() => act('reset_match')}
+                className="mt-3 rounded-lg border border-[#8ee0a9]/50 px-4 py-2 text-[#8ee0a9]">
                 NEW BOARD
               </button>
             </section>
           )}
-        </>
-      )}
+        </aside>
+      </main>
     </div>
   );
 }
