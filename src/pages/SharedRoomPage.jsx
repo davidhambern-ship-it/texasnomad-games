@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '@/components/nomadCards/nc.css';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Loader2, Unplug, ShieldCheck } from 'lucide-react';
 
 import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
@@ -40,6 +40,7 @@ function detectHostViewport() {
 }
 
 export default function SharedRoomPage() {
+  const location = useLocation();
   const { user, logout } = useAuth();
   const [phase, setPhase] = useState('loading');
   const [controllerId, setControllerId] = useState(null);
@@ -63,6 +64,17 @@ export default function SharedRoomPage() {
       ? ''
       : String(new URLSearchParams(window.location.search).get('game') || '').trim(),
   );
+
+  // React Router can reuse this page when navigating from one /room?game=... URL
+  // to another. Refresh the requested game for every search-param change instead
+  // of keeping the first game's ID for the lifetime of the mounted component.
+  useEffect(() => {
+    const nextGameId = String(new URLSearchParams(location.search).get('game') || '').trim();
+    if (nextGameId !== requestedGameIdRef.current) {
+      requestedGameIdRef.current = nextGameId;
+      requestedGameHandledRef.current = false;
+    }
+  }, [location.search]);
 
   function clearRequestedGameParam() {
     if (typeof window === 'undefined') return;
@@ -453,7 +465,7 @@ export default function SharedRoomPage() {
     clearRequestedGameParam();
 
     createRoom(game);
-  }, [phase, controllerId, activeRoom, busy]);
+  }, [phase, controllerId, activeRoom, busy, location.search]);
 
   async function updateGameState(statePatch) {
     if (!controllerId) return;
