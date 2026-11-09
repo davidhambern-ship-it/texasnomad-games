@@ -40,8 +40,6 @@ export function defaultSquareBizState() {
     correct_answer: null,
     correct_answer_text: null,
     used_question_ids: [],
-    intro_started_at: null,
-    intro_ends_at: null,
     choices_reveal_at: null,
     answer_deadline_at: null,
     result_ends_at: null,
@@ -189,20 +187,6 @@ export function startSquareBizRound(rawState, participants) {
   };
 }
 
-export function skipSquareBizIntro(rawState) {
-  const state = normalizeSquareBizState(rawState);
-  if (state.phase !== 'intro') return state;
-
-  return {
-    ...state,
-    phase: 'board',
-    intro_ends_at: Date.now(),
-    last_action: {
-      type: 'intro_skipped',
-      timestamp: Date.now(),
-    },
-  };
-}
 
 export async function selectSquareBizSquare(rawState, {
   actorAccountId,
@@ -406,17 +390,6 @@ export function advanceSquareBizClock(rawState) {
   let state = normalizeSquareBizState(rawState);
   const now = Date.now();
 
-  if (state.phase === 'intro' && state.intro_ends_at && now >= Number(state.intro_ends_at)) {
-    state = {
-      ...state,
-      phase: 'board',
-      last_action: {
-        type: 'intro_complete',
-        timestamp: now,
-      },
-    };
-  }
-
   if (state.phase === 'question_read' && state.choices_reveal_at && now >= Number(state.choices_reveal_at)) {
     state = {
       ...state,
@@ -534,8 +507,6 @@ export function publicSquareBizState(rawState, participants = [], viewerAccountI
     answerResult: state.answer_result,
     correctAnswer: revealAnswer || host ? state.correct_answer : null,
     correctAnswerText: revealAnswer || host ? state.correct_answer_text : null,
-    introStartedAt: state.intro_started_at,
-    introEndsAt: state.intro_ends_at,
     questionReplayNonce: state.question_replay_nonce,
     winner: state.winner,
     winningLine: state.winning_line,
