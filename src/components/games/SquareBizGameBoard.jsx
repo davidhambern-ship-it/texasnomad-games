@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { tngApi } from '@/api/tngApi';
 import {
   SquareBizBoard,
+  SquareBizCueCard,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
 import { getPublicTngName } from '@/lib/publicTngName';
@@ -164,42 +165,18 @@ export default function SquareBizGameBoard({ controllerId }) {
         <section className="relative flex min-h-[390px] items-center justify-center overflow-hidden rounded-xl border border-[#ff781f]/15 bg-[#08030e]/70 p-2">
           <SquareBizBoard
             compact
-            gameState={{ ...gameState, canSelectSquare: false }}
-            interactive={false}
+            gameState={gameState}
+            interactive={gameState.canSelectSquare === true}
+            onSquareClick={(squareIndex) => act('select_square', { squareIndex })}
             hostLabel="GAME BOARD"
           />
 
-          {['question_read', 'answering', 'result'].includes(phase) && (
-            <div className="absolute inset-0 z-30 bg-[#05020a]/25 backdrop-blur-[1.5px]">
-              <div className="absolute inset-x-3 bottom-3 rounded-xl border border-[#ffd633]/25 bg-[#10091a]/94 p-3">
-                <div className="text-[6px] uppercase tracking-widest text-[#ffd633]" style={MONO}>
-                  CURRENT CUE · {phase === 'question_read' ? 'READING' : phase === 'answering' ? 'CHOICES LIVE' : 'RESULT'}
-                </div>
-                <div className="mt-2 text-sm font-black text-white/85">{currentQuestion?.question}</div>
-                {phase !== 'question_read' && Array.isArray(currentQuestion?.choices) && (
-                  <div className="mt-2 grid grid-cols-2 gap-1.5">
-                    {currentQuestion.choices.map((choice, index) => {
-                      const letter = ['A','B','C','D'][index];
-                      const correct = phase === 'result' && gameState.correctAnswer === letter;
-                      const selected = gameState.selectedAnswer === letter;
-                      return (
-                        <div
-                          key={letter}
-                          className="rounded-lg border px-2 py-1.5 text-[10px]"
-                          style={{
-                            borderColor: correct ? '#4ade80' : selected ? '#ffd633' : 'rgba(255,255,255,.10)',
-                            color: correct ? '#4ade80' : selected ? '#ffd633' : 'rgba(255,255,255,.55)',
-                          }}
-                        >
-                          <b>{letter}.</b> {choice}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <SquareBizCueCard
+            gameState={gameState}
+            onAnswer={(answer) => act('answer', { answer })}
+            now={clock}
+            busy={busy}
+          />}
         </section>
 
         <aside className="flex min-h-0 flex-col gap-2">
