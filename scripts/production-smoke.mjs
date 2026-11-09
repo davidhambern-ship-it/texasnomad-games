@@ -208,16 +208,20 @@ async function main() {
     return payload?.service || 'ok';
   });
 
-  await check('VIRAL relay health', async () => {
-    const { response, payload } = await json(`${SERVICE_ORIGIN}/viral-live/health`);
-    if (!response.ok || payload?.ok !== true) throw new Error(`status ${response.status}`);
-    return 'relay responding';
+  await check('OUT! game service health', async () => {
+    const { response, payload } = await json(`${SERVICE_ORIGIN}/nc-api/health`);
+    if (!response.ok || payload?.ok !== true || payload?.service !== 'out') {
+      throw new Error(`OUT! health returned HTTP ${response.status}`);
+    }
+    return `rooms=${payload.rooms}, persistent=${payload.persistent}`;
   });
 
-  await check('Rodeo Rumble relay health', async () => {
-    const { response, payload } = await json(`${SERVICE_ORIGIN}/rr-api/health`);
-    if (!response.ok || payload?.ok !== true) throw new Error(`status ${response.status}`);
-    return 'relay responding';
+  await check('Battle Sudoku game service health', async () => {
+    const { response, payload } = await json(`${SERVICE_ORIGIN}/bs-api/health`);
+    if (!response.ok || payload?.ok !== true || payload?.service !== 'battle-sudoku') {
+      throw new Error(`Battle Sudoku health returned HTTP ${response.status}`);
+    }
+    return `rooms=${payload.rooms}, persistent=${payload.persistent}`;
   });
 
   const publicRoutes = [
