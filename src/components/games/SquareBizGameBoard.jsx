@@ -166,13 +166,14 @@ export default function SquareBizGameBoard({ controllerId }) {
           <SquareBizBoard
             compact
             gameState={gameState}
-            interactive={phase === 'board' && Boolean(gameState.myMark) && gameState.myMark === gameState.currentMark}
+            interactive={phase === 'board' && gameState.currentMark === 'X'}
             onSquareClick={(squareIndex) => act('select_square', { squareIndex })}
             hostLabel="GAME BOARD"
           />
 
           <SquareBizCueCard
             gameState={gameState}
+            viewerMark="X"
             onAnswer={(answer) => act('answer', { answer })}
             now={clock}
             busy={busy}
