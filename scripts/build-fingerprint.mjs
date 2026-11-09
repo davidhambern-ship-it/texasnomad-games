@@ -9,6 +9,7 @@ const INCLUDED_DIRECTORIES = [
   'src',
   'public',
   'server',
+  'functions',
 ];
 
 const INCLUDED_FILES = [
