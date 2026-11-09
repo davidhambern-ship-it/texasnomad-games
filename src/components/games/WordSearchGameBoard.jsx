@@ -4,10 +4,6 @@ import { Loader2, Minus, Plus, RotateCcw, Pause, Play, Lightbulb, ChevronDown, C
 import { tngApi } from '@/api/tngApi';
 import NeonWordSearchBoard from '@/components/word-search/NeonWordSearchBoard';
 import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffects';
-import {
-  GameControlDeck,
-  GameControlCard,
-} from '@/components/games/GameWorkspaceLayout';
 import { getPublicTngName } from '@/lib/publicTngName';
 import '@/components/nomadCards/nc.css';
 
