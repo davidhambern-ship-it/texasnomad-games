@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
@@ -24,6 +24,8 @@ export default function NeonWordSearchPlayer({ roomCode }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(Date.now());
+  const refreshInFlightRef = useRef(false);
+  const actionErrorRef = useRef(false);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -44,21 +46,24 @@ export default function NeonWordSearchPlayer({ roomCode }) {
     (mode === 'race' || activeSeat === seatNumber);
 
   const refresh = useCallback(async () => {
-    if (!deviceId || !roomCode) return;
+    if (!deviceId || !roomCode || busy || refreshInFlightRef.current) return;
 
+    refreshInFlightRef.current = true;
     try {
       const payload = await tngApi.wordSearch.getPlayerState(deviceId, roomCode);
       setRoom(payload.room || null);
       setParticipant(payload.participant || null);
-      setError('');
+      if (!actionErrorRef.current) setError('');
     } catch (stateError) {
       setError(stateError?.message || 'The Word Search room could not be loaded.');
+    } finally {
+      refreshInFlightRef.current = false;
     }
-  }, [deviceId, roomCode]);
+  }, [busy, deviceId, roomCode]);
 
   useEffect(() => {
     refresh();
-    const interval = window.setInterval(refresh, 800);
+    const interval = window.setInterval(refresh, 1200);
     return () => window.clearInterval(interval);
   }, [refresh]);
 
@@ -71,6 +76,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
     if (!deviceId || !roomCode || busy || !canInteract) return;
 
     setBusy(true);
+    actionErrorRef.current = false;
     setError('');
 
     try {
@@ -83,6 +89,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
       setRoom(payload.room || null);
       setParticipant(payload.participant || null);
     } catch (actionError) {
+      actionErrorRef.current = true;
       setError(actionError?.message || 'That selection could not be submitted.');
     } finally {
       setBusy(false);
