@@ -446,24 +446,48 @@ export default function SharedRoomPage() {
       return;
     }
 
-    // If this Host recovered an existing room, preserve it. The user can end
-    // that room explicitly before starting another one.
-    if (
-      activeRoom ||
-      phase === 'room' ||
-      phase === 'stale-room' ||
-      phase === 'host-recovery'
-    ) {
+    // A new game selection must not silently keep rendering the previously
+    // recovered room (for example BFF). Preserve the room only when the
+    // requested game is the same; otherwise end the old room before opening
+    // the selected game's normal create-room flow.
+    if (phase === 'host-recovery' || !controllerId || busy) return;
+
+    if (activeRoom) {
+      if (activeRoom.gameId === requestedGameId) {
+        requestedGameHandledRef.current = true;
+        clearRequestedGameParam();
+        return;
+      }
+
+      if (phase !== 'room' && phase !== 'stale-room') return;
+
       requestedGameHandledRef.current = true;
       clearRequestedGameParam();
+      setBusy(true);
+      setError('');
+      (async () => {
+        try {
+          await tngApi.host.endRoom(controllerId);
+          setActiveRoom(null);
+          setRoomState(null);
+          setRoomPeople([]);
+          setRosterError('');
+          setSelectedGame(null);
+          setPendingGame(game);
+          setPhase('ready');
+        } catch (replaceError) {
+          setError(replaceError?.message || 'The previous room could not be closed.');
+        } finally {
+          setBusy(false);
+        }
+      })();
       return;
     }
 
-    if (phase !== 'ready' || !controllerId || busy) return;
+    if (phase !== 'ready') return;
 
     requestedGameHandledRef.current = true;
     clearRequestedGameParam();
-
     createRoom(game);
   }, [phase, controllerId, activeRoom, busy, location.search]);
 
