@@ -134,6 +134,15 @@ const [
 const productionSmoke = await text('scripts/production-smoke.mjs');
 const pagesRoutesRaw = await text('public/_routes.json');
 const pagesRoutes = JSON.parse(pagesRoutesRaw);
+const pagesFunctionRoutes = await Promise.all([
+  'functions/healthz.js',
+  'functions/tng-guest/[[path]].js',
+  'functions/tng-api/[[path]].js',
+  'functions/tng-rooms/[[path]].js',
+  'functions/nc-api/[[path]].js',
+  'functions/bs-api/[[path]].js',
+].map((path) => text(path)));
+
 
 const pkg = JSON.parse(pkgRaw);
 
@@ -223,6 +232,12 @@ ok(
     ['/healthz', '/tng-guest/*', '/tng-api/*', '/tng-rooms/*', '/nc-api/*', '/bs-api/*']
       .every((route) => pagesRoutes.include.includes(route)),
   'API paths must not fall through to the static SPA; Pages Functions must receive every TNG API request',
+);
+
+ok(
+  'Cloudflare Pages has explicit handlers for each TNG API namespace',
+  pagesFunctionRoutes.every((source) => source.includes('export { onRequest }')),
+  'Every API prefix must have a concrete Pages Function route so it cannot fall through to the SPA',
 );
 
 ok(
