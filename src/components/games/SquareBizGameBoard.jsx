@@ -206,7 +206,7 @@ export default function SquareBizGameBoard({ controllerId }) {
           <section className="rounded-xl border border-white/10 bg-black/50 p-3">
             <div className="mb-2 text-[6px] uppercase tracking-[.18em] text-white/30" style={MONO}>CONTESTANTS</div>
             <div className="space-y-2">
-              <PlayerCard player={xPlayer} mark="X" current={gameState.currentMark === 'X' && !['lobby','intro','finished'].includes(phase)} />
+              <PlayerCard player={xPlayer} mark="X" current={gameState.currentMark === 'X' && !['lobby','finished'].includes(phase)} />
               <PlayerCard player={oPlayer} mark="O" current={gameState.currentMark === 'O' && !['lobby','intro','finished'].includes(phase)} />
             </div>
           </section>
