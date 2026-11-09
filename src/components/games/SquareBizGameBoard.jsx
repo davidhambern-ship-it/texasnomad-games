@@ -160,7 +160,7 @@ export default function SquareBizGameBoard({ controllerId }) {
         </div>
       </header>
 
-      <div className="grid gap-2 lg:grid-cols-[minmax(0,1.55fr)_minmax(300px,.65fr)]">
+      <div className="grid gap-2 lg:grid-cols-[minmax(0,1.8fr)_minmax(220px,.48fr)]">
         <section className="relative flex min-h-[390px] items-center justify-center overflow-hidden rounded-xl border border-[#ff781f]/15 bg-[#08030e]/70 p-2">
           <SquareBizBoard
             compact
