@@ -9,7 +9,7 @@ const WWW_ORIGIN = String(
 ).replace(/\/$/, '');
 
 const SERVICE_ORIGIN = String(
-  process.env.TNG_SERVICE_ORIGIN || 'https://texasnomad-games.pages.dev',
+  process.env.TNG_SERVICE_ORIGIN || PUBLIC_ORIGIN,
 ).replace(/\/$/, '');
 
 const EXPECTED_COMMIT = String(process.env.EXPECTED_COMMIT || '').trim();
