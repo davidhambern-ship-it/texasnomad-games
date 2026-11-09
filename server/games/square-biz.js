@@ -78,10 +78,14 @@ export function otherMark(mark) {
   return mark === 'X' ? 'O' : 'X';
 }
 
-export async function assignSquareBizPlayers(roomId, participants, executor = db) {
+export async function assignSquareBizPlayers(roomId, participants, executor = db, preferredAccountId = null) {
   const active = participants
     .filter((player) => !player.leftAt)
-    .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+    .sort((a, b) => {
+      if (preferredAccountId && a.accountId === preferredAccountId) return -1;
+      if (preferredAccountId && b.accountId === preferredAccountId) return 1;
+      return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+    });
 
   if (!active.length) return [];
 
