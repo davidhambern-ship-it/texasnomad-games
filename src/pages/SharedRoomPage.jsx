@@ -650,6 +650,7 @@ export default function SharedRoomPage() {
         {phase === 'room' && activeRoom && (
           <div className="mx-auto max-w-[1650px]">
             {roomState?.gameId !== 'word-search' && (
+              <>
               <div className="fixed inset-x-2 top-14 z-40 sm:inset-x-3">
                 <div className="mx-auto max-w-[1650px] rounded-xl border border-[#BC13FE]/30 bg-black/95 px-2.5 py-2 shadow-2xl backdrop-blur-xl">
                 <div className="flex items-center justify-between gap-2">
@@ -700,6 +701,7 @@ export default function SharedRoomPage() {
               </div>
   
               <div className="h-[58px] sm:h-[60px]" aria-hidden="true" />
+              </>
             )}
 
 
