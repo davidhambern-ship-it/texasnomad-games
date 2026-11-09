@@ -165,9 +165,17 @@ function clearQuestion(state) {
 
 export function startSquareBizRound(rawState, participants) {
   const state = normalizeSquareBizState(rawState);
+  // Seat assignment is authoritative: the host is assigned seat 2 (X)
+  // before the round starts. Do not re-sort by join time here, or a host
+  // who joined after two guests would lose the X seat despite being prioritized.
   const players = [...participants]
     .filter((player) => !player.leftAt)
-    .sort((a, b) => new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime());
+    .sort((a, b) => {
+      const seatA = Number(a.seatNumber || 999);
+      const seatB = Number(b.seatNumber || 999);
+      if (seatA !== seatB) return seatA - seatB;
+      return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
+    });
 
   if (players.length < 2) {
     const error = new Error('Square Biz needs two active players before the round can start.');
