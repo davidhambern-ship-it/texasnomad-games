@@ -20,7 +20,7 @@ export class TngApiError extends Error {
 }
 
 
-const TRANSIENT_HTTP_STATUSES = new Set([429, 502, 503, 504]);
+const TRANSIENT_HTTP_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 function sleep(ms) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
@@ -104,8 +104,14 @@ async function request(path, {
 
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new TngApiError(payload.error?.message || 'The TNG service is unavailable.', {
-      code: payload.error?.code, status: response.status, details: payload.error
+    const errorCode = payload.error?.code || `HTTP_${response.status}`;
+    const message = payload.error?.message
+      ? `${payload.error.message} (${response.status} ${errorCode})`
+      : `TNG service request failed (${response.status} ${errorCode}) at ${path}.`;
+    throw new TngApiError(message, {
+      code: errorCode,
+      status: response.status,
+      details: { ...(payload.error || {}), path, method, url },
     });
   }
   return payload;
