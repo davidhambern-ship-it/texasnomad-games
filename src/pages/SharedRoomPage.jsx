@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import '@/components/nomadCards/nc.css';
-import { Link, useLocation } from 'react-router-dom';
-import { Loader2, Unplug, ShieldCheck } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { Loader2, ShieldCheck } from 'lucide-react';
 
-import { ALL_GAMES, RoomGameIcon } from '@/components/rooms/RoomGameCatalog';
+import { ALL_GAMES } from '@/components/rooms/RoomGameCatalog';
 import HangmanGameBoard from '@/components/games/HangmanGameBoard';
 import SpadesGameBoard from '@/components/games/SpadesGameBoard';
 import WordSearchGameBoard from '@/components/games/WordSearchGameBoard';
