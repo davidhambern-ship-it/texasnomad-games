@@ -421,6 +421,154 @@ async function main() {
     }
   });
 
+  await check('Word Search live host + player API lifecycle', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `WordHost${suffix}`;
+    const playerName = `WordPlayer${suffix}`;
+    let hostGuestToken = '';
+    let hostDeviceId = '';
+    let roomCode = '';
+
+    const postJson = async (path, guestToken, deviceId, body, room = '') => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (guestToken) headers['X-TNG-Guest-Token'] = guestToken;
+      if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+      if (room) headers['X-TNG-Room-Code'] = room;
+      return json(`${SERVICE_ORIGIN}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    };
+
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) {
+        throw new Error(`guest identity failed: HTTP ${response.status} ${payload?.error?.message || ''}`);
+      }
+      return payload.token;
+    };
+
+    const createDevice = async (guestToken, role, label) => {
+      const result = await postJson('/tng-api/device-session', guestToken, '', {
+        role,
+        deviceLabel: label,
+      });
+      if (!result.response.ok || !result.payload?.device?.id) {
+        throw new Error(`${role} device creation failed: HTTP ${result.response.status} ${result.payload?.error?.message || ''}`);
+      }
+      return result.payload.device.id;
+    };
+
+    try {
+      hostGuestToken = await createIdentity(hostName);
+      const playerGuestToken = await createIdentity(playerName);
+      hostDeviceId = await createDevice(hostGuestToken, 'host_controller', `Word Search host ${suffix}`);
+      const playerDeviceId = await createDevice(playerGuestToken, 'player', `Word Search player ${suffix}`);
+
+      const hostSession = await postJson('/tng-api/host/session', hostGuestToken, hostDeviceId, {});
+      if (!hostSession.response.ok || !hostSession.payload?.hostSession?.id) {
+        throw new Error(`host session failed: HTTP ${hostSession.response.status} ${hostSession.payload?.error?.message || ''}`);
+      }
+
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, {
+        gameId: 'word-search',
+        displayName: hostName,
+      });
+      roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
+      if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
+        throw new Error(`Word Search room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+      }
+
+      const registered = await postJson('/tng-rooms/register-core', '', '', {
+        roomCode,
+        gameId: 'word-search',
+      });
+      if (!registered.response.ok || registered.payload?.registered !== true) {
+        throw new Error(`room registry registration failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+
+      const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, {
+        roomCode,
+        displayName: playerName,
+      }, roomCode);
+      if (!joined.response.ok || !joined.payload?.participant) {
+        throw new Error(`second guest could not join Word Search: HTTP ${joined.response.status} ${joined.payload?.error?.message || ''}`);
+      }
+
+      const hostHeaders = {
+        'X-TNG-Guest-Token': hostGuestToken,
+        'X-TNG-Device-Id': hostDeviceId,
+      };
+      const playerHeaders = {
+        'X-TNG-Guest-Token': playerGuestToken,
+        'X-TNG-Device-Id': playerDeviceId,
+        'X-TNG-Room-Code': roomCode,
+      };
+
+      const hostBefore = await json(`${SERVICE_ORIGIN}/tng-api/word-search/host`, { headers: hostHeaders });
+      if (!hostBefore.response.ok || hostBefore.payload?.room?.gameState?.phase !== 'setup') {
+        throw new Error(`Word Search host route failed before start: HTTP ${hostBefore.response.status} ${hostBefore.payload?.error?.message || ''}`);
+      }
+
+      const playerBefore = await json(`${SERVICE_ORIGIN}/tng-api/word-search/player`, { headers: playerHeaders });
+      if (!playerBefore.response.ok || Number(playerBefore.payload?.participant?.seatNumber) !== 2) {
+        throw new Error(`Word Search player route failed before start: HTTP ${playerBefore.response.status} ${playerBefore.payload?.error?.message || ''}`);
+      }
+
+      const started = await postJson('/tng-api/word-search/host', hostGuestToken, hostDeviceId, {
+        action: 'start_game',
+        mode: 'race',
+        difficulty: 'simpleton',
+        category: 'random',
+      });
+      const hostGame = started.payload?.room?.gameState;
+      if (!started.response.ok || hostGame?.phase !== 'playing' ||
+          !Array.isArray(hostGame.grid) || hostGame.grid.length !== 12 ||
+          !Array.isArray(hostGame.words) || !hostGame.words.length) {
+        throw new Error(`Word Search could not start a playable board: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+      }
+
+      const playerAfter = await json(`${SERVICE_ORIGIN}/tng-api/word-search/player`, { headers: playerHeaders });
+      if (!playerAfter.response.ok || playerAfter.payload?.room?.gameState?.phase !== 'playing' ||
+          playerAfter.payload?.room?.gameState?.grid?.length !== 12) {
+        throw new Error(`Word Search player did not receive the live board: HTTP ${playerAfter.response.status} ${playerAfter.payload?.error?.message || ''}`);
+      }
+
+      const move = await postJson('/tng-api/word-search/player', playerGuestToken, playerDeviceId, {
+        roomCode,
+        action: 'submit_selection',
+        cells: ['0-0', '0-1'],
+      }, roomCode);
+      if (!move.response.ok || !move.payload?.room?.gameState) {
+        throw new Error(`Word Search player move endpoint failed: HTTP ${move.response.status} ${move.payload?.error?.message || ''}`);
+      }
+
+      return `room ${roomCode}: host + guest joined, both API routes loaded, host started a 12×12 board, player received it and submitted a move`;
+    } finally {
+      if (hostGuestToken && hostDeviceId) {
+        await request(`${SERVICE_ORIGIN}/tng-api/host/room`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+        await request(`${SERVICE_ORIGIN}/tng-api/host/session`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+      }
+    }
+  });
+
   await check('Battle Sudoku live two-browser guest room', async () => {
     const suffix = Date.now().toString(36).slice(-6).toUpperCase();
     const hostName = `SmokeH${suffix}`;
