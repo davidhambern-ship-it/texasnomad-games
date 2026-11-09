@@ -107,7 +107,7 @@ async function waitForExactProduction(expectedFingerprint) {
       }
 
       lastError =
-        `service=${serviceSeen || 'unknown'} public=${publicSeen || 'unknown'} expected-fp=${expectedFingerprint.slice(0, 12)}`;
+        `service=${serviceSeen || 'unknown'} service-url=${healthResult.response.url} service-status=${healthResult.response.status} public=${publicSeen || 'unknown'} public-url=${buildResult.response.url} public-status=${buildResult.response.status} expected-fp=${expectedFingerprint.slice(0, 12)}`;
     } catch (error) {
       lastError = error?.message || String(error);
     }
