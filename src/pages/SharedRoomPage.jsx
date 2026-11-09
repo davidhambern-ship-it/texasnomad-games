@@ -523,22 +523,7 @@ export default function SharedRoomPage() {
 
   return (
     <div className="min-h-screen bg-[#050505] text-white flex flex-col">
-      <header className="fixed inset-x-0 top-0 z-50 h-14 border-b border-[#BC13FE]/40 bg-[#050505]/95 backdrop-blur-xl flex items-center justify-between px-4">
-        <Link to="/" className="font-heading tracking-widest">
-          TEXASNOMAD <span className="text-[#FF5F1F]">ROOM</span>
-        </Link>
-
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-white/50">
-            {user?.full_name || user?.email}
-          </span>
-          <button onClick={signOut} className="text-xs text-white/40">
-            LEAVE ROOM
-          </button>
-        </div>
-      </header>
-
-      <main className="flex-1 px-2 pb-3 pt-[68px] sm:px-3 sm:pb-4">
+      <main className="flex-1 px-2 pb-3 pt-2 sm:px-3 sm:pb-4">
         {phase === 'loading' && (
           <div className="h-full flex items-center justify-center text-center">
             <div>
