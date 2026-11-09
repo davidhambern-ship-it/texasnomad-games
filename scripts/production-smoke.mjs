@@ -1,7 +1,7 @@
 import { buildFingerprint } from './build-fingerprint.mjs';
 
 const PUBLIC_ORIGIN = String(
-  process.env.TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
+  process.env.TNG_PUBLIC_ORIGIN || 'https://www.texasnomadgames.com',
 ).replace(/\/$/, '');
 
 const WWW_ORIGIN = String(
