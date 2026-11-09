@@ -163,7 +163,7 @@ function clearQuestion(state) {
   };
 }
 
-export function startSquareBizRound(rawState, participants) {
+export function startSquareBizRound(rawState, participants, preferredAccountId = null) {
   const state = normalizeSquareBizState(rawState);
   // Seat assignment is authoritative: the host is assigned seat 2 (X)
   // before the round starts. Do not re-sort by join time here, or a host
@@ -171,11 +171,20 @@ export function startSquareBizRound(rawState, participants) {
   const players = [...participants]
     .filter((player) => !player.leftAt)
     .sort((a, b) => {
+      if (preferredAccountId && a.accountId === preferredAccountId) return -1;
+      if (preferredAccountId && b.accountId === preferredAccountId) return 1;
       const seatA = Number(a.seatNumber || 999);
       const seatB = Number(b.seatNumber || 999);
       if (seatA !== seatB) return seatA - seatB;
       return new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime();
     });
+
+  if (preferredAccountId && !players.some((player) => player.accountId === preferredAccountId)) {
+    const error = new Error('The host is not enrolled as a Square Biz contestant. Recreate the room and try again.');
+    error.statusCode = 409;
+    error.code = 'SQUARE_BIZ_HOST_NOT_ENROLLED';
+    throw error;
+  }
 
   if (players.length < 2) {
     const error = new Error('Square Biz needs two active players before the round can start.');
