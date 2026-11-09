@@ -25,6 +25,7 @@ export async function onRequest({ request }) {
   try {
     const upstreamResponse = await fetch(upstreamRequest);
     const responseHeaders = new Headers(upstreamResponse.headers);
+    responseHeaders.set("Cache-Control", "no-store");
     responseHeaders.set("X-TNG-Pages-Proxy", "forwarded");
     responseHeaders.set("X-TNG-Pages-Path", path);
     return new Response(upstreamResponse.body, {
