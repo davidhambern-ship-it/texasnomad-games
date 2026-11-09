@@ -132,6 +132,8 @@ const [
 ]);
 
 const productionSmoke = await text('scripts/production-smoke.mjs');
+const pagesRoutesRaw = await text('public/_routes.json');
+const pagesRoutes = JSON.parse(pagesRoutesRaw);
 
 const pkg = JSON.parse(pkgRaw);
 
@@ -213,6 +215,14 @@ ok(
     viralBridge.includes('viral-tn[a-z0-9]{4}') &&
     viralLiveModule.includes('viral-tn[a-z0-9]{4}'),
   'Every core and standalone room generator must create TN plus four characters',
+);
+
+ok(
+  'Cloudflare Pages routes every TNG API namespace through Functions',
+  pagesRoutes.version === 1 &&
+    ['/healthz', '/tng-guest/*', '/tng-api/*', '/tng-rooms/*', '/nc-api/*', '/bs-api/*']
+      .every((route) => pagesRoutes.include.includes(route)),
+  'API paths must not fall through to the static SPA; Pages Functions must receive every TNG API request',
 );
 
 ok(
