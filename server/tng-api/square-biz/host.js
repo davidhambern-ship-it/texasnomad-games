@@ -14,7 +14,6 @@ import {
   publicSquareBizState,
   replaySquareBizQuestion,
   resetSquareBizBoard,
-  skipSquareBizIntro,
   startSquareBizRound,
   syncSquareBizRoster,
 } from '../../games/square-biz.js';
@@ -176,11 +175,9 @@ export default async function handler(request, response) {
     const action = String(request.body?.action || '').trim();
     const allowed = new Set([
       'start_round',
-      'skip_intro',
       'replay_question',
       'reset_board',
       'next_turn',
-      'replay_intro',
     ]);
 
     if (!allowed.has(action)) {
@@ -215,30 +212,13 @@ export default async function handler(request, response) {
           transaction,
         );
         participants = await activeParticipants(lockedRoom.id, transaction);
-        state = startSquareBizRound(state, assigned, {
-          introDurationMs: request.body?.introDurationMs,
-        });
-      } else if (action === 'skip_intro') {
-        state = skipSquareBizIntro(state);
+        state = startSquareBizRound(state, assigned);
       } else if (action === 'replay_question') {
         state = replaySquareBizQuestion(state);
       } else if (action === 'reset_board') {
         state = resetSquareBizBoard(state);
       } else if (action === 'next_turn') {
         state = forceNextSquareBizTurn(state);
-      } else if (action === 'replay_intro') {
-        const now = Date.now();
-        const duration = Math.max(1_000, Number(request.body?.introDurationMs || 15_000));
-        state = {
-          ...state,
-          phase: 'intro',
-          intro_started_at: now,
-          intro_ends_at: now + duration,
-          last_action: {
-            type: 'intro_replayed',
-            timestamp: now,
-          },
-        };
       }
 
       return persistProjectedState(lockedRoom, state, transaction);
