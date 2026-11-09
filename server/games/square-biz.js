@@ -22,6 +22,7 @@ const WIN_LINES = [
 const QUESTION_READ_MS = 5_000;
 const ANSWER_WINDOW_MS = 12_000;
 const RESULT_HOLD_MS = 2_000;
+// Square Biz host identity normalization: keep controller and assigned contestant IDs comparable.
 
 export function defaultSquareBizState() {
   return {
