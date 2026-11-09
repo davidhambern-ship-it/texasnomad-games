@@ -82,7 +82,7 @@ export default function SquareBizGameBoard({ controllerId }) {
   const currentQuestion = gameState.currentQuestion;
 
   const refresh = useCallback(async () => {
-    if (!controllerId) return;
+    if (!controllerId || busy) return;
 
     try {
       const payload = await tngApi.squareBiz.getHostState(controllerId);
@@ -91,7 +91,7 @@ export default function SquareBizGameBoard({ controllerId }) {
       // Keep action errors visible; background polling must not erase them.
       setError((current) => current || refreshError?.message || 'Could not load Square Biz Host state.');
     }
-  }, [controllerId]);
+  }, [busy, controllerId]);
 
   useEffect(() => {
     refresh();
