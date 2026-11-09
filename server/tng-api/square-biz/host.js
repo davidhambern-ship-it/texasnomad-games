@@ -223,6 +223,7 @@ export default async function handler(request, response) {
           lockedRoom.id,
           participants,
           transaction,
+          account.id,
         );
         participants = await activeParticipants(lockedRoom.id, transaction);
         state = startSquareBizRound(state, assigned);
