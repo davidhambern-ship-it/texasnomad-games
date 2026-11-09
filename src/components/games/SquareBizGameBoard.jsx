@@ -176,7 +176,7 @@ export default function SquareBizGameBoard({ controllerId }) {
             onAnswer={(answer) => act('answer', { answer })}
             now={clock}
             busy={busy}
-          />}
+          />
         </section>
 
         <aside className="flex min-h-0 flex-col gap-2">
