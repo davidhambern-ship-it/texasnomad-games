@@ -164,7 +164,7 @@ export default async function handler(request, response) {
   }
 
   try {
-    const { account, hostSession } = await requireController(request, {
+    const { account, device, hostSession } = await requireController(request, {
       hostSessionRequired: true,
     });
 
@@ -205,6 +205,15 @@ export default async function handler(request, response) {
       }
 
       let participants = await activeParticipants(lockedRoom.id, transaction);
+      if (action === 'start_round' && !participants.some((item) => item.accountId === account.id)) {
+        await transaction.insert(roomParticipants).values({
+          roomId: lockedRoom.id,
+          accountId: account.id,
+          deviceSessionId: device.id,
+          role: 'player',
+        }).onConflictDoNothing();
+        participants = await activeParticipants(lockedRoom.id, transaction);
+      }
       let state = advanceSquareBizClock(
         syncSquareBizRoster(lockedRoom.displayState?.gameState || {}, participants),
       );
