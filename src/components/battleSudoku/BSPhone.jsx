@@ -18,7 +18,7 @@ function Shells({ have, spent = 0 }) {
 /**
  * BSPhone — one captain's screen. v = game view (with v.me), act(type, payload) → Promise<result>
  */
-export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom = null, hostAct = null }) {
+export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom = null, hostAct = null, roomCode = '' }) {
   const me = v.me;
   const players = useMemo(() => Object.fromEntries(v.players.map(p => [p.id, p])), [v.players]);
   const [sel, setSel] = useState(null);
@@ -93,6 +93,7 @@ export default function BSPhone({ v, act, now, onExit, isHost = false, hostRoom 
   const header = (
     <div className="bs-phead">
       <span className="nm"><span className="bs-dot" style={{ background: players[me.id]?.color }} /><span className="t">{players[me.id]?.name}{me.ghost ? ' 👻' : ''}</span></span>
+      {roomCode && <span className="bs-room-code-mini">{roomCode}</span>}
       <Shells have={me.shells} spent={v.phase === 'battle' ? spent : 0} />
       <span className={`bs-phase ${v.phase}`}><b>{v.phase === 'final' ? 'Done' : fmt(left)}</b><small>{v.paused ? 'PAUSED' : PHASE[v.phase]}{v.volley ? ` · ${v.volley}/${v.settings.volleys}` : ''}</small></span>
       {onExit && <button type="button" className="bs-btn small ghost" onClick={onExit} aria-label="Leave">✕</button>}
