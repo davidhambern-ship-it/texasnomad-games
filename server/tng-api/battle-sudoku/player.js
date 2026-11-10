@@ -61,6 +61,7 @@ export default async function handler(request, response) {
       captains = await assignCaptainSeats(locked.id, tx);
       participant = captains.find((p) => p.accountId === account.id);
       let state = storedBattleState(locked) || { settings: { ...G.DEFAULTS }, game: null };
+      let actionResult = { ok: true };
       state = advanceBattleState(state);
 
       if (request.method === 'POST') {
@@ -71,15 +72,15 @@ export default async function handler(request, response) {
         if (!['shuffle', 'ready', 'moveShip', 'place', 'order', 'cancel'].includes(action)) {
           const error = new Error('Unknown Battleship Sudoku player action.'); error.statusCode = 400; error.code = 'INVALID_BATTLE_SUDOKU_PLAYER_ACTION'; throw error;
         }
-        const result = G.act(state.game, account.id, { ...request.body, type: action }, Date.now());
-        if (result?.ok === false) {
-          const error = new Error(result.error || 'That move could not be completed.'); error.statusCode = 409; error.code = 'BATTLE_MOVE_REJECTED'; throw error;
+        actionResult = G.act(state.game, account.id, { ...request.body, type: action }, Date.now());
+        if (actionResult?.ok === false) {
+          const error = new Error(actionResult.error || 'That move could not be completed.'); error.statusCode = 409; error.code = 'BATTLE_MOVE_REJECTED'; throw error;
         }
       }
 
       const before = JSON.stringify(storedBattleState(locked));
       const updated = before === JSON.stringify(state) ? locked : await persistBattleState(locked, state, tx);
-      return makePublicPayload(updated, state, account.id, captains);
+      return { ...makePublicPayload(updated, state, account.id, captains), result: actionResult };
     });
     return sendJson(response, 200, payload);
   } catch (error) { return sendError(response, error); }
