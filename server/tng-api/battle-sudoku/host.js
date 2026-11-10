@@ -1,7 +1,7 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { requireController } from '../../auth/require-controller.js';
 import { db } from '../../db/client.js';
-import { gameRooms } from '../../db/schema.js';
+import { gameRooms, roomParticipants } from '../../db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 import {
   ACTIVE_ROOM_STATUSES, G, activeCaptains, advanceBattleState, ensureBattleHost,
@@ -31,7 +31,7 @@ export default async function handler(request, response) {
         const before = JSON.stringify(storedBattleState(locked));
         const state = advanceBattleState(storedBattleState(locked));
         const updated = before === JSON.stringify(state) ? locked : await persistBattleState(locked, state, tx);
-        return makePublicPayload(updated, state, account.id, captains);
+        return { ...makePublicPayload(updated, state, account.id, captains), result: actionResult };
       });
       return sendJson(response, 200, result);
     }
@@ -48,6 +48,7 @@ export default async function handler(request, response) {
       await ensureBattleHost(locked, account.id, device.id, tx);
       let captains = await activeCaptains(locked.id, tx);
       let state = storedBattleState(locked) || { settings: { ...G.DEFAULTS }, game: null };
+      let actionResult = { ok: true };
       state = advanceBattleState(state);
 
       if (action === 'start') {
@@ -91,8 +92,7 @@ export default async function handler(request, response) {
       } else if (action === 'kick') {
         const target = captains.find((p) => p.accountId === request.body?.playerId);
         if (target && target.accountId !== account.id) {
-          await tx.update((await import('../../db/schema.js')).roomParticipants)
-            .set({ leftAt: new Date() }).where(eq((await import('../../db/schema.js')).roomParticipants.id, target.id));
+          await tx.update(roomParticipants).set({ leftAt: new Date() }).where(eq(roomParticipants.id, target.id));
           captains = await activeCaptains(locked.id, tx);
           if (state.game?.players?.[target.accountId]) {
             state.game.players[target.accountId].ghost = true;
@@ -102,9 +102,9 @@ export default async function handler(request, response) {
         if (!state.game) {
           const error = new Error('The host must start the battle first.'); error.statusCode = 409; error.code = 'NO_ACTIVE_BATTLE'; throw error;
         }
-        const result = G.act(state.game, account.id, { ...request.body, type: action }, Date.now());
-        if (result?.ok === false) {
-          const error = new Error(result.error || 'That move could not be completed.'); error.statusCode = 409; error.code = 'BATTLE_MOVE_REJECTED'; throw error;
+        actionResult = G.act(state.game, account.id, { ...request.body, type: action }, Date.now());
+        if (actionResult?.ok === false) {
+          const error = new Error(actionResult.error || 'That move could not be completed.'); error.statusCode = 409; error.code = 'BATTLE_MOVE_REJECTED'; throw error;
         }
       }
 
