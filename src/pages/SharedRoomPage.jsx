@@ -8,6 +8,7 @@ import HangmanGameBoard from '@/components/games/HangmanGameBoard';
 import SpadesGameBoard from '@/components/games/SpadesGameBoard';
 import WordSearchGameBoard from '@/components/games/WordSearchGameBoard';
 import SquareBizGameBoard from '@/components/games/SquareBizGameBoard';
+import BattleSudokuLobbySettings from '@/components/games/BattleSudokuLobbySettings';
 import BFFGameBoard from '@/components/games/BFFGameBoard';
 import RoomGameBoard from '@/components/rooms/RoomGameBoard';
 import SharedRoomLobby from '@/components/rooms/SharedRoomLobby';
@@ -708,16 +709,19 @@ export default function SharedRoomPage() {
             )}
 
             {roomState && roomState.status === 'lobby' && (
-              <SharedRoomLobby
-                room={activeRoom}
-                game={roomGame}
-                people={roomPeople}
-                isHost
-                busy={busy}
-                onStart={startGame}
-                rosterError={rosterError}
-                error={error}
-              />
+              <>
+                <SharedRoomLobby
+                  room={activeRoom}
+                  game={roomGame}
+                  people={roomPeople}
+                  isHost
+                  busy={busy}
+                  onStart={startGame}
+                  rosterError={rosterError}
+                  error={error}
+                />
+                {roomState.gameId === 'sudoku' && <BattleSudokuLobbySettings controllerId={controllerId} />}
+              </>
             )}
 
             {roomState && roomState.status !== 'lobby' && roomState.gameId === 'word-search' && (
