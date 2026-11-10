@@ -757,7 +757,7 @@ export default function SharedRoomPage() {
                   {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
                   {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
-                    <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} />
+                    <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} controllerId={controllerId} />
                   )}
                 </section>
 
