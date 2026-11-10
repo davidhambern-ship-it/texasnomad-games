@@ -64,6 +64,7 @@ export default async function handler(request, response) {
       captains = await assignCaptainSeats(locked.id, tx);
       participant = captains.find((p) => p.accountId === account.id);
       let state = storedBattleState(locked) || { settings: { ...G.DEFAULTS }, game: null };
+      const previousState = JSON.stringify(state);
       let actionResult = { ok: true };
       state = advanceBattleState(state);
 
@@ -81,8 +82,10 @@ export default async function handler(request, response) {
         }
       }
 
-      const before = JSON.stringify(storedBattleState(locked));
-      const updated = before === JSON.stringify(state) ? locked : await persistBattleState(locked, state, tx);
+      const unchanged = previousState === JSON.stringify(state);
+      const updated = unchanged && request.method === 'GET'
+        ? locked
+        : await persistBattleState(locked, state, tx);
       return { ...makePublicPayload(updated, state, account.id, captains), result: actionResult };
     });
     return sendJson(response, 200, payload);
