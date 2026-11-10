@@ -55,6 +55,9 @@ export default async function handler(request, response) {
         if (state.game && state.game.phase !== 'final') {
           const error = new Error('This battle has already started.'); error.statusCode = 409; error.code = 'BATTLE_ALREADY_STARTED'; throw error;
         }
+        if (captains.length > 8) {
+          const error = new Error('Battleship Sudoku supports up to 8 captains.'); error.statusCode = 409; error.code = 'BATTLE_ROOM_FULL'; throw error;
+        }
         if (captains.length < 2) {
           const error = new Error('At least two captains must join before the battle can start.'); error.statusCode = 409; error.code = 'ROOM_NEEDS_PLAYERS'; throw error;
         }
