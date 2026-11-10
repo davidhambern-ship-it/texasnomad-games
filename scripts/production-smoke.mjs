@@ -851,6 +851,150 @@ async function main() {
     return `room ${code}: two guests completed Sudoku solving, both landed confirmed ship hits, synchronized the volley reveal, then in volley two verified repair, shield, a three-cell torpedo (two hits + one blocked cell), and the next-phase game loop`;
   });
 
+  await check('Battle Sudoku shared TNG room lifecycle', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `SudokuHost${suffix}`;
+    const playerName = `SudokuPlayer${suffix}`;
+    let hostGuestToken = '';
+    let hostDeviceId = '';
+    let roomCode = '';
+
+    const postJson = async (path, guestToken, deviceId, body, room = '') => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (guestToken) headers['X-TNG-Guest-Token'] = guestToken;
+      if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+      if (room) headers['X-TNG-Room-Code'] = room;
+      return json(`${SERVICE_ORIGIN}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    };
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) throw new Error(`guest identity failed: HTTP ${response.status}`);
+      return payload.token;
+    };
+    const createDevice = async (guestToken, role, label) => {
+      const result = await postJson('/tng-api/device-session', guestToken, '', { role, deviceLabel: label });
+      if (!result.response.ok || !result.payload?.device?.id) {
+        throw new Error(`${role} device creation failed: HTTP ${result.response.status} ${result.payload?.error?.message || ''}`);
+      }
+      return result.payload.device.id;
+    };
+
+    try {
+      hostGuestToken = await createIdentity(hostName);
+      const playerGuestToken = await createIdentity(playerName);
+      hostDeviceId = await createDevice(hostGuestToken, 'host_controller', `Sudoku host ${suffix}`);
+      const playerDeviceId = await createDevice(playerGuestToken, 'player', `Sudoku player ${suffix}`);
+
+      const session = await postJson('/tng-api/host/session', hostGuestToken, hostDeviceId, {});
+      if (!session.response.ok || !session.payload?.hostSession?.id) {
+        throw new Error(`host session failed: HTTP ${session.response.status} ${session.payload?.error?.message || ''}`);
+      }
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, {
+        gameId: 'sudoku', displayName: hostName,
+      });
+      roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
+      if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
+        throw new Error(`shared Battleship Sudoku room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+      }
+      const registered = await postJson('/tng-rooms/register-core', '', '', { roomCode, gameId: 'sudoku' });
+      if (!registered.response.ok || registered.payload?.registered !== true) {
+        throw new Error(`shared room registry failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+      const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, { roomCode }, roomCode);
+      if (!joined.response.ok || !joined.payload?.participant) {
+        throw new Error(`second captain could not join: HTTP ${joined.response.status} ${joined.payload?.error?.message || ''}`);
+      }
+
+      const hostHeaders = { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId };
+      const playerHeaders = {
+        'X-TNG-Guest-Token': playerGuestToken,
+        'X-TNG-Device-Id': playerDeviceId,
+        'X-TNG-Room-Code': roomCode,
+      };
+      const settings = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, {
+        action: 'settings', solveSec: 30, battleSec: 10, volleys: 6, difficulty: 'easy',
+      });
+      if (!settings.response.ok) {
+        throw new Error(`shared host settings failed: HTTP ${settings.response.status} ${settings.payload?.error?.message || ''}`);
+      }
+      const started = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, { action: 'start' });
+      if (!started.response.ok || !started.payload?.room?.game?.me) {
+        throw new Error(`shared host could not start the battle: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+      }
+      const playerView = await json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/player`, { headers: playerHeaders });
+      if (!playerView.response.ok || !playerView.payload?.room?.game?.me) {
+        throw new Error(`shared player did not receive captain view: HTTP ${playerView.response.status} ${playerView.payload?.error?.message || ''}`);
+      }
+
+      const hostReady = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, { action: 'ready' });
+      const playerReady = await postJson('/tng-api/battle-sudoku/player', playerGuestToken, playerDeviceId, {
+        roomCode, action: 'ready',
+      }, roomCode);
+      if (!hostReady.response.ok || hostReady.payload?.result?.ok !== true ||
+          !playerReady.response.ok || playerReady.payload?.result?.ok !== true) {
+        throw new Error('one or both captains could not lock in their fleets');
+      }
+
+      let solveView = null;
+      const solveDeadline = Date.now() + 5000;
+      while (Date.now() < solveDeadline) {
+        const [h, p] = await Promise.all([
+          json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/host`, { headers: hostHeaders }),
+          json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/player`, { headers: playerHeaders }),
+        ]);
+        if (h.payload?.room?.game?.phase === 'solve' && p.payload?.room?.game?.phase === 'solve') {
+          solveView = { host: h.payload.room.game, player: p.payload.room.game };
+          break;
+        }
+        await sleep(250);
+      }
+      if (!solveView) throw new Error('Ready actions did not advance both captains to Sudoku solve phase');
+
+      const solution = solveSudoku(solveView.host.puzzle);
+      const hostCell = solveView.host.puzzle.findIndex((digit) => digit === 0);
+      const playerCell = solveView.player.puzzle.findIndex((digit, index) => digit === 0 && index !== hostCell);
+      if (hostCell < 0 || playerCell < 0) throw new Error('Sudoku puzzle did not expose two empty cells');
+
+      const [hostMove, playerMove] = await Promise.all([
+        postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, {
+          action: 'place', cell: hostCell, digit: solution[hostCell],
+        }),
+        postJson('/tng-api/battle-sudoku/player', playerGuestToken, playerDeviceId, {
+          roomCode, action: 'place', cell: playerCell, digit: solution[playerCell],
+        }, roomCode),
+      ]);
+      if (!hostMove.response.ok || hostMove.payload?.result?.correct !== true ||
+          hostMove.payload?.room?.game?.me?.board?.[hostCell] !== solution[hostCell]) {
+        throw new Error(`host captain Sudoku move failed: HTTP ${hostMove.response.status} ${hostMove.payload?.error?.message || ''}`);
+      }
+      if (!playerMove.response.ok || playerMove.payload?.result?.correct !== true ||
+          playerMove.payload?.room?.game?.me?.board?.[playerCell] !== solution[playerCell]) {
+        throw new Error(`player captain Sudoku move failed: HTTP ${playerMove.response.status} ${playerMove.payload?.error?.message || ''}`);
+      }
+
+      return `room ${roomCode}: shared host + guest joined, host started, both private captain views loaded, both fleets locked, and both Sudoku moves were accepted`;
+    } finally {
+      if (hostGuestToken && hostDeviceId) {
+        await request(`${SERVICE_ORIGIN}/tng-api/host/room`, {
+          method: 'DELETE',
+          headers: { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId },
+        }).catch(() => {});
+        await request(`${SERVICE_ORIGIN}/tng-api/host/session`, {
+          method: 'DELETE',
+          headers: { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId },
+        }).catch(() => {});
+      }
+    }
+  });
+
   await check('unauthenticated API rejects protected profile', async () => {
     const { response } = await json(`${SERVICE_ORIGIN}/tng-api/profile`);
     if (![401, 403].includes(response.status)) {
