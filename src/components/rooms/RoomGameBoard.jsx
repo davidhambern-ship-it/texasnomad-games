@@ -1,14 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { NCHost } from '@/components/nomadCards/NCOnline';
 import { STHost } from '@/components/seeThat/STOnline';
-import { BSHost } from '@/components/battleSudoku/BSOnline';
+import BattleSudokuGameBoard from '@/components/games/BattleSudokuGameBoard';
 import WWOnline from '@/components/wordWrangler/WWOnline';
 import RRHost from '@/components/brawl/RRHost';
 import { loadSceneList } from '@/api/seeThatApi';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
 
-export default function RoomGameBoard({ gameId, roomCode }) {
+export default function RoomGameBoard({ gameId, roomCode, controllerId }) {
   // This code belongs to the shared room created by SharedRoomPage. Every
   // game adapter must attach to this exact code; it must never mint a new one.
   const identity = useTngGameIdentity();
@@ -39,7 +39,7 @@ export default function RoomGameBoard({ gameId, roomCode }) {
     if (loadError) return <p className="p-4 text-red-400">{loadError}</p>;
     return scenes.length ? <STHost initialCode={roomCode} freshRoom scenes={scenes} onExit={() => {}} /> : <p className="p-4 text-white/50">Loading See That scenes…</p>;
   }
-  if (gameId === 'sudoku') return <BSHost sharedRoomCode={roomCode} freshRoom onExit={() => {}} />;
+  if (gameId === 'sudoku') return <BattleSudokuGameBoard controllerId={controllerId} />;
   if (gameId === 'word-wrangler') {
     if (loadError) return <p className="p-4 text-red-400">{loadError}</p>;
     if (!dict) return <p className="p-4 text-white/50">Loading Word Wrangler dictionary…</p>;
