@@ -470,3 +470,5 @@
   .bs-host-room { gap: 5px; padding: 8px; }
   .bs-host-roster { max-height: 22vh; overflow: auto; }
 }
+
+.bs-room-code-mini { color: var(--bs-brass); font: 800 11px/1 monospace; letter-spacing: .18em; padding: 5px 8px; border: 1px solid var(--bs-line); border-radius: 8px; white-space: nowrap; }
