@@ -3,7 +3,7 @@ import { tngApi } from '@/api/tngApi';
 import BSPhone from '@/components/battleSudoku/BSPhone';
 import '@/components/battleSudoku/bs.css';
 
-export default function BattleSudokuGameBoard({ controllerId }) {
+export default function BattleSudokuGameBoard({ controllerId, onEndRoom }) {
   const [payload, setPayload] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -63,7 +63,7 @@ export default function BattleSudokuGameBoard({ controllerId }) {
         v={game}
         act={act}
         now={Date.now() + Number(payload?.room?.nowOffset || 0)}
-        onExit={() => {}}
+        onExit={onEndRoom || (() => {})}
         isHost
         hostRoom={payload.room}
         hostAct={act}
