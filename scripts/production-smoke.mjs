@@ -658,7 +658,7 @@ async function main() {
       }, roomCode);
       if (!hostReady.response.ok || hostReady.payload?.result?.ok !== true ||
           !playerReady.response.ok || playerReady.payload?.result?.ok !== true) {
-        throw new Error('one or both captains could not lock in their fleets');
+        throw new Error(`one or both captains could not lock in their fleets: host HTTP ${hostReady.response.status} result=${JSON.stringify(hostReady.payload?.result)} error=${JSON.stringify(hostReady.payload?.error)}; player HTTP ${playerReady.response.status} result=${JSON.stringify(playerReady.payload?.result)} error=${JSON.stringify(playerReady.payload?.error)}`);
       }
 
       let solveView = null;
