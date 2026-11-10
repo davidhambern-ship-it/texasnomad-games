@@ -199,18 +199,18 @@ export default async function handler(request, response) {
     // Dedicated cabinets still own their game rules and board state, but the
     // common room owns the lobby-to-game transition for every title.
     if (
-      ['hangman', 'word-search'].includes(room.gameId) &&
+      ['hangman', 'word-search', 'sudoku'].includes(room.gameId) &&
       command?.action !== 'start'
     ) {
       const error = new Error(
         room.gameId === 'hangman'
           ? 'Hangman state is controlled by the dedicated Hangman API.'
-          : 'Word Search state is controlled by the dedicated Word Search API.',
+          : room.gameId === 'word-search' ? 'Word Search state is controlled by the dedicated Word Search API.' : 'Battleship Sudoku state is controlled by its dedicated game API.',
       );
       error.statusCode = 409;
       error.code = room.gameId === 'hangman'
         ? 'HANGMAN_DEDICATED_API_REQUIRED'
-        : 'WORD_SEARCH_DEDICATED_API_REQUIRED';
+        : room.gameId === 'word-search' ? 'WORD_SEARCH_DEDICATED_API_REQUIRED' : 'BATTLE_SUDOKU_DEDICATED_API_REQUIRED';
       throw error;
     }
 
