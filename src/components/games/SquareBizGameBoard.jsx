@@ -174,6 +174,7 @@ export default function SquareBizGameBoard({ controllerId }) {
             compact
             gameState={gameState}
             interactive={phase === 'board' && gameState.currentMark === 'X'}
+            pointerActivate
             onSquareClick={(squareIndex) => act('select_square', { squareIndex })}
             hostLabel="GAME BOARD"
           />
