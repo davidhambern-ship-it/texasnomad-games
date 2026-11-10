@@ -14,6 +14,8 @@ import wordSearchHost from './tng-api/word-search/host.js';
 import squareBizQuestions from './tng-api/square-biz/questions.js';
 import squareBizHost from './tng-api/square-biz/host.js';
 import squareBizPlayer from './tng-api/square-biz/player.js';
+import battleSudokuHost from './tng-api/battle-sudoku/host.js';
+import battleSudokuPlayer from './tng-api/battle-sudoku/player.js';
 import publicLiveRooms from './tng-api/public/live-rooms.js';
 import social from './tng-api/social.js';
 
@@ -35,6 +37,8 @@ const routes = new Map([
   ['/square-biz/questions', squareBizQuestions],
   ['/square-biz/host', squareBizHost],
   ['/square-biz/player', squareBizPlayer],
+  ['/battle-sudoku/host', battleSudokuHost],
+  ['/battle-sudoku/player', battleSudokuPlayer],
   ['/public/live-rooms', publicLiveRooms],
   ['/social', social],
 ]);
