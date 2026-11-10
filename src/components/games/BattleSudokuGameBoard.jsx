@@ -67,6 +67,7 @@ export default function BattleSudokuGameBoard({ controllerId, onEndRoom }) {
         isHost
         hostRoom={payload.room}
         hostAct={act}
+        roomCode={payload.room.code || payload.room.roomCode}
       />
     </div>
   );
