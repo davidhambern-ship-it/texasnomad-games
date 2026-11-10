@@ -67,6 +67,7 @@ export default function NeonBattleSudokuPlayer({ roomCode }) {
         v={game}
         act={act}
         now={Date.now()}
+        roomCode={roomCode}
         onExit={() => quitTngGame(roomCode)}
       />
     </>
