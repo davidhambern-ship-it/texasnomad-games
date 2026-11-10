@@ -58,6 +58,9 @@ export default async function handler(request, response) {
       }
       await tx.update(roomParticipants).set({ deviceSessionId: device.id, lastHeartbeatAt: new Date() })
         .where(eq(roomParticipants.id, participant.id));
+      if (captains.length > 8) {
+        const error = new Error('This Battleship Sudoku room is full (8 captains maximum).'); error.statusCode = 409; error.code = 'BATTLE_ROOM_FULL'; throw error;
+      }
       captains = await assignCaptainSeats(locked.id, tx);
       participant = captains.find((p) => p.accountId === account.id);
       let state = storedBattleState(locked) || { settings: { ...G.DEFAULTS }, game: null };
