@@ -4,7 +4,7 @@ import { db } from '../../db/client.js';
 import { gameRooms, roomParticipants } from '../../db/schema.js';
 import { methodNotAllowed, sendError, sendJson } from '../../http/respond.js';
 import {
-  ACTIVE_ROOM_STATUSES, G, activeCaptains, advanceBattleState, ensureBattleHost,
+  ACTIVE_ROOM_STATUSES, G, activeCaptains, advanceBattleState, assignCaptainSeats, ensureBattleHost,
   findBattleRoom, makeCaptainRoster, makePublicPayload, persistBattleState, storedBattleState,
 } from './shared.js';
 
@@ -27,7 +27,7 @@ export default async function handler(request, response) {
       const result = await db.transaction(async (tx) => {
         const [locked] = await tx.select().from(gameRooms).where(eq(gameRooms.id, room.id)).limit(1).for('update');
         await ensureBattleHost(locked, account.id, device.id, tx);
-        const captains = await activeCaptains(locked.id, tx);
+        const captains = await assignCaptainSeats(locked.id, tx);
         const before = JSON.stringify(storedBattleState(locked));
         const state = advanceBattleState(storedBattleState(locked));
         const updated = before === JSON.stringify(state) ? locked : await persistBattleState(locked, state, tx);
@@ -46,7 +46,7 @@ export default async function handler(request, response) {
     const payload = await db.transaction(async (tx) => {
       const [locked] = await tx.select().from(gameRooms).where(eq(gameRooms.id, room.id)).limit(1).for('update');
       await ensureBattleHost(locked, account.id, device.id, tx);
-      let captains = await activeCaptains(locked.id, tx);
+      let captains = await assignCaptainSeats(locked.id, tx);
       let state = storedBattleState(locked) || { settings: { ...G.DEFAULTS }, game: null };
       let actionResult = { ok: true };
       state = advanceBattleState(state);
