@@ -720,7 +720,7 @@ export default function SharedRoomPage() {
                   rosterError={rosterError}
                   error={error}
                 />
-                {roomState.gameId === 'sudoku' && <BattleSudokuLobbySettings controllerId={controllerId} />}
+                {roomState.gameId === 'sudoku' && <BattleSudokuLobbySettings controllerId={controllerId} onEndRoom={endRoom} />}
               </>
             )}
 
