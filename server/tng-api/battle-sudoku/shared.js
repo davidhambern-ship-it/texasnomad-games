@@ -118,6 +118,7 @@ export function makePublicPayload(room, battleState, accountId, captains) {
     room: {
       id: room.id,
       roomCode: room.roomCode,
+      code: room.roomCode,
       gameId: 'sudoku',
       status: room.status,
       revision: room.revision,
