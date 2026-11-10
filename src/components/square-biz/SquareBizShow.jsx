@@ -102,6 +102,7 @@ export function SquareBizBoard({
   gameState = {},
   onSquareClick,
   interactive = false,
+  pointerActivate = false,
   compact = false,
   hostLabel = 'HOST',
 }) {
@@ -191,7 +192,18 @@ export function SquareBizBoard({
                   type="button"
                   key={index}
                   disabled={!canClick}
-                  onClick={() => canClick && onSquareClick?.(index)}
+                  onClick={pointerActivate ? undefined : () => canClick && onSquareClick?.(index)}
+                  onPointerDown={pointerActivate ? (event) => {
+                    if (!canClick) return;
+                    event.preventDefault();
+                    onSquareClick?.(index);
+                  } : undefined}
+                  onKeyDown={pointerActivate ? (event) => {
+                    if (canClick && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      onSquareClick?.(index);
+                    }
+                  } : undefined}
                   className={`group relative overflow-hidden rounded-[18%] border-[clamp(2px,.35vw,5px)] transition-all disabled:cursor-default ${canClick ? 'sb-open-square cursor-pointer hover:scale-[1.035]' : ''}`}
                   style={{
                     borderColor: mark === 'X' ? `${X_COLOR}cc` : mark === 'O' ? `${O_COLOR}cc` : '#ff781f',
