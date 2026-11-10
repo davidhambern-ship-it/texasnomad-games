@@ -720,7 +720,7 @@ export default function SharedRoomPage() {
                   rosterError={rosterError}
                   error={error}
                 />
-                {roomState.gameId === 'sudoku' && <BattleSudokuLobbySettings controllerId={controllerId} onEndRoom={endRoom} />}
+                {roomState.gameId === 'sudoku' && <BattleSudokuLobbySettings controllerId={controllerId} />}
               </>
             )}
 
@@ -763,7 +763,7 @@ export default function SharedRoomPage() {
                   {roomState?.gameId === 'square-biz' && <SquareBizGameBoard controllerId={controllerId} />}
                   {roomState?.gameId === 'bff' && <BFFGameBoard controllerId={controllerId} />}
                   {['out', 'viral', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble'].includes(roomState?.gameId) && (
-                    <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} controllerId={controllerId} />
+                    <RoomGameBoard gameId={roomState.gameId} roomCode={activeRoom.roomCode} controllerId={controllerId} onEndRoom={endRoom} />
                   )}
                 </section>
 
