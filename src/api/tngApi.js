@@ -280,6 +280,7 @@ async function getHostLiveGameState(deviceId, gameId) {
     hangman: '/api/hangman/host',
     'word-search': '/api/word-search/host',
     'square-biz': '/api/square-biz/host',
+    sudoku: '/api/battle-sudoku/host',
   };
   const path = paths[gameId];
   return path ? request(path, { deviceId }) : null;
@@ -519,6 +520,15 @@ export const tngApi = {
       roomCode,
       apiBase:BFF_API_BASE,
       body:{ action, ...payload },
+    }),
+  },
+  battleSudoku: {
+    getHostState: (deviceId) => getHostLiveGameState(deviceId, 'sudoku'),
+    hostAction: (deviceId, action, payload = {}) =>
+      hostActionAndRefresh('/api/battle-sudoku/host', deviceId, action, payload),
+    getPlayerState: (deviceId, roomCode) => request('/api/battle-sudoku/player', { deviceId, roomCode }),
+    playerAction: (deviceId, roomCode, action, payload = {}) => request('/api/battle-sudoku/player', {
+      method: 'POST', deviceId, roomCode, body: { roomCode, action, ...payload },
     }),
   },
   squareBiz: {
