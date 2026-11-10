@@ -31,7 +31,7 @@ export default async function handler(request, response) {
         const before = JSON.stringify(storedBattleState(locked));
         const state = advanceBattleState(storedBattleState(locked));
         const updated = before === JSON.stringify(state) ? locked : await persistBattleState(locked, state, tx);
-        return { ...makePublicPayload(updated, state, account.id, captains), result: actionResult };
+        return makePublicPayload(updated, state, account.id, captains);
       });
       return sendJson(response, 200, result);
     }
