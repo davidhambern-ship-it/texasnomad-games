@@ -55,6 +55,20 @@ export default function NeonBattleSudokuPlayer({ roomCode }) {
   if (!deviceId) return <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>
     <p>Your player connection is not ready.</p><Link className="bs-btn" to={`/join/${roomCode}`}>Rejoin room {roomCode}</Link>
   </div></div>;
+  if (!game && payload?.room?.status === 'lobby') return (
+    <div className="bs-wrap" style={{ maxWidth: 720 }}>
+      <div className="bs-card" style={{ textAlign: 'center' }}>
+        <h1 className="bs-h bs-logo" style={{ fontSize: 54 }}>Battle<b>Sudoku</b></h1>
+        <div className="bs-joincode" style={{ margin: '16px auto' }}>{roomCode}</div>
+        <p className="bs-sub">You’re in the shared room. Waiting for the host to start the next battle…</p>
+        <div className="bs-row" style={{ justifyContent: 'center', marginTop: 14 }}>
+          {(payload.room.roster || []).map((captain) => <span key={captain.id} className="bs-chip" style={{ '--c': captain.color }}>{captain.name}</span>)}
+        </div>
+        {error && <div className="bs-err">{error}</div>}
+        <button type="button" className="bs-btn ghost small" style={{ marginTop: 16 }} onClick={() => quitTngGame(roomCode)}>Leave room</button>
+      </div>
+    </div>
+  );
   if (!game) return <div className="bs-wrap"><div className="bs-card" style={{ textAlign: 'center' }}>
     {error || 'Connecting to your captain board…'}
     {error && <button type="button" className="bs-btn" style={{ marginTop: 12 }} onClick={refresh}>Retry</button>}
