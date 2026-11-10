@@ -518,10 +518,12 @@ export default function SharedRoomPage() {
       // through the generic room endpoint leaves an empty gameState, which
       // the Square Biz state refresh correctly normalizes back to the lobby.
       // Start the first round through its dedicated API instead.
-      const isSquareBiz = (roomState?.gameId || activeRoom?.gameId) === 'square-biz';
-      const payload = isSquareBiz
+      const currentGameId = roomState?.gameId || activeRoom?.gameId;
+      const payload = currentGameId === 'square-biz'
         ? await tngApi.squareBiz.hostAction(controllerId, 'start_round')
-        : await tngApi.host.startGame(controllerId);
+        : currentGameId === 'sudoku'
+          ? await tngApi.battleSudoku.hostAction(controllerId, 'start')
+          : await tngApi.host.startGame(controllerId);
       setRoomState(payload.room);
       setActiveRoom((current) => ({ ...current, ...payload.room }));
     } catch (startError) {
