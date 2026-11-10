@@ -112,7 +112,7 @@ export default async function handler(request, response) {
       }
 
       const updated = await persistBattleState(locked, state, tx);
-      return makePublicPayload(updated, state, account.id, captains);
+      return { ...makePublicPayload(updated, state, account.id, captains), result: actionResult };
     });
     return sendJson(response, 200, payload);
   } catch (error) { return sendError(response, error); }
