@@ -724,6 +724,18 @@ export default function SharedRoomPage() {
               </>
             )}
 
+            {roomState && roomState.status !== 'lobby' && roomState.gameId === 'sudoku' && (
+              <section ref={hostBoardRef} className="nc-panel min-w-0 w-full overflow-hidden p-3" style={{ minHeight: hostBoardHeight }}>
+                <div className="mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
+                  <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
+                  <span className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
+                    PLAYABLE HOST GAME · {roomGame?.title || 'BATTLESHIP SUDOKU'}
+                  </span>
+                </div>
+                <RoomGameBoard gameId="sudoku" roomCode={activeRoom.roomCode} controllerId={controllerId} onEndRoom={endRoom} />
+              </section>
+            )}
+
             {roomState && roomState.status !== 'lobby' && roomState.gameId === 'word-search' && (
               <div ref={hostBoardRef} className="nc-panel min-w-0 w-full p-3" style={{ minHeight: hostBoardHeight }}>
                 <WordSearchGameBoard
@@ -737,7 +749,7 @@ export default function SharedRoomPage() {
               </div>
             )}
 
-            {roomState && roomState.status !== 'lobby' && roomState.gameId !== 'word-search' && (
+            {roomState && roomState.status !== 'lobby' && !['word-search', 'sudoku'].includes(roomState.gameId) && (
               <div
                 className={
                   hostBoardSideBySide
@@ -852,7 +864,7 @@ export default function SharedRoomPage() {
                       </button>
                     </div>
                   </section>
-                  {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff'].includes(roomState.gameId) && (
+                  {roomState && !['hangman', 'spades', 'word-search', 'square-biz', 'bff', 'sudoku'].includes(roomState.gameId) && (
                     <div className="rounded-xl border border-white/10 bg-black/50 p-4 text-sm text-white/40">
                       {roomGame?.title || roomState.gameId} host controls are not yet available in this shared console.
                     </div>
