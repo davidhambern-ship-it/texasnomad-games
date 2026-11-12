@@ -472,3 +472,66 @@
 }
 
 .bs-room-code-mini { color: var(--bs-brass); font: 800 11px/1 monospace; letter-spacing: .18em; padding: 5px 8px; border: 1px solid var(--bs-line); border-radius: 8px; white-space: nowrap; }
+
+
+/* Shared-room host embedding: keep the Battleship Sudoku captain console
+   inside the TNG room card instead of covering the entire browser viewport. */
+.bs-shared-host {
+  --bs-bg: #071426;
+  --bs-panel: #0c1a2e;
+  --bs-panel2: #112540;
+  --bs-line: rgba(120, 190, 255, .22);
+  --bs-brass: #f2c14e;
+  --bs-sea: #1e6fa8;
+  --bs-sea2: #0e3a5c;
+  --bs-red: #ff4d5e;
+  --bs-green: #3ef08a;
+  --bs-text: #eaf4ff;
+  --bs-dim: rgba(234, 244, 255, .6);
+  --bs-orange: #ff7a2f;
+  --bs-purple: #b45cff;
+  width: 100%;
+  min-width: 0;
+}
+.bs-shared-host .bs-phone {
+  position: relative;
+  inset: auto;
+  z-index: 1;
+  width: 100%;
+  height: clamp(620px, calc(100dvh - 170px), 900px);
+  min-height: 620px;
+  max-height: 900px;
+  border: 1px solid var(--bs-line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.bs-shared-host .bs-play-area {
+  min-height: 0;
+  min-width: 0;
+}
+.bs-shared-host .bs-host-room {
+  align-self: stretch;
+  min-width: 0;
+  overflow-y: auto !important;
+}
+@media (max-width: 760px) {
+  .bs-shared-host .bs-phone {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  .bs-shared-host .bs-play-area {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+  }
+  .bs-shared-host .bs-pbody {
+    min-height: 560px;
+    overflow: visible;
+  }
+  .bs-shared-host .bs-host-room {
+    grid-column: 1;
+    grid-row: auto;
+    margin: 0 4px 8px;
+  }
+}
