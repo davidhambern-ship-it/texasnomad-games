@@ -39,7 +39,9 @@ export default function JoinGame() {
               setRoomCode(e.target.value.toUpperCase());
               if (error) setError(false);
             }}
-            placeholder="EX: TN817"
+            placeholder="TN7K4P"
+            maxLength={6}
+            aria-label="Enter six-character room code"
             className={`w-full max-w-xs px-4 py-3 rounded bg-black/80 border-2 text-center font-mono text-lg tracking-widest text-white placeholder:text-white/30 focus:outline-none focus:border-outlaw-gold transition-colors ${
               error ? 'border-kinetic-orange animate-shake' : 'border-cyber-purple/50'
             } ${shaking ? 'animate-shake' : ''}`}

@@ -35,19 +35,9 @@ export default function Login() {
   const { isAuthenticated, isLoadingAuth } = useAuth();
   const loginParams = new URLSearchParams(window.location.search);
   const requestedNext = loginParams.get('next');
-  const ssoStatus = loginParams.get('sso');
   const nextPath = requestedNext && requestedNext.startsWith('/') && !requestedNext.startsWith('//')
     ? requestedNext
     : '/';
-
-  const tngSsoReturn = new URL('https://texasnomadgames.com/login');
-  tngSsoReturn.searchParams.set('sso', '1');
-  if (nextPath !== '/') tngSsoReturn.searchParams.set('next', nextPath);
-
-  const bernaverseSsoUrl =
-    `https://bernaverse.hireberna.app/sso.html?app=tng&return=${encodeURIComponent(tngSsoReturn.toString())}`;
-  const bernaverseSignupUrl =
-    `https://bernaverse.hireberna.app/?auth=signup&app=tng&return=${encodeURIComponent(tngSsoReturn.toString())}`;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -66,12 +56,6 @@ export default function Login() {
 
     try {
       await tngApi.profile.get();
-
-      // Every verified TNG account belongs to the BERNAverse FREE tier.
-      // Do not block TNG login if the membership bridge is temporarily down.
-      await tngApi.bernaverse.ensureFree().catch((membershipError) => {
-        console.warn('[TNG Login] BERNAverse FREE enrollment deferred:', membershipError);
-      });
     } catch (profileError) {
       if (
         profileError?.code === 'PROFILE_NOT_FOUND' ||
@@ -163,12 +147,9 @@ export default function Login() {
         return;
       }
 
-      // TNG no longer creates accounts from the login form. All new accounts
-      // begin in the BERNAverse so TNG, TacTalk, and CREAPD can share one
-      // global identity and membership record.
+      // New TNG accounts are created directly through Neon Auth.
       throw new Error(
-        signInResult?.error?.message
-        || 'We could not sign you in. If you are new to TNG, create your FREE BERNAverse account below.'
+        signInResult?.error?.message || 'We could not sign you in. Check your email and password or create a TNG account.'
       );
     } catch (err) {
       setError(
@@ -184,11 +165,11 @@ export default function Login() {
     <AuthLayout
       icon={LogIn}
       title="Sign In to TNG"
-      subtitle="Use your BERNAverse Passport. Existing pre-SSO accounts can still use their original TNG password."
+      subtitle="Sign in with your TexasNomad Games account."
       footer={
         <>
           New to TNG?{' '}
-          <a href={bernaverseSignupUrl} style={{ color: '#BC13FE', fontWeight: 600 }}>Create your BERNAverse account</a>
+          <Link to="/register" style={{ color: '#BC13FE', fontWeight: 600 }}>Create your TNG account</Link>
         </>
       }
     >
@@ -198,33 +179,6 @@ export default function Login() {
         </div>
       )}
 
-      {ssoStatus === 'legacy' && (
-        <div style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 8, background: 'rgba(255,215,0,0.08)', border: '1px solid rgba(255,215,0,0.32)', color: '#FFE88A', fontSize: 12, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
-          <strong>YOUR TNG LOGIN WAS PRESERVED.</strong><br />
-          This account existed before BERNAverse SSO, so we did not change its password. Use your existing TNG email and password below.
-        </div>
-      )}
-
-      {['invalid', 'setup', 'unavailable'].includes(ssoStatus) && (
-        <div style={{ marginBottom: 16, padding: '11px 14px', borderRadius: 8, background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.28)', color: '#FCA5A5', fontSize: 12, lineHeight: 1.6, fontFamily: "'Inter', sans-serif" }}>
-          BERNAverse could not finish the TNG handoff. Your account was not changed. You can retry BERNAverse or use an existing TNG password below.
-        </div>
-      )}
-
-      <a
-        href={bernaverseSsoUrl}
-        style={{
-          width: '100%', height: 48, borderRadius: 10, border: '2px solid #FFD700',
-          background: 'linear-gradient(135deg, rgba(255,215,0,0.2), rgba(188,19,254,0.18))',
-          color: '#FFD700', fontFamily: "'Teko', sans-serif", fontSize: 18,
-          letterSpacing: '0.12em', textDecoration: 'none', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box',
-          boxShadow: '0 0 18px rgba(255,215,0,0.18)', marginBottom: 12,
-        }}
-      >
-        CONTINUE WITH BERNAVERSE →
-      </a>
-
       <div style={{ textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontSize: 11, marginBottom: 14, fontFamily: "'Inter', sans-serif" }}>
         EXISTING TNG PASSWORD LOGIN
       </div>
@@ -233,12 +187,6 @@ export default function Login() {
         <strong style={{ color: '#67E8F9' }}>SIGN-IN ≠ TNG PROFILE.</strong>
         <br />
         Your email/password verifies who you are. After sign-in, TNG checks for your Profile. If you already have one, you go to Welcome. If you don't, you'll create your public @handle and TNG Profile next.
-      </div>
-
-      <div style={{ marginBottom: 16, padding: '12px 13px', borderRadius: 9, border: '1px solid rgba(255,215,0,0.28)', background: 'rgba(255,215,0,0.05)', color: 'rgba(255,255,255,0.58)', fontSize: 12, lineHeight: 1.6 }}>
-        <strong style={{ color: '#FFD700' }}>PRE-BERNAVERSE TNG ACCOUNT?</strong>
-        <br />
-        Keep using your original TNG password below. We will not reset or overwrite existing credentials while the SSO migration rolls out.
       </div>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

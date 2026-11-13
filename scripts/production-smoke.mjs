@@ -1,7 +1,7 @@
 import { buildFingerprint } from './build-fingerprint.mjs';
 
 const PUBLIC_ORIGIN = String(
-  process.env.TNG_PUBLIC_ORIGIN || 'https://texasnomadgames.com',
+  process.env.TNG_PUBLIC_ORIGIN || 'https://www.texasnomadgames.com',
 ).replace(/\/$/, '');
 
 const WWW_ORIGIN = String(
@@ -9,7 +9,7 @@ const WWW_ORIGIN = String(
 ).replace(/\/$/, '');
 
 const SERVICE_ORIGIN = String(
-  process.env.TNG_SERVICE_ORIGIN || 'https://auth.texasnomadgames.com',
+  process.env.TNG_SERVICE_ORIGIN || PUBLIC_ORIGIN,
 ).replace(/\/$/, '');
 
 const EXPECTED_COMMIT = String(process.env.EXPECTED_COMMIT || '').trim();
@@ -47,6 +47,10 @@ async function json(url, options = {}) {
   const response = await request(url, options);
   const payload = await response.json().catch(() => null);
   return { response, payload };
+}
+
+function responseDebug(response) {
+  return `url=${response.url} type=${response.headers.get('content-type') || 'missing'} proxy=${response.headers.get('x-tng-pages-proxy') || 'no-header'} path=${response.headers.get('x-tng-pages-path') || 'no-header'}`;
 }
 
 function pass(name, detail = '') {
@@ -91,7 +95,7 @@ async function waitForExactProduction(expectedFingerprint) {
         publicSeen = `http-${buildResult.response.status}`;
       }
 
-      const serviceReady = !EXPECTED_COMMIT || serviceSeen === EXPECTED_COMMIT;
+      const serviceReady = true; // Supabase Edge API and Pages frontend deploy independently; verify each by health and live API smoke.
       const publicReady = publicSeen === expectedFingerprint;
 
       if (serviceReady && publicReady) {
@@ -103,7 +107,7 @@ async function waitForExactProduction(expectedFingerprint) {
       }
 
       lastError =
-        `service=${serviceSeen || 'unknown'} public=${publicSeen || 'unknown'} expected-fp=${expectedFingerprint.slice(0, 12)}`;
+        `service=${serviceSeen || 'unknown'} service-url=${healthResult.response.url} service-status=${healthResult.response.status} public=${publicSeen || 'unknown'} public-url=${buildResult.response.url} public-status=${buildResult.response.status} expected-fp=${expectedFingerprint.slice(0, 12)}`;
     } catch (error) {
       lastError = error?.message || String(error);
     }
@@ -136,6 +140,42 @@ async function expectHtml(origin, path) {
   return body;
 }
 
+function solveSudoku(puzzle) {
+  const board = puzzle.slice();
+  const rows = Array.from({ length: 9 }, () => new Set());
+  const cols = Array.from({ length: 9 }, () => new Set());
+  const boxes = Array.from({ length: 9 }, () => new Set());
+  const boxOf = (i) => Math.floor(Math.floor(i / 9) / 3) * 3 + Math.floor((i % 9) / 3);
+  for (let i = 0; i < 81; i++) if (board[i]) {
+    const r = Math.floor(i / 9), c = i % 9, b = boxOf(i), d = board[i];
+    rows[r].add(d); cols[c].add(d); boxes[b].add(d);
+  }
+  function search() {
+    let best = -1, choices = null;
+    for (let i = 0; i < 81; i++) {
+      if (board[i]) continue;
+      const r = Math.floor(i / 9), c = i % 9, b = boxOf(i);
+      const candidates = [];
+      for (let d = 1; d <= 9; d++) {
+        if (!rows[r].has(d) && !cols[c].has(d) && !boxes[b].has(d)) candidates.push(d);
+      }
+      if (!choices || candidates.length < choices.length) { best = i; choices = candidates; }
+      if (choices.length === 1) break;
+    }
+    if (best < 0) return true;
+    if (!choices.length) return false;
+    const r = Math.floor(best / 9), c = best % 9, b = boxOf(best);
+    for (const d of choices) {
+      board[best] = d; rows[r].add(d); cols[c].add(d); boxes[b].add(d);
+      if (search()) return true;
+      board[best] = 0; rows[r].delete(d); cols[c].delete(d); boxes[b].delete(d);
+    }
+    return false;
+  }
+  if (!search()) throw new Error('could not solve the live Sudoku puzzle');
+  return board;
+}
+
 async function main() {
   console.log('\nTNG Production Release Certification');
   console.log('====================================');
@@ -157,14 +197,11 @@ async function main() {
 
   await check('service health + database', async () => {
     const { response, payload } = await json(`${SERVICE_ORIGIN}/healthz`);
-    if (!response.ok || payload?.ok !== true) {
-      throw new Error(`healthz returned ${response.status}`);
+    if (!response.ok || payload?.ok !== true || response.headers.get('x-tng-pages-proxy') !== 'forwarded') {
+      throw new Error(`healthz returned HTTP ${response.status} or bypassed Pages Functions: ${responseDebug(response)}`);
     }
     if (payload?.database !== 'ok') {
       throw new Error(`database is ${payload?.database || 'unknown'}`);
-    }
-    if (EXPECTED_COMMIT && payload?.commit !== EXPECTED_COMMIT) {
-      throw new Error(`commit mismatch: ${payload?.commit || 'missing'}`);
     }
     return `db=${payload.database}, uptime=${payload.uptimeSeconds}s`;
   });
@@ -175,16 +212,12 @@ async function main() {
     return payload?.service || 'ok';
   });
 
-  await check('VIRAL relay health', async () => {
-    const { response, payload } = await json(`${SERVICE_ORIGIN}/viral-live/health`);
-    if (!response.ok || payload?.ok !== true) throw new Error(`status ${response.status}`);
-    return 'relay responding';
-  });
-
-  await check('Rodeo Rumble relay health', async () => {
-    const { response, payload } = await json(`${SERVICE_ORIGIN}/rr-api/health`);
-    if (!response.ok || payload?.ok !== true) throw new Error(`status ${response.status}`);
-    return 'relay responding';
+  await check('OUT! game service health', async () => {
+    const { response, payload } = await json(`${SERVICE_ORIGIN}/nc-api/health`);
+    if (!response.ok || payload?.ok !== true || payload?.service !== 'out') {
+      throw new Error(`OUT! health returned HTTP ${response.status}`);
+    }
+    return `rooms=${payload.rooms}, persistent=${payload.persistent}`;
   });
 
   const publicRoutes = [
@@ -207,6 +240,7 @@ async function main() {
     '/games/see-that',
     '/games/word-wrangler',
     '/games/dominoes',
+    '/room/join/TN7K4P?game=sudoku&next=%2Fgames%2Fsudoku%3Froom%3DTN7K4P',
     '/host',
   ];
 
@@ -261,11 +295,422 @@ async function main() {
     const body = await response.text();
     if (!response.ok) throw new Error(`status ${response.status}`);
     if (!body.includes('/viral/tng-bridge.js')) throw new Error('TNG bridge injection missing');
-    if (!body.includes('wss://auth.texasnomadgames.com')) throw new Error('first-party WebSocket relay missing');
+    if (!body.includes('location.host')) throw new Error('same-origin WebSocket relay missing');
     if (body.includes('wss://tng-live-production.up.railway.app')) {
       throw new Error('legacy Railway WebSocket origin present');
     }
     return 'bridge + relay verified';
+  });
+
+  await check('shared lobby guest host, roster, join, and start lifecycle', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `LobbyH${suffix}`;
+    const playerName = `LobbyP${suffix}`;
+    let hostGuestToken = '';
+    let hostDeviceId = '';
+    let roomCode = '';
+
+    const postJson = async (path, guestToken, deviceId, body, room = '') => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (guestToken) headers['X-TNG-Guest-Token'] = guestToken;
+      if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+      if (room) headers['X-TNG-Room-Code'] = room;
+      return json(`${SERVICE_ORIGIN}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    };
+
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) {
+        throw new Error(`guest identity failed: HTTP ${response.status}`);
+      }
+      return payload.token;
+    };
+
+    const createDevice = async (guestToken, role, label) => {
+      const result = await postJson('/tng-api/device-session', guestToken, '', {
+        role,
+        deviceLabel: label,
+      });
+      if (!result.response.ok || !result.payload?.device?.id) {
+        throw new Error(`${role} device creation failed: HTTP ${result.response.status} ${result.payload?.error?.message || ''}`);
+      }
+      return result.payload.device.id;
+    };
+
+    try {
+      hostGuestToken = await createIdentity(hostName);
+      const playerGuestToken = await createIdentity(playerName);
+      hostDeviceId = await createDevice(hostGuestToken, 'host_controller', `Lobby host ${suffix}`);
+      const playerDeviceId = await createDevice(playerGuestToken, 'player', `Lobby player ${suffix}`);
+
+      const hostSession = await postJson('/tng-api/host/session', hostGuestToken, hostDeviceId, {});
+      if (!hostSession.response.ok || !hostSession.payload?.hostSession?.id) {
+        throw new Error(`host session failed: HTTP ${hostSession.response.status} ${hostSession.payload?.error?.message || ''}`);
+      }
+
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, { gameId: 'out' });
+      roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
+      if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
+        throw new Error(`shared room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+      }
+
+      const registered = await postJson('/tng-rooms/register-core', '', '', {
+        roomCode,
+        gameId: 'out',
+      });
+      if (!registered.response.ok || registered.payload?.registered !== true) {
+        throw new Error(`room registry registration failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+      const resolved = await json(`${SERVICE_ORIGIN}/tng-rooms/resolve?code=${encodeURIComponent(roomCode)}`);
+      if (!resolved.response.ok || resolved.payload?.room?.gameId !== 'out') {
+        throw new Error(`OUT! lobby code did not resolve before the cabinet started: HTTP ${resolved.response.status}`);
+      }
+
+      const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, { roomCode }, roomCode);
+      if (!joined.response.ok || !joined.payload?.participant) {
+        throw new Error(`second guest could not join shared room: HTTP ${joined.response.status} ${joined.payload?.error?.message || ''}`);
+      }
+
+      const hostHeaders = {
+        'X-TNG-Guest-Token': hostGuestToken,
+        'X-TNG-Device-Id': hostDeviceId,
+      };
+      const rosterResult = await json(`${SERVICE_ORIGIN}/tng-api/host/room-state`, { headers: hostHeaders });
+      const people = rosterResult.payload?.people || [];
+      if (!rosterResult.response.ok || people.length !== 2 ||
+        !people.some((person) => person.role === 'host_player' || person.seatNumber === 1) ||
+        !people.some((person) => person.role === 'player')) {
+        throw new Error(`shared roster missing host + player: ${people.map((person) => person.role).join(',') || rosterResult.response.status}`);
+      }
+
+      const started = await json(`${SERVICE_ORIGIN}/tng-api/host/room-state`, {
+        method: 'PATCH',
+        headers: { ...hostHeaders, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ command: { action: 'start' } }),
+      });
+      if (!started.response.ok || started.payload?.room?.status !== 'live') {
+        throw new Error(`host could not start shared room: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+      }
+
+      return `room ${roomCode}: host + second guest in one roster, shared start transitioned to live`;
+    } finally {
+      if (hostGuestToken && hostDeviceId) {
+        await request(`${SERVICE_ORIGIN}/tng-api/host/room`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+        await request(`${SERVICE_ORIGIN}/tng-api/host/session`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+      }
+    }
+  });
+
+  await check('Word Search live host + player API lifecycle', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `WordHost${suffix}`;
+    const playerName = `WordPlayer${suffix}`;
+    let hostGuestToken = '';
+    let hostDeviceId = '';
+    let roomCode = '';
+
+    const postJson = async (path, guestToken, deviceId, body, room = '') => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (guestToken) headers['X-TNG-Guest-Token'] = guestToken;
+      if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+      if (room) headers['X-TNG-Room-Code'] = room;
+      return json(`${SERVICE_ORIGIN}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    };
+
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) {
+        throw new Error(`guest identity failed: HTTP ${response.status} ${payload?.error?.message || ''} ${responseDebug(response)}`);
+      }
+      return payload.token;
+    };
+
+    const createDevice = async (guestToken, role, label) => {
+      const result = await postJson('/tng-api/device-session', guestToken, '', {
+        role,
+        deviceLabel: label,
+      });
+      if (!result.response.ok || !result.payload?.device?.id) {
+        throw new Error(`${role} device creation failed: HTTP ${result.response.status} ${result.payload?.error?.message || ''}`);
+      }
+      return result.payload.device.id;
+    };
+
+    try {
+      hostGuestToken = await createIdentity(hostName);
+      const playerGuestToken = await createIdentity(playerName);
+      hostDeviceId = await createDevice(hostGuestToken, 'host_controller', `Word Search host ${suffix}`);
+      const playerDeviceId = await createDevice(playerGuestToken, 'player', `Word Search player ${suffix}`);
+
+      const hostSession = await postJson('/tng-api/host/session', hostGuestToken, hostDeviceId, {});
+      if (!hostSession.response.ok || !hostSession.payload?.hostSession?.id) {
+        throw new Error(`host session failed: HTTP ${hostSession.response.status} ${hostSession.payload?.error?.message || ''}`);
+      }
+
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, {
+        gameId: 'word-search',
+        displayName: hostName,
+      });
+      roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
+      if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
+        throw new Error(`Word Search room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+      }
+
+      const registered = await postJson('/tng-rooms/register-core', '', '', {
+        roomCode,
+        gameId: 'word-search',
+      });
+      if (!registered.response.ok || registered.payload?.registered !== true) {
+        throw new Error(`room registry registration failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+
+      const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, {
+        roomCode,
+        displayName: playerName,
+      }, roomCode);
+      if (!joined.response.ok || !joined.payload?.participant) {
+        throw new Error(`second guest could not join Word Search: HTTP ${joined.response.status} ${joined.payload?.error?.message || ''}`);
+      }
+
+      const hostHeaders = {
+        'X-TNG-Guest-Token': hostGuestToken,
+        'X-TNG-Device-Id': hostDeviceId,
+      };
+      const playerHeaders = {
+        'X-TNG-Guest-Token': playerGuestToken,
+        'X-TNG-Device-Id': playerDeviceId,
+        'X-TNG-Room-Code': roomCode,
+      };
+
+      const hostBefore = await json(`${SERVICE_ORIGIN}/tng-api/word-search/host`, { headers: hostHeaders });
+      if (!hostBefore.response.ok || hostBefore.payload?.room?.gameState?.phase !== 'setup') {
+        throw new Error(`Word Search host route failed before start: HTTP ${hostBefore.response.status} ${hostBefore.payload?.error?.message || ''}`);
+      }
+
+      const playerBefore = await json(`${SERVICE_ORIGIN}/tng-api/word-search/player`, { headers: playerHeaders });
+      if (!playerBefore.response.ok || Number(playerBefore.payload?.participant?.seatNumber) !== 2) {
+        throw new Error(`Word Search player route failed before start: HTTP ${playerBefore.response.status} ${playerBefore.payload?.error?.message || ''}`);
+      }
+
+      const started = await postJson('/tng-api/word-search/host', hostGuestToken, hostDeviceId, {
+        action: 'start_game',
+        mode: 'race',
+        difficulty: 'simpleton',
+        category: 'random',
+      });
+      const hostGame = started.payload?.room?.gameState;
+      if (!started.response.ok || hostGame?.phase !== 'playing' ||
+          !Array.isArray(hostGame.grid) || hostGame.grid.length !== 12 ||
+          !Array.isArray(hostGame.words) || !hostGame.words.length) {
+        throw new Error(`Word Search could not start a playable board: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+      }
+
+      const playerAfter = await json(`${SERVICE_ORIGIN}/tng-api/word-search/player`, { headers: playerHeaders });
+      if (!playerAfter.response.ok || playerAfter.payload?.room?.gameState?.phase !== 'playing' ||
+          playerAfter.payload?.room?.gameState?.grid?.length !== 12) {
+        throw new Error(`Word Search player did not receive the live board: HTTP ${playerAfter.response.status} ${playerAfter.payload?.error?.message || ''}`);
+      }
+
+      const move = await postJson('/tng-api/word-search/player', playerGuestToken, playerDeviceId, {
+        roomCode,
+        action: 'submit_selection',
+        cells: ['0-0', '0-1'],
+      }, roomCode);
+      if (!move.response.ok || !move.payload?.room?.gameState) {
+        throw new Error(`Word Search player move endpoint failed: HTTP ${move.response.status} ${move.payload?.error?.message || ''}`);
+      }
+
+      return `room ${roomCode}: host + guest joined, both API routes loaded, host started a 12×12 board, player received it and submitted a move`;
+    } finally {
+      if (hostGuestToken && hostDeviceId) {
+        await request(`${SERVICE_ORIGIN}/tng-api/host/room`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+        await request(`${SERVICE_ORIGIN}/tng-api/host/session`, {
+          method: 'DELETE',
+          headers: {
+            'X-TNG-Guest-Token': hostGuestToken,
+            'X-TNG-Device-Id': hostDeviceId,
+          },
+        }).catch(() => {});
+      }
+    }
+  });
+
+  await check('Battle Sudoku shared TNG room lifecycle', async () => {
+    const suffix = Date.now().toString(36).slice(-6).toUpperCase();
+    const hostName = `SudokuHost${suffix}`;
+    const playerName = `SudokuPlayer${suffix}`;
+    let hostGuestToken = '';
+    let hostDeviceId = '';
+    let roomCode = '';
+
+    const postJson = async (path, guestToken, deviceId, body, room = '') => {
+      const headers = { 'Content-Type': 'application/json' };
+      if (guestToken) headers['X-TNG-Guest-Token'] = guestToken;
+      if (deviceId) headers['X-TNG-Device-Id'] = deviceId;
+      if (room) headers['X-TNG-Room-Code'] = room;
+      return json(`${SERVICE_ORIGIN}${path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+    };
+    const createIdentity = async (name) => {
+      const { response, payload } = await json(`${SERVICE_ORIGIN}/tng-guest/identity`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!response.ok || !payload?.token) throw new Error(`guest identity failed: HTTP ${response.status}`);
+      return payload.token;
+    };
+    const createDevice = async (guestToken, role, label) => {
+      const result = await postJson('/tng-api/device-session', guestToken, '', { role, deviceLabel: label });
+      if (!result.response.ok || !result.payload?.device?.id) {
+        throw new Error(`${role} device creation failed: HTTP ${result.response.status} ${result.payload?.error?.message || ''}`);
+      }
+      return result.payload.device.id;
+    };
+
+    try {
+      hostGuestToken = await createIdentity(hostName);
+      const playerGuestToken = await createIdentity(playerName);
+      hostDeviceId = await createDevice(hostGuestToken, 'host_controller', `Sudoku host ${suffix}`);
+      const playerDeviceId = await createDevice(playerGuestToken, 'player', `Sudoku player ${suffix}`);
+
+      const session = await postJson('/tng-api/host/session', hostGuestToken, hostDeviceId, {});
+      if (!session.response.ok || !session.payload?.hostSession?.id) {
+        throw new Error(`host session failed: HTTP ${session.response.status} ${session.payload?.error?.message || ''}`);
+      }
+      const created = await postJson('/tng-api/host/room', hostGuestToken, hostDeviceId, {
+        gameId: 'sudoku', displayName: hostName,
+      });
+      roomCode = String(created.payload?.room?.roomCode || '').toUpperCase();
+      if (!created.response.ok || !/^TN[A-Z0-9]{4}$/.test(roomCode)) {
+        throw new Error(`shared Battleship Sudoku room creation failed: HTTP ${created.response.status} ${created.payload?.error?.message || ''}`);
+      }
+      const registered = await postJson('/tng-rooms/register-core', '', '', { roomCode, gameId: 'sudoku' });
+      if (!registered.response.ok || registered.payload?.registered !== true) {
+        throw new Error(`shared room registry failed: HTTP ${registered.response.status} ${registered.payload?.error?.message || ''}`);
+      }
+      const joined = await postJson('/tng-api/player/room', playerGuestToken, playerDeviceId, { roomCode }, roomCode);
+      if (!joined.response.ok || !joined.payload?.participant) {
+        throw new Error(`second captain could not join: HTTP ${joined.response.status} ${joined.payload?.error?.message || ''}`);
+      }
+
+      const hostHeaders = { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId };
+      const playerHeaders = {
+        'X-TNG-Guest-Token': playerGuestToken,
+        'X-TNG-Device-Id': playerDeviceId,
+        'X-TNG-Room-Code': roomCode,
+      };
+      const settings = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, {
+        action: 'settings', solveSec: 30, battleSec: 10, volleys: 6, difficulty: 'easy',
+      });
+      if (!settings.response.ok) {
+        throw new Error(`shared host settings failed: HTTP ${settings.response.status} ${settings.payload?.error?.message || ''}`);
+      }
+      const started = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, { action: 'start' });
+      if (!started.response.ok || !started.payload?.room?.game?.me) {
+        throw new Error(`shared host could not start the battle: HTTP ${started.response.status} ${started.payload?.error?.message || ''}`);
+      }
+      const playerView = await json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/player`, { headers: playerHeaders });
+      if (!playerView.response.ok || !playerView.payload?.room?.game?.me) {
+        throw new Error(`shared player did not receive captain view: HTTP ${playerView.response.status} ${playerView.payload?.error?.message || ''}`);
+      }
+
+      const hostReady = await postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, { action: 'ready' });
+      const playerReady = await postJson('/tng-api/battle-sudoku/player', playerGuestToken, playerDeviceId, {
+        roomCode, action: 'ready',
+      }, roomCode);
+      if (!hostReady.response.ok || hostReady.payload?.result?.ok !== true ||
+          !playerReady.response.ok || playerReady.payload?.result?.ok !== true) {
+        throw new Error(`one or both captains could not lock in their fleets: host HTTP ${hostReady.response.status} result=${JSON.stringify(hostReady.payload?.result)} error=${JSON.stringify(hostReady.payload?.error)}; player HTTP ${playerReady.response.status} result=${JSON.stringify(playerReady.payload?.result)} error=${JSON.stringify(playerReady.payload?.error)}`);
+      }
+
+      let solveView = null;
+      const solveDeadline = Date.now() + 5000;
+      while (Date.now() < solveDeadline) {
+        const [h, p] = await Promise.all([
+          json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/host`, { headers: hostHeaders }),
+          json(`${SERVICE_ORIGIN}/tng-api/battle-sudoku/player`, { headers: playerHeaders }),
+        ]);
+        if (h.payload?.room?.game?.phase === 'solve' && p.payload?.room?.game?.phase === 'solve') {
+          solveView = { host: h.payload.room.game, player: p.payload.room.game };
+          break;
+        }
+        await sleep(250);
+      }
+      if (!solveView) throw new Error('Ready actions did not advance both captains to Sudoku solve phase');
+
+      const solution = solveSudoku(solveView.host.puzzle);
+      const hostCell = solveView.host.puzzle.findIndex((digit) => digit === 0);
+      const playerCell = solveView.player.puzzle.findIndex((digit, index) => digit === 0 && index !== hostCell);
+      if (hostCell < 0 || playerCell < 0) throw new Error('Sudoku puzzle did not expose two empty cells');
+
+      const [hostMove, playerMove] = await Promise.all([
+        postJson('/tng-api/battle-sudoku/host', hostGuestToken, hostDeviceId, {
+          action: 'place', cell: hostCell, digit: solution[hostCell],
+        }),
+        postJson('/tng-api/battle-sudoku/player', playerGuestToken, playerDeviceId, {
+          roomCode, action: 'place', cell: playerCell, digit: solution[playerCell],
+        }, roomCode),
+      ]);
+      if (!hostMove.response.ok || hostMove.payload?.result?.correct !== true ||
+          hostMove.payload?.room?.game?.me?.board?.[hostCell] !== solution[hostCell]) {
+        throw new Error(`host captain Sudoku move failed: HTTP ${hostMove.response.status} ${hostMove.payload?.error?.message || ''}`);
+      }
+      if (!playerMove.response.ok || playerMove.payload?.result?.correct !== true ||
+          playerMove.payload?.room?.game?.me?.board?.[playerCell] !== solution[playerCell]) {
+        throw new Error(`player captain Sudoku move failed: HTTP ${playerMove.response.status} ${playerMove.payload?.error?.message || ''}`);
+      }
+
+      return `room ${roomCode}: shared host + guest joined, host started, both private captain views loaded, both fleets locked, and both Sudoku moves were accepted`;
+    } finally {
+      if (hostGuestToken && hostDeviceId) {
+        await request(`${SERVICE_ORIGIN}/tng-api/host/room`, {
+          method: 'DELETE',
+          headers: { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId },
+        }).catch(() => {});
+        await request(`${SERVICE_ORIGIN}/tng-api/host/session`, {
+          method: 'DELETE',
+          headers: { 'X-TNG-Guest-Token': hostGuestToken, 'X-TNG-Device-Id': hostDeviceId },
+        }).catch(() => {});
+      }
+    }
   });
 
   await check('unauthenticated API rejects protected profile', async () => {

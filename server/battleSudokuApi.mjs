@@ -18,7 +18,7 @@ import * as G from '../src/lib/battleSudoku/game.js';
 
 const MAX_PLAYERS = 8;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLORS = ['#ffd23f', '#ff5f6d', '#3ec5ff', '#3ef08a', '#c77dff', '#ff9f1c', '#f15bb5', '#e5e7eb'];
 const CPU_NAMES = [['Tank', 3], ['Carlos', 5], ['Lemonade', 6], ['Violet', 7], ['Dexter', 8], ['Berna', 9]];
 const SOLVE = [30, 40, 60], BATTLE = [10, 15, 20], VOLLEYS = [6, 8, 10];
@@ -137,27 +137,43 @@ export function createBattleSudokuApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = Array.from(
-        { length: 5 },
-        () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
-      ).join('');
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
 
-      if (await roomExists(c)) continue;
+    // Use cryptographic randomness for public room codes. Math.random can be
+    // repeated or poorly seeded across short-lived edge isolates, causing
+    // every reservation attempt to collide with an existing room.
+    const makeCandidate = () => {
+      const bytes = randomBytes(4);
+      const c = 'TN' + Array.from(
+        { length: 4 },
+        (_, index) => CODE_CHARS[bytes[index] % CODE_CHARS.length],
+      ).join('');
+      return c;
+    };
+
+    const attempts = requested ? 1 : 128;
+    for (let i = 0; i < attempts; i++) {
+      const candidate = requested || makeCandidate();
+
+      if (await roomExists(candidate)) continue;
 
       const claimed = await claimRoomCode({
-        code: c,
+        code: candidate,
         gameId: 'sudoku',
         service: 'battle-sudoku',
         kind: 'standalone',
-        joinPath: '/games/sudoku?room=' + encodeURIComponent(c),
-        spectatePath: '/games/sudoku?display=' + encodeURIComponent(c),
+        joinPath: '/games/sudoku?room=' + encodeURIComponent(candidate),
+        spectatePath: '/games/sudoku?display=' + encodeURIComponent(candidate),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
-      if (claimed) return c;
+      if (claimed) return candidate;
     }
     throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
@@ -211,12 +227,25 @@ export function createBattleSudokuApi({
         need(isHost, 'Only the host can do that.');
         room.game = null; return {};
       }
+      case 'pause': {
+        need(isHost, 'Only the host can pause the game.');
+        need(room.game && room.game.phase !== 'final', 'There is no active game.', 'NO_GAME', 409);
+        if (!room.game.pausedAt) { room.game.pausedAt = now; room.game.pausedRemainingMs = Math.max(0, room.game.phaseEndsAt - now); }
+        return { paused: true };
+      }
+      case 'resume': {
+        need(isHost, 'Only the host can resume the game.');
+        need(room.game && room.game.pausedAt, 'The game is not paused.', 'NOT_PAUSED', 409);
+        room.game.phaseEndsAt = now + Math.max(0, Number(room.game.pausedRemainingMs) || 0);
+        delete room.game.pausedAt; delete room.game.pausedRemainingMs;
+        return { paused: false };
+      }
       case 'leave': {
         if (me && !room.game) room.players = room.players.filter(p => p.id !== me.id);
         else if (me) me.token = null;
         return {};
       }
-      case 'shuffle': case 'ready': case 'place': case 'order': case 'cancel': {
+      case 'shuffle': case 'ready': case 'moveShip': case 'place': case 'order': case 'cancel': {
         need(me, 'Join the game first.', 'NO_SEAT');
         need(room.game, 'The game hasn’t started.', 'NO_GAME', 409);
         need(room.game.players[me.id], 'You joined after this game started — you’re in the next one.', 'NOT_IN_GAME', 409);
@@ -246,18 +275,31 @@ export function createBattleSudokuApi({
         });
       }
       if (req.method === 'POST' && path === '/rooms') {
+        const body = await readBody(req);
         const hostIdentity = await resolveIdentity(req);
-        if (!hostIdentity?.accountId) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting BattleSudoku.');
+        if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting BattleSudoku.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now.');
-        const code = await newCode(hostIdentity.accountId);
+        const code = await newCode(hostIdentity.accountId || null, body?.roomCode);
+        const hostPlayer = {
+          id: newId(),
+          accountId: hostIdentity.accountId || null,
+          guestId: hostIdentity.guestId || null,
+          name: clean(hostIdentity.publicName || 'Host', 32),
+          token: newToken(),
+          color: COLORS[0],
+          lastSeen: now,
+        };
         const room = {
           code,
           hostToken: newToken(),
-          hostAccountId: hostIdentity.accountId,
+          hostAccountId: hostIdentity.accountId || null,
+          hostGuestId: hostIdentity.guestId || null,
           hostName: hostIdentity.publicName || 'Host',
-          players: [],
+          // The creator is a real captain from the instant the room exists.
+          // Keep the host-control token separate from the playable seat token.
+          players: [hostPlayer],
           game: null,
           settings: { ...G.DEFAULTS },
           createdAt: now,
@@ -270,9 +312,9 @@ export function createBattleSudokuApi({
           throw error;
         }
         const v = view(room, null, now); v.you = { isHost: true };
-        return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
+        return send(res, 200, { roomCode: code, token: room.hostToken, playerToken: hostPlayer.token, playerId: hostPlayer.id, ...v });
       }
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
@@ -283,8 +325,8 @@ export function createBattleSudokuApi({
 
       const isHost = Boolean(
         tokenClaimsHost &&
-        requestIdentity?.accountId &&
-        (!room.hostAccountId || String(room.hostAccountId) === String(requestIdentity.accountId))
+        ((requestIdentity?.accountId && String(room.hostAccountId || '') === String(requestIdentity.accountId)) ||
+          (requestIdentity?.guestId && String(room.hostGuestId || '') === String(requestIdentity.guestId)))
       );
 
       const findMe = () => (
@@ -315,12 +357,15 @@ export function createBattleSudokuApi({
         room.updatedAt = t;
         if (body.action === 'join') {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining BattleSudoku.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining BattleSudoku.');
           }
 
           let me = findMe() || room.players.find(
-            p => String(p.accountId || '') === String(identity.accountId),
+            (p) => (
+              (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId))
+            ),
           ) || null;
           let issued;
 
@@ -335,7 +380,8 @@ export function createBattleSudokuApi({
             }
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               color: nextColor(room),
@@ -353,10 +399,12 @@ export function createBattleSudokuApi({
           return send(res, 200, { token: issued || token, playerId: me.id, ...view(room, me, t) });
         }
         const me = findMe();
-        if (me?.accountId) {
+        if (me?.accountId || me?.guestId) {
           const identity = requestIdentity || await resolveIdentity(req);
-          if (!identity?.accountId || String(identity.accountId) !== String(me.accountId)) {
-            throw err(403, 'IDENTITY_MISMATCH', 'That BattleSudoku seat belongs to another TNG account.');
+          const sameAccount = me.accountId && String(identity?.accountId || '') === String(me.accountId);
+          const sameGuest = me.guestId && String(identity?.guestId || '') === String(me.guestId);
+          if (!sameAccount && !sameGuest) {
+            throw err(403, 'IDENTITY_MISMATCH', 'That BattleSudoku seat belongs to another player identity.');
           }
         }
         const result = act(room, isHost ? 'host' : me, body, t);

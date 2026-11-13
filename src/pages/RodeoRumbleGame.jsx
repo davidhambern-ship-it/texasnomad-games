@@ -4,37 +4,30 @@ import Header from '@/components/home/Header';
 import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import RRHost from '@/components/brawl/RRHost';
 import RRController from '@/components/brawl/RRController';
-import RRDisplay from '@/components/brawl/RRDisplay';
 import RRPortrait from '@/components/brawl/RRPortrait';
 import { ROSTER } from '@/lib/brawl/fighters';
 import { rrSfx } from '@/components/brawl/rrSfx';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/brawl/rr.css';
 
 // Rodeo Rumble — multiplayer-only TNG platform fighter
 //   /games/rodeo-rumble            join / learn-more landing
-//   /games/rodeo-rumble?host=1     authenticated Host + live fight screen
 //   /games/rodeo-rumble?room=CODE  signed-in phone controller
-//   /games/rodeo-rumble?display=CODE read-only paired Game Display / spectator
 export default function RodeoRumbleGame() {
   const [params, setParams] = useSearchParams();
   const room = (params.get('room') || '').toUpperCase();
-  const display = (params.get('display') || '').toUpperCase();
   const isHost = params.get('host') === '1';
   const [code, setCode] = useState('');
   const [err, setErr] = useState('');
   const identity = useTngGameIdentity();
   const toMenu = () => { setParams({}, { replace: true }); };
 
-  if (/^[A-Z]{5}$/.test(display)) {
-    return <RRDisplay code={display} />;
-  }
-
   if (isHost) {
-    return <RRHost onExit={() => window.location.assign('/host')} />;
+    return <RRHost onExit={() => window.location.assign(getStoredGuestIdentity() ? '/games' : '/host')} />;
   }
 
-  if (/^[A-Z]{5}$/.test(room)) {
+  if (/^TN[A-Z0-9]{4}$/.test(room)) {
     return (
       <RRController
         code={room}
@@ -47,8 +40,8 @@ export default function RodeoRumbleGame() {
 
   const join = () => {
     const c = code.trim().toUpperCase();
-    if (!/^[A-Z]{5}$/.test(c)) {
-      setErr('Room codes are 5 letters — check the Host screen.');
+    if (!/^TN[A-Z0-9]{4}$/.test(c)) {
+      setErr('Room codes use TN followed by 4 letters or numbers.');
       return;
     }
     rrSfx.unlock();
@@ -76,10 +69,10 @@ export default function RodeoRumbleGame() {
                 className="rr-input"
                 style={{ maxWidth: 220 }}
                 value={code}
-                maxLength={5}
+                maxLength={6}
                 placeholder="CODE"
                 onChange={(event) => {
-                  setCode(event.target.value.toUpperCase().replace(/[^A-Z]/g, ''));
+                  setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''));
                   setErr('');
                 }}
                 onKeyDown={(event) => event.key === 'Enter' && join()}
@@ -94,10 +87,10 @@ export default function RodeoRumbleGame() {
             <button
               type="button"
               className="rr-mode"
-              onClick={() => window.location.assign('/host?game=rodeo-rumble')}
+              onClick={() => window.location.assign('/room?game=rodeo-rumble')}
             >
-              <b>Host a rumble</b>
-              <span>Launch from the TNG Host Controller, then 2–8 signed-in players join on their phones. Every phone becomes a controller.</span>
+              <b>Create Room</b>
+              <span>Launch a live room, then 2–8 players join on their phones with a guest name or TNG account.</span>
             </button>
           </div>
         </div>

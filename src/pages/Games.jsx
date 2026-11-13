@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/home/Header';
 import SpadesCabinetImage from '@/components/games/SpadesCabinetImage';
+import NCCard from '@/components/nomadCards/NCCard';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
 
 const VIRAL_CABINET_IMAGE = '/VIRAL_Cabinet_Image.png';
 
@@ -196,13 +198,7 @@ function ArcadeCabinet({ game, featured = false, onCreateRoom, onJoinRoom, creat
               textShadow: `0 0 8px ${glowColor}`,
             }}
           >
-            {game.launchLabel
-              ? game.launchLabel
-              : game.standalone
-                ? '🚀 LAUNCH GAME'
-                : creating === game.id
-                  ? '⚙ CREATING…'
-                  : '⚡ CREATE ROOM'}
+            Create Room
           </button>
 
           {(!game.standalone || game.supportsDirectJoin) && (
@@ -521,17 +517,19 @@ const GAMES = [
     featured: false,
   },
   {
-    id: 'uno',
-    title: 'UNO',
-    tagline: 'Match · Reverse · Draw · Shout UNO',
-    color: '#ef4444',
-    color2: '#facc15',
-    marqueeText: 'MATCH THE COLOR • MATCH THE NUMBER • HIT THEM WITH ACTION CARDS • GET TO ONE',
-    screenText: 'UNO',
-    constructionIcon: '🟥',
-    description: 'The fast card-shedding game where you match by color or number, use action cards to flip the momentum, and try to empty your hand before everybody else.',
-    tags: ['Card Game', 'Party', 'Fast Play'],
-    path: '/games/uno',
+    id: 'out',
+    title: 'OUT!',
+    tagline: 'Last Card. Loud Call.',
+    color: '#f2c14e',
+    color2: '#3ef08a',
+    marqueeText: 'MATCH • SKIP • REVERSE • DRAW • CALL OUT!',
+    screenComponent: <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: '100%', background: 'radial-gradient(ellipse, #17543a, #0d1f17)' }}>{['r','y','w','g','b'].map((c,i) => <NCCard key={c} card={{c,v: ['7','skip','w4','rev','d2'][i]}} w={55} style={{transform: `rotate(${(i-2)*12}deg)`}} />)}</div>,
+    description: 'Race to empty your hand. Match colors or numbers, skip rivals, reverse play, and make them draw. Call OUT! on your last card. Everyone sees the table and their own private hand — including the host. Play solo or bring up to 10 players, with CPUs to fill seats.',
+    tags: ['2–10 Players', 'Card Game', 'Solo + Party'],
+    path: '/games/out',
+    standalone: true,
+    supportsDirectJoin: true,
+    launchLabel: 'PLAY OUT!',
     featured: false,
   },
   {
@@ -606,7 +604,7 @@ const GAMES = [
   },
 ];
 
-const IN_CONSTRUCTION_IDS = ['uno', 'poker', 'bowling', 'snake', 'phase-10'];
+const IN_CONSTRUCTION_IDS = ['poker', 'bowling', 'snake', 'phase-10'];
 
 const CONSTRUCTION_DETAILS = {
   uno: {
@@ -673,11 +671,9 @@ export default function Games() {
   const audioRef = useRef(null);
   const [constructionGame, setConstructionGame] = useState(null);
 
-  const handleCreateRoom = (gameId) => {
-    // Every multiplayer Host launch goes through the TNG Host Controller first.
-    // Core games create a Neon room there; standalone games are handed off to
-    // their own live service only after the authenticated Host session is ready.
+  const handleCreateRoom = async (gameId) => {
     const hostGameId = gameId === 'txd' ? 'dominoes' : gameId;
+
     const hostableGames = new Set([
       'bff',
       'square-biz',
@@ -690,14 +686,30 @@ export default function Games() {
       'sudoku',
       'rodeo-rumble',
       'dominoes',
+      'out',
     ]);
 
-    if (hostableGames.has(hostGameId)) {
-      navigate(`/host?game=${encodeURIComponent(hostGameId)}`);
+    if (!hostableGames.has(hostGameId)) {
+      console.warn('[TNG Games] No live host route is configured for', gameId);
       return;
     }
 
-    console.warn('[TNG Games] No live host route is configured for', gameId);
+    // Room creation uses a short-lived guest identity, never a player account.
+    // Without this step the shared room controller fails its first API call
+    // with GUEST_REQUIRED and no room code is ever created.
+    if (!getStoredGuestIdentity()) {
+      const enteredName = window.prompt('Choose your host name to create a room:');
+      if (!enteredName || !enteredName.trim()) return;
+
+      try {
+        await createGuestIdentity(enteredName);
+      } catch (identityError) {
+        window.alert(identityError?.message || 'TNG could not start guest play.');
+        return;
+      }
+    }
+
+    navigate(`/room?game=${encodeURIComponent(hostGameId)}`);
   };
 
   const handleJoinRoom = (gameId, code) => {

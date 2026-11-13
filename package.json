@@ -12,22 +12,22 @@
     "preview": "vite preview",
     "start": "node server.mjs",
     "prebuild": "node scripts/restore-viral.mjs && node scripts/write-build-meta.mjs",
+    "sim:out": "node scripts/nomad-cards-sim.mjs",
     "sim:dominoes": "node scripts/domino-sim.mjs",
     "sim:word-wrangler": "node scripts/word-wrangler-sim.mjs",
     "sim:battle-sudoku": "node scripts/battle-sudoku-sim.mjs",
-    "test:games": "npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku && npm run sim:rodeo-rumble",
+    "test:word-search": "node --test server/games/word-search.test.mjs",
+    "test:games": "npm run test:word-search && npm run sim:out && npm run sim:dominoes && npm run sim:word-wrangler && npm run sim:battle-sudoku && npm run sim:rodeo-rumble && npm run test:guest-rooms",
     "ci:verify": "npm run build && npm run lint && npm run typecheck && npm run test:games && npm run test:release",
     "test:release": "node scripts/release-audit.mjs",
     "smoke:production": "node scripts/production-smoke.mjs",
     "start:web": "node scripts/static-web.mjs",
-    "sim:rodeo-rumble": "node scripts/brawl-sim.mjs 40 && SIZE=8 node scripts/brawl-sim.mjs 40"
+    "sim:rodeo-rumble": "node scripts/brawl-sim.mjs 40 && SIZE=8 node scripts/brawl-sim.mjs 40",
+    "test:guest-rooms": "node --test server/guestRoomSupport.test.mjs"
   },
   "dependencies": {
-    "@base44/sdk": "^0.8.57",
-    "@base44/vite-plugin": "^1.0.50",
     "@hello-pangea/dnd": "^17.0.0",
     "@hookform/resolvers": "^4.1.2",
-    "@neondatabase/auth": "^0.5.0-beta",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
     "@radix-ui/react-aspect-ratio": "^1.1.2",
@@ -86,7 +86,8 @@
     "three": "^0.171.0",
     "vaul": "^1.1.2",
     "ws": "^8.18.0",
-    "zod": "^3.24.2"
+    "zod": "4.6.7",
+    "drizzle-orm": "^0.45.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.19.0",
@@ -107,5 +108,10 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5.8.2",
     "vite": "^6.1.0"
+  },
+  "overrides": {
+    "zod": "$zod",
+    "dompurify": "3.4.17",
+    "fast-uri": "3.1.9"
   }
 }

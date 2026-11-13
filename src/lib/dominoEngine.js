@@ -31,7 +31,7 @@ export const roundTo5 = (n) => Math.round(n / 5) * 5;
 
 export function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+  return 'TN' + Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
 }
 
 export function shuffle(arr, rnd = Math.random) {

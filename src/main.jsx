@@ -71,7 +71,7 @@ function showGlobalCrash(kind, errorLike, eventMeta = {}) {
         `${kind}: ${message}`,
         location ? `SOURCE: ${location}` : '',
         stack ? `STACK:\n${stack}` : '',
-        lastAuthRequest ? `LAST NEON AUTH REQUEST: ${lastAuthRequest}` : '',
+        lastAuthRequest ? `LAST TNG AUTH REQUEST: ${lastAuthRequest}` : '',
         `URL: ${window.location.href}`,
       ].filter(Boolean).join('\n\n');
     }

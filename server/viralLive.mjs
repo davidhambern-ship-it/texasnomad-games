@@ -25,7 +25,7 @@ const MAX_FRAME = 16 * 1024;         // VIRAL snapshots are kept under ~4 KB
 const MAX_PEERS = 40;                // 12 seats + watchers
 const MAX_MSGS_PER_10S = 120;        // per connection
 const KEEP_STATE_MS = 6 * 60 * 60 * 1000; // remember the last snapshot of an empty room for 6 hours
-const ROOM_RE = /^viral-[a-z]{4}$/;
+const ROOM_RE = /^viral-tn[a-z0-9]{4}$/;
 const TOPICS = new Set(['state', 'act']);
 
 export function createViralLive({
@@ -37,11 +37,21 @@ export function createViralLive({
   touchRoomCode = async () => {},
   releaseRoomCode = async () => {},
   store = null,
+  createRoomBridge = null,
 } = {}) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: MAX_FRAME });
   const rooms = new Map(); // name → { peers, lastState, lastStateAt, hostId, hostAccountId }
   const lastCheckpoint = new Map();
   const recordedSessions = new Set();
+
+  function attachRoomBridge(name, room) {
+    if (!createRoomBridge || room.bridge) return;
+    room.bridge = createRoomBridge({
+      game: 'viral',
+      roomCode: name.slice(6).toUpperCase(),
+      onEvent: (event) => broadcastLocal(room, event),
+    });
+  }
 
   async function getRoom(name) {
     let r = rooms.get(name);
@@ -58,6 +68,7 @@ export function createViralLive({
       lastStateAt: Number(saved?.lastStateAt || 0),
       hostId: null,
       hostAccountId: saved?.hostAccountId || null,
+      hostGuestId: saved?.hostGuestId || null,
       playerAccounts:
         saved?.playerAccounts && typeof saved.playerAccounts === 'object'
           ? saved.playerAccounts
@@ -66,6 +77,7 @@ export function createViralLive({
       updatedAt: Number(saved?.updatedAt || saved?.lastStateAt || Date.now()),
     };
     rooms.set(name, r);
+    attachRoomBridge(name, r);
     return r;
   }
 
@@ -87,6 +99,7 @@ export function createViralLive({
       lastState: r.lastState || null,
       lastStateAt: Number(r.lastStateAt || 0),
       hostAccountId: r.hostAccountId || null,
+      hostGuestId: r.hostGuestId || null,
       playerAccounts: r.playerAccounts || {},
       gameSerial: Math.max(1, Number(r.gameSerial || 1)),
       updatedAt,
@@ -154,11 +167,22 @@ export function createViralLive({
 
   const peerList = (r) => [...r.peers].map(([id, p]) => {
     const presence = p.presence || {};
-    const { accountId, ...publicPresence } = presence;
+    const { accountId, guestId, ...publicPresence } = presence;
     return { id, presence: publicPresence };
   });
-  const send = (ws, obj) => { if (ws.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
-  const broadcast = (r, obj, exceptId) => { const s = JSON.stringify(obj); for (const [id, p] of r.peers) if (id !== exceptId && p.ws.readyState === 1) { try { p.ws.send(s); } catch { /* closed */ } } };
+  const send = (ws, obj) => { if (ws?.readyState === 1) { try { ws.send(JSON.stringify(obj)); } catch { /* closed */ } } };
+  function broadcastLocal(r, obj, exceptId) {
+    const payload = JSON.stringify(obj);
+    for (const [id, peer] of r.peers) {
+      if (id !== exceptId && peer.ws.readyState === 1) {
+        try { peer.ws.send(payload); } catch { /* closed */ }
+      }
+    }
+  }
+  function broadcast(r, obj, exceptId) {
+    broadcastLocal(r, obj, exceptId);
+    r.bridge?.publish(obj);
+  }
 
   wss.on('connection', async (ws, req, roomName) => {
     const r = await getRoom(roomName);
@@ -205,7 +229,7 @@ export function createViralLive({
             identity = null;
           }
 
-          if (!identity?.accountId || !identity?.publicName) {
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
             me.presence = {};
             send(ws, {
               t: 'msg',
@@ -217,23 +241,23 @@ export function createViralLive({
             return;
           }
 
-          // One signed-in TNG account owns at most one online VIRAL seat.
+          // One identity (account or temporary guest) owns at most one online seat.
           for (const [peerId, peer] of r.peers) {
-            if (
-              peerId !== id &&
-              String(peer.presence?.accountId || '') === String(identity.accountId)
-            ) {
-              peer.presence = {};
-            }
+            const sameIdentity = identity.accountId
+              ? String(peer.presence?.accountId || '') === String(identity.accountId)
+              : String(peer.presence?.guestId || '') === String(identity.guestId);
+            if (peerId !== id && sameIdentity) peer.presence = {};
           }
 
           clean.seat = p.seat;
           clean.name = String(identity.publicName).slice(0, 24);
-          clean.accountId = String(identity.accountId);
+          if (identity.accountId) clean.accountId = String(identity.accountId);
+          if (identity.guestId) clean.guestId = String(identity.guestId);
 
           r.playerAccounts = r.playerAccounts || {};
           r.playerAccounts[clean.seat] = {
-            accountId: clean.accountId,
+            accountId: clean.accountId || null,
+            guestId: clean.guestId || null,
             name: clean.name,
           };
           r.updatedAt = now;
@@ -260,12 +284,16 @@ export function createViralLive({
           }
 
           const accountId = String(verified?.accountId || '');
-          const roomOwnedByAnotherAccount =
-            r.hostAccountId &&
-            accountId &&
-            String(r.hostAccountId) !== accountId;
+          const guestId = String(verified?.guestId || '');
+          const hasHostIdentity = Boolean(accountId || guestId);
+          const roomOwnedByAnotherAccount = Boolean(
+            r.hostAccountId && String(r.hostAccountId) !== accountId,
+          );
+          const roomOwnedByAnotherGuest = Boolean(
+            r.hostGuestId && String(r.hostGuestId) !== guestId,
+          );
 
-          if (!accountId || roomOwnedByAnotherAccount) {
+          if (!hasHostIdentity || roomOwnedByAnotherAccount || roomOwnedByAnotherGuest) {
             // A client may call itself "host", but without a verified active TNG
             // Host Controller it remains an ordinary peer and can never publish
             // authoritative game state.
@@ -275,7 +303,7 @@ export function createViralLive({
               topic: '__tng_host_auth',
               data: {
                 ok: false,
-                code: roomOwnedByAnotherAccount
+                code: (roomOwnedByAnotherAccount || roomOwnedByAnotherGuest)
                   ? 'ROOM_HOST_OWNED'
                   : 'HOST_AUTH_REQUIRED',
               },
@@ -291,7 +319,7 @@ export function createViralLive({
             gameId: 'viral',
             service: 'viral-live',
             kind: 'standalone',
-            joinPath: `/viral/index.html?join=${encodeURIComponent(publicCode)}`,
+            joinPath: `/games/viral?room=${encodeURIComponent(publicCode)}`,
             spectatePath: `/viral/index.html?display=${encodeURIComponent(publicCode)}`,
             hostAccountId: accountId,
             ttlMs: KEEP_STATE_MS,
@@ -311,7 +339,8 @@ export function createViralLive({
           }
 
           clean.role = 'host';
-          r.hostAccountId = accountId;
+          r.hostAccountId = accountId || null;
+          r.hostGuestId = guestId || null;
           r.hostId = id;
           r.updatedAt = now;
           me.presence = clean;
@@ -373,6 +402,7 @@ export function createViralLive({
       broadcast(r, { t: 'peers', joined: [], left: [{ id }], peers: peerList(r) });
       if (!r.peers.size && !r.lastState) {
         rooms.delete(roomName);
+        r.bridge?.close();
         lastCheckpoint.delete(roomName);
         if (store) store.remove(roomName).catch(() => {});
         releaseRoomCode(roomName.slice(6).toUpperCase(), 'viral-live').catch(() => {});
@@ -392,6 +422,7 @@ export function createViralLive({
     for (const [name, r] of rooms) {
       if (!r.peers.size && r.lastStateAt < cutoff) {
         rooms.delete(name);
+        r.bridge?.close();
         lastCheckpoint.delete(name);
         if (store) await store.remove(name).catch(() => {});
         await releaseRoomCode(name.slice(6).toUpperCase(), 'viral-live').catch(() => {});
@@ -435,6 +466,7 @@ export function createViralLive({
             lastStateAt: Number(saved.lastStateAt || 0),
             hostId: null,
             hostAccountId: saved.hostAccountId || null,
+            hostGuestId: saved.hostGuestId || null,
             playerAccounts:
               saved.playerAccounts && typeof saved.playerAccounts === 'object'
                 ? saved.playerAccounts
@@ -443,6 +475,7 @@ export function createViralLive({
             updatedAt: Number(saved.updatedAt || saved.lastStateAt || Date.now()),
           };
           rooms.set(roomName, room);
+          attachRoomBridge(roomName, room);
         }
       }
 

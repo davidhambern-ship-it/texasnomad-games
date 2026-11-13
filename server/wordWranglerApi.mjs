@@ -26,7 +26,7 @@ const DURATIONS = [90, 150, 240];
 const COUNTDOWN_MS = 4000;
 const GRACE_MS = 1500;
 const ROOM_TTL_MS = 2 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const CPU_CREW = [
   { id: 'berna', name: 'Berna' }, { id: 'dexter', name: 'Dexter' }, { id: 'lemonade', name: 'Lemonade' },
   { id: 'carlos', name: 'Carlos' }, { id: 'violet', name: 'Violet' }, { id: 'tank', name: 'Tank' },
@@ -156,27 +156,33 @@ export function createWordWranglerApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = Array.from(
-        { length: 5 },
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
+    for (let i = 0; i < (requested ? 1 : 50); i++) {
+      const c = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
+      const candidate = requested || c;
 
-      if (await roomExists(c)) continue;
+      if (await roomExists(candidate)) continue;
 
       const claimed = await claimRoomCode({
-        code: c,
+        code: candidate,
         gameId: 'word-wrangler',
         service: 'word-wrangler',
         kind: 'standalone',
-        joinPath: '/games/word-wrangler?room=' + encodeURIComponent(c),
-        spectatePath: '/games/word-wrangler?display=' + encodeURIComponent(c),
+        joinPath: '/games/word-wrangler?room=' + encodeURIComponent(candidate),
+        spectatePath: '/games/word-wrangler?display=' + encodeURIComponent(candidate),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
-      if (claimed) return c;
+      if (claimed) return candidate;
     }
     throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
@@ -277,6 +283,40 @@ export function createWordWranglerApi({
     }
   }
 
+  function tick(room, now) {
+    let changed = false;
+
+    if (room.phase === 'countdown' && now >= Number(room.startsAt || 0)) {
+      room.phase = 'playing';
+      changed = true;
+    }
+
+    if (room.phase === 'playing' && now >= Number(room.endsAt || 0)) {
+      room.phase = 'over';
+      changed = true;
+    }
+
+    if (room.phase === 'playing') {
+      const { dict, trie, common } = dictionary();
+      for (const rival of room.players) {
+        if (!rival.isAI || !rival.st || now < Number(rival.nextAt || 0)) continue;
+
+        const pick = E.cpuPickWord(rival.st, trie, rival.level, { common });
+        if (pick?.path) {
+          const result = E.applyWord(rival.st, pick.path, dict);
+          if (result.ok) {
+            rival.st = result.state;
+            rival.last = { w: result.word, p: result.points, at: now };
+          }
+        }
+        rival.nextAt = now + E.cpuDelayMs(rival.level);
+        changed = true;
+      }
+    }
+
+    if (changed) room.updatedAt = now;
+  }
+
   return async function handleWordWranglerApi(req, res) {
     const url = new URL(req.url || '/', 'http://localhost');
     const path = url.pathname.replace(/^\/ww-api/, '') || '/';
@@ -297,18 +337,19 @@ export function createWordWranglerApi({
       }
 
       if (req.method === 'POST' && path === '/rooms') {
-        await readBody(req);
+        const body = await readBody(req);
         const identity = await resolveIdentity(req);
-        if (!identity?.accountId || !identity?.publicName) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting Word Wrangler.');
+        if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting Word Wrangler.');
         }
         const name = clean(identity.publicName, 32);
         if (!name) throw err(400, 'NAME_REQUIRED', 'Your TNG profile needs a public name.');
         if ((await roomCount()) > 2000) throw err(503, 'BUSY', 'Too many rooms right now — try again soon.');
-        const code = await newCode(identity.accountId);
+        const code = await newCode(identity.accountId || null, body?.roomCode);
         const host = {
           id: newId(),
-          accountId: identity.accountId,
+          accountId: identity.accountId || null,
+          guestId: identity.guestId || null,
           name,
           token: newToken(),
           isAI: false,
@@ -325,7 +366,7 @@ export function createWordWranglerApi({
         return send(res, 200, { roomCode: code, token: host.token, playerId: host.id, ...view(room, host, now) });
       }
 
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
@@ -352,12 +393,15 @@ export function createWordWranglerApi({
         let issued;
         if (body.action === 'join') {
           const identity = await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining Word Wrangler.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining Word Wrangler.');
           }
 
           me = me || room.players.find(
-            p => !p.isAI && String(p.accountId || '') === String(identity.accountId),
+            p => !p.isAI && (
+              (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId))
+            ),
           ) || null;
 
           if (!me) {
@@ -372,7 +416,8 @@ export function createWordWranglerApi({
             }
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               isAI: false,

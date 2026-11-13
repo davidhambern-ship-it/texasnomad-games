@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import '@/components/nomadCards/nc.css';
 
 function snapEndCell(a, b, size) {
   if (!a || !b) return b;
@@ -257,9 +258,9 @@ export default function NeonWordSearchBoard({
       ref={boardRef}
       className="inline-block rounded-xl p-2 select-none overscroll-contain"
       style={{
-        background: 'linear-gradient(135deg,#07040d,#0d0620)',
-        border: `2px solid ${myColor}55`,
-        boxShadow: `0 0 26px ${myColor}18, inset 0 0 30px rgba(255,255,255,.02)`,
+        background: 'radial-gradient(ellipse at 50% 45%, #22805a 0%, #17543a 58%, #0f3d2a 100%)',
+        border: '5px solid #5a3418',
+        boxShadow: 'inset 0 0 32px rgba(0,0,0,.45), 0 8px 22px rgba(0,0,0,.35)',
         touchAction: canInteract ? 'none' : 'pan-y',
         userSelect: 'none',
         WebkitUserSelect: 'none',
@@ -312,7 +313,7 @@ export default function NeonWordSearchBoard({
                     ? `2px solid ${myColor}`
                     : found
                       ? `1px solid ${activeColor}aa`
-                      : '1px solid rgba(188,19,254,.16)',
+                      : '1px solid rgba(242,193,78,.18)',
                   boxShadow: previewed
                     ? `0 0 10px ${myColor}80`
                     : found

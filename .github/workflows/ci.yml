@@ -1,0 +1,36 @@
+name: TNG verification
+
+on:
+  push:
+    branches:
+      - migration/off-railway-guest-platform
+  pull_request:
+    branches:
+      - migration/off-railway-guest-platform
+
+concurrency:
+  group: tng-production-verification
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps --no-audit --no-fund
+      - name: Build, lint, typecheck, and game simulations
+        run: npm run ci:verify
+      - name: Certify live production rooms and Word Search
+        if: github.event_name == 'push'
+        run: npm run smoke:production

@@ -4,6 +4,9 @@ import { Link } from 'react-router-dom';
 import { TngApiError, tngApi } from '@/api/tngApi';
 import { resolveTngRoom } from '@/api/roomRegistry';
 import { useAuth } from '@/lib/AuthContext';
+import { createGuestIdentity, getStoredGuestIdentity } from '@/lib/guestIdentity';
+
+const ENGINE_ROOM_GAME_IDS = new Set(['out', 'dominoes', 'see-that', 'word-wrangler', 'sudoku', 'rodeo-rumble', 'viral']);
 
 const GAME_PATHS = {
   bff: '/games/bff',
@@ -11,9 +14,13 @@ const GAME_PATHS = {
   hangman: '/games/hangman',
   spades: '/games/spades',
   'word-search': '/games/word-search',
-  sudoku: '/games/sudoku',
-  'see-that': '/games/see-that',
   viral: '/games/viral',
+  dominoes: '/games/dominoes',
+  'see-that': '/games/see-that',
+  'word-wrangler': '/games/word-wrangler',
+  sudoku: '/games/sudoku',
+  'rodeo-rumble': '/games/rodeo-rumble',
+  out: '/games/out',
 };
 
 async function ensurePlayerDevice(accountId) {
@@ -46,7 +53,7 @@ function validatePlayerJoin(payload, roomCode) {
 
   if (role === 'host_player' || role === 'host' || seatNumber === 1) {
     throw new TngApiError(
-      `This TNG account is already hosting room ${roomCode}. Sign in with a different TNG account to join as a player.`,
+      `This guest name is already hosting room ${roomCode}. Choose a different player name to join.`,
       {
         code: 'HOST_ACCOUNT_CANNOT_JOIN_AS_PLAYER',
         status: 409,
@@ -64,66 +71,6 @@ function gameTitle(gameId) {
     .join(' ');
 }
 
-async function claimSpadesSeat(deviceId, roomCode, joinedPayload) {
-  const existingSeat = Number(joinedPayload?.participant?.seatNumber || 0);
-  if ([2, 3, 4].includes(existingSeat)) return joinedPayload;
-
-  const statePayload = await tngApi.spades.getPlayerState(deviceId, roomCode);
-  const gameState = statePayload?.room?.gameState || {};
-  const players = Array.isArray(gameState.players) ? gameState.players : [];
-
-  const candidates = [2, 3, 4]
-    .map((seatNumber) => {
-      const occupant = players.find((player) => Number(player?.seatNumber) === seatNumber);
-      return {
-        seatNumber,
-        priority: occupant?.playerType === 'cpu' ? 0 : occupant ? 2 : 1,
-      };
-    })
-    .filter((candidate) => candidate.priority < 2)
-    .sort((a, b) => a.priority - b.priority || a.seatNumber - b.seatNumber);
-
-  if (candidates.length === 0) {
-    throw new TngApiError(
-      'This Spades table has no open or CPU-controlled seats available.',
-      {
-        code: 'SPADES_TABLE_FULL',
-        status: 409,
-      },
-    );
-  }
-
-  let lastSeatError = null;
-
-  for (const candidate of candidates) {
-    try {
-      return await tngApi.spades.playerAction(
-        deviceId,
-        roomCode,
-        'sit',
-        { seatNumber: candidate.seatNumber },
-      );
-    } catch (seatError) {
-      if (
-        seatError instanceof TngApiError &&
-        seatError.code === 'SPADES_SEAT_TAKEN'
-      ) {
-        lastSeatError = seatError;
-        continue;
-      }
-      throw seatError;
-    }
-  }
-
-  throw lastSeatError || new TngApiError(
-    'The available Spades seats were claimed before you could join.',
-    {
-      code: 'SPADES_TABLE_FULL',
-      status: 409,
-    },
-  );
-}
-
 export default function JoinRoom() {
   const { user, isAuthenticated, isLoadingAuth } = useAuth();
   const path = window.location.pathname;
@@ -133,6 +80,7 @@ export default function JoinRoom() {
   const [roomInfo, setRoomInfo] = useState(null);
   const [loadingRoom, setLoadingRoom] = useState(true);
   const [joining, setJoining] = useState(false);
+  const [guestName, setGuestName] = useState(() => getStoredGuestIdentity()?.name || '');
 
   useEffect(() => {
     if (roomCode === 'UNKNOWN') {
@@ -149,12 +97,6 @@ export default function JoinRoom() {
       setError(null);
 
       try {
-        if (!isAuthenticated) {
-          const next = encodeURIComponent(`/join/${roomCode}`);
-          window.location.replace(`/login?next=${next}`);
-          return;
-        }
-
         const registeredRoom = await resolveTngRoom(roomCode);
         if (cancelled) return;
 
@@ -164,25 +106,10 @@ export default function JoinRoom() {
           return;
         }
 
-        // Standalone games own their own join/seat screens. The registry gives
-        // us the destination directly, so /join/CODE no longer probes every
-        // game service one by one.
-        if (registeredRoom.kind === 'standalone') {
-          window.location.replace(registeredRoom.joinPath);
-          return;
-        }
-
-        // Core TNG rooms still use the central player/spectator lifecycle.
-        const payload = await tngApi.spectator.getState(roomCode);
-        if (cancelled) return;
-
-        if (!payload?.room?.gameId) {
-          setError(`Room "${roomCode}" could not be loaded.`);
-          setLoadingRoom(false);
-          return;
-        }
-
-        setRoomInfo(payload.room);
+        // Every game uses the same explicit join step. This registers the
+        // guest in the shared room roster before the player enters that game's
+        // own cabinet and game-specific seat flow.
+        setRoomInfo(registeredRoom);
         setLoadingRoom(false);
       } catch (roomError) {
         if (cancelled) return;
@@ -208,18 +135,17 @@ export default function JoinRoom() {
     setError(null);
 
     try {
-      let deviceId = await ensurePlayerDevice(user?.id);
+      const guestIdentity = getStoredGuestIdentity() || await createGuestIdentity(guestName);
+
+      let deviceId = await ensurePlayerDevice(guestIdentity.id || user?.id || 'guest');
       let payload;
 
       try {
         payload = validatePlayerJoin(
-          await tngApi.player.joinRoom(deviceId, roomCode),
+          await tngApi.player.joinRoom(deviceId, roomCode, guestName.trim()),
           roomCode,
         );
 
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
       } catch (joinError) {
         if (
           joinError instanceof TngApiError &&
@@ -228,24 +154,27 @@ export default function JoinRoom() {
           localStorage.removeItem('tng_player_device_id');
           deviceId = await ensurePlayerDevice(user?.id);
           payload = validatePlayerJoin(
-            await tngApi.player.joinRoom(deviceId, roomCode),
+            await tngApi.player.joinRoom(deviceId, roomCode, guestName.trim()),
             roomCode,
           );
 
-        if (payload.room?.gameId === 'spades') {
-          payload = await claimSpadesSeat(deviceId, roomCode, payload);
-        }
         } else {
           throw joinError;
         }
       }
 
-      const gamePath = GAME_PATHS[payload?.room?.gameId || roomInfo.gameId];
+      const gameId = payload?.room?.gameId || roomInfo.gameId;
+      const gamePath = roomInfo.joinPath || GAME_PATHS[gameId];
       if (!gamePath) {
         throw new Error(`Unknown game type for room "${roomCode}".`);
       }
 
-      window.location.replace(`${gamePath}?room=${roomCode}&neon=1`);
+      const cabinetPath = gamePath.includes('?')
+        ? gamePath
+        : `${gamePath}?room=${roomCode}`;
+      window.location.replace(
+        `/room/join/${roomCode}?game=${encodeURIComponent(gameId)}&next=${encodeURIComponent(cabinetPath)}`,
+      );
     } catch (joinError) {
       setError(
         joinError?.message ||
@@ -255,9 +184,18 @@ export default function JoinRoom() {
     }
   }
 
-  function spectate() {
+  async function spectate() {
     if (!roomInfo) return;
-    window.location.replace(`/spectate/${roomCode}`);
+    try {
+      if (!getStoredGuestIdentity()) await createGuestIdentity(guestName);
+      window.location.replace(
+        (roomInfo.kind === 'standalone' || ENGINE_ROOM_GAME_IDS.has(roomInfo.gameId))
+          ? (roomInfo.spectatePath || roomInfo.joinPath)
+          : (roomInfo.spectatePath || `/spectate/${roomCode}`),
+      );
+    } catch (spectateError) {
+      setError(spectateError?.message || 'Choose a player name to spectate.');
+    }
   }
 
   return (
@@ -296,11 +234,28 @@ export default function JoinRoom() {
             Join takes a player seat. Spectate opens a read-only live view and does not take a seat or let you make game moves.
           </p>
 
+          {(
+            <label className="mt-6 block text-left text-xs font-semibold uppercase tracking-widest text-white/60">
+              Your player name
+              <input
+                value={guestName}
+                onChange={(event) => setGuestName(event.target.value)}
+                maxLength={32}
+                autoComplete="nickname"
+                placeholder="Enter a name"
+                className="mt-2 w-full rounded-xl border border-white/15 bg-black/40 px-4 py-3 text-base text-white outline-none focus:border-[#BC13FE]"
+              />
+              <span className="mt-2 block text-[11px] font-normal normal-case tracking-normal text-white/40">
+                Guest sessions expire automatically. No account is created.
+              </span>
+            </label>
+          )}
+
           <div className="mt-7 grid gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={joinGame}
-              disabled={joining}
+              disabled={joining || guestName.trim().length < 2}
               className="rounded-xl border-2 border-[#BC13FE] bg-[#BC13FE]/15 px-5 py-4 font-heading text-lg tracking-wider text-[#BC13FE] transition hover:bg-[#BC13FE]/25 disabled:opacity-40"
             >
               {joining ? 'JOINING…' : 'JOIN GAME'}
@@ -309,7 +264,7 @@ export default function JoinRoom() {
             <button
               type="button"
               onClick={spectate}
-              disabled={joining}
+              disabled={joining || guestName.trim().length < 2}
               className="rounded-xl border-2 border-[#FFD700] bg-[#FFD700]/10 px-5 py-4 font-heading text-lg tracking-wider text-[#FFD700] transition hover:bg-[#FFD700]/20 disabled:opacity-40"
             >
               SPECTATE

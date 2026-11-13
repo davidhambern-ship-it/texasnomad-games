@@ -6,7 +6,6 @@ import { tngApi } from '@/api/tngApi';
 import {
   SquareBizBoard,
   SquareBizCueCard,
-  SquareBizIntro,
   SquareBizShowStyles,
 } from '@/components/square-biz/SquareBizShow';
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
@@ -20,7 +19,6 @@ const O_COLOR = '#25b9ff';
 function statusFor(gameState) {
   const phase = gameState.phase || 'lobby';
   if (phase === 'lobby') return 'WAITING FOR HOST';
-  if (phase === 'intro') return 'SHOW OPEN';
   if (phase === 'board') return gameState.canSelectSquare ? 'PICK A SQUARE' : `PLAYER ${gameState.currentMark} TURN`;
   if (phase === 'question_read') return gameState.canAnswer ? 'READ THE QUESTION' : 'QUESTION LIVE';
   if (phase === 'answering') return gameState.canAnswer ? 'CHOOSE YOUR ANSWER' : 'ANSWERING';
@@ -225,10 +223,6 @@ export default function NeonSquareBizPlayer({ roomCode }) {
                 </div>
               )}
             </div>
-          )}
-
-          {phase === 'intro' && (
-            <SquareBizIntro gameState={gameState} now={clock} playAudio />
           )}
         </main>
 

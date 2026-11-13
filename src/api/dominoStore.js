@@ -1,4 +1,5 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 
 const DOMINO_API_BASE = tngServiceUrl('/domino-api');
@@ -36,6 +37,10 @@ async function request(path = '', {
 
   const authToken = await getNeonAuthToken().catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  else {
+    const guest = getStoredGuestIdentity();
+    if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
+  }
 
   if (host) {
     const deviceId = readLocal('tng_device_id');

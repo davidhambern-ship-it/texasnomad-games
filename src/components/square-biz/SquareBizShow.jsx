@@ -102,6 +102,7 @@ export function SquareBizBoard({
   gameState = {},
   onSquareClick,
   interactive = false,
+  pointerActivate = false,
   compact = false,
   hostLabel = 'HOST',
 }) {
@@ -185,13 +186,24 @@ export function SquareBizBoard({
           <div className="absolute -inset-[4%] rounded-[28px] border border-[#ff781f]/35 opacity-60" />
           <div className="relative grid h-full w-full grid-cols-3 grid-rows-3 gap-[2.8%]">
             {board.map((mark, index) => {
-              const canClick = interactive && gameState.canSelectSquare && !mark;
+              const canClick = interactive && !mark;
               return (
                 <button
                   type="button"
                   key={index}
                   disabled={!canClick}
-                  onClick={() => canClick && onSquareClick?.(index)}
+                  onClick={pointerActivate ? undefined : () => canClick && onSquareClick?.(index)}
+                  onPointerDown={pointerActivate ? (event) => {
+                    if (!canClick) return;
+                    event.preventDefault();
+                    onSquareClick?.(index);
+                  } : undefined}
+                  onKeyDown={pointerActivate ? (event) => {
+                    if (canClick && (event.key === 'Enter' || event.key === ' ')) {
+                      event.preventDefault();
+                      onSquareClick?.(index);
+                    }
+                  } : undefined}
                   className={`group relative overflow-hidden rounded-[18%] border-[clamp(2px,.35vw,5px)] transition-all disabled:cursor-default ${canClick ? 'sb-open-square cursor-pointer hover:scale-[1.035]' : ''}`}
                   style={{
                     borderColor: mark === 'X' ? `${X_COLOR}cc` : mark === 'O' ? `${O_COLOR}cc` : '#ff781f',
@@ -288,7 +300,7 @@ function AnswerButton({ letter, text, disabled, selected, correct, wrong, onClic
   );
 }
 
-export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), busy = false }) {
+export function SquareBizCueCard({ gameState = {}, viewerMark = gameState.myMark, onAnswer, now = Date.now(), busy = false }) {
   const phase = gameState.phase;
   const question = gameState.currentQuestion;
   if (!question || !['question_read', 'answering', 'result'].includes(phase)) return null;
@@ -351,7 +363,7 @@ export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), b
                     key={letter}
                     letter={letter}
                     text={text}
-                    disabled={busy || result || gameState.canAnswer !== true}
+                    disabled={busy || result || !viewerMark || viewerMark !== gameState.currentMark || !['question_read', 'answering'].includes(phase)}
                     selected={!result && selected}
                     correct={correct}
                     wrong={wrong}
@@ -383,230 +395,6 @@ export function SquareBizCueCard({ gameState = {}, onAnswer, now = Date.now(), b
   );
 }
 
-const INTRO_SLIDES = [
-  {
-    kicker: 'WELCOME TO',
-    title: 'SQUARE BIZ!',
-    body: 'BE A CONTESTANT OR BE A SQUARE!',
-    accent: ORANGE,
-    art: 'logo',
-  },
-  {
-    kicker: 'HERE’S THE BIZ',
-    title: 'PICK. ANSWER. CLAIM.',
-    body: 'Choose an open square. Get the question right and your piece owns it. Miss it? The square stays open.',
-    accent: PURPLE,
-    art: 'rules',
-  },
-  {
-    kicker: 'THAT’S IT!',
-    title: 'THREE IN A ROW.',
-    body: 'Right answers build your line. First Player X or Player O to connect three squares takes the round.',
-    accent: X_COLOR,
-    art: 'win',
-  },
-];
-
-function IntroArt({ type }) {
-  if (type === 'rules') {
-    return (
-      <div className="grid w-full max-w-[470px] grid-cols-3 items-center gap-3">
-        <div className="rounded-2xl border-2 border-[#ff781f] p-3 text-center">
-          <div className="text-4xl">☝️</div><div className="mt-2 text-[7px] text-[#ff781f]" style={MONO}>PICK</div>
-        </div>
-        <div className="rounded-2xl border-2 border-[#ffd633] p-3 text-center">
-          <div className="text-4xl">?</div><div className="mt-2 text-[7px] text-[#ffd633]" style={MONO}>ANSWER</div>
-        </div>
-        <div className="rounded-2xl border-2 border-[#4ade80] p-3 text-center">
-          <div className="text-4xl">💥</div><div className="mt-2 text-[7px] text-[#4ade80]" style={MONO}>CLAIM</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (type === 'win') {
-    return (
-      <div className="relative w-[220px] sm:w-[250px]">
-        <div className="relative grid aspect-square w-full grid-cols-3 gap-2">
-          {[0,1,2,3,4,5,6,7,8].map((i) => (
-            <div
-              key={i}
-              className="relative aspect-square rounded-lg border-2 border-[#ff781f]/65 bg-[#ff781f]/5"
-            >
-              {[0,4,8].includes(i) && (
-                <PieceArt mark="X" className="absolute inset-[12%] h-auto w-auto" />
-              )}
-            </div>
-          ))}
-
-          <svg
-            className="pointer-events-none absolute inset-0 h-full w-full"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            <line
-              x1="16"
-              y1="16"
-              x2="84"
-              y2="84"
-              stroke="#ff1593"
-              strokeWidth="4"
-              strokeLinecap="round"
-              style={{ filter: 'drop-shadow(0 0 8px #ff1593)' }}
-            />
-          </svg>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="relative h-[170px] w-[300px]">
-      <PieceArt mark="X" className="absolute left-0 top-4 h-36 w-36 -rotate-6 opacity-90" />
-      <PieceArt mark="O" className="absolute right-0 top-2 h-40 w-40 rotate-6 opacity-90" />
-      <div className="absolute inset-x-0 bottom-0 text-center text-5xl">♛</div>
-    </div>
-  );
-}
-
-export function SquareBizIntro({
-  gameState = {},
-  now = Date.now(),
-  audioSrc = '/assets/square-biz/Square%20Biz!.mp3',
-  playAudio = false,
-}) {
-  const audioRef = useRef(null);
-  const audioOwnerRef = useRef(`sb-audio-${Math.random().toString(36).slice(2)}-${Date.now()}`);
-  const [audioSuppressed, setAudioSuppressed] = useState(false);
-  const start = Number(gameState.introStartedAt || now);
-  const end = Number(gameState.introEndsAt || start + 30_800);
-  const duration = Math.max(1, end - start);
-  const elapsed = Math.max(0, now - start);
-  const ratio = Math.min(0.999, elapsed / duration);
-  const index = ratio < .34 ? 0 : ratio < .67 ? 1 : 2;
-  const slide = INTRO_SLIDES[index];
-
-  useEffect(() => {
-    const audio = audioRef.current;
-    if (!audio || !playAudio) return undefined;
-
-    let cancelled = false;
-    const owner = audioOwnerRef.current;
-    const lockKey = 'tng_square_biz_intro_audio_lock';
-    const targetTime = Math.max(0, elapsed / 1000);
-    const lockExpiry = Math.max(Date.now() + 5_000, end + 3_000);
-
-    const claimAudio = () => {
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        const sameIntro = Number(current?.start || 0) === start;
-        const lockAlive = Number(current?.expiresAt || 0) > Date.now();
-
-        if (current?.owner && current.owner !== owner && sameIntro && lockAlive) {
-          setAudioSuppressed(true);
-          return false;
-        }
-
-        localStorage.setItem(lockKey, JSON.stringify({
-          owner,
-          start,
-          expiresAt: lockExpiry,
-        }));
-        setAudioSuppressed(false);
-        return true;
-      } catch {
-        setAudioSuppressed(false);
-        return true;
-      }
-    };
-
-    const releaseAudio = () => {
-      try {
-        const raw = localStorage.getItem(lockKey);
-        const current = raw ? JSON.parse(raw) : null;
-        if (current?.owner === owner) {
-          localStorage.removeItem(lockKey);
-        }
-      } catch {}
-    };
-
-    const begin = async () => {
-      if (cancelled || !claimAudio()) return;
-
-      try {
-        if (Math.abs(audio.currentTime - targetTime) > 1.25) {
-          audio.currentTime = targetTime;
-        }
-        await audio.play();
-      } catch {
-        // No player-facing audio controls. If a browser blocks autoplay,
-        // the next Host-started round will retry from the shared intro event.
-      }
-    };
-
-    if (audio.readyState >= 3) {
-      begin();
-    } else {
-      audio.addEventListener('canplaythrough', begin, { once: true });
-      audio.load();
-    }
-
-    const handleStorage = (event) => {
-      if (event.key !== lockKey || cancelled) return;
-      try {
-        const current = event.newValue ? JSON.parse(event.newValue) : null;
-        if (current?.owner && current.owner !== owner && Number(current.start || 0) === start) {
-          audio.pause();
-          setAudioSuppressed(true);
-        }
-      } catch {}
-    };
-
-    window.addEventListener('storage', handleStorage);
-
-    return () => {
-      cancelled = true;
-      audio.removeEventListener('canplaythrough', begin);
-      window.removeEventListener('storage', handleStorage);
-      audio.pause();
-      releaseAudio();
-    };
-  // This is the known-good post-choppy behavior: one audio owner per browser,
-  // synchronized to the shared intro timestamp.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start, end, playAudio]);
-
-  return (
-    <div className="absolute inset-0 z-50 flex items-center justify-center overflow-hidden bg-[#020104] px-4">
-      <audio ref={audioRef} src={audioSrc} preload="auto" />
-      <div className="absolute inset-0 opacity-45" style={{
-        background:
-          'radial-gradient(circle at 25% 15%, rgba(159,69,255,.28), transparent 26%), radial-gradient(circle at 78% 70%, rgba(255,21,147,.24), transparent 30%), radial-gradient(circle at 50% 55%, rgba(255,120,31,.13), transparent 35%)',
-      }} />
-
-      <div key={index} className="sb-intro-slide relative z-10 flex w-full max-w-[980px] flex-col items-center justify-center text-center">
-        <div className="text-[9px] uppercase tracking-[.35em]" style={{ ...MONO, color: slide.accent }}>{slide.kicker}</div>
-        <div
-          className="mt-3 text-[clamp(3rem,9vw,8rem)] font-black uppercase leading-[.86] text-white"
-          style={{ ...DISPLAY, textShadow: `5px 5px 0 ${slide.accent}, -4px 2px 0 #7323cf` }}
-        >
-          {slide.title}
-        </div>
-        <div className="mt-6">
-          <IntroArt type={slide.art} />
-        </div>
-        <div className="mt-4 max-w-[760px] px-4 text-[clamp(.8rem,1.5vw,1.15rem)] font-bold leading-snug text-white/78">
-          {slide.body}
-        </div>
-      </div>
-
-      <div className="absolute bottom-5 left-1/2 h-1.5 w-[min(560px,74vw)] -translate-x-1/2 overflow-hidden rounded-full bg-white/10">
-        <div className="h-full rounded-full bg-gradient-to-r from-[#9f45ff] via-[#ff1593] to-[#ff781f]" style={{ width: `${Math.max(2, ratio * 100)}%` }} />
-      </div>
-    </div>
-  );
-}
 
 export function SquareBizShowStyles() {
   return (
@@ -630,11 +418,6 @@ export function SquareBizShowStyles() {
         65% { transform: scale(1.16) rotate(2deg); opacity: 1; }
         100% { transform: scale(1) rotate(0); }
       }
-      @keyframes sb-intro {
-        0% { opacity: 0; transform: scale(.82) rotate(-2deg); filter: blur(10px); }
-        18% { opacity: 1; transform: scale(1.03) rotate(0); filter: blur(0); }
-        100% { opacity: 1; transform: scale(1); }
-      }
       @keyframes sb-win {
         0% { stroke-dasharray: 0 160; opacity: .2; }
         100% { stroke-dasharray: 160 0; opacity: 1; }
@@ -648,11 +431,10 @@ export function SquareBizShowStyles() {
       .sb-open-square { animation: sb-board-hit 2.4s ease-in-out infinite; }
       .sb-current-player { animation: sb-player-pulse 1.4s ease-in-out infinite; }
       .sb-result-pop { animation: sb-result 520ms cubic-bezier(.12,.85,.22,1.25) both; }
-      .sb-intro-slide { animation: sb-intro 760ms cubic-bezier(.2,.8,.2,1) both; }
       .sb-win-line { filter: drop-shadow(0 0 6px currentColor); animation: sb-win 650ms ease-out both; }
       .sb-countdown-hot { animation: sb-hot 750ms ease-in-out infinite; }
       @media (prefers-reduced-motion: reduce) {
-        .sb-piece-slam,.sb-open-square,.sb-current-player,.sb-result-pop,.sb-intro-slide,.sb-win-line,.sb-countdown-hot { animation: none !important; }
+        .sb-piece-slam,.sb-open-square,.sb-current-player,.sb-result-pop,.sb-win-line,.sb-countdown-hot { animation: none !important; }
       }
     `}</style>
   );

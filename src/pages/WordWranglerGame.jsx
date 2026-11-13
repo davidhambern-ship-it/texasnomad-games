@@ -7,14 +7,15 @@ import TestFeedbackButton from '@/components/testing/TestFeedbackButton';
 import { loadWordDict } from '@/lib/wordWranglerDict';
 import { SPECIALS } from '@/lib/wordWranglerEngine';
 import { useTngGameIdentity } from '@/hooks/useTngGameIdentity';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import '@/components/wordWrangler/ww.css';
 
 export default function WordWranglerGame() {
   const [params, setParams] = useSearchParams();
   const roomParam = (params.get('room') || '').toUpperCase();
-  const validRoom = /^[A-Z]{5}$/.test(roomParam) ? roomParam : '';
+  const validRoom = /^TN[A-Z0-9]{4}$/.test(roomParam) ? roomParam : '';
   const displayParam = (params.get('display') || '').toUpperCase();
-  const validDisplay = /^[A-Z]{5}$/.test(displayParam) ? displayParam : '';
+  const validDisplay = /^TN[A-Z0-9]{4}$/.test(displayParam) ? displayParam : '';
   const [launchedFromHost] = useState(() => params.get('host') === '1');
   const [screen, setScreen] = useState(validRoom || launchedFromHost ? 'online' : 'menu'); // menu | online
   const [dict, setDict] = useState(null);
@@ -32,7 +33,7 @@ export default function WordWranglerGame() {
 
   const toMenu = () => {
     if (launchedFromHost) {
-      window.location.replace('/host');
+      window.location.replace(getStoredGuestIdentity() ? '/games' : '/host');
       return;
     }
     setScreen('menu');
@@ -80,9 +81,9 @@ export default function WordWranglerGame() {
           {identity.error && <div className="ww-err">{identity.error}</div>}
         </div>
         <div className="ww-modes">
-          <button type="button" className="ww-mode" onClick={() => setScreen('online')}>
+          <button type="button" className="ww-mode" onClick={() => window.location.assign('/room?game=word-wrangler')}>
             <div className="ww-h">Online Race</div>
-            <p>Host a room, share the code, and race friends live on identical boards.</p>
+            <p>Create Room, share the code, and race friends live on identical boards.</p>
             <span className="tag">2–8 players</span>
           </button>
         </div>

@@ -33,7 +33,7 @@ const lastSpots = new Map();
 const MAX_PLAYERS = 12;
 const COUNTDOWN_MS = 4000;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const COLORS = ['#ffd700', '#ff5f1f', '#22d3ee', '#3ef08a', '#ff7ad9', '#a855f7', '#f97316', '#60a5fa', '#facc15', '#f43f5e', '#14b8a6', '#e5e7eb'];
 
 // ── scenes ──────────────────────────────────────────────────────────────────
@@ -170,27 +170,33 @@ export function createSeeThatApi({
     return store ? store.exists(code) : false;
   }
 
-  const newCode = async (hostAccountId) => {
-    for (let i = 0; i < 50; i++) {
-      const c = Array.from(
-        { length: 5 },
+  const newCode = async (hostAccountId, requestedCode = '') => {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) {
+      throw err(400, 'INVALID_ROOM_CODE', 'Shared TNG room codes must use TN followed by four letters or numbers.');
+    }
+    for (let i = 0; i < (requested ? 1 : 50); i++) {
+      const c = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
+      const candidate = requested || c;
 
-      if (await roomExists(c)) continue;
+      if (await roomExists(candidate)) continue;
 
       const claimed = await claimRoomCode({
-        code: c,
+        code: candidate,
         gameId: 'see-that',
         service: 'see-that',
         kind: 'standalone',
-        joinPath: '/games/see-that?room=' + encodeURIComponent(c),
-        spectatePath: '/games/see-that?display=' + encodeURIComponent(c),
+        joinPath: '/games/see-that?room=' + encodeURIComponent(candidate),
+        spectatePath: '/games/see-that?display=' + encodeURIComponent(candidate),
         hostAccountId,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       });
 
-      if (claimed) return c;
+      if (claimed) return candidate;
     }
     throw err(503, 'NO_CODE', 'TNG could not reserve a room code. Try again.');
   };
@@ -334,15 +340,16 @@ export function createSeeThatApi({
       if (req.method === 'GET' && path === '/scenes') return send(res, 200, { scenes: scenes().list });
 
       if (req.method === 'POST' && path === '/rooms') {
+        const body = await readBody(req);
         const hostIdentity = await resolveIdentity(req);
-        if (!hostIdentity?.accountId) {
-          throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before hosting See That.');
+        if ((!hostIdentity?.accountId && !hostIdentity?.guestId) || !hostIdentity?.publicName) {
+          throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before hosting See That.');
         }
         if ((await roomCount()) > 1000) throw err(503, 'BUSY', 'Too many games right now — try again soon.');
         const S = scenes();
-        const code = await newCode(hostIdentity.accountId);
+        const code = await newCode(hostIdentity.accountId || null, body?.roomCode);
         const room = {
-          code, hostToken: newToken(), hostAccountId: hostIdentity.accountId, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
+          code, hostToken: newToken(), hostAccountId: hostIdentity.accountId || null, hostGuestId: hostIdentity.guestId || null, hostName: hostIdentity.publicName || 'Host', phase: 'lobby', roundNo: 0, round: null, history: [], players: [],
           settings: { sceneId: S.list[0]?.id || 'random', count: 10, seconds: 120, rounds: 3, difficulty: 'normal' }, createdAt: now, updatedAt: now,
         };
         try {
@@ -356,7 +363,7 @@ export function createSeeThatApi({
         return send(res, 200, { roomCode: code, token: room.hostToken, ...v });
       }
 
-      const m = path.match(/^\/rooms\/([A-Za-z]{4,6})(\/action)?$/);
+      const m = path.match(/^\/rooms\/([A-Z0-9]{4,8})(\/action)?$/);
       if (!m) return send(res, 404, { error: { code: 'NOT_FOUND', message: 'Not found.' } });
       const code = m[1].toUpperCase();
       const room = await loadRoom(code);
@@ -366,8 +373,8 @@ export function createSeeThatApi({
       if (tokenClaimsHost) {
         const hostIdentity = await resolveIdentity(req);
         isHost = Boolean(
-          hostIdentity?.accountId &&
-          (!room.hostAccountId || String(room.hostAccountId) === String(hostIdentity.accountId))
+          ((hostIdentity?.accountId && String(room.hostAccountId || '') === String(hostIdentity.accountId)) ||
+            (hostIdentity?.guestId && String(room.hostGuestId || '') === String(hostIdentity.guestId)))
         );
       }
       const findMe = () => (token && !tokenClaimsHost ? room.players.find(p => p.token === token) || null : null);
@@ -393,12 +400,15 @@ export function createSeeThatApi({
         room.updatedAt = t;
         if (body.action === 'join') {
           const identity = await resolveIdentity(req);
-          if (!identity?.accountId || !identity?.publicName) {
-            throw err(401, 'AUTH_REQUIRED', 'Sign in to TNG before joining See That.');
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            throw err(401, 'AUTH_REQUIRED', 'Choose a guest name or sign in to TNG before joining See That.');
           }
 
           let me = findMe() || room.players.find(
-            p => String(p.accountId || '') === String(identity.accountId),
+            (p) => (
+              (identity.accountId && String(p.accountId || '') === String(identity.accountId)) ||
+              (identity.guestId && String(p.guestId || '') === String(identity.guestId))
+            ),
           ) || null;
           let issued;
 
@@ -409,7 +419,8 @@ export function createSeeThatApi({
             const used = new Set(room.players.map(p => p.color));
             me = {
               id: newId(),
-              accountId: identity.accountId,
+              accountId: identity.accountId || null,
+              guestId: identity.guestId || null,
               name,
               token: newToken(),
               color: COLORS.find(c => !used.has(c)) || COLORS[room.players.length % COLORS.length],

@@ -23,7 +23,7 @@ export const SHIPS = [
   { id: 'submarine', name: 'Submarine', size: 3 },
   { id: 'destroyer', name: 'Destroyer', size: 2 },
 ];
-export const DEFAULTS = { difficulty: 'normal', setupSec: 20, solveSec: 40, battleSec: 15, revealSec: 7, volleys: 8 };
+export const DEFAULTS = { difficulty: 'normal', setupSec: 60, solveSec: 40, battleSec: 15, revealSec: 7, volleys: 8 };
 export const MAX_SHELLS = 8;
 export const START_SHELLS = 2;
 export const COST = { fire: 1, torpedo: 3, repair: 1, shield: 1 };
@@ -124,10 +124,12 @@ export function finish(g, now, winner, reason) {
 export function act(g, pid, a, now = Date.now()) {
   const P = g.players[pid];
   if (!P) return { ok: false, error: 'Not in this game.' };
+  if (g.pausedAt) return { ok: false, error: 'The host has paused the game.' };
   switch (a.type) {
     case 'shuffle':
       if (g.phase !== 'setup') return { ok: false, error: 'Fleet is locked in.' };
       P.ships = randomFleet(); P.ready = false; return { ok: true };
+    case 'moveShip': return moveShip(g, P, String(a.shipId || ''), Number(a.cell), a.dir === 'v' ? 'v' : 'h');
     case 'ready':
       if (g.phase !== 'setup') return { ok: false };
       P.ready = true; return { ok: true };
@@ -138,6 +140,20 @@ export function act(g, pid, a, now = Date.now()) {
       P.orders = P.orders.filter(o => o.id !== a.orderId); return { ok: true };
     default: return { ok: false, error: 'Unknown action.' };
   }
+}
+
+function moveShip(g, P, shipId, cell, dir) {
+  if (g.phase !== 'setup' || P.ready) return { ok: false, error: 'Fleet placement is locked.' };
+  const ship = P.ships.find(s => s.id === shipId);
+  if (!ship) return { ok: false, error: 'Select a ship first.' };
+  if (!Number.isInteger(cell) || cell < 0 || cell >= 81) return { ok: false, error: 'Choose a valid starting square.' };
+  const row = Math.floor(cell / 9), col = cell % 9;
+  if ((dir === 'h' && col + ship.size > 9) || (dir === 'v' && row + ship.size > 9)) return { ok: false, error: 'That ship would extend beyond the board.' };
+  const cells = Array.from({ length: ship.size }, (_, k) => dir === 'h' ? cell + k : cell + 9 * k);
+  const occupied = new Set(P.ships.filter(s => s.id !== shipId).flatMap(s => s.cells));
+  if (cells.some(c => occupied.has(c))) return { ok: false, error: 'Ships cannot overlap. Choose another position.' };
+  ship.cells = cells; ship.hits = []; P.ready = false;
+  return { ok: true, shipId, cells };
 }
 
 function place(g, P, cell, digit, now) {
@@ -276,6 +292,7 @@ function resolve(g, now) {
 
 // ── clock: advance phases + CPU captains ────────────────────────────────────
 export function tick(g, now = Date.now()) {
+  if (g.pausedAt) return;
   for (let guard = 0; guard < 6; guard++) {
     if (g.phase === 'final') return;
     cpuStep(g, now);
@@ -373,7 +390,7 @@ export function view(g, pid = null, now = Date.now()) {
     sunk: P.ships.filter(s => s.hits.length >= s.size).map(s => ({ id: s.id, name: s.name, cells: s.cells })),
   });
   const out = {
-    phase: g.phase, phaseEndsAt: g.phaseEndsAt, now, volley: g.volley, settings: g.settings, puzzle: g.puzzle,
+    phase: g.phase, phaseEndsAt: g.pausedAt ? now + Math.max(0, Number(g.pausedRemainingMs) || 0) : g.phaseEndsAt, paused: !!g.pausedAt, now, volley: g.volley, settings: g.settings, puzzle: g.puzzle,
     leader: g.leader, winner: g.winner, winReason: g.winReason,
     players: g.order.map(id => pub(g.players[id])), feed: g.feed.slice(-12), reveal: g.reveal,
   };

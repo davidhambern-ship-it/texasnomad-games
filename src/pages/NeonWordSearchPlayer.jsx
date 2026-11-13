@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
@@ -8,6 +8,7 @@ import WordSearchTurnEffects from '@/components/word-search/WordSearchTurnEffect
 import { TngNotificationToaster } from '@/components/social/TngNotificationToaster';
 import { getPublicTngName } from '@/lib/publicTngName';
 import { quitTngGame } from '@/lib/quitTngGame';
+import '@/components/nomadCards/nc.css';
 
 const PS2 = { fontFamily: "'Press Start 2P', monospace" };
 
@@ -23,6 +24,8 @@ export default function NeonWordSearchPlayer({ roomCode }) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [clock, setClock] = useState(Date.now());
+  const refreshInFlightRef = useRef(false);
+  const actionErrorRef = useRef(false);
 
   const deviceId = localStorage.getItem('tng_player_device_id');
   const gameState = room?.gameState || {};
@@ -43,21 +46,24 @@ export default function NeonWordSearchPlayer({ roomCode }) {
     (mode === 'race' || activeSeat === seatNumber);
 
   const refresh = useCallback(async () => {
-    if (!deviceId || !roomCode) return;
+    if (!deviceId || !roomCode || busy || refreshInFlightRef.current) return;
 
+    refreshInFlightRef.current = true;
     try {
       const payload = await tngApi.wordSearch.getPlayerState(deviceId, roomCode);
       setRoom(payload.room || null);
       setParticipant(payload.participant || null);
-      setError('');
+      if (!actionErrorRef.current) setError('');
     } catch (stateError) {
       setError(stateError?.message || 'The Word Search room could not be loaded.');
+    } finally {
+      refreshInFlightRef.current = false;
     }
-  }, [deviceId, roomCode]);
+  }, [busy, deviceId, roomCode]);
 
   useEffect(() => {
     refresh();
-    const interval = window.setInterval(refresh, 800);
+    const interval = window.setInterval(refresh, 1200);
     return () => window.clearInterval(interval);
   }, [refresh]);
 
@@ -70,6 +76,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
     if (!deviceId || !roomCode || busy || !canInteract) return;
 
     setBusy(true);
+    actionErrorRef.current = false;
     setError('');
 
     try {
@@ -82,6 +89,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
       setRoom(payload.room || null);
       setParticipant(payload.participant || null);
     } catch (actionError) {
+      actionErrorRef.current = true;
       setError(actionError?.message || 'That selection could not be submitted.');
     } finally {
       setBusy(false);
@@ -106,7 +114,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
   if (!deviceId) {
     return (
-      <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center text-center px-4">
+      <div className="nc-root flex items-center justify-center px-4 text-center">
         <div>
           <div className="text-red-400 mb-4">Player device not registered.</div>
           <Link to={`/join/${roomCode}`} className="text-[#FFD700] underline">
@@ -119,9 +127,9 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
   if (!room && !error) {
     return (
-      <div className="min-h-screen bg-[#070311] text-white flex items-center justify-center">
+      <div className="nc-root flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin text-[#BC13FE]" />
+          <Loader2 className="mx-auto mb-4 h-10 w-10 animate-spin" style={{ color: "var(--nc-gold)" }} />
           <div className="text-sm text-white/40">Connecting to Word Search room {roomCode}…</div>
         </div>
       </div>
@@ -129,18 +137,18 @@ export default function NeonWordSearchPlayer({ roomCode }) {
   }
 
   return (
-    <div className="min-h-screen lg:h-[100dvh] lg:overflow-hidden bg-[#070311] text-white">
+    <div className="nc-root min-h-screen lg:h-[100dvh] lg:overflow-hidden">
       <TngNotificationToaster />
       <div className="mx-auto flex min-h-screen lg:h-full max-w-[1500px] flex-col gap-2 p-2 lg:min-h-0">
 
-        <header className="shrink-0 rounded-xl border bg-black/60 px-3 py-2.5 flex items-center justify-between gap-3"
+        <header className="nc-panel shrink-0 flex items-center justify-between gap-3"
           style={{ borderColor: `${myColor}55` }}>
           <div className="min-w-0">
             <div className="text-[6px] sm:text-[7px] tracking-widest uppercase" style={{ ...PS2, color: myColor }}>
               TEXASNOMAD WORD SEARCH
             </div>
             <div className="mt-1 flex items-center gap-2 sm:gap-3">
-              <span className="font-mono text-base sm:text-lg tracking-[0.15em] text-[#FFD700]">{roomCode}</span>
+              <span className="font-mono text-base sm:text-lg tracking-[0.15em]" style={{ color: "var(--nc-gold)" }}>{roomCode}</span>
               <span className="text-[11px] text-white/40">Seat {seatNumber || '—'}</span>
               <span className="h-2.5 w-2.5 rounded-full" style={{ background: myColor, boxShadow: `0 0 8px ${myColor}` }} />
             </div>
@@ -165,23 +173,23 @@ export default function NeonWordSearchPlayer({ roomCode }) {
         </header>
 
         {error && (
-          <div className="shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-400 text-center">
+          <div className="nc-err shrink-0 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-center">
             {error}
           </div>
         )}
 
-        <section className="grid grid-cols-3 gap-1.5 lg:hidden">
-          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+        <section className="grid grid-cols-3 gap-2 lg:hidden">
+          <div className="nc-panel p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
-            <div className="mt-1 text-base text-[#FFD700]" style={PS2}>
+            <div className="mt-1 text-base" style={{ ...PS2, color: "var(--nc-gold)" }}>
               {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
             </div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+          <div className="nc-panel rounded-lg p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
-            <div className="mt-1 text-base text-[#4ade80]" style={PS2}>{foundCount}/{words.length || 0}</div>
+            <div className="mt-1 text-base" style={{ ...PS2, color: "#8ee0a9" }} style={PS2}>{foundCount}/{words.length || 0}</div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+          <div className="nc-panel rounded-lg p-2 text-center">
             <div className="text-[5px] text-white/25 uppercase" style={PS2}>YOU</div>
             <div className="mt-1 text-base" style={{ ...PS2, color: myColor }}>{myScore}</div>
           </div>
@@ -196,7 +204,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
 
         <main className="min-h-0 flex-1 grid gap-2 lg:grid-cols-[minmax(0,1.4fr)_minmax(310px,.7fr)]">
 
-          <section className="relative min-h-0 rounded-xl border border-[#BC13FE]/20 bg-black/45 p-1 sm:p-2 flex items-center justify-center overflow-hidden lg:overflow-auto">
+          <section className="nc-panel relative min-h-0 p-1 sm:p-2 flex items-center justify-center overflow-hidden lg:overflow-auto">
             <WordSearchTurnEffects
               mode={mode}
               phase={phase}
@@ -222,31 +230,31 @@ export default function NeonWordSearchPlayer({ roomCode }) {
             ) : (
               <div className="text-center">
                 <div className="text-6xl mb-4">🔍</div>
-                <div className="text-lg text-[#BC13FE]">Waiting for the Host to start Word Search…</div>
+                <div className="text-lg text-[#f2c14e]">Waiting for the Host to start Word Search…</div>
               </div>
             )}
           </section>
 
           <aside className="min-h-0 flex flex-col gap-2">
 
-            <section className="hidden lg:grid shrink-0 grid-cols-3 gap-1.5">
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+            <section className="hidden lg:grid shrink-0 grid-cols-3 gap-2">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>TIME</div>
                 <div className="mt-1 text-xl text-[#FFD700]" style={PS2}>
                   {phase === 'playing' && !paused ? formatTime(timeRemaining) : paused ? 'PAUSE' : '--'}
                 </div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>FOUND</div>
-                <div className="mt-1 text-xl text-[#4ade80]" style={PS2}>{foundCount}/{words.length || 0}</div>
+                <div className="mt-1 text-xl text-[#8ee0a9]" style={PS2}>{foundCount}/{words.length || 0}</div>
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/55 p-2 text-center">
+              <div className="nc-panel rounded-lg p-2 text-center">
                 <div className="text-[5px] text-white/25 uppercase" style={PS2}>YOU</div>
                 <div className="mt-1 text-xl" style={{ ...PS2, color: myColor }}>{myScore}</div>
               </div>
             </section>
 
-            <section className="shrink-0 rounded-xl border border-white/10 bg-black/50 p-2.5">
+            <section className="nc-panel shrink-0 p-2.5">
               <div className="mb-2 flex items-center justify-between">
                 <span className="text-[6px] text-white/25 uppercase tracking-widest" style={PS2}>PLAYERS</span>
                 <span className="text-[6px] text-white/20 uppercase" style={PS2}>
@@ -290,9 +298,9 @@ export default function NeonWordSearchPlayer({ roomCode }) {
               </div>
             </section>
 
-            <section className="min-h-0 flex-1 rounded-xl border border-[#BC13FE]/20 bg-black/55 p-2.5 flex flex-col">
+            <section className="nc-panel min-h-0 flex-1 p-2.5 flex flex-col">
               <div className="mb-2 flex shrink-0 items-center justify-between">
-                <span className="text-[6px] text-[#BC13FE] uppercase tracking-widest" style={PS2}>WORDS</span>
+                <span className="text-[6px] text-[#f2c14e] uppercase tracking-widest" style={PS2}>WORDS</span>
                 <span className="text-[6px] text-[#FFD700]" style={PS2}>{foundCount}/{words.length}</span>
               </div>
 
@@ -326,7 +334,7 @@ export default function NeonWordSearchPlayer({ roomCode }) {
               </div>
             </section>
 
-            <section className="shrink-0 rounded-xl border border-white/10 bg-black/45 p-2.5">
+            <section className="nc-panel shrink-0 p-2.5">
               <div className="text-[5px] text-[#FFD700]/60 uppercase tracking-widest" style={PS2}>SCORING</div>
               <div className="mt-1 text-[10px] leading-relaxed text-white/40">
                 10 pts per letter + placement bonus + difficulty bonus. Wrong selection −20. Turn timeout −10.

@@ -1,4 +1,5 @@
 import { getNeonAuthToken } from '@/lib/neonAuth';
+import { getStoredGuestIdentity } from '@/lib/guestIdentity';
 import { tngServiceUrl } from '@/lib/tngServiceOrigin';
 // Client for BattleSudoku party rooms (server.mjs → server/battleSudokuApi.mjs)
 export const BS_API_BASE = tngServiceUrl('/bs-api');
@@ -13,6 +14,11 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
 
   const authToken = await getNeonAuthToken({ forceRefresh }).catch(() => '');
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
+  // BattleSudoku's live room service validates the shared TNG guest session.
+  // Send it even when a legacy Neon token is also present; the service does
+  // not use that legacy token to resolve a TNG player identity.
+  const guest = getStoredGuestIdentity();
+  if (guest?.token) headers['X-TNG-Guest-Token'] = guest.token;
 
   let res;
   try { res = await fetch(`${BS_API_BASE}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store' }); }
@@ -26,7 +32,7 @@ async function call(path, { method = 'GET', body, token, forceRefresh = false } 
   return data;
 }
 export const bsApi = {
-  createRoom: () => call('/rooms', { method: 'POST', body: {} }),
+  createRoom: (roomCode) => call('/rooms', { method: 'POST', body: { roomCode } }),
   getRoom: (code, token) => call(`/rooms/${encodeURIComponent(code)}`, { token }),
   action: (code, token, action, payload = {}) => call(`/rooms/${encodeURIComponent(code)}/action`, { method: 'POST', token, body: { action, ...payload } }),
 };
@@ -37,6 +43,6 @@ export const bsSeat = {
 };
 export async function resolveBattleSudokuRoom(code) {
   const c = String(code || '').trim().toUpperCase();
-  if (!/^[A-Z]{5}$/.test(c)) return null;
+  if (!/^TN[A-Z0-9]{4}$/.test(c)) return null;
   try { const d = await bsApi.getRoom(c); return d?.room || null; } catch { return null; }
 }

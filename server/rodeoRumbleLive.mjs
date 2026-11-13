@@ -3,7 +3,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 
 const MAX_PLAYERS = 8;
 const ROOM_TTL_MS = 3 * 60 * 60 * 1000;
-const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const FIGHTERS = new Set(['tex', 'bronco', 'dusty', 'sparky', 'danni', 'katarina', 'brittani', 'richard', 'robert']);
 const COLORS = ['#ff5f6d', '#3ec5ff', '#ffd23f', '#3ef08a', '#c77dff', '#ff9f1c', '#f15bb5', '#e5e7eb'];
 
@@ -19,6 +19,8 @@ export function createRodeoRumbleLive({
   claimRoomCode = async () => true,
   touchRoomCode = async () => {},
   releaseRoomCode = async () => {},
+  store = null,
+  createRoomBridge = null,
 } = {}) {
   const rooms = new Map();
   const wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
@@ -34,48 +36,164 @@ export function createRodeoRumbleLive({
     color: player.color,
     online: !!(player.ws && player.ws.readyState === WebSocket.OPEN),
   }));
-  const toPlayers = (room, msg) => {
+  const sendPlayersLocal = (room, msg) => {
     const data = JSON.stringify(msg);
     for (const player of room.players.values()) {
       if (player.ws && player.ws.readyState === WebSocket.OPEN) player.ws.send(data);
     }
   };
-  const toDisplays = (room, msg) => {
+  const sendDisplaysLocal = (room, msg) => {
     const data = JSON.stringify(msg);
     for (const ws of room.displays) {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
     }
   };
+  const sendHost = (room, msg) => {
+    send(room.host, msg);
+    room.bridge?.publish({ kind: 'to-host', message: msg });
+  };
+  const toPlayers = (room, msg) => {
+    sendPlayersLocal(room, msg);
+    room.bridge?.publish({ kind: 'to-players', message: msg });
+  };
+  const toDisplays = (room, msg) => {
+    sendDisplaysLocal(room, msg);
+    room.bridge?.publish({ kind: 'to-displays', message: msg });
+  };
+  function attachRoomBridge(room) {
+    if (!createRoomBridge || room.bridge) return;
+    room.bridge = createRoomBridge({
+      game: 'rodeo-rumble',
+      roomCode: room.code,
+      onEvent: (event) => {
+        if (!event || typeof event !== 'object') return;
+        if (event.kind === 'to-host') {
+          const message = event.message || {};
+          if (message.t === 'pjoin') {
+            const current = room.players.get(String(message.id));
+            if (!current) {
+              room.players.set(String(message.id), {
+                id: String(message.id), name: clean(message.name), fighter: message.fighter || null,
+                ready: Boolean(message.ready), color: message.color || nextColor(room),
+                ws: null, remote: true,
+              });
+            } else {
+              Object.assign(current, { name: clean(message.name), fighter: message.fighter || null, ready: Boolean(message.ready), color: message.color || current.color });
+            }
+          } else if (message.t === 'pleave' && message.gone) {
+            const current = room.players.get(String(message.id));
+            if (current?.remote) room.players.delete(String(message.id));
+          }
+          send(room.host, message);
+        } else if (event.kind === 'to-players') {
+          if (event.message?.t === 'host') room.hostOnline = Boolean(event.message.online);
+          sendPlayersLocal(room, event.message || {});
+        } else if (event.kind === 'to-displays') {
+          sendDisplaysLocal(room, event.message || {});
+        } else if (event.kind === 'kick') {
+          const player = room.players.get(String(event.id || ''));
+          if (player && player.ws) {
+            send(player.ws, { t: 'error', code: 'KICKED', message: 'The host removed you from this rumble.' });
+            try { player.ws.close(); } catch { /* ignore */ }
+            room.players.delete(player.id);
+            room.removedPlayerIds?.add(player.id);
+            room.localPlayerIds?.delete(player.id);
+            persistRoom(room).catch(() => {});
+          }
+        } else if (event.kind === 'room-closed') {
+          const closed = { t: 'error', code: 'CLOSED', message: 'The host ended this rumble.' };
+          sendPlayersLocal(room, closed);
+          sendDisplaysLocal(room, closed);
+          for (const player of room.players.values()) {
+            try { player.ws?.close(); } catch { /* ignore */ }
+          }
+          for (const display of room.displays) {
+            try { display.close(); } catch { /* ignore */ }
+          }
+          room.bridge?.close();
+          rooms.delete(room.code);
+        }
+      },
+    });
+  }
   const touch = (room) => { room.updatedAt = Date.now(); };
+  async function persistRoom(room) {
+    if (!store || !room) return;
+    const saved = await store.load(room.code).catch(() => null);
+    const players = new Map((saved?.players || []).map((player) => [String(player.id), player]));
+    for (const id of room.removedPlayerIds || []) players.delete(String(id));
+    for (const id of room.localPlayerIds || []) {
+      const player = room.players.get(String(id));
+      if (player) {
+        const { ws, remote, ...plain } = player;
+        players.set(String(id), plain);
+      } else {
+        players.delete(String(id));
+      }
+    }
+    const snapshot = {
+      code: room.code, hostToken: room.hostToken, hostAccountId: room.hostAccountId,
+      hostGuestId: room.hostGuestId, hostOnline: Boolean(room.hostOnline),
+      lobby: room.lobby, latestFrame: room.latestFrame, latestResult: room.latestResult,
+      matchSeq: room.matchSeq, recordedSeq: room.recordedSeq,
+      createdAt: room.createdAt, updatedAt: room.updatedAt,
+      players: [...players.values()],
+    };
+    await store.save(room.code, snapshot);
+    room.removedPlayerIds?.clear();
+  }
+  async function loadRoom(code) {
+    const key = String(code || '').toUpperCase();
+    if (rooms.has(key)) return rooms.get(key);
+    if (!store) return null;
+    const saved = await store.load(key).catch(() => null);
+    if (!saved) return null;
+    const room = {
+      ...saved, host: null, hostOnline: Boolean(saved.hostOnline),
+      players: new Map((saved.players || []).map((player) => [String(player.id), { ...player, ws: null, remote: true }])),
+      displays: new Set(), localPlayerIds: new Set(), removedPlayerIds: new Set(),
+    };
+    rooms.set(key, room);
+    attachRoomBridge(room);
+    return room;
+  }
   const nextColor = (room) => {
     const used = new Set([...room.players.values()].map((player) => player.color));
     return COLORS.find((color) => !used.has(color)) || COLORS[room.players.size % COLORS.length];
   };
 
-  async function createRoom(hostIdentity) {
-    for (let attempt = 0; attempt < 50; attempt += 1) {
-      const code = Array.from(
-        { length: 5 },
+  async function createRoom(hostIdentity, requestedCode = '') {
+    const requested = String(requestedCode || '').trim().toUpperCase();
+    if (requested && !/^TN[A-Z0-9]{4}$/.test(requested)) return null;
+    for (let attempt = 0; attempt < (requested ? 1 : 50); attempt += 1) {
+      const code = 'TN' + Array.from(
+        { length: 4 },
         () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)],
       ).join('');
-      if (rooms.has(code)) continue;
+      const candidate = requested || code;
+      if (rooms.has(candidate)) continue;
       const ok = await claimRoomCode({
-        code,
+        code: candidate,
         gameId: 'rodeo-rumble',
         service: 'rodeo-rumble',
         kind: 'standalone',
-        joinPath: `/games/rodeo-rumble?room=${encodeURIComponent(code)}`,
-        spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(code)}`,
-        hostAccountId: hostIdentity.accountId,
+        joinPath: `/games/rodeo-rumble?room=${encodeURIComponent(candidate)}`,
+        spectatePath: `/games/rodeo-rumble?display=${encodeURIComponent(candidate)}`,
+        hostAccountId: hostIdentity.accountId || null,
         ttlMs: ROOM_TTL_MS,
+        allowExisting: Boolean(requested),
       }).catch(() => false);
       if (!ok) continue;
       const room = {
-        code,
+        code: candidate,
         hostToken: newToken(),
-        hostAccountId: String(hostIdentity.accountId),
+        hostAccountId: hostIdentity.accountId ? String(hostIdentity.accountId) : null,
+        hostGuestId: hostIdentity.guestId ? String(hostIdentity.guestId) : null,
         host: null,
+        hostOnline: false,
         players: new Map(),
+        localPlayerIds: new Set(),
+        removedPlayerIds: new Set(),
         displays: new Set(),
         lobby: null,
         latestFrame: null,
@@ -86,6 +204,8 @@ export function createRodeoRumbleLive({
         updatedAt: Date.now(),
       };
       rooms.set(code, room);
+      attachRoomBridge(room);
+      await persistRoom(room).catch(() => {});
       return room;
     }
     return null;
@@ -142,22 +262,24 @@ export function createRodeoRumbleLive({
             token: msg.authToken,
             deviceId: msg.deviceId,
           }).catch(() => null);
-          if (!hostIdentity?.accountId) {
+          if (!hostIdentity?.accountId && !hostIdentity?.guestId) {
             send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Open Rodeo Rumble from the signed-in TNG Host Controller.' });
             ws.close(4000, 'auth required');
             return;
           }
 
           const code = String(msg.code || '').toUpperCase();
-          const savedRoom = code ? rooms.get(code) : null;
+          const savedRoom = code ? await loadRoom(code) : null;
           if (
             savedRoom &&
             savedRoom.hostToken === msg.token &&
-            String(savedRoom.hostAccountId) === String(hostIdentity.accountId)
+            (hostIdentity.accountId
+              ? String(savedRoom.hostAccountId || '') === String(hostIdentity.accountId)
+              : String(savedRoom.hostGuestId || '') === String(hostIdentity.guestId))
           ) {
             room = savedRoom;
           } else {
-            room = await createRoom(hostIdentity);
+            room = await createRoom(hostIdentity, code);
           }
           if (!room) {
             send(ws, { t: 'error', code: 'NO_CODE', message: 'TNG could not reserve a room code. Try again.' });
@@ -169,7 +291,9 @@ export function createRodeoRumbleLive({
           }
           role = 'host';
           room.host = ws;
+          room.hostOnline = true;
           touch(room);
+          await persistRoom(room).catch(() => {});
           send(ws, { t: 'room', code: room.code, token: room.hostToken, players: roster(room) });
           toPlayers(room, { t: 'host', online: true });
           toDisplays(room, { t: 'host', online: true });
@@ -178,31 +302,43 @@ export function createRodeoRumbleLive({
 
         if (msg.t === 'join') {
           const code = String(msg.code || '').toUpperCase();
-          room = rooms.get(code);
+          room = await loadRoom(code);
           if (!room) {
             send(ws, { t: 'error', code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found. Check the code on the Host screen.` });
             ws.close();
             return;
           }
           const identity = await resolvePlayerIdentity({ token: msg.authToken }).catch(() => null);
-          if (!identity?.accountId || !identity?.publicName) {
-            send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Sign in to TNG before joining Rodeo Rumble.' });
+          if ((!identity?.accountId && !identity?.guestId) || !identity?.publicName) {
+            send(ws, { t: 'error', code: 'AUTH_REQUIRED', message: 'Choose a guest name or sign in to TNG before joining Rodeo Rumble.' });
             ws.close(4000, 'auth required');
             return;
           }
 
+          const identityKey = identity.accountId
+            ? `account:${identity.accountId}`
+            : `guest:${identity.guestId}`;
           const seatByToken = msg.token
             ? [...room.players.values()].find((player) => player.token === msg.token)
             : null;
-          const seatByAccount = [...room.players.values()].find(
-            (player) => String(player.accountId || '') === String(identity.accountId),
+          const seatByIdentity = [...room.players.values()].find((player) =>
+            player.identityKey === identityKey ||
+            (identity.accountId && String(player.accountId || '') === String(identity.accountId)) ||
+            (identity.guestId && String(player.guestId || '') === String(identity.guestId)),
           );
-          me = seatByToken || seatByAccount || null;
-          if (me && String(me.accountId || '') !== String(identity.accountId)) {
-            send(ws, { t: 'error', code: 'IDENTITY_MISMATCH', message: 'That Rodeo Rumble seat belongs to another TNG account.' });
+          me = seatByToken || seatByIdentity || null;
+
+          const identityMatchesSeat = !me || (
+            identity.accountId
+              ? String(me.accountId || '') === String(identity.accountId)
+              : String(me.guestId || '') === String(identity.guestId)
+          );
+          if (!identityMatchesSeat) {
+            send(ws, { t: 'error', code: 'IDENTITY_MISMATCH', message: 'That Rodeo Rumble seat belongs to another player identity.' });
             ws.close(4000, 'identity mismatch');
             return;
           }
+
           if (!me) {
             if (room.players.size >= MAX_PLAYERS) {
               send(ws, { t: 'error', code: 'FULL', message: 'This rumble is full (8 players).' });
@@ -212,7 +348,9 @@ export function createRodeoRumbleLive({
             me = {
               id: newId(),
               token: newToken(),
-              accountId: String(identity.accountId),
+              identityKey,
+              accountId: identity.accountId ? String(identity.accountId) : null,
+              guestId: identity.guestId ? String(identity.guestId) : null,
               name: clean(identity.publicName),
               fighter: null,
               ready: false,
@@ -221,6 +359,7 @@ export function createRodeoRumbleLive({
             };
             room.players.set(me.id, me);
           } else {
+            me.identityKey = identityKey;
             me.name = clean(identity.publicName);
             if (!msg.token || msg.token !== me.token) me.token = newToken();
           }
@@ -228,8 +367,12 @@ export function createRodeoRumbleLive({
             try { me.ws.close(4000, 'replaced'); } catch { /* ignore */ }
           }
           me.ws = ws;
+          me.remote = false;
+          room.localPlayerIds.add(me.id);
+          room.removedPlayerIds.delete(me.id);
           role = 'player';
           touch(room);
+          await persistRoom(room).catch(() => {});
           send(ws, {
             t: 'joined',
             id: me.id,
@@ -238,16 +381,16 @@ export function createRodeoRumbleLive({
             name: me.name,
             color: me.color,
             fighter: me.fighter,
-            host: !!room.host,
+            host: Boolean(room.hostOnline || room.host),
             lobby: room.lobby,
           });
-          send(room.host, { t: 'pjoin', id: me.id, name: me.name, fighter: me.fighter, ready: me.ready, color: me.color });
+          sendHost(room, { t: 'pjoin', id: me.id, name: me.name, fighter: me.fighter, ready: me.ready, color: me.color });
           return;
         }
 
         if (msg.t === 'display') {
           const code = String(msg.code || '').toUpperCase();
-          room = rooms.get(code);
+          room = await loadRoom(code);
           if (!room) {
             send(ws, { t: 'error', code: 'ROOM_NOT_FOUND', message: `Room ${code} wasn’t found.` });
             ws.close();
@@ -258,7 +401,7 @@ export function createRodeoRumbleLive({
           send(ws, {
             t: 'displayed',
             code: room.code,
-            host: !!room.host,
+            host: Boolean(room.hostOnline || room.host),
             lobby: room.lobby,
             frame: room.latestFrame,
             result: room.latestResult,
@@ -290,17 +433,22 @@ export function createRodeoRumbleLive({
         if (msg.t === 'pick' && FIGHTERS.has(msg.fighter)) {
           me.fighter = msg.fighter;
           me.ready = false;
-          send(room.host, { t: 'pick', id: me.id, fighter: me.fighter });
+          sendHost(room, { t: 'pick', id: me.id, fighter: me.fighter });
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'ready') {
           me.ready = !!msg.v;
-          send(room.host, { t: 'ready', id: me.id, v: me.ready });
+          sendHost(room, { t: 'ready', id: me.id, v: me.ready });
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'leave') {
           room.players.delete(me.id);
-          send(room.host, { t: 'pleave', id: me.id, gone: true });
+          room.localPlayerIds.delete(me.id);
+          room.removedPlayerIds.add(me.id);
+          await persistRoom(room).catch(() => {});
+          sendHost(room, { t: 'pleave', id: me.id, gone: true });
           ws.close();
         }
         return;
@@ -318,6 +466,7 @@ export function createRodeoRumbleLive({
           }
           toPlayers(room, { t: 'lobby', lobby: room.lobby });
           toDisplays(room, { t: 'lobby', lobby: room.lobby });
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'status') {
@@ -327,6 +476,7 @@ export function createRodeoRumbleLive({
         if (msg.t === 'frame') {
           room.latestFrame = msg.frame || null;
           toDisplays(room, { t: 'frame', frame: room.latestFrame });
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'result') {
@@ -334,12 +484,14 @@ export function createRodeoRumbleLive({
           toPlayers(room, msg);
           toDisplays(room, msg);
           await maybeRecordResult(room, room.latestResult);
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'reset') {
           room.latestFrame = null;
           room.latestResult = null;
           toDisplays(room, { t: 'lobby', lobby: room.lobby });
+          await persistRoom(room).catch(() => {});
           return;
         }
         if (msg.t === 'kick') {
@@ -348,13 +500,19 @@ export function createRodeoRumbleLive({
             send(player.ws, { t: 'error', code: 'KICKED', message: 'The host removed you from this rumble.' });
             try { player.ws?.close(); } catch { /* ignore */ }
             room.players.delete(player.id);
-            send(room.host, { t: 'pleave', id: player.id, gone: true });
+            room.localPlayerIds.delete(player.id);
+            room.removedPlayerIds.add(player.id);
+            await persistRoom(room).catch(() => {});
+            sendHost(room, { t: 'pleave', id: player.id, gone: true });
           }
+          room.bridge?.publish({ kind: 'kick', id: String(msg.id || '') });
           return;
         }
         if (msg.t === 'close') {
           toPlayers(room, { t: 'error', code: 'CLOSED', message: 'The host ended this rumble.' });
           toDisplays(room, { t: 'error', code: 'CLOSED', message: 'The host ended this rumble.' });
+          room.bridge?.publish({ kind: 'room-closed' });
+          room.bridge?.close();
           rooms.delete(room.code);
           releaseRoomCode(room.code, 'rodeo-rumble').catch(() => {});
           ws.close();
@@ -366,12 +524,16 @@ export function createRodeoRumbleLive({
       if (!room) return;
       if (role === 'host' && room.host === ws) {
         room.host = null;
+        room.hostOnline = false;
         toPlayers(room, { t: 'host', online: false });
         toDisplays(room, { t: 'host', online: false });
+        persistRoom(room).catch(() => {});
       }
       if (role === 'player' && me && me.ws === ws) {
         me.ws = null;
-        send(room.host, { t: 'pleave', id: me.id, gone: false });
+        room.localPlayerIds.delete(me.id);
+        persistRoom(room).catch(() => {});
+        sendHost(room, { t: 'pleave', id: me.id, gone: false });
       }
       if (role === 'display') room.displays.delete(ws);
     });
@@ -388,6 +550,7 @@ export function createRodeoRumbleLive({
       const anyone = room.host || [...room.players.values()].some((player) => player.ws) || room.displays.size > 0;
       if (!anyone && now - room.updatedAt > 20 * 60 * 1000) {
         rooms.delete(code);
+        room.bridge?.close();
         releaseRoomCode(code, 'rodeo-rumble').catch(() => {});
         continue;
       }
@@ -419,7 +582,7 @@ export function createRodeoRumbleLive({
       wss.handleUpgrade(request, socket, head, (ws) => wss.emit('connection', ws, request));
       return true;
     },
-    handleHttp(req, res) {
+    async handleHttp(req, res) {
       const url = new URL(req.url || '/', 'http://localhost');
       const json = (status, body) => {
         res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
@@ -428,11 +591,11 @@ export function createRodeoRumbleLive({
       if (url.pathname === '/rr-api/health') return json(200, { ok: true, service: 'rodeo-rumble', ...this.stats() });
       if (url.pathname === '/rr-api/resolve') {
         const code = String(url.searchParams.get('code') || '').toUpperCase();
-        const liveRoom = rooms.get(code);
+        const liveRoom = await loadRoom(code);
         return json(200, {
           live: !!liveRoom,
           roomCode: code,
-          hostPresent: !!(liveRoom?.host),
+          hostPresent: Boolean(liveRoom?.hostOnline || liveRoom?.host),
           players: liveRoom ? liveRoom.players.size : 0,
         });
       }

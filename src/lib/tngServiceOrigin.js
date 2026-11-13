@@ -1,22 +1,29 @@
-const LIVE_TNG_SERVICE_ORIGIN = 'https://auth.texasnomadgames.com';
+const LOCAL_TNG_SERVICE_ORIGIN = 'http://localhost:3000';
 
 function normalizeOrigin(value = '') {
   return String(value || '').trim().replace(/\/+$/, '');
 }
 
-function isRailwayHost() {
+function currentHost() {
+  return typeof window === 'undefined' ? '' : window.location.hostname.toLowerCase();
+}
+
+function isVercelOrTngHost() {
+  const host = currentHost();
   return (
-    typeof window !== 'undefined' &&
-    window.location.hostname.endsWith('.up.railway.app')
+    host.endsWith('.vercel.app') ||
+    host.endsWith('.pages.dev') ||
+    host.endsWith('.workers.dev') ||
+    host === 'texasnomadgames.com' ||
+    host === 'www.texasnomadgames.com'
   );
 }
 
-// Browser traffic uses one TNG service origin. Railway preview/staging can stay
-// same-origin; the public site uses the first-party auth.texasnomadgames.com
-// domain, which is attached to the same TNG server that owns every API/WS route.
+// Production and preview use same-origin API routes. Local development targets
+// the local Node API server; no Railway or Neon service is used.
 export const TNG_SERVICE_ORIGIN =
   normalizeOrigin(import.meta.env.VITE_TNG_SERVICE_ORIGIN) ||
-  (isRailwayHost() ? '' : LIVE_TNG_SERVICE_ORIGIN);
+  (isVercelOrTngHost() ? '' : LOCAL_TNG_SERVICE_ORIGIN);
 
 export function tngServiceUrl(path = '') {
   const suffix = String(path || '').startsWith('/') ? String(path || '') : `/${path}`;
