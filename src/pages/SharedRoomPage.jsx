@@ -725,7 +725,7 @@ export default function SharedRoomPage() {
             )}
 
             {roomState && roomState.status !== 'lobby' && roomState.gameId === 'sudoku' && (
-              <section ref={hostBoardRef} className="nc-panel min-w-0 w-full overflow-hidden p-3" style={{ minHeight: hostBoardHeight }}>
+              <section ref={hostBoardRef} className="nc-panel min-w-0 w-full overflow-visible p-3" style={{ minHeight: hostBoardHeight }}>
                 <div className="mb-3 flex items-center gap-2 border-b border-white/10 pb-3">
                   <span className="h-2 w-2 rounded-full bg-[#BC13FE] animate-pulse" />
                   <span className="text-[7px] uppercase tracking-[0.16em] text-[#BC13FE]" style={PS2}>
