@@ -498,21 +498,26 @@
   inset: auto;
   z-index: 1;
   width: 100%;
-  height: clamp(620px, calc(100dvh - 170px), 900px);
+  height: auto;
   min-height: 620px;
-  max-height: 900px;
+  max-height: none;
   border: 1px solid var(--bs-line);
   border-radius: 14px;
-  overflow: hidden;
+  overflow: visible;
 }
 .bs-shared-host .bs-play-area {
+  flex: 0 0 auto;
   min-height: 0;
   min-width: 0;
+  overflow: visible;
+  grid-auto-rows: min-content;
+  align-items: start;
 }
 .bs-shared-host .bs-host-room {
-  align-self: stretch;
+  align-self: start;
   min-width: 0;
-  overflow-y: auto !important;
+  max-height: none;
+  overflow: visible !important;
 }
 @media (max-width: 760px) {
   .bs-shared-host .bs-phone {
